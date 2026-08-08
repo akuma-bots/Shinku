@@ -1,0 +1,34 @@
+{
+  "entradas": [
+    {
+      "id": "senha",
+      "palavras_chave": ["senha", "esqueci a senha", "resetar senha", "trocar senha", "nao consigo logar", "login"],
+      "resposta": "Para redefinir sua senha, acesse Configurações > Segurança > Redefinir senha e siga o link enviado por e-mail. Se não receber o e-mail em 5 minutos, verifique a caixa de spam.",
+      "escalar_sempre": false
+    },
+    {
+      "id": "pagamento",
+      "palavras_chave": ["pagamento", "cobranca", "cartao recusado", "boleto", "reembolso", "estorno", "compra nao caiu"],
+      "resposta": "Sobre pagamentos: verifique se os dados do cartão estão corretos e se há limite disponível. Reembolsos são processados em até 7 dias úteis após a solicitação ser aprovada.",
+      "escalar_sempre": false
+    },
+    {
+      "id": "conta_banida",
+      "palavras_chave": ["banido", "banida", "suspenso", "conta bloqueada", "fui banido"],
+      "resposta": "Bans e suspensões são analisados caso a caso pela nossa equipe. Vou encaminhar seu ticket para um humano revisar o motivo da sua conta.",
+      "escalar_sempre": true
+    },
+    {
+      "id": "erro_app",
+      "palavras_chave": ["bug", "erro", "travando", "crashando", "nao abre", "tela branca"],
+      "resposta": "Para bugs, tente: 1) fechar e abrir o app novamente, 2) verificar se há atualização disponível, 3) reiniciar o dispositivo. Se o problema continuar, me diga qual dispositivo e versão você está usando.",
+      "escalar_sempre": false
+    },
+    {
+      "id": "cancelamento",
+      "palavras_chave": ["cancelar assinatura", "cancelar plano", "quero cancelar", "encerrar conta"],
+      "resposta": "Para cancelar sua assinatura, acesse Configurações > Assinatura > Cancelar. O acesso permanece ativo até o fim do período já pago.",
+      "escalar_sempre": false
+    }
+  ]
+}
