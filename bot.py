@@ -31,16 +31,11 @@ COGS = [
     "cogs.tickets", "cogs.moderacao", "cogs.automod", "cogs.configuracao",
     "cogs.logs", "cogs.antiraid", "cogs.gerencia", "cogs.autocargo",
     "cogs.contadores", "cogs.eventos", "cogs.parcerias", "cogs.embeds", "cogs.customizacao",
-    "cogs.chat", "cogs.guerras", "cogs.perfil", "cogs.denuncias", "cogs.sorteios", "cogs.roblox",
-    "cogs.aprendizado",
+    "cogs.guerras", "cogs.perfil", "cogs.denuncias", "cogs.sorteios", "cogs.roblox",
+    "cogs.modmail", "cogs.backup",
 ]
 
 # --- "Salvar" os comandos entre reinícios --------------------------------
-# Guarda uma assinatura (hash) do conjunto atual de comandos em disco. Se o
-# bot reiniciar e os comandos forem exatamente os mesmos de antes, pula a
-# sincronização global — isso evita bater no limite de atualizações do
-# Discord quando o bot reinicia com frequência (o que fazia comandos
-# sumirem ou pararem de atualizar depois de cada deploy).
 CAMINHO_CACHE_COMANDOS = Path(__file__).resolve().parent / "data" / "comandos_sincronizados.json"
 
 
@@ -71,8 +66,6 @@ def _salvar_cache_comandos(dados: dict):
 async def on_ready():
     print(f"Bot online como {bot.user}")
 
-    # 1) Sync global — só refaz se o conjunto de comandos realmente mudou
-    #    desde a última vez que o bot rodou (evita limite de taxa do Discord).
     assinatura_atual = _assinatura_comandos()
     cache = _carregar_cache_comandos()
     try:
@@ -85,10 +78,6 @@ async def on_ready():
     except Exception as e:
         print(f"Erro ao sincronizar comandos globalmente: {e}")
 
-    # 2) Sync instantâneo em TODOS os servidores onde o bot já está agora —
-    #    sem precisar de nenhum ID fixo no .env. Isso faz os comandos
-    #    aparecerem na hora em cada servidor, sem esperar a propagação
-    #    global (que pode levar até 1h), toda vez que o bot reinicia.
     for guild in bot.guilds:
         try:
             bot.tree.copy_global_to(guild=guild)
@@ -101,8 +90,7 @@ async def on_ready():
 async def iniciar_servidor_web():
     """Servidor HTTP mínimo — só existe pra plataformas como o Render, que
     precisam de uma porta respondendo pra considerar o app 'saudável' (e pra
-    um serviço tipo UptimeRobot ter algo pra pingar e evitar hibernação). Na
-    Discloud/Bot-Hosting isso não é necessário, mas não atrapalha em nada."""
+    um serviço tipo UptimeRobot ter algo pra pingar e evitar hibernação)."""
     app = web.Application()
 
     async def handle(request):
@@ -129,6 +117,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    if not TOKEN:
-        raise SystemExit("DISCORD_TOKEN não encontrado. Preencha o arquivo .env antes de rodar o bot.")
     asyncio.run(main())
