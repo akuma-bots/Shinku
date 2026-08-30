@@ -11,10 +11,8 @@ PADRAO = {
     "canal_eventos_id": None,        # onde anunciar eventos agendados do Discord
     "canal_parcerias_id": None,      # onde postar as parcerias registradas
     "contadores": [],                # [{ "tipo": "membros", "canal_id": int, "cargo_id": int|None }]
-    "chat_cargo_id": None,           # cargo liberado pra marcar o bot e conversar
-    "chat_canal_id": None,           # (opcional) restringe o chat a um canal específico
     "canal_denuncias_id": None,      # onde as denúncias chegam pra equipe revisar
-    "tema_diario": None,             # tema customizado da pesquisa diária (padrão: novidades do Gakuran)
+    "categoria_modmail_id": None,    # categoria onde os canais de DM/mod mail são criados
 }
 
 
@@ -44,7 +42,6 @@ async def set_config(guild_id: int, **campos) -> dict:
 
 
 async def liberar_canal_para_regra(guild_id: int, regra_id: str, canal_id: int):
-    """Marca um canal como isento de uma regra específica, só para este servidor."""
     dados = await _tudo()
     atual = dados.get(str(guild_id), dict(PADRAO))
     excecoes = atual.setdefault("canais_liberados", {})
@@ -57,7 +54,6 @@ async def liberar_canal_para_regra(guild_id: int, regra_id: str, canal_id: int):
 
 
 async def bloquear_canal_para_regra(guild_id: int, regra_id: str, canal_id: int):
-    """Remove a isenção de um canal para uma regra específica."""
     dados = await _tudo()
     atual = dados.get(str(guild_id), dict(PADRAO))
     excecoes = atual.setdefault("canais_liberados", {})
@@ -75,7 +71,6 @@ async def canal_liberado_para_regra(guild_id: int, regra_id: str, canal_id: int)
 
 
 async def definir_canal_cargo_automatico(guild_id: int, canal_id: int, cargo_id: int):
-    """Define que quem postar no canal `canal_id` recebe o cargo `cargo_id` automaticamente."""
     dados = await _tudo()
     atual = dados.get(str(guild_id), dict(PADRAO))
     mapa = atual.setdefault("canais_cargo_automatico", {})
