@@ -6,7 +6,6 @@ PADRAO = {
     "support_role_id": None,
     "log_channel_id": None,
     "ticket_category_id": None,
-    "canais_liberados": {},          # regra_id -> [channel_id, ...] — exceções por servidor
     "canais_cargo_automatico": {},   # channel_id (str) -> role_id — cargo dado ao postar no canal
     "canal_eventos_id": None,        # onde anunciar eventos agendados do Discord
     "canal_parcerias_id": None,      # onde postar as parcerias registradas
@@ -24,7 +23,6 @@ async def get_config(guild_id: int) -> dict:
     dados = await _tudo()
     config = dados.get(str(guild_id), {})
     resultado = {**PADRAO, **config}
-    resultado["canais_liberados"] = config.get("canais_liberados", {})
     resultado["canais_cargo_automatico"] = config.get("canais_cargo_automatico", {})
     resultado["contadores"] = config.get("contadores", [])
     return resultado
@@ -39,35 +37,6 @@ async def set_config(guild_id: int, **campos) -> dict:
     dados[str(guild_id)] = atual
     await salvar(ARQUIVO, dados)
     return atual
-
-
-async def liberar_canal_para_regra(guild_id: int, regra_id: str, canal_id: int):
-    dados = await _tudo()
-    atual = dados.get(str(guild_id), dict(PADRAO))
-    excecoes = atual.setdefault("canais_liberados", {})
-    lista = excecoes.setdefault(regra_id, [])
-    if canal_id not in lista:
-        lista.append(canal_id)
-    dados[str(guild_id)] = atual
-    await salvar(ARQUIVO, dados)
-    return lista
-
-
-async def bloquear_canal_para_regra(guild_id: int, regra_id: str, canal_id: int):
-    dados = await _tudo()
-    atual = dados.get(str(guild_id), dict(PADRAO))
-    excecoes = atual.setdefault("canais_liberados", {})
-    lista = excecoes.get(regra_id, [])
-    if canal_id in lista:
-        lista.remove(canal_id)
-    dados[str(guild_id)] = atual
-    await salvar(ARQUIVO, dados)
-    return lista
-
-
-async def canal_liberado_para_regra(guild_id: int, regra_id: str, canal_id: int) -> bool:
-    config = await get_config(guild_id)
-    return canal_id in config["canais_liberados"].get(regra_id, [])
 
 
 async def definir_canal_cargo_automatico(guild_id: int, canal_id: int, cargo_id: int):
