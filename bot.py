@@ -1,3 +1,4 @@
+
 import os
 import json
 import hashlib
@@ -28,8 +29,8 @@ intents.presences = True  # necessário pro contador de "membros online"
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 COGS = [
-    "cogs.tickets", "cogs.moderacao", "cogs.automod", "cogs.configuracao",
-    "cogs.logs", "cogs.antiraid", "cogs.gerencia", "cogs.autocargo",
+    "cogs.tickets", "cogs.moderacao", "cogs.configuracao",
+    "cogs.logs", "cogs.antiraid", "cogs.autocargo",
     "cogs.contadores", "cogs.eventos", "cogs.parcerias", "cogs.embeds", "cogs.customizacao",
     "cogs.guerras", "cogs.perfil", "cogs.denuncias", "cogs.sorteios", "cogs.roblox",
     "cogs.modmail", "cogs.backup",
