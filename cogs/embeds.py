@@ -11,16 +11,39 @@ def _cor_para_int(valor: str) -> int:
         return 0x5865F2
 
 
+def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
+    """Monta uma View só com botões de LINK (não precisam de código de resposta,
+    então funcionam pra sempre, mesmo depois do bot reiniciar)."""
+    view = discord.ui.View(timeout=None)
+    tem_botao = False
+    if botao1_texto and botao1_url:
+        view.add_item(discord.ui.Button(label=botao1_texto[:80], url=botao1_url, style=discord.ButtonStyle.link))
+        tem_botao = True
+    if botao2_texto and botao2_url:
+        view.add_item(discord.ui.Button(label=botao2_texto[:80], url=botao2_url, style=discord.ButtonStyle.link))
+        tem_botao = True
+    return view if tem_botao else None
+
+
 class EmbedModal(discord.ui.Modal, title="Criar embed"):
     titulo = discord.ui.TextInput(label="Título", required=False, max_length=256)
-    descricao = discord.ui.TextInput(label="Descrição", style=discord.TextStyle.paragraph, required=False, max_length=4000)
-    cor = discord.ui.TextInput(label="Cor em hex (ex: FF0000)", required=False, max_length=7, placeholder="5865F2")
-    imagem = discord.ui.TextInput(label="URL da imagem (opcional)", required=False)
+    descricao = discord.ui.TextInput(
+        label="Descrição (aceita **negrito**, • listas)",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=4000,
+    )
+    cor = discord.ui.TextInput(label="Cor em hex (ex: FFD700 pra dourado)", required=False, max_length=7, placeholder="5865F2")
+    imagem = discord.ui.TextInput(label="URL da imagem/banner (opcional)", required=False)
     rodape = discord.ui.TextInput(label="Rodapé (opcional)", required=False, max_length=256)
 
-    def __init__(self, canal: discord.TextChannel):
+    def __init__(self, canal: discord.TextChannel, botao1_texto=None, botao1_url=None, botao2_texto=None, botao2_url=None):
         super().__init__()
         self.canal = canal
+        self.botao1_texto = botao1_texto
+        self.botao1_url = botao1_url
+        self.botao2_texto = botao2_texto
+        self.botao2_url = botao2_url
 
     async def on_submit(self, interaction: discord.Interaction):
         embed = discord.Embed(
@@ -33,7 +56,8 @@ class EmbedModal(discord.ui.Modal, title="Criar embed"):
         if self.rodape.value:
             embed.set_footer(text=self.rodape.value)
 
-        await self.canal.send(embed=embed)
+        view = _view_com_botoes(self.botao1_texto, self.botao1_url, self.botao2_texto, self.botao2_url)
+        await self.canal.send(embed=embed, view=view)
         await interaction.response.send_message(f"✅ Embed enviada em {self.canal.mention}.", ephemeral=True)
 
 
@@ -72,18 +96,34 @@ class EditarEmbedModal(discord.ui.Modal, title="Editar embed"):
 
 class Embeds(commands.Cog):
     """Comandos de embed customizada: abre um formulário (título, descrição,
-    cor, imagem, rodapé) e publica no canal escolhido, sem precisar mexer em
-    código ou JSON."""
+    cor, imagem, rodapé) e publica no canal escolhido, com opção de até 2
+    botões de link embaixo — pra deixar painéis com visual profissional."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="criar-embed", description="Abre um formulário pra criar e enviar uma embed customizada.")
-    @app_commands.describe(canal="Canal onde a embed vai ser enviada (padrão: este canal)")
+    @app_commands.command(name="criar-embed", description="Abre um formulário pra criar e enviar uma embed customizada, com botões opcionais.")
+    @app_commands.describe(
+        canal="Canal onde a embed vai ser enviada (padrão: este canal)",
+        botao1_texto="Texto do 1º botão (opcional, ex: '🌐 Nosso site')",
+        botao1_url="Link do 1º botão (obrigatório se usar o texto acima)",
+        botao2_texto="Texto do 2º botão (opcional)",
+        botao2_url="Link do 2º botão (obrigatório se usar o texto acima)",
+    )
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def criar_embed(self, interaction: discord.Interaction, canal: discord.TextChannel = None):
+    async def criar_embed(
+        self,
+        interaction: discord.Interaction,
+        canal: discord.TextChannel = None,
+        botao1_texto: str = None,
+        botao1_url: str = None,
+        botao2_texto: str = None,
+        botao2_url: str = None,
+    ):
         canal_destino = canal or interaction.channel
-        await interaction.response.send_modal(EmbedModal(canal_destino))
+        await interaction.response.send_modal(
+            EmbedModal(canal_destino, botao1_texto, botao1_url, botao2_texto, botao2_url)
+        )
 
     @app_commands.command(name="editar-embed", description="Edita uma embed já enviada pelo bot.")
     @app_commands.describe(canal="Canal onde a mensagem está", id_mensagem="ID da mensagem com a embed")
