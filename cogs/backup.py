@@ -3,7 +3,7 @@ import json
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from utils.storage import carregar
+from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 
 # Todo arquivo de dados guardado por servidor (guild_id como chave) entra no backup.
@@ -61,6 +61,46 @@ class Backup(commands.Cog):
         await interaction.followup.send(
             "📦 Backup gerado. Guarda esse arquivo num lugar seguro — ele tem os dados do servidor, mas nenhum token ou senha.",
             file=arquivo,
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="backup-restaurar", description="Restaura os dados deste servidor a partir de um arquivo de backup (.json).")
+    @app_commands.describe(arquivo="O arquivo .json gerado por /backup-agora ou pelo painel web")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def backup_restaurar(self, interaction: discord.Interaction, arquivo: discord.Attachment):
+        await interaction.response.defer(ephemeral=True)
+
+        if not arquivo.filename.lower().endswith(".json"):
+            await interaction.followup.send("Isso não parece um arquivo de backup — precisa ser um `.json`.", ephemeral=True)
+            return
+
+        try:
+            conteudo_bruto = await arquivo.read()
+            dados = json.loads(conteudo_bruto)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            await interaction.followup.send("Não consegui ler esse arquivo. Confere se é um backup gerado pelo bot ou pelo painel, sem edição manual.", ephemeral=True)
+            return
+
+        if not isinstance(dados, dict):
+            await interaction.followup.send("Formato de arquivo inesperado.", ephemeral=True)
+            return
+
+        restaurados = []
+        for nome_arquivo, dados_guild in dados.items():
+            if nome_arquivo not in ARQUIVOS_COM_DADOS:
+                continue  # ignora qualquer chave que não seja um arquivo de dados reconhecido, por segurança
+            todos = await carregar(nome_arquivo, {})
+            todos[str(interaction.guild.id)] = dados_guild
+            await salvar(nome_arquivo, todos)
+            restaurados.append(nome_arquivo)
+
+        if not restaurados:
+            await interaction.followup.send("O arquivo não tinha nenhum dado reconhecido pra restaurar.", ephemeral=True)
+            return
+
+        await interaction.followup.send(
+            f"✅ Restaurado: {', '.join(restaurados)}.\n"
+            f"⚠️ Isso **sobrescreveu** os dados atuais desses sistemas — qualquer coisa que mudou depois desse backup foi perdida.",
             ephemeral=True,
         )
 
