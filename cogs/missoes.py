@@ -35,6 +35,8 @@ class Missoes(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        if not hasattr(bot, "processadores_revisao"):
+            bot.processadores_revisao = {}
         bot.processadores_revisao["missao"] = self.processar_aprovacao
 
     async def processar_aprovacao(self, guild: discord.Guild, revisao: dict) -> str:
