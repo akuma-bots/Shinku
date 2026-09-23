@@ -30,6 +30,8 @@ class PvE(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        if not hasattr(bot, "processadores_revisao"):
+            bot.processadores_revisao = {}
         bot.processadores_revisao["pve"] = self.processar_aprovacao_pve
 
     async def processar_aprovacao_pve(self, guild: discord.Guild, revisao: dict) -> str:
