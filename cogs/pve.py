@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import pve
+from utils import pve, pontuacao_pve
 from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 from utils.perfis import ARQUIVO_PERFIS, get_perfil, calcular_patente_atual, definir_patente
@@ -26,7 +26,7 @@ class PvE(commands.Cog):
     """PvE por sorteio: o bot sorteia um inimigo aleatório da lista
     configurada pelo servidor, o jogador enfrenta e manda a print do
     resultado, que passa pela revisão manual em Provas-PVE antes de aplicar
-    XP e vitória automaticamente."""
+    XP, pontuação PvE e vitória automaticamente."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -41,8 +41,11 @@ class PvE(commands.Cog):
 
         xp = encontro["inimigo"]["recompensa_xp"]
         resultado = await _adicionar_xp(guild.id, revisao["autor_id"], xp)
+        total_pontos = await pontuacao_pve.adicionar_pontos(guild.id, revisao["autor_id"], xp)
         await pve.marcar_status(guild.id, encontro["id"], "concluido")
-        texto = f"+{xp} XP e +1 vitória para <@{revisao['autor_id']}> (derrotou {encontro['inimigo']['nome']})"
+
+        texto = (f"+{xp} XP, +{xp} pts PvE e +1 vitória para <@{revisao['autor_id']}> "
+                 f"(derrotou {encontro['inimigo']['nome']}) — total PvE: {total_pontos} pts")
 
         nova_patente = await calcular_patente_atual(guild.id, resultado["perfil"]["xp"])
         if nova_patente and nova_patente["nome"] != resultado["patente_antiga"]:
@@ -97,7 +100,7 @@ class PvE(commands.Cog):
             description=f"{interaction.user.mention} está enfrentando um inimigo **{inimigo['dificuldade']}**!",
             color=CORES_DIFICULDADE.get(inimigo["dificuldade"], 0x5865F2),
         )
-        embed.add_field(name="Recompensa", value=f"{inimigo['recompensa_xp']} XP")
+        embed.add_field(name="Recompensa", value=f"{inimigo['recompensa_xp']} XP / pts")
         embed.set_footer(text=f"ID: {encontro['id']} • use /pve-completar pra enviar a prova")
         await canal.send(embed=embed)
 
