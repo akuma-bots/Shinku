@@ -1,5 +1,5 @@
 TEMPLATES_PADRAO = [
-    {"tipo": "pvp", "titulo": "Missão Fácil", "descricao": "Derrote 1 membro de uma gangue rival.", "recompensa_xp": 20},
+    {"tipo": "pvp", "titulo": "Missão Fácil", "descricao": "Derrote um membro de uma gangue rival.", "recompensa_xp": 20},
     {"tipo": "pvp", "titulo": "Missão Média", "descricao": "Derrote um veterano de uma gangue rival.", "recompensa_xp": 40},
     {"tipo": "pvp", "titulo": "Missão Difícil", "descricao": "Derrote um líder de uma gangue rival.", "recompensa_xp": 70},
 ]
