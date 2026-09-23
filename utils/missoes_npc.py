@@ -1,17 +1,15 @@
-import random
-
 TEMPLATES_PADRAO = [
-    {"tipo": "pvp", "titulo": "Duelo Relâmpago", "descricao": "Vença 1 duelo PvP hoje.", "recompensa_xp": 15},
-    {"tipo": "pvp", "titulo": "Sequência de Vitórias", "descricao": "Vença 2 duelos PvP hoje.", "recompensa_xp": 30},
-    {"tipo": "pve", "titulo": "Caçador Iniciante", "descricao": "Derrote 1 inimigo no PvE.", "recompensa_xp": 15},
-    {"tipo": "pve", "titulo": "Exterminador", "descricao": "Derrote 2 inimigos no PvE.", "recompensa_xp": 30},
-    {"tipo": "pve", "titulo": "Caça ao Chefe", "descricao": "Derrote um inimigo difícil no PvE.", "recompensa_xp": 50},
+    {"tipo": "pvp", "titulo": "Missão Fácil", "descricao": "Derrote 1 membro de uma gangue rival.", "recompensa_xp": 20},
+    {"tipo": "pvp", "titulo": "Missão Média", "descricao": "Derrote um veterano de uma gangue rival.", "recompensa_xp": 40},
+    {"tipo": "pvp", "titulo": "Missão Difícil", "descricao": "Derrote um líder de uma gangue rival.", "recompensa_xp": 70},
 ]
 
 
 def sortear(quantidade: int) -> list:
-    """Sorteia `quantidade` templates sem repetir, a menos que peçam mais
-    missões do que existem templates disponíveis."""
+    """Retorna as missões diárias fixas (fácil, média, difícil). Se um dia
+    você adicionar mais opções em TEMPLATES_PADRAO, passa a sortear entre
+    elas normalmente; por enquanto, com só 3 templates, sempre devolve as 3."""
+    import random
     pool = list(TEMPLATES_PADRAO)
     random.shuffle(pool)
     if quantidade <= len(pool):
