@@ -59,6 +59,10 @@ class Missoes(commands.Cog):
                         pass
             texto += f"\n⬆️ Promovido(a) para **{nova_patente['nome']}**"
 
+        recordes_cog = self.bot.get_cog("Recordes")
+        if recordes_cog:
+            await recordes_cog.anunciar_se_recorde(guild, "xp_total", revisao["autor_id"], resultado["perfil"]["xp"])
+
         return texto
 
     # ---------------- Configuração de canais ----------------
