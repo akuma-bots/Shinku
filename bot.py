@@ -1,8 +1,8 @@
-
 import os
 import json
 import hashlib
 import asyncio
+import pkgutil
 from pathlib import Path
 import discord
 from discord.ext import commands
@@ -28,13 +28,19 @@ intents.presences = True  # necessário pro contador de "membros online"
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-COGS = [
-    "cogs.tickets", "cogs.moderacao", "cogs.configuracao",
-    "cogs.logs", "cogs.antiraid", "cogs.autocargo",
-    "cogs.contadores", "cogs.eventos", "cogs.parcerias", "cogs.embeds", "cogs.customizacao",
-    "cogs.guerras", "cogs.perfil", "cogs.denuncias", "cogs.sorteios", "cogs.roblox",
-    "cogs.modmail", "cogs.backup",
-]
+
+def _descobrir_cogs() -> list:
+    """Escaneia a pasta cogs/ e retorna "cogs.nome_do_arquivo" pra cada
+    arquivo .py encontrado — não precisa mais listar os cogs na mão."""
+    pasta_cogs = Path(__file__).resolve().parent / "cogs"
+    nomes = [
+        modulo.name for modulo in pkgutil.iter_modules([str(pasta_cogs)])
+        if not modulo.name.startswith("_")
+    ]
+    return [f"cogs.{nome}" for nome in sorted(nomes)]
+
+
+COGS = _descobrir_cogs()
 
 # --- "Salvar" os comandos entre reinícios --------------------------------
 CAMINHO_CACHE_COMANDOS = Path(__file__).resolve().parent / "data" / "comandos_sincronizados.json"
@@ -109,8 +115,11 @@ async def iniciar_servidor_web():
 async def main():
     async with bot:
         for cog in COGS:
-            await bot.load_extension(cog)
-            print(f"Cog carregado: {cog}")
+            try:
+                await bot.load_extension(cog)
+                print(f"Cog carregado: {cog}")
+            except Exception as e:
+                print(f"⚠️ Falha ao carregar {cog}: {e}")
         await asyncio.gather(
             bot.start(TOKEN),
             iniciar_servidor_web(),
