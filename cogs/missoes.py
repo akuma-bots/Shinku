@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import missoes
+from utils import missoes, pontuacao_pve
 from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 from utils.perfis import ARQUIVO_PERFIS, get_perfil, calcular_patente_atual, definir_patente
@@ -30,8 +30,8 @@ async def _adicionar_xp(guild_id: int, user_id: int, xp_ganho: int) -> dict:
 class Missoes(commands.Cog):
     """Missões PvP e PvE configuráveis pelos líderes. A conclusão passa pelo
     motor de revisão (print + aprovação manual em Provas-PVP/Provas-PVE) — só
-    depois de aprovada é que o XP é somado automaticamente e a patente é
-    reavaliada, igual já acontece em guerras.py."""
+    depois de aprovada é que o XP é somado automaticamente (e, se for missão
+    PvE, também soma pontuação PvE separada) e a patente é reavaliada."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -46,6 +46,10 @@ class Missoes(commands.Cog):
 
         resultado = await _adicionar_xp(guild.id, revisao["autor_id"], missao["recompensa_xp"])
         texto = f"+{missao['recompensa_xp']} XP para <@{revisao['autor_id']}>"
+
+        if missao["tipo"] == "pve":
+            total_pontos = await pontuacao_pve.adicionar_pontos(guild.id, revisao["autor_id"], missao["recompensa_xp"])
+            texto += f"\n+{missao['recompensa_xp']} pts PvE (total: {total_pontos} pts)"
 
         nova_patente = await calcular_patente_atual(guild.id, resultado["perfil"]["xp"])
         if nova_patente and nova_patente["nome"] != resultado["patente_antiga"]:
@@ -88,7 +92,7 @@ class Missoes(commands.Cog):
     # ---------------- Missões ----------------
     @app_commands.command(name="missao-criar", description="Cria uma nova missão PvP ou PvE.")
     @app_commands.describe(tipo="PvP ou PvE", titulo="Título curto da missão",
-                            descricao="O que o jogador precisa fazer", recompensa_xp="XP dado ao concluir")
+                            descricao="O que o jogador precisa fazer", recompensa_xp="XP (e pontos, se for PvE) dado ao concluir")
     @app_commands.choices(tipo=TIPO_CHOICES)
     @app_commands.checks.has_permissions(administrator=True)
     async def missao_criar(self, interaction: discord.Interaction, tipo: app_commands.Choice[str],
@@ -102,7 +106,7 @@ class Missoes(commands.Cog):
 
         embed = discord.Embed(title=f"🎯 Nova missão ({tipo.name})", description=titulo, color=0xFEE75C)
         embed.add_field(name="Objetivo", value=descricao, inline=False)
-        embed.add_field(name="Recompensa", value=f"{recompensa_xp} XP", inline=True)
+        embed.add_field(name="Recompensa", value=f"{recompensa_xp} XP" + (" / pts PvE" if tipo.value == "pve" else ""), inline=True)
         embed.set_footer(text=f"ID: {missao['id']} • use /missao-completar pra enviar a prova")
         await canal.send(embed=embed)
 
