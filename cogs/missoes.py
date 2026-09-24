@@ -3,9 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import missoes, pontuacao_pve
-from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
-from utils.perfis import ARQUIVO_PERFIS, get_perfil, calcular_patente_atual, definir_patente
+from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 TIPO_CHOICES = [
     app_commands.Choice(name="PvP", value="pvp"),
@@ -14,16 +13,13 @@ TIPO_CHOICES = [
 
 
 async def _adicionar_xp(guild_id: int, user_id: int, xp_ganho: int) -> dict:
-    """Soma XP ao perfil do jogador. Fica aqui (em vez de mexer em
-    utils/perfis.py) pra não duplicar/conflitar com a lógica já existente —
-    usa o mesmo formato de dados que perfil.py já lê."""
-    await get_perfil(guild_id, user_id)  # garante que o perfil já existe com os campos padrão
-    todos = await carregar(ARQUIVO_PERFIS, {})
-    perfis_guild = todos.setdefault(str(guild_id), {})
-    perfil = perfis_guild[str(user_id)]
-    patente_antiga = perfil.get("patente")
-    perfil["xp"] = perfil.get("xp", 0) + xp_ganho
-    await salvar(ARQUIVO_PERFIS, todos)
+    """Soma XP ao perfil do jogador, usando o mesmo caminho de leitura/escrita
+    que utils/perfis.py já usa internamente (get_perfil + _salvar_perfil) —
+    evita duplicar a lógica de criação de perfil padrão."""
+    perfil = await get_perfil(guild_id, user_id)
+    patente_antiga = perfil["patente"]
+    perfil["xp"] += xp_ganho
+    await _salvar_perfil(guild_id, user_id, perfil)
     return {"perfil": perfil, "patente_antiga": patente_antiga}
 
 
