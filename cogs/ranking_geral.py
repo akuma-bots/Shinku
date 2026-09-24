@@ -62,9 +62,9 @@ class RankingGeral(commands.Cog):
         top = sorted(pontuados, key=lambda item: item[1], reverse=True)[:10]
 
         cabecalho = (
-            f"╔══════════════════════════════════════╗\n"
+            f"╔═════════════════════════════════╗\n"
             f"║        {guild.name} | {_negrito('TOP 10')}        ║\n"
-            f"╚══════════════════════════════════════╝\n\n"
+            f"╚═════════════════════════════════╝\n\n"
             f"「 {_negrito('RANKING COMPETITIVO')} 」\n\n"
         )
 
