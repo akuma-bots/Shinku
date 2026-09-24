@@ -3,9 +3,8 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import desafios
-from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
-from utils.perfis import ARQUIVO_PERFIS, get_perfil, calcular_patente_atual, definir_patente
+from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 XP_VITORIA_PVP = 50  # ajuste esse valor como preferir
 
@@ -20,22 +19,18 @@ def _view_desafio(desafio_id: str) -> discord.ui.View:
 
 
 async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int):
-    await get_perfil(guild_id, vencedor_id)
-    await get_perfil(guild_id, perdedor_id)
-    todos = await carregar(ARQUIVO_PERFIS, {})
-    perfis_guild = todos.setdefault(str(guild_id), {})
+    pv = await get_perfil(guild_id, vencedor_id)
+    patente_antiga = pv["patente"]
+    pv["vitorias"] += 1
+    pv["kills"] += 1
+    pv["xp"] += XP_VITORIA_PVP
+    await _salvar_perfil(guild_id, vencedor_id, pv)
 
-    pv = perfis_guild[str(vencedor_id)]
-    patente_antiga = pv.get("patente")
-    pv["vitorias"] = pv.get("vitorias", 0) + 1
-    pv["kills"] = pv.get("kills", 0) + 1
-    pv["xp"] = pv.get("xp", 0) + XP_VITORIA_PVP
+    pp = await get_perfil(guild_id, perdedor_id)
+    pp["derrotas"] += 1
+    pp["deaths"] += 1
+    await _salvar_perfil(guild_id, perdedor_id, pp)
 
-    pp = perfis_guild[str(perdedor_id)]
-    pp["derrotas"] = pp.get("derrotas", 0) + 1
-    pp["deaths"] = pp.get("deaths", 0) + 1
-
-    await salvar(ARQUIVO_PERFIS, todos)
     return pv, patente_antiga
 
 
