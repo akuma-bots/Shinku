@@ -2,12 +2,18 @@ import os
 import json
 import hashlib
 import asyncio
+import logging
 import pkgutil
 from pathlib import Path
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 from aiohttp import web
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 # Usa o caminho absoluto do .env, na mesma pasta deste arquivo — evita
 # que o load_dotenv() falhe quando o diretório de trabalho atual (cwd)
