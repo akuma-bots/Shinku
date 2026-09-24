@@ -1,14 +1,11 @@
-from utils.storage import carregar, salvar
-from utils.perfis import ARQUIVO_PERFIS, get_perfil
+from utils.storage import carregar
+from utils.perfis import get_perfil, _salvar_perfil, ARQUIVO_PERFIS
 
 
 async def adicionar_pontos(guild_id: int, user_id: int, pontos: int) -> int:
-    await get_perfil(guild_id, user_id)
-    todos = await carregar(ARQUIVO_PERFIS, {})
-    perfis_guild = todos.setdefault(str(guild_id), {})
-    perfil = perfis_guild[str(user_id)]
+    perfil = await get_perfil(guild_id, user_id)
     perfil["pontos_pve"] = perfil.get("pontos_pve", 0) + pontos
-    await salvar(ARQUIVO_PERFIS, todos)
+    await _salvar_perfil(guild_id, user_id, perfil)
     return perfil["pontos_pve"]
 
 
