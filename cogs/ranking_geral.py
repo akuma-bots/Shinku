@@ -9,12 +9,29 @@ from utils.perfis import ARQUIVO_PERFIS
 PESOS_PADRAO = {"xp": 1, "vitoria": 10, "mvp": 20}
 
 
+def _negrito(texto: str) -> str:
+    """Converte letras/números ASCII pra Unicode Mathematical Bold (𝐀𝐁𝐂...𝟎𝟏𝟐).
+    Usado só em rótulos e números — dígitos em negrito matemático têm largura
+    consistente entre si, então a coluna de pontos fica alinhada mesmo com
+    nomes (menções) de tamanhos diferentes."""
+    resultado = []
+    for ch in texto:
+        if 'A' <= ch <= 'Z':
+            resultado.append(chr(0x1D400 + (ord(ch) - ord('A'))))
+        elif 'a' <= ch <= 'z':
+            resultado.append(chr(0x1D41A + (ord(ch) - ord('a'))))
+        elif '0' <= ch <= '9':
+            resultado.append(chr(0x1D7CE + (ord(ch) - ord('0'))))
+        else:
+            resultado.append(ch)
+    return ''.join(resultado)
+
+
 class RankingGeral(commands.Cog):
-    """Top global do servidor: junta XP, vitórias (PvP + PvE + guerra, já
-    que todas usam o mesmo campo `vitorias` do perfil) e MVPs de guerra numa
-    única pontuação combinada. Depois de configurado com /ranking-canal, o
-    placar fica 100% automático: a cada 10 minutos o bot edita a mesma
-    mensagem com as posições atualizadas, sem precisar de comando manual."""
+    """Top global do servidor (P.C. — Pontos de Competição: XP + vitórias +
+    MVPs combinados, com pesos ajustáveis). Painel automático que se atualiza
+    sozinho a cada 10 minutos, editando a mesma mensagem, com menção clicável
+    de cada jogador."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -36,22 +53,49 @@ class RankingGeral(commands.Cog):
                 + perfil.get("vitorias", 0) * pesos["vitoria"]
                 + perfil.get("mvps", 0) * pesos["mvp"])
 
-    async def _montar_embed(self, guild_id: int) -> discord.Embed:
-        pesos = await self._pesos(guild_id)
+    async def _montar_embed(self, guild: discord.Guild) -> discord.Embed:
+        pesos = await self._pesos(guild.id)
         todos = await carregar(ARQUIVO_PERFIS, {})
-        perfis_guild = todos.get(str(guild_id), {})
+        perfis_guild = todos.get(str(guild.id), {})
 
-        if not perfis_guild:
-            return discord.Embed(title="🌍 Top Global do Servidor",
-                                  description="Ninguém tem perfil registrado ainda.", color=0x5865F2)
-
-        pontuados = [(uid, self._pontuacao(perfil, pesos)) for uid, perfil in perfis_guild.items()]
+        pontuados = [(int(uid), self._pontuacao(perfil, pesos)) for uid, perfil in perfis_guild.items()]
         top = sorted(pontuados, key=lambda item: item[1], reverse=True)[:10]
 
-        linhas = [f"**#{i+1}** <@{uid}> — {pontos:.0f} pts" for i, (uid, pontos) in enumerate(top)]
-        embed = discord.Embed(title="🌍 Top Global do Servidor", description="\n".join(linhas), color=0x5865F2)
-        embed.set_footer(text=f"Pontuação: XP×{pesos['xp']} + Vitórias×{pesos['vitoria']} + MVPs×{pesos['mvp']} • atualiza a cada 10 min")
-        return embed
+        cabecalho = (
+            f"╔══════════════════════════════════════╗\n"
+            f"║        {guild.name} | {_negrito('TOP 10')}        ║\n"
+            f"╚══════════════════════════════════════╝\n\n"
+            f"「 {_negrito('RANKING COMPETITIVO')} 」\n\n"
+        )
+
+        if not top:
+            descricao = cabecalho + "Ninguém pontuou ainda. Os primeiros resultados aprovados já entram no placar."
+            return discord.Embed(description=descricao, color=0xFFD700)
+
+        linhas_top = []
+        for i, (uid, pontos) in enumerate(top, start=1):
+            linhas_top.append(f"│ {_negrito('No.')}{_negrito(f'{i:02d}')}  — <@{uid}>")
+            linhas_top.append(f"│           {_negrito(f'{int(pontos):03d}')} {_negrito('P.C.')}")
+            if i != len(top):
+                linhas_top.append("│")
+        corpo = "\n".join(linhas_top)
+
+        descricao = (
+            f"{cabecalho}"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{_negrito('TOP 10')} — 𝐂𝐋𝐀𝐒𝐒𝐈𝐅𝐈𝐂𝐀𝐂̧𝐀̃𝐎\n\n"
+            f"╭──────────────────────────────────────╮\n"
+            f"{corpo}\n"
+            f"╰──────────────────────────────────────╯\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"「 𝐀𝐓𝐔𝐀𝐋𝐈𝐙𝐀𝐂̧𝐀̃𝐎 」\n\n"
+            f"A classificação é definida pela quantidade de P.C. — Pontos de Competição "
+            f"acumulados por cada membro.\n\n"
+            f"Novos resultados poderão alterar a posição dos participantes no Top 10.\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"「 {guild.name} | {_negrito('TOP 10')} 」"
+        )
+        return discord.Embed(description=descricao, color=0xFFD700)
 
     @tasks.loop(minutes=10)
     async def atualizar_ranking_automatico(self):
@@ -71,7 +115,7 @@ class RankingGeral(commands.Cog):
         if not canal:
             return
 
-        embed = await self._montar_embed(guild.id)
+        embed = await self._montar_embed(guild)
         mensagem_id = config.get("ranking_mensagem_id")
 
         if mensagem_id:
@@ -80,7 +124,7 @@ class RankingGeral(commands.Cog):
                 await msg.edit(embed=embed)
                 return
             except (discord.NotFound, discord.Forbidden):
-                pass  # a mensagem foi apagada — cria uma nova abaixo
+                pass
 
         nova_msg = await canal.send(embed=embed)
         await set_config(guild.id, ranking_mensagem_id=nova_msg.id)
@@ -93,7 +137,7 @@ class RankingGeral(commands.Cog):
         await interaction.response.send_message(f"✅ Placar automático configurado em {canal.mention}.", ephemeral=True)
         await self._atualizar_painel(interaction.guild)
 
-    @app_commands.command(name="ranking-pesos", description="Define os pesos usados no ranking geral combinado.")
+    @app_commands.command(name="ranking-pesos", description="Define os pesos usados no cálculo de P.C. (Pontos de Competição).")
     @app_commands.describe(peso_xp="Peso do XP (padrão: 1)", peso_vitoria="Peso por vitória (padrão: 10)",
                             peso_mvp="Peso por MVP de guerra (padrão: 20)")
     @app_commands.checks.has_permissions(administrator=True)
@@ -114,9 +158,9 @@ class RankingGeral(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name="ranking-geral", description="Mostra o top global agora, sem esperar a atualização automática.")
+    @app_commands.command(name="ranking-geral", description="Mostra o Top 10 agora, sem esperar a atualização automática.")
     async def ranking_geral(self, interaction: discord.Interaction):
-        embed = await self._montar_embed(interaction.guild.id)
+        embed = await self._montar_embed(interaction.guild)
         await interaction.response.send_message(embed=embed)
 
 
