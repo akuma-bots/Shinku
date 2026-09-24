@@ -3,22 +3,18 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import pve, pontuacao_pve
-from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
-from utils.perfis import ARQUIVO_PERFIS, get_perfil, calcular_patente_atual, definir_patente
+from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 CORES_DIFICULDADE = {"fácil": 0x57F287, "médio": 0xFEE75C, "difícil": 0xED4245}
 
 
 async def _adicionar_xp(guild_id: int, user_id: int, xp_ganho: int) -> dict:
-    await get_perfil(guild_id, user_id)
-    todos = await carregar(ARQUIVO_PERFIS, {})
-    perfis_guild = todos.setdefault(str(guild_id), {})
-    perfil = perfis_guild[str(user_id)]
-    patente_antiga = perfil.get("patente")
-    perfil["xp"] = perfil.get("xp", 0) + xp_ganho
-    perfil["vitorias"] = perfil.get("vitorias", 0) + 1
-    await salvar(ARQUIVO_PERFIS, todos)
+    perfil = await get_perfil(guild_id, user_id)
+    patente_antiga = perfil["patente"]
+    perfil["xp"] += xp_ganho
+    perfil["vitorias"] += 1
+    await _salvar_perfil(guild_id, user_id, perfil)
     return {"perfil": perfil, "patente_antiga": patente_antiga}
 
 
