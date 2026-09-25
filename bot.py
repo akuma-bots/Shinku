@@ -79,25 +79,34 @@ def _salvar_cache_comandos(dados: dict):
 async def on_ready():
     print(f"Bot online como {bot.user}")
 
-    assinatura_atual = _assinatura_comandos()
     cache = _carregar_cache_comandos()
-    try:
-        if cache.get("assinatura") != assinatura_atual:
-            synced_global = await bot.tree.sync()
-            print(f"{len(synced_global)} comandos sincronizados globalmente (o conjunto de comandos mudou).")
-            _salvar_cache_comandos({"assinatura": assinatura_atual})
-        else:
-            print("Comandos idênticos aos da última vez — sync global pulado (evita limite de taxa do Discord).")
-    except Exception as e:
-        print(f"Erro ao sincronizar comandos globalmente: {e}")
 
-    for guild in bot.guilds:
+    # Limpeza única: a versão antiga registrava os comandos GLOBALMENTE e
+    # também POR SERVIDOR ao mesmo tempo, fazendo cada comando aparecer
+    # duplicado na lista do Discord. Isso remove o registro global remoto
+    # (sem apagar nada do código) — roda só 1 vez, controlado pelo cache.
+    if not cache.get("globais_limpos"):
         try:
-            bot.tree.copy_global_to(guild=guild)
-            synced_guild = await bot.tree.sync(guild=guild)
-            print(f"{len(synced_guild)} comandos sincronizados instantaneamente em '{guild.name}'.")
+            await bot.http.bulk_upsert_global_commands(bot.application_id, [])
+            print("Registro global duplicado removido (limpeza única).")
         except Exception as e:
-            print(f"Erro ao sincronizar comandos em '{guild.name}': {e}")
+            print(f"Erro ao limpar comandos globais: {e}")
+        cache["globais_limpos"] = True
+        _salvar_cache_comandos(cache)
+
+    assinatura_atual = _assinatura_comandos()
+    if cache.get("assinatura") != assinatura_atual:
+        for guild in bot.guilds:
+            try:
+                bot.tree.copy_global_to(guild=guild)
+                synced_guild = await bot.tree.sync(guild=guild)
+                print(f"{len(synced_guild)} comandos sincronizados instantaneamente em '{guild.name}'.")
+            except Exception as e:
+                print(f"Erro ao sincronizar comandos em '{guild.name}': {e}")
+        cache["assinatura"] = assinatura_atual
+        _salvar_cache_comandos(cache)
+    else:
+        print("Comandos idênticos aos da última vez — sync pulado (evita limite de taxa do Discord).")
 
 
 async def iniciar_servidor_web():
