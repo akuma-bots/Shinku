@@ -5,7 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 from utils.storage import carregar_config
-from utils.guild_config import get_config
+from utils.guild_config import get_config, set_config
 from utils import tickets
 
 CANAIS_ESCALADOS = set()        # tickets já entregues para atendimento humano
@@ -16,6 +16,9 @@ FRASES_FECHAR = ["fechar o ticket", "fechar ticket", "encerrar o ticket", "encer
 TEMPO_INATIVIDADE_SEGUNDOS = 10 * 60  # 10 minutos
 
 CUSTOM_ID_SELECT = "ticket:abrir_select"
+
+TITULO_PADRAO = "🎫 Central de Suporte"
+DESCRICAO_PADRAO = "Selecione o tipo de atendimento abaixo pra abrir um ticket com a nossa equipe."
 
 
 def _normalizar(texto: str) -> str:
@@ -70,6 +73,19 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
     return view
 
 
+async def _montar_embed_painel(guild_id: int) -> discord.Embed:
+    config = await get_config(guild_id)
+    embed = discord.Embed(
+        title=config.get("ticket_painel_titulo") or TITULO_PADRAO,
+        description=config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
+        color=0x5865F2,
+    )
+    banner_url = config.get("ticket_painel_banner_url")
+    if banner_url:
+        embed.set_image(url=banner_url)
+    return embed
+
+
 class FecharTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -83,9 +99,11 @@ class FecharTicketView(discord.ui.View):
 class Tickets(commands.Cog):
     """Sistema de tickets por categoria: o painel mostra um menu suspenso
     (configurável com /ticket-tipo-*) e cada opção cria um canal já rotulado
-    pro tipo escolhido. Só a categoria com `usa_ia=True` (Dúvidas, por
-    padrão) aciona a resposta automática pela base de conhecimento; as
-    outras vão direto pra equipe de suporte."""
+    pro tipo escolhido. Título, descrição e banner do painel são
+    customizáveis com /ticket-painel-customizar, sem precisar mexer em
+    código. Só a categoria com `usa_ia=True` (Dúvidas, por padrão) aciona a
+    resposta automática pela base de conhecimento; as outras vão direto pra
+    equipe de suporte."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -137,13 +155,40 @@ class Tickets(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def ticket_painel(self, interaction: discord.Interaction):
         view = await _montar_select(interaction.guild.id)
-        embed = discord.Embed(
-            title="🎫 Central de Suporte",
-            description="Selecione o tipo de atendimento abaixo pra abrir um ticket com a nossa equipe.",
-            color=0x5865F2,
-        )
+        embed = await _montar_embed_painel(interaction.guild.id)
         await interaction.channel.send(embed=embed, view=view)
         await interaction.response.send_message("✅ Painel publicado.", ephemeral=True)
+
+    @app_commands.command(name="ticket-painel-customizar", description="Define título, descrição e banner do painel de tickets.")
+    @app_commands.describe(titulo="Título do painel (deixe em branco pra manter o atual)",
+                            descricao="Descrição do painel (deixe em branco pra manter a atual)",
+                            banner="Imagem de banner (opcional)")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def ticket_painel_customizar(self, interaction: discord.Interaction, titulo: str = None,
+                                        descricao: str = None, banner: discord.Attachment = None):
+        campos = {}
+        if titulo is not None:
+            campos["ticket_painel_titulo"] = titulo
+        if descricao is not None:
+            campos["ticket_painel_descricao"] = descricao
+        if banner is not None:
+            campos["ticket_painel_banner_url"] = banner.url
+        if not campos:
+            await interaction.response.send_message("Você não passou nada pra alterar.", ephemeral=True)
+            return
+
+        await set_config(interaction.guild.id, **campos)
+        await interaction.response.send_message(
+            "✅ Painel customizado. Rode `/ticket-painel` de novo pra publicar a versão atualizada.", ephemeral=True
+        )
+
+    @app_commands.command(name="ticket-painel-resetar", description="Volta o título, descrição e banner do painel pro padrão.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def ticket_painel_resetar(self, interaction: discord.Interaction):
+        await set_config(interaction.guild.id, ticket_painel_titulo="", ticket_painel_descricao="", ticket_painel_banner_url="")
+        await interaction.response.send_message(
+            "✅ Painel restaurado pro padrão. Rode `/ticket-painel` de novo pra publicar.", ephemeral=True
+        )
 
     @app_commands.command(name="ticket-tipo-adicionar", description="Adiciona (ou atualiza) uma categoria de ticket no menu.")
     @app_commands.describe(label="Nome mostrado no menu", descricao="Descrição curta (aparece embaixo do nome)",
