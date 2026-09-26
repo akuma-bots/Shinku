@@ -15,7 +15,7 @@ async def _salvar_guild(guild_id: int, lista: list):
     await salvar(ARQUIVO_DESAFIOS, dados)
 
 
-async def criar(guild_id: int, desafiante_id: int, desafiado_id: int) -> dict:
+async def criar(guild_id: int, desafiante_id: int, desafiado_id: int, aposta_xp: int = 0) -> dict:
     lista = (await _tudo()).get(str(guild_id), [])
     desafio = {
         "id": str(uuid.uuid4())[:8],
@@ -24,6 +24,7 @@ async def criar(guild_id: int, desafiante_id: int, desafiado_id: int) -> dict:
         "status": "pendente",
         "vencedor_id": None,
         "perdedor_id": None,
+        "aposta_xp": aposta_xp,
         "timestamp": time.time(),
         "mensagem_id": None,
         "canal_id": None,
@@ -68,9 +69,6 @@ async def definir_resultado(guild_id: int, desafio_id: str, vencedor_id: int, pe
 
 
 async def get_ultimo_entre(guild_id: int, id_a: int, id_b: int):
-    """Último desafio (qualquer status) entre essas duas pessoas — usado
-    pro cooldown, pra evitar que duas pessoas fiquem se desafiando repetido
-    só pra farmar XP fácil."""
     lista = (await _tudo()).get(str(guild_id), [])
     relacionados = [d for d in lista if {d["desafiante_id"], d["desafiado_id"]} == {id_a, id_b}]
     if not relacionados:
