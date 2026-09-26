@@ -21,7 +21,7 @@ async def criar(guild_id: int, desafiante_id: int, desafiado_id: int) -> dict:
         "id": str(uuid.uuid4())[:8],
         "desafiante_id": desafiante_id,
         "desafiado_id": desafiado_id,
-        "status": "pendente",  # pendente | recusado | aceito | aguardando_revisao | concluido
+        "status": "pendente",
         "vencedor_id": None,
         "perdedor_id": None,
         "timestamp": time.time(),
@@ -65,3 +65,14 @@ async def definir_resultado(guild_id: int, desafio_id: str, vencedor_id: int, pe
         alvo["status"] = "aguardando_revisao"
         await _salvar_guild(guild_id, lista)
     return alvo
+
+
+async def get_ultimo_entre(guild_id: int, id_a: int, id_b: int):
+    """Último desafio (qualquer status) entre essas duas pessoas — usado
+    pro cooldown, pra evitar que duas pessoas fiquem se desafiando repetido
+    só pra farmar XP fácil."""
+    lista = (await _tudo()).get(str(guild_id), [])
+    relacionados = [d for d in lista if {d["desafiante_id"], d["desafiado_id"]} == {id_a, id_b}]
+    if not relacionados:
+        return None
+    return max(relacionados, key=lambda d: d["timestamp"])
