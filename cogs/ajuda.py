@@ -22,6 +22,7 @@ SISTEMAS = {
     "Ajuda": ("📖", "Ajuda"),
 }
 ORDEM = list(SISTEMAS.keys())
+LIMITE_DESCRICAO = 3800  # margem de segurança abaixo do limite de 4096 do Discord
 
 
 def _sistema_do_comando(comando: app_commands.Command):
@@ -32,19 +33,49 @@ def _sistema_do_comando(comando: app_commands.Command):
 
 
 def _pode_ver(comando: app_commands.Command, membro: discord.Member) -> bool:
-    """Comando sem nenhuma permissão exigida (`checks` vazio) é visível pra
-    todo mundo; comando que exige permissão só aparece pra quem tem
-    manage_guild ou administrator — automático, sem precisar marcar nada."""
     if not comando.checks:
         return True
     return membro.guild_permissions.administrator or membro.guild_permissions.manage_guild
 
 
+class PaginacaoAjuda(discord.ui.View):
+    """Navegação simples entre páginas do /help, só pra quem pediu o
+    comando — dura 2 minutos e depois os botões somem sozinhos."""
+
+    def __init__(self, paginas: list, autor_id: int):
+        super().__init__(timeout=120)
+        self.paginas = paginas
+        self.autor_id = autor_id
+        self.indice = 0
+        self._atualizar_botoes()
+
+    def _atualizar_botoes(self):
+        self.botao_anterior.disabled = self.indice == 0
+        self.botao_proxima.disabled = self.indice == len(self.paginas) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message("Esse menu não é seu — use `/help` pra abrir o seu.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="⬅️ Anterior", style=discord.ButtonStyle.secondary)
+    async def botao_anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.indice -= 1
+        self._atualizar_botoes()
+        await interaction.response.edit_message(embed=self.paginas[self.indice], view=self)
+
+    @discord.ui.button(label="Próxima ➡️", style=discord.ButtonStyle.secondary)
+    async def botao_proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.indice += 1
+        self._atualizar_botoes()
+        await interaction.response.edit_message(embed=self.paginas[self.indice], view=self)
+
+
 class Ajuda(commands.Cog):
-    """/help com todos os comandos organizados por SISTEMA (Missões, PvP,
-    PvE, Guerras, Tickets, Formulários, etc.) — cada bloco é um cog, e cada
-    pessoa só vê, dentro de cada bloco, os comandos que ela tem permissão
-    de usar."""
+    """/help com todos os comandos organizados por sistema, em texto corrido
+    (não em fields — evita o limite de 25 campos do Discord) e paginado
+    automaticamente se não couber numa mensagem só."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -61,30 +92,16 @@ class Ajuda(commands.Cog):
             agrupado[nome_cog]["comandos"].append(comando)
         return agrupado
 
-    @app_commands.command(name="help", description="Lista todos os comandos do bot, organizados por sistema.")
-    async def help_cmd(self, interaction: discord.Interaction):
-        agrupado = self._montar_agrupado(interaction.user)
+    def _montar_paginas(self, agrupado: dict) -> list:
         chaves_ordenadas = [k for k in ORDEM if k in agrupado] + [k for k in agrupado if k not in ORDEM]
 
-        embed = discord.Embed(
-            title="📖 Comandos do Bot",
-            description="Cada sistema tem seu próprio bloco de comandos abaixo.",
-            color=0x5865F2,
-        )
+        blocos = []
         for chave in chaves_ordenadas:
             grupo = agrupado[chave]
-            linhas = [f"**/{c.name}** — {c.description}" for c in grupo["comandos"]]
-            bloco, primeiro = "", True
-            for linha in linhas:
-                if len(bloco) + len(linha) + 1 > 1024:
-                    embed.add_field(name=f"{grupo['emoji']} {grupo['titulo']}" if primeiro else "↳ continuação", value=bloco, inline=False)
-                    bloco, primeiro = "", False
-                bloco += linha + "\n"
-            if bloco:
-                embed.add_field(name=f"{grupo['emoji']} {grupo['titulo']}" if primeiro else "↳ continuação", value=bloco, inline=False)
+            linhas = "\n".join(f"**/{c.name}** — {c.description}" for c in grupo["comandos"])
+            blocos.append(f"**{grupo['emoji']} {grupo['titulo']}**\n{linhas}")
 
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Ajuda(bot))
+        paginas_texto, atual = [], ""
+        for bloco in blocos:
+            candidato = f"{atual}\n\n{bloco}" if atual else bloco
+            if len(candidato) > LIMITE_DESC
