@@ -27,7 +27,7 @@ async def get_formulario(guild_id: int, formulario_id: str):
 
 
 async def criar_formulario(guild_id: int, nome: str, titulo_painel: str, descricao_painel: str,
-                            banner_url: str, perguntas: list, criado_por: int) -> dict:
+                            banner_url: str, criado_por: int) -> dict:
     lista = await listar_formularios(guild_id)
     formulario = {
         "id": str(uuid.uuid4())[:8],
@@ -35,7 +35,7 @@ async def criar_formulario(guild_id: int, nome: str, titulo_painel: str, descric
         "titulo_painel": titulo_painel,
         "descricao_painel": descricao_painel,
         "banner_url": banner_url,
-        "perguntas": perguntas,       # lista de até 5 strings (limite de campos de um modal)
+        "paginas": [],                # lista de páginas; cada página é uma lista de até 5 perguntas
         "cargos_notificar": [],       # lista de role_id
         "criado_por": criado_por,
         "timestamp": time.time(),
@@ -51,6 +51,34 @@ async def remover_formulario(guild_id: int, formulario_id: str) -> bool:
     if len(nova_lista) == len(lista):
         return False
     await _salvar_formularios_guild(guild_id, nova_lista)
+    return True
+
+
+def perguntas_flat(formulario: dict) -> list:
+    """Todas as perguntas do formulário, de todas as páginas, em ordem."""
+    achatado = []
+    for pagina in formulario["paginas"]:
+        achatado.extend(pagina)
+    return achatado
+
+
+async def adicionar_pagina(guild_id: int, formulario_id: str, perguntas: list) -> dict:
+    lista = await listar_formularios(guild_id)
+    alvo = next((f for f in lista if f["id"] == formulario_id), None)
+    if not alvo:
+        return None
+    alvo["paginas"].append(perguntas[:5])
+    await _salvar_formularios_guild(guild_id, lista)
+    return alvo
+
+
+async def remover_pagina(guild_id: int, formulario_id: str, indice: int) -> bool:
+    lista = await listar_formularios(guild_id)
+    alvo = next((f for f in lista if f["id"] == formulario_id), None)
+    if not alvo or not (0 <= indice < len(alvo["paginas"])):
+        return False
+    alvo["paginas"].pop(indice)
+    await _salvar_formularios_guild(guild_id, lista)
     return True
 
 
