@@ -1,3 +1,4 @@
+import time
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -7,6 +8,7 @@ from utils.guild_config import get_config, set_config
 from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 XP_VITORIA_PVP = 50  # ajuste esse valor como preferir
+COOLDOWN_PADRAO_MINUTOS = 15
 
 
 def _view_desafio(desafio_id: str) -> discord.ui.View:
@@ -38,7 +40,8 @@ class Desafios(commands.Cog):
     """Duelo PvP casual: /desafiar posta em Desafios com botões Aceitar/
     Recusar; se aceito, anuncia em Lutas; o resultado é enviado por print e
     passa pelo mesmo motor de revisão manual (Provas-PVP) antes de atualizar
-    XP, vitórias/derrotas e patente automaticamente."""
+    XP, vitórias/derrotas e patente automaticamente. Tem um cooldown entre a
+    mesma dupla de jogadores, configurável, pra evitar farm de XP."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -77,7 +80,7 @@ class Desafios(commands.Cog):
 
         return texto
 
-    # ---------------- Configuração de canais ----------------
+    # ---------------- Configuração ----------------
     @app_commands.command(name="desafio-canais", description="Define os canais de desafios e lutas.")
     @app_commands.describe(canal_desafios="Onde os desafios são anunciados", canal_lutas="Onde as lutas aceitas são anunciadas")
     @app_commands.checks.has_permissions(administrator=True)
@@ -87,6 +90,13 @@ class Desafios(commands.Cog):
         await interaction.response.send_message(
             f"✅ Desafios em {canal_desafios.mention}, lutas em {canal_lutas.mention}.", ephemeral=True
         )
+
+    @app_commands.command(name="desafio-cooldown", description="Define o tempo mínimo entre desafios da mesma dupla de jogadores.")
+    @app_commands.describe(minutos="Minutos de espera entre desafios da mesma dupla")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def desafio_cooldown(self, interaction: discord.Interaction, minutos: int):
+        await set_config(interaction.guild.id, desafio_cooldown_minutos=minutos)
+        await interaction.response.send_message(f"✅ Cooldown definido em {minutos} minuto(s).", ephemeral=True)
 
     # ---------------- Desafio ----------------
     @app_commands.command(name="desafiar", description="Desafia um membro para uma luta PvP.")
@@ -99,9 +109,22 @@ class Desafios(commands.Cog):
             await interaction.response.send_message("Você não pode desafiar um bot.", ephemeral=True)
             return
 
+        config = await get_config(interaction.guild.id)
+        cooldown_min = config.get("desafio_cooldown_minutos", COOLDOWN_PADRAO_MINUTOS)
+        ultimo = await desafios.get_ultimo_entre(interaction.guild.id, interaction.user.id, membro.id)
+        if ultimo and cooldown_min > 0:
+            segundos_passados = time.time() - ultimo["timestamp"]
+            segundos_necessarios = cooldown_min * 60
+            if segundos_passados < segundos_necessarios:
+                restante_min = int((segundos_necessarios - segundos_passados) // 60) + 1
+                await interaction.response.send_message(
+                    f"Vocês já se desafiaram recentemente — espera mais **{restante_min} min** pra desafiar de novo.",
+                    ephemeral=True,
+                )
+                return
+
         desafio = await desafios.criar(interaction.guild.id, interaction.user.id, membro.id)
 
-        config = await get_config(interaction.guild.id)
         canal_id = config.get("canal_desafios_id")
         canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
 
