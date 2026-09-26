@@ -104,4 +104,34 @@ class Ajuda(commands.Cog):
         paginas_texto, atual = [], ""
         for bloco in blocos:
             candidato = f"{atual}\n\n{bloco}" if atual else bloco
-            if len(candidato) > LIMITE_DESC
+            if len(candidato) > LIMITE_DESCRICAO:
+                paginas_texto.append(atual)
+                atual = bloco
+            else:
+                atual = candidato
+        if atual:
+            paginas_texto.append(atual)
+
+        total = len(paginas_texto)
+        embeds = []
+        for i, texto in enumerate(paginas_texto, start=1):
+            embed = discord.Embed(title="📖 Comandos do Bot", description=texto, color=0x5865F2)
+            embed.set_footer(text=f"Página {i}/{total}")
+            embeds.append(embed)
+        return embeds
+
+    @app_commands.command(name="help", description="Lista todos os comandos do bot, organizados por sistema.")
+    async def help_cmd(self, interaction: discord.Interaction):
+        agrupado = self._montar_agrupado(interaction.user)
+        paginas = self._montar_paginas(agrupado)
+
+        if len(paginas) == 1:
+            await interaction.response.send_message(embed=paginas[0], ephemeral=True)
+            return
+
+        view = PaginacaoAjuda(paginas, interaction.user.id)
+        await interaction.response.send_message(embed=paginas[0], view=view, ephemeral=True)
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Ajuda(bot))
