@@ -23,10 +23,6 @@ async def _salvar_da_guild(guild_id: int, lista):
 
 
 async def _cargo_categoria_parcerias(guild: discord.Guild) -> discord.Role | None:
-    """Cargo configurado com /configurar-cargo-parcerias. Se ninguém
-    configurou ainda, cai pro nome literal 'PARCERIAS' como último recurso
-    (mas o recomendado é sempre configurar, já que o nome real do cargo no
-    servidor pode ter estilização/caracteres especiais)."""
     config = await get_config(guild.id)
     cargo_id = config.get("cargo_categoria_parcerias_id")
     if cargo_id:
@@ -37,9 +33,6 @@ async def _cargo_categoria_parcerias(guild: discord.Guild) -> discord.Role | Non
 
 
 async def _criar_cargo_da_parceria(guild: discord.Guild, nome: str) -> tuple[discord.Role | None, str | None]:
-    """Cria o cargo com o nome da parceria e o posiciona logo abaixo do
-    cargo-categoria configurado. Devolve (cargo, aviso) — aviso é None se
-    deu tudo certo, ou uma mensagem explicando o que não funcionou."""
     cargo_categoria = await _cargo_categoria_parcerias(guild)
     if not cargo_categoria:
         return None, "não achei o cargo-categoria de parcerias. Configure com `/configurar-cargo-parcerias` primeiro."
@@ -61,8 +54,9 @@ async def _criar_cargo_da_parceria(guild: discord.Guild, nome: str) -> tuple[dis
 class Parcerias(commands.Cog):
     """Registro de parcerias com outros servidores: guarda nome, convite e
     descrição, publica um anúncio no canal de parcerias, cria um cargo com
-    o nome da parceria logo abaixo do cargo-categoria configurado, e mantém
-    uma lista consultável."""
+    o nome da parceria logo abaixo do cargo-categoria configurado (e já dá
+    esse cargo pra quem registrou a parceria), e mantém uma lista
+    consultável."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -83,7 +77,7 @@ class Parcerias(commands.Cog):
             f"✅ Novos cargos de parceria vão ser criados logo abaixo de {cargo.mention}.", ephemeral=True
         )
 
-    @app_commands.command(name="adicionar-parceria", description="Registra uma parceria com outro servidor, anuncia no canal e cria o cargo dela.")
+    @app_commands.command(name="adicionar-parceria", description="Registra uma parceria, anuncia no canal, cria o cargo dela e já te dá esse cargo.")
     @app_commands.describe(
         nome="Nome do servidor parceiro",
         convite="Link de convite do servidor parceiro",
@@ -112,6 +106,14 @@ class Parcerias(commands.Cog):
 
         cargo, aviso_cargo = await _criar_cargo_da_parceria(interaction.guild, nome)
 
+        atribuido_ao_autor = False
+        if cargo:
+            try:
+                await interaction.user.add_roles(cargo, reason=f"Registrou a parceria com {nome}")
+                atribuido_ao_autor = True
+            except discord.Forbidden:
+                pass
+
         embed = discord.Embed(title=f"🤝 Nova parceria: {nome}", description=descricao, color=0x57F287)
         embed.add_field(name="Convite", value=convite, inline=False)
         if banner:
@@ -129,6 +131,8 @@ class Parcerias(commands.Cog):
 
         if cargo and not aviso_cargo:
             resultado_cargo = f" e o cargo {cargo.mention} foi criado"
+            if atribuido_ao_autor:
+                resultado_cargo += " (e já foi atribuído a você)"
         elif cargo and aviso_cargo:
             resultado_cargo = f" — cargo {cargo.mention} criado, mas {aviso_cargo}"
         else:
