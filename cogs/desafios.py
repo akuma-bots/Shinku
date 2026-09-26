@@ -7,7 +7,7 @@ from utils import desafios
 from utils.guild_config import get_config, set_config
 from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
-XP_VITORIA_PVP = 50  # ajuste esse valor como preferir
+XP_VITORIA_PVP = 50
 COOLDOWN_PADRAO_MINUTOS = 15
 
 
@@ -20,12 +20,12 @@ def _view_desafio(desafio_id: str) -> discord.ui.View:
     return view
 
 
-async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int):
+async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int, xp_extra_vencedor: int = 0):
     pv = await get_perfil(guild_id, vencedor_id)
     patente_antiga = pv["patente"]
     pv["vitorias"] += 1
     pv["kills"] += 1
-    pv["xp"] += XP_VITORIA_PVP
+    pv["xp"] += XP_VITORIA_PVP + xp_extra_vencedor
     await _salvar_perfil(guild_id, vencedor_id, pv)
 
     pp = await get_perfil(guild_id, perdedor_id)
@@ -36,12 +36,27 @@ async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int
     return pv, patente_antiga
 
 
+async def _remover_xp(guild_id: int, user_id: int, quantidade: int) -> bool:
+    perfil = await get_perfil(guild_id, user_id)
+    if perfil["xp"] < quantidade:
+        return False
+    perfil["xp"] -= quantidade
+    await _salvar_perfil(guild_id, user_id, perfil)
+    return True
+
+
+async def _devolver_xp(guild_id: int, user_id: int, quantidade: int):
+    perfil = await get_perfil(guild_id, user_id)
+    perfil["xp"] += quantidade
+    await _salvar_perfil(guild_id, user_id, perfil)
+
+
 class Desafios(commands.Cog):
     """Duelo PvP casual: /desafiar posta em Desafios com botões Aceitar/
-    Recusar; se aceito, anuncia em Lutas; o resultado é enviado por print e
-    passa pelo mesmo motor de revisão manual (Provas-PVP) antes de atualizar
-    XP, vitórias/derrotas e patente automaticamente. Tem um cooldown entre a
-    mesma dupla de jogadores, configurável, pra evitar farm de XP."""
+    Recusar; se aceito, anuncia em Lutas; o resultado passa pela revisão
+    manual (Provas-PVP) antes de atualizar XP, vitórias/derrotas e patente.
+    Tem cooldown entre a mesma dupla (evita farm de XP) e aposta de XP
+    opcional: quem vence leva o XP dos dois lados."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -54,10 +69,13 @@ class Desafios(commands.Cog):
         if not desafio:
             return "⚠️ Desafio original não foi encontrado."
 
-        pv, patente_antiga = await _atualizar_stats_pvp(guild.id, desafio["vencedor_id"], desafio["perdedor_id"])
+        xp_extra = desafio["aposta_xp"] * 2 if desafio["aposta_xp"] > 0 else 0
+        pv, patente_antiga = await _atualizar_stats_pvp(guild.id, desafio["vencedor_id"], desafio["perdedor_id"], xp_extra)
         await desafios.definir_status(guild.id, desafio["id"], "concluido")
 
         texto = f"🏆 <@{desafio['vencedor_id']}> venceu! +{XP_VITORIA_PVP} XP, +1 vitória. <@{desafio['perdedor_id']}> +1 derrota."
+        if desafio["aposta_xp"] > 0:
+            texto += f"\n💰 <@{desafio['vencedor_id']}> ganhou a aposta: +{xp_extra} XP (os {desafio['aposta_xp']} XP de cada lado)."
 
         nova_patente = await calcular_patente_atual(guild.id, pv["xp"])
         if nova_patente and nova_patente["nome"] != patente_antiga:
@@ -99,14 +117,17 @@ class Desafios(commands.Cog):
         await interaction.response.send_message(f"✅ Cooldown definido em {minutos} minuto(s).", ephemeral=True)
 
     # ---------------- Desafio ----------------
-    @app_commands.command(name="desafiar", description="Desafia um membro para uma luta PvP.")
-    @app_commands.describe(membro="Quem você quer desafiar")
-    async def desafiar(self, interaction: discord.Interaction, membro: discord.Member):
+    @app_commands.command(name="desafiar", description="Desafia um membro para uma luta PvP, com aposta de XP opcional.")
+    @app_commands.describe(membro="Quem você quer desafiar", aposta_xp="XP que cada um aposta (opcional, ambos apostam o mesmo valor)")
+    async def desafiar(self, interaction: discord.Interaction, membro: discord.Member, aposta_xp: int = 0):
         if membro.id == interaction.user.id:
             await interaction.response.send_message("Você não pode se desafiar.", ephemeral=True)
             return
         if membro.bot:
             await interaction.response.send_message("Você não pode desafiar um bot.", ephemeral=True)
+            return
+        if aposta_xp < 0:
+            await interaction.response.send_message("A aposta não pode ser negativa.", ephemeral=True)
             return
 
         config = await get_config(interaction.guild.id)
@@ -123,7 +144,13 @@ class Desafios(commands.Cog):
                 )
                 return
 
-        desafio = await desafios.criar(interaction.guild.id, interaction.user.id, membro.id)
+        if aposta_xp > 0:
+            ok = await _remover_xp(interaction.guild.id, interaction.user.id, aposta_xp)
+            if not ok:
+                await interaction.response.send_message(f"Você não tem {aposta_xp} XP pra apostar.", ephemeral=True)
+                return
+
+        desafio = await desafios.criar(interaction.guild.id, interaction.user.id, membro.id, aposta_xp)
 
         canal_id = config.get("canal_desafios_id")
         canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
@@ -133,6 +160,8 @@ class Desafios(commands.Cog):
             description=f"{interaction.user.mention} desafiou {membro.mention} para uma luta!",
             color=0xED4245,
         )
+        if aposta_xp > 0:
+            embed.add_field(name="💰 Aposta", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
         embed.set_footer(text=f"ID: {desafio['id']}")
         msg = await canal.send(content=membro.mention, embed=embed, view=_view_desafio(desafio["id"]))
         await desafios.definir_mensagem(interaction.guild.id, desafio["id"], canal.id, msg.id)
@@ -159,6 +188,17 @@ class Desafios(commands.Cog):
         await interaction.response.defer()
 
         if acao == "aceitar":
+            if desafio["aposta_xp"] > 0:
+                ok = await _remover_xp(interaction.guild.id, interaction.user.id, desafio["aposta_xp"])
+                if not ok:
+                    await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
+                    await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
+                    embed = interaction.message.embeds[0]
+                    embed.color = 0x99AAB5
+                    embed.add_field(name="🚫 Cancelado", value=f"{interaction.user.mention} não tem XP suficiente pra cobrir a aposta.", inline=False)
+                    await interaction.message.edit(embed=embed, view=None)
+                    return
+
             await desafios.definir_status(interaction.guild.id, desafio_id, "aceito")
             embed = interaction.message.embeds[0]
             embed.color = 0x57F287
@@ -176,6 +216,8 @@ class Desafios(commands.Cog):
             aviso.set_footer(text=f"Ao terminar, use /luta-completar desafio_id:{desafio_id}")
             await canal.send(embed=aviso)
         else:
+            if desafio["aposta_xp"] > 0:
+                await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
             await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
             embed = interaction.message.embeds[0]
             embed.color = 0x99AAB5
