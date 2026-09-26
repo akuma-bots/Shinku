@@ -1,8 +1,24 @@
+import hashlib
+import aiohttp
 import discord
 from discord.ext import commands
-from utils import revisoes
+from utils import revisoes, auditoria
 
 CORES = {"pvp": 0xED4245, "pve": 0x57F287, "missao": 0xFEE75C}
+
+
+async def _hash_imagem(url: str):
+    """Baixa a imagem e calcula um hash do conteúdo — usado pra detectar se
+    a mesma print está sendo reaproveitada em outra prova."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resposta:
+                if resposta.status != 200:
+                    return None
+                dados = await resposta.read()
+                return hashlib.sha256(dados).hexdigest()
+    except Exception:
+        return None
 
 
 def _embed_revisao(revisao: dict) -> discord.Embed:
@@ -30,18 +46,15 @@ def _view_revisao(revisao_id: str) -> discord.ui.View:
 class Revisoes(commands.Cog):
     """Motor de aprovação manual por print. Outros cogs (missões, PvP, PvE)
     chamam `abrir_revisao(...)` pra criar a pendência e postar o embed com
-    botões no canal certo (Provas-PVP / Provas-PVE). Quando um admin aprova,
-    o processador registrado em `bot.processadores_revisao[tipo]` é chamado
-    automaticamente pra aplicar o resultado (XP, vitórias, medalhas, etc) —
-    cada cog novo só precisa registrar o seu processador, sem mexer aqui.
-
-    Os botões usam custom_id fixo (não view registrada em memória), então
-    continuam funcionando normalmente mesmo depois de um restart do bot."""
+    botões no canal certo. Ao abrir, calcula um hash da imagem e avisa o
+    revisor se a mesma print já foi usada antes. Quando um admin aprova ou
+    rejeita, o processador do tipo é chamado automaticamente, e a decisão
+    fica registrada no canal de auditoria (se configurado)."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         if not hasattr(bot, "processadores_revisao"):
-            bot.processadores_revisao = {}  # tipo -> async def(guild, revisao) -> str | None
+            bot.processadores_revisao = {}
 
     async def abrir_revisao(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
@@ -49,7 +62,24 @@ class Revisoes(commands.Cog):
         revisao = await revisoes.criar_pendencia(
             guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao
         )
-        msg = await canal.send(embed=_embed_revisao(revisao), view=_view_revisao(revisao["id"]))
+
+        hash_imagem = await _hash_imagem(print_url)
+        duplicata = None
+        if hash_imagem:
+            await revisoes.definir_hash(guild.id, revisao["id"], hash_imagem)
+            encontradas = await revisoes.buscar_por_hash(guild.id, hash_imagem, excluir_id=revisao["id"])
+            if encontradas:
+                duplicata = encontradas[0]
+
+        embed = _embed_revisao(revisao)
+        if duplicata:
+            embed.add_field(
+                name="⚠️ Possível print repetida",
+                value=f"Esta mesma imagem já apareceu na revisão `{duplicata['id']}` ({duplicata['status']}). Confira com atenção antes de aprovar.",
+                inline=False,
+            )
+
+        msg = await canal.send(embed=embed, view=_view_revisao(revisao["id"]))
         await revisoes.definir_mensagem(guild.id, revisao["id"], canal.id, msg.id)
         return revisao
 
@@ -88,12 +118,26 @@ class Revisoes(commands.Cog):
                 embed.add_field(name="Resultado aplicado", value=resultado_texto, inline=False)
             await interaction.message.edit(embed=embed, view=None)
 
+            await auditoria.registrar(
+                interaction.guild, "📋 Revisão aprovada",
+                f"Tipo: **{revisao['tipo']}**\nAutor: <@{revisao['autor_id']}>\n"
+                f"Aprovado por: {interaction.user.mention}\nID: `{revisao['id']}`",
+                cor=0x57F287,
+            )
+
         else:
             revisao = await revisoes.rejeitar(interaction.guild.id, revisao_id, interaction.user.id)
             embed = _embed_revisao(revisao)
             embed.color = 0xED4245
             embed.add_field(name="❌ Rejeitado por", value=interaction.user.mention, inline=False)
             await interaction.message.edit(embed=embed, view=None)
+
+            await auditoria.registrar(
+                interaction.guild, "📋 Revisão rejeitada",
+                f"Tipo: **{revisao['tipo']}**\nAutor: <@{revisao['autor_id']}>\n"
+                f"Rejeitado por: {interaction.user.mention}\nID: `{revisao['id']}`",
+                cor=0xED4245,
+            )
 
             autor = interaction.guild.get_member(revisao["autor_id"])
             if autor:
