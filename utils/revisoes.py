@@ -42,6 +42,7 @@ async def criar_pendencia(guild_id: int, tipo: str, autor_id: int, referencia_id
         "timestamp": time.time(),
         "mensagem_id": None,
         "canal_id": None,
+        "hash_imagem": None,
     }
     lista.append(revisao)
     await _salvar_guild(guild_id, lista)
@@ -60,6 +61,21 @@ async def definir_mensagem(guild_id: int, revisao_id: str, canal_id: int, mensag
             r["canal_id"] = canal_id
             r["mensagem_id"] = mensagem_id
     await _salvar_guild(guild_id, lista)
+
+
+async def definir_hash(guild_id: int, revisao_id: str, hash_imagem: str):
+    lista = await listar(guild_id)
+    for r in lista:
+        if r["id"] == revisao_id:
+            r["hash_imagem"] = hash_imagem
+    await _salvar_guild(guild_id, lista)
+
+
+async def buscar_por_hash(guild_id: int, hash_imagem: str, excluir_id: str = None) -> list:
+    """Outras revisões (não rejeitadas) que usaram exatamente a mesma
+    imagem — sinal de que a print pode estar sendo reaproveitada."""
+    lista = await listar(guild_id)
+    return [r for r in lista if r.get("hash_imagem") == hash_imagem and r["id"] != excluir_id and r["status"] != "rejeitada"]
 
 
 async def aprovar(guild_id: int, revisao_id: str, revisor_id: int):
