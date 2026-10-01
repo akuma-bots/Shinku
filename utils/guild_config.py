@@ -25,10 +25,6 @@ PADRAO = {
 
     "contadores": [],
 
-    "canal_denuncias_id": None,
-
-    "categoria_modmail_id": None,
-
     "canal_auditoria_id": 1545838575449276478,
 
     "canal_desafios_id": 1545834386128375909,
