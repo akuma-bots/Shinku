@@ -426,7 +426,10 @@ class Parcerias(commands.Cog):
             )
             return
 
-        await interaction.response.defer()
+        # IMPORTANTE:
+        # A lista inteira do comando fica invisível para os demais
+        # membros do canal.
+        await interaction.response.defer(ephemeral=True)
 
         # Cada parceria recebe seu próprio embed e seu próprio
         # botão, deixando o cargo de seleção imediatamente abaixo.
@@ -479,9 +482,11 @@ class Parcerias(commands.Cog):
                 text=f"Parceria {indice} • NÊMESIS"
             )
 
+            # A resposta também permanece efêmera.
             await interaction.followup.send(
                 embed=embed,
                 view=view,
+                ephemeral=True,
             )
 
         if len(lista) > 25:
