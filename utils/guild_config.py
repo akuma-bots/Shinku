@@ -22,6 +22,7 @@ PADRAO = {
     "contadores": [],
 
     "canal_auditoria_id": 1545838575449276478,
+    "canal_guerras_id": 1545834530085142678,
 
     # ========================================================
     # COMPETITIVO
