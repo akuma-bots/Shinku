@@ -23,7 +23,7 @@ def _extrair_mencoes(texto: str) -> list:
 
     return [
         int(m)
-        for m in re.findall(r"<@!?(\d+)>", texto)
+        for m in re.findall(r"<@!?(\\d+)>", texto)
     ]
 
 
@@ -107,13 +107,21 @@ class Guerras(commands.Cog):
             interaction.guild.id
         )
 
-        canal_id = config["canal_eventos_id"]
+        # Canal oficial de guerras da NÊMESIS.
+        canal_id = config.get("canal_guerras_id")
 
         canal = (
             interaction.guild.get_channel(canal_id)
             if canal_id
             else interaction.channel
         )
+
+        if canal is None:
+            await interaction.response.send_message(
+                "❌ O canal oficial de guerras não foi encontrado.",
+                ephemeral=True,
+            )
+            return
 
         registro_id = str(uuid.uuid4())[:8]
 
@@ -135,11 +143,6 @@ class Guerras(commands.Cog):
 
         dados["agendamentos"].append(
             agendamento
-        )
-
-        await self._salvar_dados_guild(
-            interaction.guild.id,
-            dados,
         )
 
         embed = discord.Embed(
@@ -165,11 +168,23 @@ class Guerras(commands.Cog):
             text=f"Agendada por {interaction.user}"
         )
 
-        mensagem = await canal.send(
-            embed=embed
-        )
+        try:
+            mensagem = await canal.send(
+                embed=embed
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ Não tenho permissão para enviar mensagens no canal oficial de guerras.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException:
+            await interaction.response.send_message(
+                "❌ Não foi possível publicar a guerra no canal oficial.",
+                ephemeral=True,
+            )
+            return
 
-        # Guarda também a mensagem criada no Discord.
         agendamento["mensagem_id"] = mensagem.id
 
         await self._salvar_dados_guild(
@@ -344,8 +359,6 @@ class Guerras(commands.Cog):
             registro
         )
 
-        # Se existir um agendamento correspondente,
-        # marca-o como concluído.
         for agendamento in reversed(
             dados["agendamentos"]
         ):
