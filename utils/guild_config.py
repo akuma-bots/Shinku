@@ -10,28 +10,21 @@ ARQUIVO = "guild_configs.json"
 
 PADRAO = {
     "support_role_id": 1549832967495491645,
-
     "log_channel_id": 1545838386944938024,
-
     "ticket_category_id": 1545835749369446603,
-
     "canais_cargo_automatico": {},
-
     "canal_eventos_id": 1545835097830334536,
-
     "canal_parcerias_id": 1545831702444777492,
-
     "cargo_categoria_parcerias_id": 1553019315664461934,
-
     "contadores": [],
-
     "canal_auditoria_id": 1545838575449276478,
 
     "canal_desafios_id": 1545834386128375909,
-
     "desafio_cooldown_minutos": 60,
-
     "canal_lutas_id": 1545834447944028170,
+
+    "canal_provas_pvp_id": 1545853928736952420,
+    "canal_ranking_id": 1545834182406574241,
 }
 
 
