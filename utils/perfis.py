@@ -1,12 +1,10 @@
 from utils.storage import carregar, salvar
-from utils.competitivo_sync import (
-    somar_pontos_competitivo,
-    migrar_perfil_se_necessario,
-)
+from utils.competitivo_sync import somar_pontos_competitivo
 
 
 ARQUIVO_PERFIS = "perfis.json"
 ARQUIVO_PATENTES = "patentes_config.json"
+ARQUIVO_COMPETITIVO = "competitivo.json"
 
 
 PADRAO_PERFIL = {
@@ -91,10 +89,8 @@ async def _sincronizar_site(
     Sincroniza o perfil do Bot com o competitivo.json
     compartilhado pelo Dashboard.
 
-    Importante:
-    - P.C. existentes no site não são sobrescritos.
-    - delta_pontos é somado ao P.C. atual.
-    - estatísticas do Bot são atualizadas.
+    O P.C. existente no Dashboard não é sobrescrito.
+    O delta recebido é apenas somado ao valor atual.
     """
 
     competitivo = await somar_pontos_competitivo(
@@ -111,21 +107,36 @@ async def _sincronizar_site(
         ),
     )
 
-    # Estatísticas adicionais mantidas pelo Bot.
     competitivo["xp"] = int(
-        perfil.get("xp", 0) or 0
+        perfil.get(
+            "xp",
+            0,
+        )
+        or 0
     )
 
     competitivo["kills"] = int(
-        perfil.get("kills", 0) or 0
+        perfil.get(
+            "kills",
+            0,
+        )
+        or 0
     )
 
     competitivo["deaths"] = int(
-        perfil.get("deaths", 0) or 0
+        perfil.get(
+            "deaths",
+            0,
+        )
+        or 0
     )
 
     competitivo["mvps"] = int(
-        perfil.get("mvps", 0) or 0
+        perfil.get(
+            "mvps",
+            0,
+        )
+        or 0
     )
 
     competitivo["sequencia_atual"] = int(
@@ -155,15 +166,6 @@ async def _sincronizar_site(
         )
     )
 
-    # KDR calculado para o Dashboard.
-    mortes = int(
-        perfil.get(
-            "deaths",
-            0,
-        )
-        or 0
-    )
-
     kills = int(
         perfil.get(
             "kills",
@@ -172,16 +174,25 @@ async def _sincronizar_site(
         or 0
     )
 
-    competitivo["kdr"] = round(
-        kills / mortes,
-        2,
-    ) if mortes > 0 else float(kills)
+    deaths = int(
+        perfil.get(
+            "deaths",
+            0,
+        )
+        or 0
+    )
 
-    # Mantém o perfil atualizado no mesmo arquivo.
-    from utils.storage import carregar as carregar_storage
+    competitivo["kdr"] = (
+        round(
+            kills / deaths,
+            2,
+        )
+        if deaths > 0
+        else float(kills)
+    )
 
-    dados = await carregar_storage(
-        "competitivo.json",
+    dados = await carregar(
+        ARQUIVO_COMPETITIVO,
         {
             "catalogo": [],
             "perfis": {},
@@ -198,10 +209,12 @@ async def _sincronizar_site(
         {},
     )
 
-    dados["perfis"][str(user_id)] = competitivo
+    dados["perfis"][
+        str(user_id)
+    ] = competitivo
 
     await salvar(
-        "competitivo.json",
+        ARQUIVO_COMPETITIVO,
         dados,
     )
 
@@ -214,10 +227,8 @@ async def sincronizar_perfil_site(
     nome: str = "",
 ) -> dict:
     """
-    Sincronização manual/completa de um perfil.
-
-    Útil quando o usuário já possuía dados antes
-    da integração com o Dashboard.
+    Sincroniza manualmente um perfil existente
+    do Bot com o Dashboard.
     """
 
     perfil = await get_perfil(
@@ -237,10 +248,10 @@ async def sincronizar_todos_perfis_site(
     guild_id: int,
 ) -> int:
     """
-    Percorre todos os perfis da guild e sincroniza
-    suas estatísticas com o Dashboard.
+    Sincroniza todos os perfis da guild
+    com o Dashboard.
 
-    Retorna a quantidade sincronizada.
+    Retorna a quantidade de perfis sincronizados.
     """
 
     todos = await carregar(
@@ -427,13 +438,6 @@ async def registrar_resultado_guerra(
         perfil,
     )
 
-    /*
-     * P.C. competitivo gerado pela atividade.
-     *
-     * Vitória = 40 P.C.
-     * Derrota = 10 P.C.
-     * MVP = 20 P.C.
-     */
     delta_pontos = (
         (
             XP_VITORIA
@@ -498,7 +502,6 @@ async def registrar_pvp(
         perfil_perdedor,
     )
 
-    # PvP também sincroniza imediatamente com o site.
     await _sincronizar_site(
         user_id=vencedor_id,
         perfil=perfil_vencedor,
