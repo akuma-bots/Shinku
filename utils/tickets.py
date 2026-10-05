@@ -15,7 +15,7 @@ TIPOS_PADRAO = [
         "label": "Dúvidas",
         "emoji": "❓",
         "descricao": "Clique aqui, para tirar as suas dúvidas!",
-        "usa_ia": True,
+        "usa_ia": False,
     },
     {
         "valor": "recompensas",
