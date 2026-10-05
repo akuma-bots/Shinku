@@ -12,19 +12,56 @@ PADRAO = {
     "support_role_id": 1549832967495491645,
     "log_channel_id": 1545838386944938024,
     "ticket_category_id": 1545835749369446603,
+
     "canais_cargo_automatico": {},
+
     "canal_eventos_id": 1545835097830334536,
     "canal_parcerias_id": 1545831702444777492,
     "cargo_categoria_parcerias_id": 1553019315664461934,
+
     "contadores": [],
+
     "canal_auditoria_id": 1545838575449276478,
+
+    # ========================================================
+    # COMPETITIVO
+    # ========================================================
 
     "canal_desafios_id": 1545834386128375909,
     "desafio_cooldown_minutos": 60,
+
     "canal_lutas_id": 1545834447944028170,
 
     "canal_provas_pvp_id": 1545853928736952420,
+
     "canal_ranking_id": 1545834182406574241,
+
+    # ========================================================
+    # MISSÕES
+    # ========================================================
+
+    "canal_missoes_missao_id": 1556543214885019668,
+    "canal_provas_missao_id": 1556543417843056641,
+
+    # ========================================================
+    # CONTRIBUIÇÕES
+    # ========================================================
+
+    "canal_missoes_contribuicao_id": 1556543539213639760,
+    "canal_provas_contribuicao_id": 1556543628296593448,
+
+    # ========================================================
+    # MISSÕES ESPECIAIS
+    # ========================================================
+
+    "canal_missoes_especial_id": 1556543708478972015,
+    "canal_provas_especial_id": 1556543872534839336,
+
+    # ========================================================
+    # RECORDES
+    # ========================================================
+
+    "canal_recordes_id": 1545834618182303874,
 }
 
 
@@ -98,6 +135,10 @@ async def set_config(
     return atual
 
 
+# ============================================================
+# CARGOS AUTOMÁTICOS
+# ============================================================
+
 async def definir_canal_cargo_automatico(
     guild_id: int,
     canal_id: int,
@@ -165,6 +206,10 @@ async def remover_canal_cargo_automatico(
 
     return mapa
 
+
+# ============================================================
+# CONTADORES
+# ============================================================
 
 async def adicionar_contador(
     guild_id: int,
