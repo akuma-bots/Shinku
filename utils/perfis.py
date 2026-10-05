@@ -1,5 +1,8 @@
 from utils.storage import carregar, salvar
-from utils.competitivo_sync import somar_pontos_competitivo
+from utils.competitivo_sync import (
+    somar_pontos_competitivo,
+    migrar_perfil_se_necessario,
+)
 
 
 ARQUIVO_PERFIS = "perfis.json"
@@ -47,7 +50,10 @@ async def get_perfil(
         **PADRAO_PERFIL,
         **perfil,
         "medalhas": list(
-            perfil.get("medalhas", [])
+            perfil.get(
+                "medalhas",
+                [],
+            )
         ),
     }
 
@@ -57,7 +63,6 @@ async def _salvar_perfil(
     user_id: int,
     perfil: dict,
 ):
-
     todos = await carregar(
         ARQUIVO_PERFIS,
         {},
@@ -74,6 +79,216 @@ async def _salvar_perfil(
         ARQUIVO_PERFIS,
         todos,
     )
+
+
+async def _sincronizar_site(
+    user_id: int,
+    perfil: dict,
+    nome: str = "",
+    delta_pontos: int = 0,
+) -> dict:
+    """
+    Sincroniza o perfil do Bot com o competitivo.json
+    compartilhado pelo Dashboard.
+
+    Importante:
+    - P.C. existentes no site não são sobrescritos.
+    - delta_pontos é somado ao P.C. atual.
+    - estatísticas do Bot são atualizadas.
+    """
+
+    competitivo = await somar_pontos_competitivo(
+        user_id=user_id,
+        nome=nome,
+        delta=delta_pontos,
+        vitorias=perfil.get(
+            "vitorias",
+            0,
+        ),
+        derrotas=perfil.get(
+            "derrotas",
+            0,
+        ),
+    )
+
+    # Estatísticas adicionais mantidas pelo Bot.
+    competitivo["xp"] = int(
+        perfil.get("xp", 0) or 0
+    )
+
+    competitivo["kills"] = int(
+        perfil.get("kills", 0) or 0
+    )
+
+    competitivo["deaths"] = int(
+        perfil.get("deaths", 0) or 0
+    )
+
+    competitivo["mvps"] = int(
+        perfil.get("mvps", 0) or 0
+    )
+
+    competitivo["sequencia_atual"] = int(
+        perfil.get(
+            "sequencia_atual",
+            0,
+        )
+        or 0
+    )
+
+    competitivo["maior_sequencia"] = int(
+        perfil.get(
+            "maior_sequencia",
+            0,
+        )
+        or 0
+    )
+
+    competitivo["patente"] = perfil.get(
+        "patente"
+    )
+
+    competitivo["medalhas"] = list(
+        perfil.get(
+            "medalhas",
+            [],
+        )
+    )
+
+    # KDR calculado para o Dashboard.
+    mortes = int(
+        perfil.get(
+            "deaths",
+            0,
+        )
+        or 0
+    )
+
+    kills = int(
+        perfil.get(
+            "kills",
+            0,
+        )
+        or 0
+    )
+
+    competitivo["kdr"] = round(
+        kills / mortes,
+        2,
+    ) if mortes > 0 else float(kills)
+
+    # Mantém o perfil atualizado no mesmo arquivo.
+    from utils.storage import carregar as carregar_storage
+
+    dados = await carregar_storage(
+        "competitivo.json",
+        {
+            "catalogo": [],
+            "perfis": {},
+        },
+    )
+
+    dados.setdefault(
+        "catalogo",
+        [],
+    )
+
+    dados.setdefault(
+        "perfis",
+        {},
+    )
+
+    dados["perfis"][str(user_id)] = competitivo
+
+    await salvar(
+        "competitivo.json",
+        dados,
+    )
+
+    return competitivo
+
+
+async def sincronizar_perfil_site(
+    guild_id: int,
+    user_id: int,
+    nome: str = "",
+) -> dict:
+    """
+    Sincronização manual/completa de um perfil.
+
+    Útil quando o usuário já possuía dados antes
+    da integração com o Dashboard.
+    """
+
+    perfil = await get_perfil(
+        guild_id,
+        user_id,
+    )
+
+    return await _sincronizar_site(
+        user_id=user_id,
+        perfil=perfil,
+        nome=nome,
+        delta_pontos=0,
+    )
+
+
+async def sincronizar_todos_perfis_site(
+    guild_id: int,
+) -> int:
+    """
+    Percorre todos os perfis da guild e sincroniza
+    suas estatísticas com o Dashboard.
+
+    Retorna a quantidade sincronizada.
+    """
+
+    todos = await carregar(
+        ARQUIVO_PERFIS,
+        {},
+    )
+
+    guild_dados = todos.get(
+        str(guild_id),
+        {},
+    )
+
+    if not isinstance(
+        guild_dados,
+        dict,
+    ):
+        return 0
+
+    quantidade = 0
+
+    for user_id, perfil in guild_dados.items():
+
+        if not isinstance(
+            perfil,
+            dict,
+        ):
+            continue
+
+        try:
+            await _sincronizar_site(
+                user_id=int(user_id),
+                perfil={
+                    **PADRAO_PERFIL,
+                    **perfil,
+                },
+                delta_pontos=0,
+            )
+
+            quantidade += 1
+
+        except Exception as erro:
+            print(
+                f"[SINCRONIZAÇÃO] "
+                f"Falha no perfil {user_id}: "
+                f"{erro}"
+            )
+
+    return quantidade
 
 
 async def get_patentes(
@@ -206,32 +421,46 @@ async def registrar_resultado_guerra(
         medalhas_novas
     )
 
-    # Salva o perfil antigo do bot.
     await _salvar_perfil(
         guild_id,
         user_id,
         perfil,
     )
 
-    # ==========================================================
-    # SINCRONIZAÇÃO COM O DASHBOARD
-    # ==========================================================
-
+    /*
+     * P.C. competitivo gerado pela atividade.
+     *
+     * Vitória = 40 P.C.
+     * Derrota = 10 P.C.
+     * MVP = 20 P.C.
+     */
     delta_pontos = (
-        (XP_VITORIA if venceu else XP_DERROTA)
-        + (10 if venceu else 0)
-        + (XP_BONUS_MVP if foi_mvp else 0)
+        (
+            XP_VITORIA
+            if venceu
+            else XP_DERROTA
+        )
+        + (
+            10
+            if venceu
+            else 0
+        )
+        + (
+            XP_BONUS_MVP
+            if foi_mvp
+            else 0
+        )
     )
 
-    await somar_pontos_competitivo(
+    competitivo = await _sincronizar_site(
         user_id=user_id,
-        delta=delta_pontos,
-        vitorias=perfil["vitorias"],
-        derrotas=perfil["derrotas"],
+        perfil=perfil,
+        delta_pontos=delta_pontos,
     )
 
     return {
         "perfil": perfil,
+        "competitivo": competitivo,
         "medalhas_novas": medalhas_novas,
         "patente_antiga": patente_antiga,
     }
@@ -267,6 +496,19 @@ async def registrar_pvp(
         guild_id,
         perdedor_id,
         perfil_perdedor,
+    )
+
+    # PvP também sincroniza imediatamente com o site.
+    await _sincronizar_site(
+        user_id=vencedor_id,
+        perfil=perfil_vencedor,
+        delta_pontos=0,
+    )
+
+    await _sincronizar_site(
+        user_id=perdedor_id,
+        perfil=perfil_perdedor,
+        delta_pontos=0,
     )
 
     return (
@@ -311,6 +553,12 @@ async def definir_patente(
         guild_id,
         user_id,
         perfil,
+    )
+
+    await _sincronizar_site(
+        user_id=user_id,
+        perfil=perfil,
+        delta_pontos=0,
     )
 
     return perfil
