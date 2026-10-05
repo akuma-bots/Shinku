@@ -2,160 +2,638 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils import missoes, pontuacao_pve
+from utils import missoes
 from utils.guild_config import get_config, set_config
-from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
+from utils.perfis import (
+    get_perfil,
+    calcular_patente_atual,
+    definir_patente,
+    _salvar_perfil,
+)
+
 
 TIPO_CHOICES = [
-    app_commands.Choice(name="PvP", value="pvp"),
-    app_commands.Choice(name="PvE", value="pve"),
+    app_commands.Choice(name="Missões", value="missao"),
+    app_commands.Choice(name="Contribuições", value="contribuicao"),
+    app_commands.Choice(name="Missões Especiais", value="especial"),
 ]
 
 
-async def _adicionar_xp(guild_id: int, user_id: int, xp_ganho: int) -> dict:
-    """Soma XP ao perfil do jogador, usando o mesmo caminho de leitura/escrita
-    que utils/perfis.py já usa internamente (get_perfil + _salvar_perfil) —
-    evita duplicar a lógica de criação de perfil padrão."""
-    perfil = await get_perfil(guild_id, user_id)
+TIPOS = {
+    "missao": {
+        "nome": "Missões",
+        "icone": "🎯",
+        "cor": 0xFEE75C,
+    },
+    "contribuicao": {
+        "nome": "Contribuições",
+        "icone": "🤝",
+        "cor": 0x5865F2,
+    },
+    "especial": {
+        "nome": "Missões Especiais",
+        "icone": "✦",
+        "cor": 0x9B59B6,
+    },
+}
+
+
+async def _adicionar_xp(
+    guild_id: int,
+    user_id: int,
+    xp_ganho: int,
+) -> dict:
+
+    perfil = await get_perfil(
+        guild_id,
+        user_id,
+    )
+
     patente_antiga = perfil["patente"]
+
     perfil["xp"] += xp_ganho
-    await _salvar_perfil(guild_id, user_id, perfil)
-    return {"perfil": perfil, "patente_antiga": patente_antiga}
+
+    await _salvar_perfil(
+        guild_id,
+        user_id,
+        perfil,
+    )
+
+    return {
+        "perfil": perfil,
+        "patente_antiga": patente_antiga,
+    }
 
 
 class Missoes(commands.Cog):
-    """Missões PvP e PvE configuráveis pelos líderes. A conclusão passa pelo
-    motor de revisão (print + aprovação manual em Provas-PVP/Provas-PVE) — só
-    depois de aprovada é que o XP é somado automaticamente (e, se for missão
-    PvE, também soma pontuação PvE separada) e a patente é reavaliada."""
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(
+        self,
+        bot: commands.Bot,
+    ):
         self.bot = bot
-        if not hasattr(bot, "processadores_revisao"):
+
+        if not hasattr(
+            bot,
+            "processadores_revisao",
+        ):
             bot.processadores_revisao = {}
-        bot.processadores_revisao["missao"] = self.processar_aprovacao
 
-    async def processar_aprovacao(self, guild: discord.Guild, revisao: dict) -> str:
-        missao = await missoes.get(guild.id, revisao["referencia_id"])
+        bot.processadores_revisao[
+            "missao"
+        ] = self.processar_aprovacao
+
+    # ============================================================
+    # PROCESSAMENTO DA APROVAÇÃO
+    # ============================================================
+
+    async def processar_aprovacao(
+        self,
+        guild: discord.Guild,
+        revisao: dict,
+    ) -> str:
+
+        missao = await missoes.get(
+            guild.id,
+            revisao["referencia_id"],
+        )
+
         if not missao:
-            return "⚠️ Missão original não foi encontrada (pode ter sido removida)."
+            return (
+                "⚠️ A missão original não foi encontrada "
+                "(pode ter sido removida)."
+            )
 
-        resultado = await _adicionar_xp(guild.id, revisao["autor_id"], missao["recompensa_xp"])
-        texto = f"+{missao['recompensa_xp']} XP para <@{revisao['autor_id']}>"
+        recompensa = int(
+            missao.get(
+                "recompensa_xp",
+                0,
+            )
+        )
 
-        if missao["tipo"] == "pve":
-            total_pontos = await pontuacao_pve.adicionar_pontos(guild.id, revisao["autor_id"], missao["recompensa_xp"])
-            texto += f"\n+{missao['recompensa_xp']} pts PvE (total: {total_pontos} pts)"
+        resultado = await _adicionar_xp(
+            guild.id,
+            revisao["autor_id"],
+            recompensa,
+        )
 
-        nova_patente = await calcular_patente_atual(guild.id, resultado["perfil"]["xp"])
-        if nova_patente and nova_patente["nome"] != resultado["patente_antiga"]:
-            await definir_patente(guild.id, revisao["autor_id"], nova_patente["nome"])
-            membro = guild.get_member(revisao["autor_id"])
-            cargo_id = nova_patente.get("cargo_id")
+        tipo = missao.get(
+            "tipo",
+            "missao",
+        )
+
+        info = TIPOS.get(
+            tipo,
+            TIPOS["missao"],
+        )
+
+        texto = (
+            f"+{recompensa} XP para "
+            f"<@{revisao['autor_id']}>"
+        )
+
+        # ========================================================
+        # VERIFICAÇÃO DE PATENTE
+        # ========================================================
+
+        nova_patente = await calcular_patente_atual(
+            guild.id,
+            resultado["perfil"]["xp"],
+        )
+
+        if (
+            nova_patente
+            and nova_patente["nome"]
+            != resultado["patente_antiga"]
+        ):
+
+            await definir_patente(
+                guild.id,
+                revisao["autor_id"],
+                nova_patente["nome"],
+            )
+
+            membro = guild.get_member(
+                revisao["autor_id"]
+            )
+
+            cargo_id = nova_patente.get(
+                "cargo_id"
+            )
+
             if membro and cargo_id:
-                cargo = guild.get_role(cargo_id)
+
+                cargo = guild.get_role(
+                    cargo_id
+                )
+
                 if cargo:
+
                     try:
-                        await membro.add_roles(cargo, reason="Promoção automática por missão")
+                        await membro.add_roles(
+                            cargo,
+                            reason=(
+                                "Promoção automática "
+                                "por conclusão aprovada."
+                            ),
+                        )
+
                     except discord.Forbidden:
                         pass
-            texto += f"\n⬆️ Promovido(a) para **{nova_patente['nome']}**"
 
-        recordes_cog = self.bot.get_cog("Recordes")
+            texto += (
+                f"\n⬆️ Promovido(a) para "
+                f"**{nova_patente['nome']}**"
+            )
+
+        # ========================================================
+        # RECORDES
+        # ========================================================
+
+        recordes_cog = self.bot.get_cog(
+            "Recordes"
+        )
+
         if recordes_cog:
-            await recordes_cog.anunciar_se_recorde(guild, "xp_total", revisao["autor_id"], resultado["perfil"]["xp"])
+
+            await recordes_cog.anunciar_se_recorde(
+                guild,
+                "xp_total",
+                revisao["autor_id"],
+                resultado["perfil"]["xp"],
+            )
 
         return texto
 
-    # ---------------- Configuração de canais ----------------
-    @app_commands.command(name="missao-canais", description="Define os canais de missões e provas pra PvP ou PvE.")
-    @app_commands.describe(tipo="PvP ou PvE", canal_missoes="Onde as missões ativas são postadas",
-                            canal_provas="Onde os jogadores mandam a print pra aprovação")
-    @app_commands.choices(tipo=TIPO_CHOICES)
-    @app_commands.checks.has_permissions(administrator=True)
-    async def missao_canais(self, interaction: discord.Interaction, tipo: app_commands.Choice[str],
-                             canal_missoes: discord.TextChannel, canal_provas: discord.TextChannel):
+    # ============================================================
+    # CONFIGURAÇÃO DOS CANAIS
+    # ============================================================
+
+    @app_commands.command(
+        name="missao-canais",
+        description=(
+            "Configura os canais de um dos sistemas "
+            "de Missões da NÊMESIS."
+        ),
+    )
+    @app_commands.describe(
+        tipo="Sistema que será configurado.",
+        canal_missoes=(
+            "Canal onde as atividades serão publicadas."
+        ),
+        canal_provas=(
+            "Canal onde as provas serão enviadas "
+            "para aprovação."
+        ),
+    )
+    @app_commands.choices(
+        tipo=TIPO_CHOICES
+    )
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def missao_canais(
+        self,
+        interaction: discord.Interaction,
+        tipo: app_commands.Choice[str],
+        canal_missoes: discord.TextChannel,
+        canal_provas: discord.TextChannel,
+    ):
+
+        chave_missoes = (
+            f"canal_missoes_{tipo.value}_id"
+        )
+
+        chave_provas = (
+            f"canal_provas_{tipo.value}_id"
+        )
+
         await set_config(
             interaction.guild.id,
-            **{f"canal_missoes_{tipo.value}_id": canal_missoes.id,
-               f"canal_provas_{tipo.value}_id": canal_provas.id},
+            **{
+                chave_missoes: canal_missoes.id,
+                chave_provas: canal_provas.id,
+            },
         )
+
+        info = TIPOS[
+            tipo.value
+        ]
+
         await interaction.response.send_message(
-            f"✅ Canais de **{tipo.name}** configurados: missões em {canal_missoes.mention}, "
-            f"provas em {canal_provas.mention}.", ephemeral=True
+            (
+                f"{info['icone']} **{info['nome']}** configurado.\n\n"
+                f"Atividades: {canal_missoes.mention}\n"
+                f"Provas: {canal_provas.mention}"
+            ),
+            ephemeral=True,
         )
 
-    # ---------------- Missões ----------------
-    @app_commands.command(name="missao-criar", description="Cria uma nova missão PvP ou PvE.")
-    @app_commands.describe(tipo="PvP ou PvE", titulo="Título curto da missão",
-                            descricao="O que o jogador precisa fazer", recompensa_xp="XP (e pontos, se for PvE) dado ao concluir")
-    @app_commands.choices(tipo=TIPO_CHOICES)
-    @app_commands.checks.has_permissions(administrator=True)
-    async def missao_criar(self, interaction: discord.Interaction, tipo: app_commands.Choice[str],
-                            titulo: str, descricao: str, recompensa_xp: int):
-        missao = await missoes.criar(interaction.guild.id, tipo.value, titulo, descricao,
-                                      recompensa_xp, interaction.user.id)
+    # ============================================================
+    # CRIAR
+    # ============================================================
 
-        config = await get_config(interaction.guild.id)
-        canal_id = config.get(f"canal_missoes_{tipo.value}_id")
-        canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
+    @app_commands.command(
+        name="missao-criar",
+        description=(
+            "Cria uma atividade de Missões, "
+            "Contribuições ou Missões Especiais."
+        ),
+    )
+    @app_commands.describe(
+        tipo="Tipo da atividade.",
+        titulo="Título da atividade.",
+        descricao="Descrição e objetivo.",
+        recompensa_xp="Quantidade de XP concedida após aprovação.",
+    )
+    @app_commands.choices(
+        tipo=TIPO_CHOICES
+    )
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def missao_criar(
+        self,
+        interaction: discord.Interaction,
+        tipo: app_commands.Choice[str],
+        titulo: str,
+        descricao: str,
+        recompensa_xp: app_commands.Range[int, 1, 100000],
+    ):
 
-        embed = discord.Embed(title=f"🎯 Nova missão ({tipo.name})", description=titulo, color=0xFEE75C)
-        embed.add_field(name="Objetivo", value=descricao, inline=False)
-        embed.add_field(name="Recompensa", value=f"{recompensa_xp} XP" + (" / pts PvE" if tipo.value == "pve" else ""), inline=True)
-        embed.set_footer(text=f"ID: {missao['id']} • use /missao-completar pra enviar a prova")
-        await canal.send(embed=embed)
+        missao = await missoes.criar(
+            interaction.guild.id,
+            tipo.value,
+            titulo,
+            descricao,
+            recompensa_xp,
+            interaction.user.id,
+        )
 
-        await interaction.response.send_message(f"✅ Missão criada em {canal.mention}.", ephemeral=True)
+        config = await get_config(
+            interaction.guild.id
+        )
 
-    @app_commands.command(name="missao-listar", description="Lista as missões ativas.")
-    @app_commands.describe(tipo="(Opcional) filtra por PvP ou PvE")
-    @app_commands.choices(tipo=TIPO_CHOICES)
-    async def missao_listar(self, interaction: discord.Interaction, tipo: app_commands.Choice[str] = None):
-        lista = await missoes.listar(interaction.guild.id, tipo=tipo.value if tipo else None)
+        chave_canal = (
+            f"canal_missoes_{tipo.value}_id"
+        )
+
+        canal_id = config.get(
+            chave_canal
+        )
+
+        canal = (
+            interaction.guild.get_channel(
+                canal_id
+            )
+            if canal_id
+            else interaction.channel
+        )
+
+        info = TIPOS[
+            tipo.value
+        ]
+
+        embed = discord.Embed(
+            title=(
+                f"{info['icone']} "
+                f"{info['nome']}"
+            ),
+            description=titulo,
+            color=info["cor"],
+        )
+
+        embed.add_field(
+            name="Objetivo",
+            value=descricao,
+            inline=False,
+        )
+
+        embed.add_field(
+            name="Recompensa",
+            value=f"**{recompensa_xp} XP**",
+            inline=True,
+        )
+
+        embed.add_field(
+            name="Identificação",
+            value=f"`{missao['id']}`",
+            inline=True,
+        )
+
+        embed.set_footer(
+            text=(
+                "Use /missao-completar "
+                "para enviar sua prova."
+            )
+        )
+
+        await canal.send(
+            embed=embed
+        )
+
+        await interaction.response.send_message(
+            (
+                f"✅ {info['nome']} criada em "
+                f"{canal.mention}."
+            ),
+            ephemeral=True,
+        )
+
+    # ============================================================
+    # LISTAR
+    # ============================================================
+
+    @app_commands.command(
+        name="missao-listar",
+        description=(
+            "Lista as atividades ativas."
+        ),
+    )
+    @app_commands.describe(
+        tipo="Filtra por tipo.",
+    )
+    @app_commands.choices(
+        tipo=TIPO_CHOICES
+    )
+    async def missao_listar(
+        self,
+        interaction: discord.Interaction,
+        tipo: app_commands.Choice[str] = None,
+    ):
+
+        lista = await missoes.listar(
+            interaction.guild.id,
+            tipo=tipo.value
+            if tipo
+            else None,
+        )
+
         if not lista:
-            await interaction.response.send_message("Nenhuma missão ativa no momento.", ephemeral=True)
+
+            await interaction.response.send_message(
+                "Nenhuma atividade ativa no momento.",
+                ephemeral=True,
+            )
+
             return
 
-        linhas = [f"**[{m['tipo'].upper()}] {m['titulo']}** — {m['recompensa_xp']} XP (ID: `{m['id']}`)" for m in lista]
-        embed = discord.Embed(title="🎯 Missões ativas", description="\n".join(linhas), color=0xFEE75C)
-        await interaction.response.send_message(embed=embed)
+        linhas = []
 
-    @app_commands.command(name="missao-remover", description="Desativa uma missão.")
-    @app_commands.describe(missao_id="ID da missão (aparece em /missao-listar)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def missao_remover(self, interaction: discord.Interaction, missao_id: str):
-        ok = await missoes.desativar(interaction.guild.id, missao_id)
+        for item in lista:
+
+            info = TIPOS.get(
+                item.get(
+                    "tipo",
+                    "missao",
+                ),
+                TIPOS["missao"],
+            )
+
+            linhas.append(
+                f"{info['icone']} "
+                f"**{item['titulo']}** — "
+                f"{item['recompensa_xp']} XP "
+                f"`{item['id']}`"
+            )
+
+        embed = discord.Embed(
+            title="📋 Atividades ativas",
+            description="\n".join(linhas),
+            color=0x5865F2,
+        )
+
+        await interaction.response.send_message(
+            embed=embed
+        )
+
+    # ============================================================
+    # REMOVER
+    # ============================================================
+
+    @app_commands.command(
+        name="missao-remover",
+        description=(
+            "Desativa uma atividade."
+        ),
+    )
+    @app_commands.describe(
+        missao_id=(
+            "ID da atividade."
+        ),
+    )
+    @app_commands.checks.has_permissions(
+        administrator=True
+    )
+    async def missao_remover(
+        self,
+        interaction: discord.Interaction,
+        missao_id: str,
+    ):
+
+        ok = await missoes.desativar(
+            interaction.guild.id,
+            missao_id,
+        )
+
         if not ok:
-            await interaction.response.send_message("Não achei nenhuma missão ativa com esse ID.", ephemeral=True)
-            return
-        await interaction.response.send_message("🗑️ Missão desativada.", ephemeral=True)
 
-    @app_commands.command(name="missao-completar", description="Envia a prova de que você concluiu uma missão.")
-    @app_commands.describe(missao_id="ID da missão (aparece em /missao-listar)", print="Print comprovando a conclusão")
-    async def missao_completar(self, interaction: discord.Interaction, missao_id: str, print: discord.Attachment):
-        missao = await missoes.get(interaction.guild.id, missao_id)
+            await interaction.response.send_message(
+                (
+                    "❌ Não encontrei nenhuma "
+                    "atividade ativa com esse ID."
+                ),
+                ephemeral=True,
+            )
+
+            return
+
+        await interaction.response.send_message(
+            "🗑️ Atividade desativada.",
+            ephemeral=True,
+        )
+
+    # ============================================================
+    # ENVIAR PROVA
+    # ============================================================
+
+    @app_commands.command(
+        name="missao-completar",
+        description=(
+            "Envia uma prova de conclusão."
+        ),
+    )
+    @app_commands.describe(
+        missao_id=(
+            "ID da atividade."
+        ),
+        print=(
+            "Imagem comprovando a conclusão."
+        ),
+    )
+    async def missao_completar(
+        self,
+        interaction: discord.Interaction,
+        missao_id: str,
+        print: discord.Attachment,
+    ):
+
+        missao = await missoes.get(
+            interaction.guild.id,
+            missao_id,
+        )
+
         if not missao or not missao["ativa"]:
-            await interaction.response.send_message("Não achei nenhuma missão ativa com esse ID.", ephemeral=True)
+
+            await interaction.response.send_message(
+                (
+                    "❌ Não encontrei nenhuma "
+                    "atividade ativa com esse ID."
+                ),
+                ephemeral=True,
+            )
+
             return
 
-        config = await get_config(interaction.guild.id)
-        canal_id = config.get(f"canal_provas_{missao['tipo']}_id")
-        canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
+        tipo = missao.get(
+            "tipo",
+            "missao",
+        )
 
-        revisoes_cog = self.bot.get_cog("Revisoes")
+        if tipo not in TIPOS:
+
+            await interaction.response.send_message(
+                (
+                    "❌ Essa atividade utiliza "
+                    "um tipo antigo que não "
+                    "faz mais parte da NÊMESIS."
+                ),
+                ephemeral=True,
+            )
+
+            return
+
+        config = await get_config(
+            interaction.guild.id
+        )
+
+        chave_provas = (
+            f"canal_provas_{tipo}_id"
+        )
+
+        canal_id = config.get(
+            chave_provas
+        )
+
+        canal = (
+            interaction.guild.get_channel(
+                canal_id
+            )
+            if canal_id
+            else None
+        )
+
+        if not canal:
+
+            await interaction.response.send_message(
+                (
+                    "❌ O canal de provas desse "
+                    "sistema ainda não foi configurado."
+                ),
+                ephemeral=True,
+            )
+
+            return
+
+        revisoes_cog = self.bot.get_cog(
+            "Revisoes"
+        )
+
         if not revisoes_cog:
-            await interaction.response.send_message("⚠️ O sistema de revisão não está carregado. Avise um admin.", ephemeral=True)
+
+            await interaction.response.send_message(
+                (
+                    "⚠️ O sistema de revisão "
+                    "não está carregado."
+                ),
+                ephemeral=True,
+            )
+
             return
+
+        info = TIPOS[
+            tipo
+        ]
 
         await revisoes_cog.abrir_revisao(
-            interaction.guild, canal,
-            tipo="missao", autor_id=interaction.user.id, referencia_id=missao["id"],
-            print_url=print.url, titulo=missao["titulo"],
-            descricao=f"Enviado por {interaction.user.mention} para conclusão da missão.",
+            interaction.guild,
+            canal,
+            tipo="missao",
+            autor_id=interaction.user.id,
+            referencia_id=missao["id"],
+            print_url=print.url,
+            titulo=(
+                f"{info['nome']} — "
+                f"{missao['titulo']}"
+            ),
+            descricao=(
+                f"Prova enviada por "
+                f"{interaction.user.mention}."
+            ),
         )
-        await interaction.response.send_message(f"✅ Prova enviada para revisão em {canal.mention}.", ephemeral=True)
+
+        await interaction.response.send_message(
+            (
+                f"✅ Sua prova foi enviada para "
+                f"{canal.mention} e aguarda revisão."
+            ),
+            ephemeral=True,
+        )
 
 
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Missoes(bot))
+async def setup(
+    bot: commands.Bot,
+):
+    await bot.add_cog(
+        Missoes(bot)
+    )
