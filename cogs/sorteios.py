@@ -11,96 +11,108 @@ from utils.storage import carregar, salvar
 
 ARQUIVO = "sorteios.json"
 
-
 COR_SORTEIO = 0x5865F2
 COR_SUCESSO = 0x57F287
 COR_ERRO = 0xED4245
 
 
-def formatar_data(timestamp: float) -> str:
-    return f"<t:{int(timestamp)}:F>"
-
-
-def formatar_relativo(timestamp: float) -> str:
-    return f"<t:{int(timestamp)}:R>"
+def timestamp_discord(timestamp: float, formato: str = "F") -> str:
+    return f"<t:{int(timestamp)}:{formato}>"
 
 
 class BotaoParticipar(discord.ui.View):
-    """View persistente dos sorteios."""
+    """
+    View persistente dos sorteios.
 
-    def __init__(self):
+    Os dados são recuperados do sorteios.json,
+    permitindo que os botões continuem funcionando
+    mesmo depois que o bot reiniciar.
+    """
+
+    def __init__(
+        self,
+        participantes: int = 0,
+        encerrado: bool = False,
+    ):
         super().__init__(timeout=None)
 
-    async def obter_sorteio(self, mensagem_id: int):
+        self.encerrado = encerrado
+        self.participantes_total = participantes
+
+        for item in self.children:
+            if item.custom_id == "sorteio_participar_btn":
+                item.label = (
+                    "🎁 Encerrado"
+                    if encerrado
+                    else f"🎁 Participar ({participantes})"
+                )
+
+                item.disabled = encerrado
+
+            elif item.custom_id == "sorteio_participantes_btn":
+                item.label = (
+                    f"👥 Participantes ({participantes})"
+                )
+
+    async def obter_sorteio(
+        self,
+        mensagem_id: int,
+    ):
         todos = await carregar(
             ARQUIVO,
             {},
         )
 
-        return next(
-            (
-                sorteio
-                for sorteio in todos.values()
-                if str(sorteio.get("mensagem_id"))
+        for sorteio in todos.values():
+            if (
+                str(sorteio.get("mensagem_id"))
                 == str(mensagem_id)
-            ),
-            None,
+            ):
+                return sorteio
+
+        return None
+
+    async def salvar_sorteio(
+        self,
+        sorteio: dict,
+    ):
+        todos = await carregar(
+            ARQUIVO,
+            {},
         )
 
-    async def atualizar_mensagem(
+        sorteio["atualizado_em"] = time.time()
+
+        todos[str(sorteio["id"])] = sorteio
+
+        await salvar(
+            ARQUIVO,
+            todos,
+        )
+
+    async def atualizar_botoes(
         self,
         interaction: discord.Interaction,
         sorteio: dict,
     ):
-        participantes = sorteio.get(
-            "participantes",
-            [],
-        )
-
-        encerrado = sorteio.get(
-            "encerrado",
-            False,
-        )
-
-        view = BotaoParticipar()
-
-        botao_participar = next(
-            (
-                item
-                for item in view.children
-                if item.custom_id
-                == "sorteio_participar_btn"
-            ),
-            None,
-        )
-
-        botao_participantes = next(
-            (
-                item
-                for item in view.children
-                if item.custom_id
-                == "sorteio_participantes_btn"
-            ),
-            None,
-        )
-
-        if botao_participar:
-            botao_participar.label = (
-                f"🎁 Participar ({len(participantes)})"
+        quantidade = len(
+            sorteio.get(
+                "participantes",
+                [],
             )
+        )
 
-            if encerrado:
-                botao_participar.disabled = True
-                botao_participar.label = "🎁 Encerrado"
-
-        if botao_participantes:
-            botao_participantes.label = (
-                f"👥 Participantes ({len(participantes)})"
-            )
+        view = BotaoParticipar(
+            participantes=quantidade,
+            encerrado=sorteio.get(
+                "encerrado",
+                False,
+            ),
+        )
 
         try:
             await interaction.message.edit(
-                view=view,
+                view=view
             )
         except discord.HTTPException:
             pass
@@ -121,29 +133,28 @@ class BotaoParticipar(discord.ui.View):
 
         if not sorteio:
             await interaction.response.send_message(
-                "Não encontrei os dados desse sorteio.",
+                "Não foi possível encontrar este sorteio.",
                 ephemeral=True,
             )
             return
 
         if sorteio.get("encerrado"):
             await interaction.response.send_message(
-                "Esse sorteio já foi encerrado.",
+                "Este sorteio já foi encerrado.",
                 ephemeral=True,
             )
             return
 
-        if (
-            time.time()
-            >= float(
-                sorteio.get(
-                    "fim",
-                    0,
-                )
+        fim = float(
+            sorteio.get(
+                "fim",
+                0,
             )
-        ):
+        )
+
+        if time.time() >= fim:
             await interaction.response.send_message(
-                "Esse sorteio já terminou.",
+                "O período de participação deste sorteio já terminou.",
                 ephemeral=True,
             )
             return
@@ -168,16 +179,8 @@ class BotaoParticipar(discord.ui.View):
 
         sorteio["atualizado_em"] = time.time()
 
-        todos = await carregar(
-            ARQUIVO,
-            {},
-        )
-
-        todos[sorteio["id"]] = sorteio
-
-        await salvar(
-            ARQUIVO,
-            todos,
+        await self.salvar_sorteio(
+            sorteio
         )
 
         await interaction.response.send_message(
@@ -185,7 +188,7 @@ class BotaoParticipar(discord.ui.View):
             ephemeral=True,
         )
 
-        await self.atualizar_mensagem(
+        await self.atualizar_botoes(
             interaction,
             sorteio,
         )
@@ -195,7 +198,7 @@ class BotaoParticipar(discord.ui.View):
         style=discord.ButtonStyle.primary,
         custom_id="sorteio_participantes_btn",
     )
-    async def participantes(
+    async def mostrar_participantes(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button,
@@ -206,7 +209,7 @@ class BotaoParticipar(discord.ui.View):
 
         if not sorteio:
             await interaction.response.send_message(
-                "Não encontrei os dados desse sorteio.",
+                "Não foi possível encontrar este sorteio.",
                 ephemeral=True,
             )
             return
@@ -223,8 +226,6 @@ class BotaoParticipar(discord.ui.View):
             )
             return
 
-        total = len(participantes)
-
         linhas = []
 
         limite = 50
@@ -237,10 +238,14 @@ class BotaoParticipar(discord.ui.View):
                 f"`{indice:02}` <@{usuario_id}>"
             )
 
-        if total > limite:
+        if len(participantes) > limite:
             linhas.append(
-                f"\n... e mais "
-                f"**{total - limite}** participantes."
+                ""
+            )
+
+            linhas.append(
+                f"... e mais "
+                f"**{len(participantes) - limite}** participantes."
             )
 
         embed = discord.Embed(
@@ -251,8 +256,8 @@ class BotaoParticipar(discord.ui.View):
 
         embed.set_footer(
             text=(
-                f"{total} participante"
-                f"{'s' if total != 1 else ''}"
+                f"{len(participantes)} participante"
+                f"{'s' if len(participantes) != 1 else ''}"
             )
         )
 
@@ -266,9 +271,14 @@ class Sorteios(commands.Cog):
     """
     Sistema de sorteios da NÊMESIS.
 
-    Os sorteios são persistidos em sorteios.json
-    e sincronizados com o Dashboard através do
-    armazenamento compartilhado.
+    Cada sorteio possui:
+    - texto/descrição;
+    - requisitos;
+    - prêmio;
+    - quantidade de vencedores;
+    - data de término;
+    - participantes;
+    - seleção automática dos vencedores.
     """
 
     def __init__(
@@ -286,7 +296,7 @@ class Sorteios(commands.Cog):
     def cog_unload(self):
         self.verificar_sorteios.cancel()
 
-    async def _obter_sorteio(
+    async def obter_sorteio(
         self,
         sorteio_id: str,
     ):
@@ -299,7 +309,7 @@ class Sorteios(commands.Cog):
             str(sorteio_id)
         )
 
-    async def _salvar_sorteio(
+    async def salvar_sorteio(
         self,
         sorteio: dict,
     ):
@@ -319,53 +329,54 @@ class Sorteios(commands.Cog):
 
     def criar_embed(
         self,
+        *,
+        texto: str,
+        requisitos: str,
         premio: str,
-        descricao: str,
-        requisito: str,
-        fim: float,
         vencedores: int,
+        fim: float,
         criado_por: discord.Member,
-        banner_url: str | None = None,
+        banner: str = "",
     ) -> discord.Embed:
 
-        texto = ""
+        descricao = ""
 
-        if descricao:
-            texto += (
-                f"{descricao}\n\n"
+        if texto.strip():
+            descricao += (
+                f"{texto.strip()}\n\n"
             )
 
-        if requisito:
-            texto += (
+        if requisitos.strip():
+            descricao += (
                 "⚠️ **Requisitos mínimos:**\n"
-                f"{requisito}\n\n"
+                f"{requisitos.strip()}\n\n"
             )
 
-        texto += (
+        descricao += (
             "🎁 **Prêmio:**\n"
-            f"**{premio}**\n\n"
-            "🏆 **Vencedores:** "
+            f"{premio.strip()}\n\n"
+            "🏆 **Vencedores:**\n"
             f"**{vencedores}**\n\n"
-            "⏰ **Termina:**\n"
-            f"{formatar_data(fim)} "
-            f"({formatar_relativo(fim)})\n\n"
+            "⏰ **Sorteio termina:**\n"
+            f"{timestamp_discord(fim, 'F')} "
+            f"({timestamp_discord(fim, 'R')})\n\n"
             "Clique em **Participar** abaixo "
             "para entrar no sorteio."
         )
 
         embed = discord.Embed(
-            title=f"🎁 {premio}",
-            description=texto,
+            title="🎁 SORTEIO",
+            description=descricao,
             color=COR_SORTEIO,
         )
 
         embed.set_author(
-            name="NÊMESIS • SORTEIO"
+            name="NÊMESIS"
         )
 
-        if banner_url:
+        if banner.strip():
             embed.set_image(
-                url=banner_url
+                url=banner.strip()
             )
 
         embed.set_footer(
@@ -373,9 +384,7 @@ class Sorteios(commands.Cog):
                 f"Sorteio criado por "
                 f"{criado_por.display_name}"
             ),
-            icon_url=(
-                criado_por.display_avatar.url
-            ),
+            icon_url=criado_por.display_avatar.url,
         )
 
         return embed
@@ -384,44 +393,25 @@ class Sorteios(commands.Cog):
         self,
         quantidade: int = 0,
         encerrado: bool = False,
-    ):
-        view = BotaoParticipar()
+    ) -> BotaoParticipar:
 
-        for item in view.children:
-            if (
-                item.custom_id
-                == "sorteio_participar_btn"
-            ):
-                item.label = (
-                    "🎁 Encerrado"
-                    if encerrado
-                    else f"🎁 Participar ({quantidade})"
-                )
-
-                item.disabled = encerrado
-
-            elif (
-                item.custom_id
-                == "sorteio_participantes_btn"
-            ):
-                item.label = (
-                    f"👥 Participantes ({quantidade})"
-                )
-
-        return view
+        return BotaoParticipar(
+            participantes=quantidade,
+            encerrado=encerrado,
+        )
 
     @app_commands.command(
         name="sorteio-criar",
-        description="Cria um sorteio visual da NÊMESIS.",
+        description="Cria um sorteio da NÊMESIS.",
     )
     @app_commands.describe(
-        premio="Prêmio do sorteio",
-        duracao_minutos="Duração do sorteio em minutos",
-        vencedores="Quantidade de vencedores",
-        descricao="Descrição ou informações do sorteio",
-        requisito="Requisito mínimo para participar",
-        banner="URL da imagem/banner do sorteio",
-        canal="Canal onde o sorteio será publicado",
+        texto="Texto apresentado no sorteio.",
+        requisitos="Requisitos mínimos para participar.",
+        premio="Prêmio que será sorteado.",
+        vencedores="Quantidade de vencedores.",
+        duracao_minutos="Tempo até o encerramento do sorteio.",
+        banner="URL da imagem/banner do sorteio.",
+        canal="Canal onde o sorteio será publicado.",
     )
     @app_commands.checks.has_permissions(
         manage_guild=True
@@ -429,24 +419,24 @@ class Sorteios(commands.Cog):
     async def sorteio_criar(
         self,
         interaction: discord.Interaction,
+        texto: str,
+        requisitos: str,
         premio: str,
+        vencedores: int,
         duracao_minutos: int,
-        vencedores: int = 1,
-        descricao: str = "",
-        requisito: str = "",
         banner: str = "",
         canal: discord.TextChannel = None,
     ):
-        if duracao_minutos <= 0:
+        if vencedores <= 0:
             await interaction.response.send_message(
-                "A duração precisa ser maior que 0 minutos.",
+                "A quantidade de vencedores precisa ser maior que 0.",
                 ephemeral=True,
             )
             return
 
-        if vencedores <= 0:
+        if duracao_minutos <= 0:
             await interaction.response.send_message(
-                "A quantidade de vencedores precisa ser maior que 0.",
+                "A duração precisa ser maior que 0 minutos.",
                 ephemeral=True,
             )
             return
@@ -463,9 +453,22 @@ class Sorteios(commands.Cog):
             or interaction.channel
         )
 
+        if not isinstance(
+            canal_destino,
+            discord.TextChannel,
+        ):
+            await interaction.response.send_message(
+                "Não foi possível determinar o canal do sorteio.",
+                ephemeral=True,
+            )
+            return
+
         fim = (
             time.time()
-            + duracao_minutos * 60
+            + (
+                duracao_minutos
+                * 60
+            )
         )
 
         sorteio_id = str(
@@ -473,17 +476,13 @@ class Sorteios(commands.Cog):
         )[:8]
 
         embed = self.criar_embed(
+            texto=texto,
+            requisitos=requisitos,
             premio=premio,
-            descricao=descricao,
-            requisito=requisito,
-            fim=fim,
             vencedores=vencedores,
+            fim=fim,
             criado_por=interaction.user,
-            banner_url=(
-                banner.strip()
-                if banner
-                else None
-            ),
+            banner=banner,
         )
 
         view = self.criar_view(
@@ -514,18 +513,14 @@ class Sorteios(commands.Cog):
         sorteio = {
             "id": sorteio_id,
             "guild_id": interaction.guild.id,
+
             "canal_id": canal_destino.id,
             "mensagem_id": mensagem.id,
 
+            "texto": texto,
+            "requisitos": requisitos,
             "premio": premio,
-
-            "descricao": descricao,
-            "requisito": requisito,
-            "banner": (
-                banner.strip()
-                if banner
-                else None
-            ),
+            "banner": banner.strip() or None,
 
             "fim": fim,
             "vencedores": vencedores,
@@ -536,12 +531,13 @@ class Sorteios(commands.Cog):
             "encerrado": False,
 
             "criado_por_id": interaction.user.id,
+
             "criado_em": agora,
             "atualizado_em": agora,
             "encerrado_em": None,
         }
 
-        await self._salvar_sorteio(
+        await self.salvar_sorteio(
             sorteio
         )
 
@@ -552,13 +548,56 @@ class Sorteios(commands.Cog):
                 f"ID: `{sorteio_id}`"
             )
         )
+    async def atualizar_mensagem(
+        self,
+        sorteio: dict,
+    ):
+        canal = self.bot.get_channel(
+            sorteio.get("canal_id")
+        )
+
+        if not canal:
+            return
+
+        try:
+            mensagem = await canal.fetch_message(
+                sorteio.get("mensagem_id")
+            )
+        except (
+            discord.NotFound,
+            discord.Forbidden,
+            discord.HTTPException,
+        ):
+            return
+
+        quantidade = len(
+            sorteio.get(
+                "participantes",
+                [],
+            )
+        )
+
+        view = self.criar_view(
+            quantidade=quantidade,
+            encerrado=sorteio.get(
+                "encerrado",
+                False,
+            ),
+        )
+
+        try:
+            await mensagem.edit(
+                view=view
+            )
+        except discord.HTTPException:
+            pass
 
     @app_commands.command(
         name="sorteio-encerrar",
-        description="Encerra um sorteio e sorteia os vencedores.",
+        description="Encerra um sorteio e seleciona os vencedores.",
     )
     @app_commands.describe(
-        id="ID do sorteio",
+        id="ID do sorteio.",
     )
     @app_commands.checks.has_permissions(
         manage_guild=True
@@ -568,14 +607,18 @@ class Sorteios(commands.Cog):
         interaction: discord.Interaction,
         id: str,
     ):
-        sorteio = await self._obter_sorteio(
+        sorteio = await self.obter_sorteio(
             id
         )
 
         if (
             not sorteio
-            or sorteio.get("guild_id")
-            != interaction.guild.id
+            or str(
+                sorteio.get("guild_id")
+            )
+            != str(
+                interaction.guild.id
+            )
         ):
             await interaction.response.send_message(
                 "Não encontrei esse sorteio.",
@@ -591,17 +634,17 @@ class Sorteios(commands.Cog):
             return
 
         await interaction.response.send_message(
-            "Encerrando sorteio...",
+            "Encerrando sorteio e selecionando os vencedores...",
             ephemeral=True,
         )
 
-        await self._sortear_vencedores(
+        await self.sortear_vencedores(
             sorteio
         )
 
     @app_commands.command(
         name="sorteio-listar",
-        description="Lista os sorteios ativos do servidor.",
+        description="Lista os sorteios ativos da NÊMESIS.",
     )
     async def sorteio_listar(
         self,
@@ -612,17 +655,29 @@ class Sorteios(commands.Cog):
             {},
         )
 
-        ativos = [
-            sorteio
-            for sorteio in todos.values()
-            if sorteio.get("guild_id")
-            == interaction.guild.id
-            and not sorteio.get("encerrado")
-        ]
+        ativos = []
+
+        for sorteio in todos.values():
+            if (
+                str(
+                    sorteio.get("guild_id")
+                )
+                != str(
+                    interaction.guild.id
+                )
+            ):
+                continue
+
+            if sorteio.get("encerrado"):
+                continue
+
+            ativos.append(
+                sorteio
+            )
 
         if not ativos:
             await interaction.response.send_message(
-                "Nenhum sorteio em andamento.",
+                "Nenhum sorteio está em andamento.",
                 ephemeral=True,
             )
             return
@@ -630,7 +685,7 @@ class Sorteios(commands.Cog):
         linhas = []
 
         for sorteio in ativos:
-            participantes = len(
+            quantidade = len(
                 sorteio.get(
                     "participantes",
                     [],
@@ -639,16 +694,22 @@ class Sorteios(commands.Cog):
 
             linhas.append(
                 f"**#{sorteio['id']}** — "
-                f"{sorteio['premio']} "
-                f"• **{participantes}** participantes "
+                f"**{sorteio['premio']}**\n"
+                f"👥 {quantidade} participantes "
                 f"• termina "
-                f"{formatar_relativo(sorteio['fim'])}"
+                f"{timestamp_discord(sorteio['fim'], 'R')}"
             )
 
         embed = discord.Embed(
             title="🎁 Sorteios ativos",
-            description="\n".join(linhas),
+            description="\n\n".join(
+                linhas
+            ),
             color=COR_SORTEIO,
+        )
+
+        embed.set_footer(
+            text="NÊMESIS • Sorteios"
         )
 
         await interaction.response.send_message(
@@ -656,51 +717,7 @@ class Sorteios(commands.Cog):
             ephemeral=True,
         )
 
-    async def _atualizar_sorteio_discord(
-        self,
-        sorteio: dict,
-    ):
-        canal = self.bot.get_channel(
-            sorteio.get("canal_id")
-        )
-
-        if not canal:
-            return
-
-        try:
-            mensagem = await canal.fetch_message(
-                sorteio.get("mensagem_id")
-            )
-        except (
-            discord.NotFound,
-            discord.Forbidden,
-            discord.HTTPException,
-        ):
-            return
-
-        participantes = len(
-            sorteio.get(
-                "participantes",
-                [],
-            )
-        )
-
-        view = self.criar_view(
-            quantidade=participantes,
-            encerrado=sorteio.get(
-                "encerrado",
-                False,
-            ),
-        )
-
-        try:
-            await mensagem.edit(
-                view=view
-            )
-        except discord.HTTPException:
-            pass
-
-    async def _sortear_vencedores(
+    async def sortear_vencedores(
         self,
         sorteio: dict,
     ):
@@ -714,23 +731,27 @@ class Sorteios(commands.Cog):
             )
         )
 
-        quantidade = min(
-            int(
-                sorteio.get(
-                    "vencedores",
-                    1,
-                )
-            ),
+        quantidade_solicitada = int(
+            sorteio.get(
+                "vencedores",
+                1,
+            )
+        )
+
+        quantidade_real = min(
+            quantidade_solicitada,
             len(participantes),
         )
 
         vencedores_ids = []
 
-        if quantidade > 0:
+        if quantidade_real > 0:
             vencedores_ids = random.sample(
                 participantes,
-                quantidade,
+                quantidade_real,
             )
+
+        agora = time.time()
 
         sorteio["encerrado"] = True
 
@@ -738,10 +759,14 @@ class Sorteios(commands.Cog):
             vencedores_ids
         )
 
-        sorteio["encerrado_em"] = time.time()
-        sorteio["atualizado_em"] = time.time()
+        sorteio["encerrado_em"] = agora
+        sorteio["atualizado_em"] = agora
 
-        await self._salvar_sorteio(
+        await self.salvar_sorteio(
+            sorteio
+        )
+
+        await self.atualizar_mensagem(
             sorteio
         )
 
@@ -752,33 +777,13 @@ class Sorteios(commands.Cog):
         if not canal:
             return
 
-        try:
-            mensagem = await canal.fetch_message(
-                sorteio.get("mensagem_id")
-            )
-
-            await mensagem.edit(
-                view=self.criar_view(
-                    quantidade=len(
-                        participantes
-                    ),
-                    encerrado=True,
-                )
-            )
-        except (
-            discord.NotFound,
-            discord.Forbidden,
-            discord.HTTPException,
-        ):
-            pass
-
         if not participantes:
             embed = discord.Embed(
-                title="🎁 Sorteio encerrado",
+                title="🎁 SORTEIO ENCERRADO",
                 description=(
                     f"O sorteio de "
-                    f"**{sorteio['premio']}** foi encerrado.\n\n"
-                    "Ninguém participou."
+                    f"**{sorteio['premio']}** terminou.\n\n"
+                    "Não houve participantes."
                 ),
                 color=COR_ERRO,
             )
@@ -786,20 +791,29 @@ class Sorteios(commands.Cog):
             await canal.send(
                 embed=embed
             )
+
             return
 
         mencoes = ", ".join(
-            f"<@{uid}>"
-            for uid in vencedores_ids
+            f"<@{usuario_id}>"
+            for usuario_id in vencedores_ids
         )
 
+        if vencedores_ids:
+            resultado = mencoes
+        else:
+            resultado = (
+                "Não foi possível selecionar "
+                "um vencedor."
+            )
+
         embed = discord.Embed(
-            title="🏆 Sorteio encerrado!",
+            title="🏆 SORTEIO ENCERRADO",
             description=(
-                f"🎁 **Prêmio:** "
+                f"🎁 **Prêmio:**\n"
                 f"{sorteio['premio']}\n\n"
                 f"🏆 **Vencedor(es):**\n"
-                f"{mencoes}\n\n"
+                f"{resultado}\n\n"
                 f"👥 **Participantes:** "
                 f"**{len(participantes)}**"
             ),
@@ -828,19 +842,22 @@ class Sorteios(commands.Cog):
         for sorteio in list(
             todos.values()
         ):
-            if (
-                sorteio.get("encerrado")
-                or agora
-                < float(
-                    sorteio.get(
-                        "fim",
-                        0,
-                    )
-                )
+            if sorteio.get(
+                "encerrado"
             ):
                 continue
 
-            await self._sortear_vencedores(
+            fim = float(
+                sorteio.get(
+                    "fim",
+                    0,
+                )
+            )
+
+            if agora < fim:
+                continue
+
+            await self.sortear_vencedores(
                 sorteio
             )
 
@@ -854,4 +871,6 @@ class Sorteios(commands.Cog):
 async def setup(
     bot: commands.Bot,
 ):
-    await bot.add_cog
+    await bot.add_cog(
+        Sorteios(bot)
+    )
