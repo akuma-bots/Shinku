@@ -32,9 +32,7 @@ PADRAO = {
     "desafio_cooldown_minutos": 60,
 
     "canal_lutas_id": 1545834447944028170,
-
     "canal_provas_pvp_id": 1545853928736952420,
-
     "canal_ranking_id": 1545834182406574241,
 
     # ========================================================
@@ -66,12 +64,131 @@ PADRAO = {
 }
 
 
+# ============================================================
+# CAMPOS QUE REPRESENTAM IDs DO DISCORD
+# ============================================================
+
+CAMPOS_ID = (
+    "support_role_id",
+    "log_channel_id",
+    "ticket_category_id",
+
+    "canal_eventos_id",
+    "canal_parcerias_id",
+    "cargo_categoria_parcerias_id",
+
+    "canal_auditoria_id",
+    "canal_guerras_id",
+
+    "canal_desafios_id",
+    "canal_lutas_id",
+    "canal_provas_pvp_id",
+    "canal_ranking_id",
+
+    "canal_missoes_missao_id",
+    "canal_provas_missao_id",
+
+    "canal_missoes_contribuicao_id",
+    "canal_provas_contribuicao_id",
+
+    "canal_missoes_especial_id",
+    "canal_provas_especial_id",
+
+    "canal_recordes_id",
+)
+
+
+# ============================================================
+# NORMALIZAÇÃO DOS IDs
+# ============================================================
+
+def _normalizar_id(valor):
+    """
+    Converte IDs vindos do dashboard/Upstash para int.
+
+    O site pode salvar IDs como strings, por exemplo:
+        "1545838386944938024"
+
+    O discord.py espera:
+        1545838386944938024
+    """
+
+    if valor is None or valor == "":
+        return None
+
+    try:
+        return int(valor)
+
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalizar_config(config: dict) -> dict:
+
+    resultado = {
+        **PADRAO,
+        **(config or {}),
+    }
+
+    # --------------------------------------------------------
+    # Normaliza todos os IDs Discord
+    # --------------------------------------------------------
+
+    for campo in CAMPOS_ID:
+        resultado[campo] = _normalizar_id(
+            resultado.get(campo)
+        )
+
+    # --------------------------------------------------------
+    # Canais de cargo automático
+    # --------------------------------------------------------
+
+    canais_cargo = resultado.get(
+        "canais_cargo_automatico",
+        {},
+    )
+
+    if not isinstance(canais_cargo, dict):
+        canais_cargo = {}
+
+    resultado["canais_cargo_automatico"] = {
+        str(canal_id): int(cargo_id)
+        for canal_id, cargo_id in canais_cargo.items()
+        if _normalizar_id(canal_id) is not None
+        and _normalizar_id(cargo_id) is not None
+    }
+
+    # --------------------------------------------------------
+    # Contadores
+    # --------------------------------------------------------
+
+    contadores = resultado.get(
+        "contadores",
+        [],
+    )
+
+    if not isinstance(contadores, list):
+        contadores = []
+
+    resultado["contadores"] = contadores
+
+    return resultado
+
+
+# ============================================================
+# STORAGE
+# ============================================================
+
 async def _tudo():
     return await carregar(
         ARQUIVO,
         {},
     )
 
+
+# ============================================================
+# OBTER CONFIGURAÇÃO
+# ============================================================
 
 async def get_config(
     guild_id: int,
@@ -84,27 +201,12 @@ async def get_config(
         {},
     )
 
-    resultado = {
-        **PADRAO,
-        **config,
-    }
+    return _normalizar_config(config)
 
-    resultado[
-        "canais_cargo_automatico"
-    ] = config.get(
-        "canais_cargo_automatico",
-        {},
-    )
 
-    resultado[
-        "contadores"
-    ] = config.get(
-        "contadores",
-        [],
-    )
-
-    return resultado
-
+# ============================================================
+# SALVAR CONFIGURAÇÃO
+# ============================================================
 
 async def set_config(
     guild_id: int,
@@ -113,17 +215,20 @@ async def set_config(
 
     dados = await _tudo()
 
-    atual = {
-        **PADRAO,
-        **dados.get(
+    atual = _normalizar_config(
+        dados.get(
             str(guild_id),
             {},
-        ),
-    }
+        )
+    )
 
     for chave, valor in campos.items():
 
         if valor is not None:
+
+            if chave in CAMPOS_ID:
+                valor = _normalizar_id(valor)
+
             atual[chave] = valor
 
     dados[str(guild_id)] = atual
@@ -148,20 +253,19 @@ async def definir_canal_cargo_automatico(
 
     dados = await _tudo()
 
-    atual = {
-        **PADRAO,
-        **dados.get(
+    atual = _normalizar_config(
+        dados.get(
             str(guild_id),
             {},
-        ),
-    }
+        )
+    )
 
     mapa = atual.setdefault(
         "canais_cargo_automatico",
         {},
     )
 
-    mapa[str(canal_id)] = cargo_id
+    mapa[str(canal_id)] = int(cargo_id)
 
     dados[str(guild_id)] = atual
 
@@ -180,13 +284,12 @@ async def remover_canal_cargo_automatico(
 
     dados = await _tudo()
 
-    atual = {
-        **PADRAO,
-        **dados.get(
+    atual = _normalizar_config(
+        dados.get(
             str(guild_id),
             {},
-        ),
-    }
+        )
+    )
 
     mapa = atual.setdefault(
         "canais_cargo_automatico",
@@ -221,13 +324,12 @@ async def adicionar_contador(
 
     dados = await _tudo()
 
-    atual = {
-        **PADRAO,
-        **dados.get(
+    atual = _normalizar_config(
+        dados.get(
             str(guild_id),
             {},
-        ),
-    }
+        )
+    )
 
     lista = atual.setdefault(
         "contadores",
@@ -243,8 +345,12 @@ async def adicionar_contador(
     lista.append(
         {
             "tipo": tipo,
-            "canal_id": canal_id,
-            "cargo_id": cargo_id,
+            "canal_id": int(canal_id),
+            "cargo_id": (
+                int(cargo_id)
+                if cargo_id is not None
+                else None
+            ),
         }
     )
 
@@ -265,13 +371,12 @@ async def remover_contador(
 
     dados = await _tudo()
 
-    atual = {
-        **PADRAO,
-        **dados.get(
+    atual = _normalizar_config(
+        dados.get(
             str(guild_id),
             {},
-        ),
-    }
+        )
+    )
 
     lista = atual.setdefault(
         "contadores",
