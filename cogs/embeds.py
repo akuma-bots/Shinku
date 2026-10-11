@@ -25,40 +25,103 @@ def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
     return view if tem_botao else None
 
 
-class EmbedModal(discord.ui.Modal, title="Criar embed"):
-    titulo = discord.ui.TextInput(label="Título", required=False, max_length=256)
-    descricao = discord.ui.TextInput(
-        label="Descrição (aceita **negrito**, • listas)",
-        style=discord.TextStyle.paragraph,
-        required=False,
-        max_length=4000,
-    )
-    cor = discord.ui.TextInput(label="Cor em hex (ex: FFD700 pra dourado)", required=False, max_length=7, placeholder="5865F2")
-    imagem = discord.ui.TextInput(label="URL da imagem/banner (opcional)", required=False)
-    rodape = discord.ui.TextInput(label="Rodapé (opcional)", required=False, max_length=256)
+class EmbedModal(discord.ui.Modal, title="Criar embed — até 20 mil caracteres"):
+    parte1 = discord.ui.TextInput(label="Descrição — parte 1/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    parte2 = discord.ui.TextInput(label="Descrição — parte 2/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    parte3 = discord.ui.TextInput(label="Descrição — parte 3/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    parte4 = discord.ui.TextInput(label="Descrição — parte 4/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
+    parte5 = discord.ui.TextInput(label="Descrição — parte 5/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
 
-    def __init__(self, canal: discord.TextChannel, botao1_texto=None, botao1_url=None, botao2_texto=None, botao2_url=None):
+    def __init__(
+        self,
+        canal: discord.TextChannel,
+        titulo="",
+        cor="5865F2",
+        imagem="",
+        rodape="",
+        botao1_texto=None,
+        botao1_url=None,
+        botao2_texto=None,
+        botao2_url=None,
+    ):
         super().__init__()
         self.canal = canal
-        self.botao1_texto = botao1_texto
-        self.botao1_url = botao1_url
-        self.botao2_texto = botao2_texto
-        self.botao2_url = botao2_url
+        self.titulo_embed = (titulo or "").strip()[:256]
+        self.cor_embed = _cor_para_int(cor)
+        self.imagem_embed = (imagem or "").strip()
+        self.rodape_embed = (rodape or "").strip()[:2048]
+        self.botao1_texto = (botao1_texto or "").strip()
+        self.botao1_url = (botao1_url or "").strip()
+        self.botao2_texto = (botao2_texto or "").strip()
+        self.botao2_url = (botao2_url or "").strip()
 
     async def on_submit(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title=self.titulo.value or None,
-            description=self.descricao.value or None,
-            color=_cor_para_int(self.cor.value),
-        )
-        if self.imagem.value:
-            embed.set_image(url=self.imagem.value)
-        if self.rodape.value:
-            embed.set_footer(text=self.rodape.value)
+        partes = [
+            campo.value
+            for campo in (self.parte1, self.parte2, self.parte3, self.parte4, self.parte5)
+            if campo.value
+        ]
+        if not partes:
+            partes = [""]
 
-        view = _view_com_botoes(self.botao1_texto, self.botao1_url, self.botao2_texto, self.botao2_url)
-        await self.canal.send(embed=embed, view=view)
-        await interaction.response.send_message(f"✅ Embed enviada em {self.canal.mention}.", ephemeral=True)
+        total = sum(len(parte) for parte in partes)
+        if total > 20000:
+            await interaction.response.send_message(
+                "A descrição pode ter no máximo 20.000 caracteres.",
+                ephemeral=True,
+            )
+            return
+
+        for nome, url in (
+            ("Botão 1", self.botao1_url),
+            ("Botão 2", self.botao2_url),
+            ("Imagem", self.imagem_embed),
+        ):
+            if url and not url.startswith(("https://", "http://")):
+                await interaction.response.send_message(
+                    "{}: informe uma URL iniciada por http:// ou https://.".format(nome),
+                    ephemeral=True,
+                )
+                return
+
+        view = _view_com_botoes(
+            self.botao1_texto,
+            self.botao1_url,
+            self.botao2_texto,
+            self.botao2_url,
+        )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        enviados = 0
+        try:
+            for indice, texto in enumerate(partes):
+                titulo = self.titulo_embed
+                if indice > 0:
+                    sufixo = " — continuação {}/{}".format(indice + 1, len(partes))
+                    titulo = "{}{}".format(titulo[:256 - len(sufixo)], sufixo) if titulo else "Continuação {}/{}".format(indice + 1, len(partes))
+
+                embed = discord.Embed(
+                    title=titulo or None,
+                    description=texto or None,
+                    color=self.cor_embed,
+                )
+                if indice == 0:
+                    if self.imagem_embed:
+                        embed.set_image(url=self.imagem_embed)
+                    if self.rodape_embed:
+                        embed.set_footer(text=self.rodape_embed)
+
+                await self.canal.send(embed=embed, view=view if indice == 0 else None)
+                enviados += 1
+        except discord.HTTPException as erro:
+            await interaction.followup.send(
+                "Não consegui enviar todas as partes. Foram enviadas {} de {} mensagens. Erro: {}".format(enviados, len(partes), erro),
+                ephemeral=True,
+            )
+            return
+
+        mensagem = "✅ Embed publicada em {}. Foram enviadas {} mensagem(ns), com {:,} caracteres no total.".format(self.canal.mention, enviados, total).replace(",", ".")
+        await interaction.followup.send(mensagem, ephemeral=True)
 
 
 class EditarEmbedModal(discord.ui.Modal, title="Editar embed"):
@@ -102,27 +165,62 @@ class Embeds(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="criar-embed", description="Abre um formulário pra criar e enviar uma embed customizada, com botões opcionais.")
+    @app_commands.command(
+        name="criar-embed",
+        description="Cria uma embed com descrição de até 20.000 caracteres.",
+    )
     @app_commands.describe(
-        canal="Canal onde a embed vai ser enviada (padrão: este canal)",
-        botao1_texto="Texto do 1º botão (opcional, ex: '🌐 Nosso site')",
-        botao1_url="Link do 1º botão (obrigatório se usar o texto acima)",
-        botao2_texto="Texto do 2º botão (opcional)",
-        botao2_url="Link do 2º botão (obrigatório se usar o texto acima)",
+        canal="Canal onde as mensagens serão enviadas (padrão: este canal)",
+        titulo="Título da embed (opcional)",
+        cor="Cor em hexadecimal, por exemplo 5865F2",
+        imagem="URL da imagem/banner (opcional)",
+        rodape="Texto do rodapé (opcional)",
+        botao1_texto="Texto do primeiro botão de link (opcional)",
+        botao1_url="URL do primeiro botão (obrigatória se usar o texto)",
+        botao2_texto="Texto do segundo botão de link (opcional)",
+        botao2_url="URL do segundo botão (obrigatória se usar o texto)",
     )
     @app_commands.checks.has_permissions(manage_guild=True)
     async def criar_embed(
         self,
         interaction: discord.Interaction,
         canal: discord.TextChannel = None,
+        titulo: str = None,
+        cor: str = "5865F2",
+        imagem: str = None,
+        rodape: str = None,
         botao1_texto: str = None,
         botao1_url: str = None,
         botao2_texto: str = None,
         botao2_url: str = None,
     ):
+        if bool(botao1_texto) != bool(botao1_url) or bool(botao2_texto) != bool(botao2_url):
+            await interaction.response.send_message(
+                "Para cada botão, preencha o texto e a URL.",
+                ephemeral=True,
+            )
+            return
+
         canal_destino = canal or interaction.channel
+        if not isinstance(canal_destino, (discord.TextChannel, discord.Thread)):
+            await interaction.response.send_message(
+                "Escolha um canal de texto válido.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.send_modal(
-            EmbedModal(canal_destino, botao1_texto, botao1_url, botao2_texto, botao2_url)
+            EmbedModal(
+                canal_destino,
+                titulo=titulo,
+                cor=cor,
+                imagem=imagem,
+                rodape=rodape,
+                botao1_texto=botao1_texto,
+                botao1_url=botao1_url,
+                botao2_texto=botao2_texto,
+                botao2_url=botao2_url,
+            )
         )
 
     @app_commands.command(name="editar-embed", description="Edita uma embed já enviada pelo bot.")
