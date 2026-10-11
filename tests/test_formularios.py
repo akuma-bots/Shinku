@@ -3,7 +3,8 @@ from types import SimpleNamespace
 
 import discord
 
-from cogs.formularios import _embeds_painel, _embeds_resposta, _paginas_modal
+from cogs import formularios as cog_formularios
+from cogs.formularios import _embeds_painel, _embeds_resposta, _paginas_modal, _limpar_sessoes_formularios
 
 
 class TestFormularios(unittest.TestCase):
@@ -18,6 +19,25 @@ class TestFormularios(unittest.TestCase):
         self.assertGreater(len(embeds), 1)
         self.assertTrue(all(embed.description for embed in embeds))
         self.assertTrue(all(len(embed.description) <= 4096 for embed in embeds))
+
+    def test_sessoes_abandonadas_sao_removidas(self):
+        cog_formularios.SESSOES_FORMULARIOS.clear()
+        cog_formularios.SESSOES_FORMULARIOS[(1, 2, "antiga")] = {
+            "formulario": {},
+            "respostas": [],
+            "atualizado_em": 100,
+        }
+        cog_formularios.SESSOES_FORMULARIOS[(1, 2, "recente")] = {
+            "formulario": {},
+            "respostas": [],
+            "atualizado_em": 950,
+        }
+
+        _limpar_sessoes_formularios(agora=1000)
+
+        self.assertNotIn((1, 2, "antiga"), cog_formularios.SESSOES_FORMULARIOS)
+        self.assertIn((1, 2, "recente"), cog_formularios.SESSOES_FORMULARIOS)
+        cog_formularios.SESSOES_FORMULARIOS.clear()
 
     def test_etapas_com_mais_de_cinco_perguntas_sao_divididas_para_modais(self):
         formulario = {
