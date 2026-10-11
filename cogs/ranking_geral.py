@@ -353,11 +353,21 @@ class RankingGeral(
         if not canal_id:
             return
 
-        canal = guild.get_channel(
-            canal_id
-        )
+        try:
+            canal_id = int(canal_id)
+        except (TypeError, ValueError):
+            return
 
-        if not canal:
+        canal = guild.get_channel(canal_id)
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(canal_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                print(f"[RankingGeral] Canal {canal_id} inacessível: {erro}")
+                return
+
+        if not callable(getattr(canal, "send", None)):
+            print(f"[RankingGeral] ID {canal_id} não é um canal que aceita mensagens.")
             return
 
         embed = await self._montar_embed(
