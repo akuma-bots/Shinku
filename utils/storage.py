@@ -39,6 +39,7 @@ UPSTASH_TOKEN = os.getenv(
 USANDO_UPSTASH = bool(
     UPSTASH_URL and UPSTASH_TOKEN
 )
+UPSTASH_CONFIG_INCOMPLETA = bool(UPSTASH_URL) != bool(UPSTASH_TOKEN)
 
 
 # =========================================================
@@ -248,6 +249,12 @@ async def carregar(
         data/nome_arquivo
     """
 
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise ErroStorage(
+            "Configuração parcial do Upstash: configure URL e token juntos; "
+            "o armazenamento local não será usado como fallback silencioso."
+        )
+
     if USANDO_UPSTASH:
 
         valor = await _comando_redis(
@@ -303,6 +310,12 @@ async def salvar(
     Sem Upstash:
         data/nome_arquivo
     """
+
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise ErroStorage(
+            "Configuração parcial do Upstash: configure URL e token juntos; "
+            "o armazenamento local não será usado como fallback silencioso."
+        )
 
     if USANDO_UPSTASH:
 
