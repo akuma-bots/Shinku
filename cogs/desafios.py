@@ -420,7 +420,7 @@ class Desafios(commands.Cog):
 
         embed = discord.Embed(
             title="Diagnóstico de canais — NÊMESIS",
-            description="\\n".join(linhas),
+            description="\n".join(linhas),
             color=0x57F287 if all("❌" not in linha and "⚠️" not in linha for linha in linhas) else 0xFEE75C,
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
