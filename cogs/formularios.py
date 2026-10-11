@@ -171,11 +171,22 @@ class ModalFormulario(discord.ui.Modal):
                 ephemeral=True,
             )
             return
+        # A publicação no canal e as DMs podem levar mais que o prazo inicial
+        # da interação; defer evita que o Discord mostre "Falha na interação".
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        resposta = await formularios.criar_resposta(
+            guild.id,
+            self.formulario["id"],
+            interaction.user.id,
+            todas_respostas,
+        )
         cog = interaction.client.get_cog("Formularios")
-        resposta = await formularios.criar_resposta(guild.id, self.formulario["id"],
-                                                      interaction.user.id, todas_respostas)
-        await cog.notificar_cargos(guild, self.formulario, resposta)
-        await interaction.response.send_message("✅ Sua candidatura foi enviada!", ephemeral=True)
+        if cog is not None:
+            await cog.notificar_cargos(guild, self.formulario, resposta)
+        await interaction.followup.send(
+            "✅ Sua candidatura foi enviada!",
+            ephemeral=True,
+        )
 
 
 def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> list[discord.Embed]:
