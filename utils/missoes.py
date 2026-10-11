@@ -30,6 +30,10 @@ def _normalizar_tipo(tipo: str) -> str:
         "contribuição",
         "contribuicoes",
         "contribuições",
+        "pontuacao",
+        "pontuação",
+        "pontuacoes",
+        "pontuações",
     ):
         return "contribuicao"
 
