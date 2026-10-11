@@ -67,8 +67,8 @@ class AvisosPrivados(commands.Cog):
 
         if receber:
             texto = (
-                "Você ativou os avisos privados da NÊMESIS. 
-                "Você receberá comunicados sobre novidades, sistemas, eventos e avisos importantes. 
+                "Você ativou os avisos privados da NÊMESIS. "
+                "Você receberá comunicados sobre novidades, sistemas, eventos e avisos importantes. "
                 "Para parar, use `/avisos-privados` com **receber: Não**."
             )
         else:
@@ -133,8 +133,8 @@ class AvisosPrivados(commands.Cog):
 
         if len(inscritos) > LIMITE_POR_ENVIO:
             await interaction.response.send_message(
-                f"Este comunicado alcançaria {len(inscritos)} inscritos. 
-                f"O limite por envio é {LIMITE_POR_ENVIO}; nenhum DM foi enviado. 
+                f"Este comunicado alcançaria {len(inscritos)} inscritos. "
+                f"O limite por envio é {LIMITE_POR_ENVIO}; nenhum DM foi enviado. "
                 "Divida o comunicado em lotes ou reduza a lista de inscritos.",
                 ephemeral=True,
             )
