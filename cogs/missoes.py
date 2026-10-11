@@ -94,7 +94,9 @@ class Missoes(commands.Cog):
     @staticmethod
     def _dividir_descricao(descricao: str, limite: int = 3800) -> list[str]:
         """Divide descrições longas em blocos compatíveis com o limite do Discord."""
-        texto = str(descricao or "Consulte a descrição com a liderança.").strip()
+        texto = str(descricao if descricao is not None else "")
+        if not texto:
+            texto = "Consulte a descrição com a liderança."
         if len(texto) > 20000:
             texto = texto[:20000]
 
@@ -109,11 +111,12 @@ class Missoes(commands.Cog):
                 corte = texto.rfind(" ", 0, limite)
             if corte < limite // 2:
                 corte = limite
+            elif corte < limite:
+                # Mantém a quebra de linha/espaço para não perder caracteres.
+                corte += 1
 
-            parte = texto[:corte].rstrip()
-            if parte:
-                partes.append(parte)
-            texto = texto[corte:].lstrip()
+            partes.append(texto[:corte])
+            texto = texto[corte:]
 
         return partes or ["Consulte a descrição com a liderança."]
 
