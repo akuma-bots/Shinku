@@ -649,7 +649,8 @@ class Tickets(commands.Cog):
         )
 
         ticket_atual = await tickets.get_ticket_por_canal(
-            message.channel.id
+            message.guild.id,
+            message.channel.id,
         )
 
         if ticket_atual and eh_suporte:
