@@ -1,12 +1,77 @@
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils import formularios
+from utils.storage import carregar, salvar
 
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
 PREFIXO_RECUSAR = "formulario:recusar:"
+CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
+ARQUIVO_PAINEIS_DISCORD = "formularios_discord.json"
+GUILD_NEMESIS_ID = 1543381737961160910
+
+
+def _perguntas_pagina(formulario: dict, indice: int) -> list:
+    paginas = formulario.get("paginas") or []
+    if not 0 <= indice < len(paginas):
+        return []
+    pagina = paginas[indice]
+    if isinstance(pagina, dict):
+        return pagina.get("perguntas") or []
+    return pagina if isinstance(pagina, list) else []
+
+
+def _texto_pergunta(pergunta) -> str:
+    if isinstance(pergunta, dict):
+        return str(pergunta.get("texto") or pergunta.get("pergunta") or "Pergunta")
+    return str(pergunta)
+
+
+def _perguntas_flat(formulario: dict) -> list:
+    resultado = []
+    for indice in range(len(formulario.get("paginas") or [])):
+        resultado.extend(_perguntas_pagina(formulario, indice))
+    return resultado
+
+
+def _embed_painel(formulario: dict) -> discord.Embed:
+    titulo = formulario.get("titulo_painel") or formulario.get("nome") or "Formulário"
+    descricao = formulario.get("descricao_painel") or "Preencha o formulário pelo botão abaixo."
+    embed = discord.Embed(title=str(titulo)[:256], description=str(descricao)[:3500], color=0x5865F2)
+    linhas = []
+    for numero_pagina, _pagina in enumerate(formulario.get("paginas") or [], start=1):
+        perguntas = _perguntas_pagina(formulario, numero_pagina - 1)
+        if not perguntas:
+            continue
+        linhas.append(f"**Etapa {numero_pagina}**")
+        for pergunta in perguntas:
+            texto = _texto_pergunta(pergunta)
+            if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha":
+                opcoes = pergunta.get("opcoes") or []
+                if opcoes:
+                    texto += " — Opções: " + ", ".join(str(opcao) for opcao in opcoes[:10])
+            linhas.append(f"• {texto}")
+    if linhas:
+        resumo = "\n".join(linhas)
+        embed.add_field(name="Perguntas do formulário", value=resumo[:1024], inline=False)
+    if formulario.get("banner_url"):
+        embed.set_image(url=str(formulario["banner_url"]))
+    embed.set_footer(text="NÊMESIS • Formulário sincronizado com o site")
+    return embed
+
+
+def _view_painel(formulario: dict) -> discord.ui.View:
+    view = discord.ui.View(timeout=None)
+    ativo = formulario.get("ativo") is not False
+    tem_perguntas = any(_perguntas_pagina(formulario, i) for i in range(len(formulario.get("paginas") or [])))
+    view.add_item(discord.ui.Button(
+        label="Preencher formulário", style=discord.ButtonStyle.primary, emoji="📝",
+        custom_id=f"{PREFIXO_ABRIR}{formulario.get('id', '')}",
+        disabled=(not ativo or not tem_perguntas),
+    ))
+    return view
 
 
 class ModalFormulario(discord.ui.Modal):
@@ -16,9 +81,9 @@ class ModalFormulario(discord.ui.Modal):
     inteiro. As respostas vão sendo acumuladas de página em página."""
 
     def __init__(self, formulario: dict, pagina_indice: int = 0, respostas_acumuladas: list = None):
-        pagina = formulario["paginas"][pagina_indice]
+        pagina = _perguntas_pagina(formulario, pagina_indice)
         total_paginas = len(formulario["paginas"])
-        titulo = formulario["nome"][:34]
+        titulo = str(formulario.get("nome") or formulario.get("titulo_painel") or "Formulário")[:34]
         if total_paginas > 1:
             titulo = f"{titulo} ({pagina_indice + 1}/{total_paginas})"[:45]
         super().__init__(title=titulo)
@@ -27,9 +92,16 @@ class ModalFormulario(discord.ui.Modal):
         self.pagina_indice = pagina_indice
         self.respostas_acumuladas = respostas_acumuladas or []
         self.inputs = []
-        for pergunta in pagina:
-            campo = discord.ui.TextInput(label=pergunta[:45], style=discord.TextStyle.paragraph,
-                                          required=True, max_length=1000)
+        for pergunta in pagina[:5]:
+            texto = _texto_pergunta(pergunta)
+            obrigatoria = pergunta.get("obrigatoria", True) if isinstance(pergunta, dict) else True
+            opcoes = pergunta.get("opcoes") or [] if isinstance(pergunta, dict) else []
+            placeholder = None
+            if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha" and opcoes:
+                placeholder = ("Escolha uma opção: " + " | ".join(str(opcao) for opcao in opcoes))[:100]
+            campo = discord.ui.TextInput(label=texto[:45], style=discord.TextStyle.paragraph,
+                                          required=bool(obrigatoria), max_length=1000,
+                                          placeholder=placeholder)
             self.inputs.append(campo)
             self.add_item(campo)
 
@@ -52,7 +124,7 @@ class ModalFormulario(discord.ui.Modal):
 def _embed_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> discord.Embed:
     embed = discord.Embed(title=f"📥 Nova candidatura — {formulario['nome']}", color=0x5865F2)
     embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
-    perguntas = formularios.perguntas_flat(formulario)
+    perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
     for pergunta, resp in zip(perguntas, resposta["respostas"]):
         embed.add_field(name=pergunta[:256], value=resp[:1024], inline=False)
     embed.set_footer(text=f"ID: {resposta['id']} • {guild.name}")
@@ -77,6 +149,78 @@ class Formularios(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.sincronizar_paineis.start()
+
+    def cog_unload(self):
+        self.sincronizar_paineis.cancel()
+
+    @tasks.loop(seconds=60)
+    async def sincronizar_paineis(self):
+        guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+        if guild is None:
+            return
+        canal = guild.get_channel(CANAL_PAINEIS_FORMULARIOS)
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(CANAL_PAINEIS_FORMULARIOS)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return
+
+        lista = await formularios.listar_formularios(guild.id)
+        lista = [item for item in lista if isinstance(item, dict) and item.get("id")]
+        dados_paineis = await carregar(ARQUIVO_PAINEIS_DISCORD, {})
+        if not isinstance(dados_paineis, dict):
+            dados_paineis = {}
+        registros = dados_paineis.setdefault(str(guild.id), {})
+        ids_atuais = {str(item["id"]) for item in lista}
+
+        for item in lista:
+            formulario_id = str(item["id"])
+            registro = registros.get(formulario_id, {})
+            mensagem = None
+            if isinstance(registro, dict) and registro.get("message_id"):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["message_id"]))
+                except discord.NotFound:
+                    mensagem = None
+                except (discord.Forbidden, discord.HTTPException):
+                    continue
+
+            embed = _embed_painel(item)
+            view = _view_painel(item)
+            if mensagem is None:
+                try:
+                    mensagem = await canal.send(embed=embed, view=view)
+                except (discord.Forbidden, discord.HTTPException):
+                    continue
+            else:
+                try:
+                    await mensagem.edit(embed=embed, view=view)
+                except (discord.Forbidden, discord.HTTPException):
+                    continue
+
+            registros[formulario_id] = {
+                "channel_id": int(canal.id),
+                "message_id": int(mensagem.id),
+            }
+
+        for formulario_id in list(registros):
+            if formulario_id in ids_atuais:
+                continue
+            registro = registros.get(formulario_id, {})
+            if isinstance(registro, dict) and registro.get("message_id"):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["message_id"]))
+                    await mensagem.delete()
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
+            registros.pop(formulario_id, None)
+
+        await salvar(ARQUIVO_PAINEIS_DISCORD, dados_paineis)
+
+    @sincronizar_paineis.before_loop
+    async def antes_de_sincronizar_paineis(self):
+        await self.bot.wait_until_ready()
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
         embed = _embed_resposta(formulario, resposta, guild)
