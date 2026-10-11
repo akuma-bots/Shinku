@@ -607,7 +607,18 @@ class Formularios(commands.Cog):
                 return
 
             novo_status = "aprovada" if aprovado else "recusada"
-            await formularios.definir_status_resposta(guild_encontrada.id, resposta_id, novo_status, interaction.user.id)
+            resultado = await formularios.definir_status_resposta(
+                guild_encontrada.id,
+                resposta_id,
+                novo_status,
+                interaction.user.id,
+            )
+            if not resultado:
+                await interaction.response.send_message(
+                    "Essa candidatura já foi revisada por outra pessoa.",
+                    ephemeral=True,
+                )
+                return
 
             embed = interaction.message.embeds[0]
             embed.color = 0x57F287 if aprovado else 0xED4245
