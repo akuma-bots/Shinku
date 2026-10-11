@@ -103,7 +103,7 @@ async def _sincronizar_site(
     Sincroniza o perfil do Bot com o competitivo.json
     compartilhado pelo Dashboard.
 
-    O P.C. existente no Dashboard não é sobrescrito.
+    A pontuação existente no Dashboard não é sobrescrita.
     O delta recebido é apenas somado ao valor atual.
     """
 
