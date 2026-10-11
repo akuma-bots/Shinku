@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 TIPOS = {
     "missao": {"nome": "Missão", "emoji": "🎯"},
     # O valor interno antigo é mantido para compatibilidade com os dados existentes.
-    "contribuicao": {"nome": "Pontuação", "emoji": "✦"},
+    "contribuicao": {"nome": "Contribuição", "emoji": "✦"},
     "especial": {"nome": "Missão especial", "emoji": "⭐"},
 }
 
@@ -40,10 +40,7 @@ CANAIS_PADRAO = {
     "canal_provas_especial_id": 1556543872534839336,
 }
 
-NOMES_CANAIS = {
-    "canal_missoes_contribuicao_id": "・𝖯𝗈𝗇𝗍𝗎𝖺𝖼̧𝖺̃𝗈",
-    "canal_provas_contribuicao_id": "・𝖯𝗋𝗈𝗏𝖺𝗌-𝖽𝖾-𝖯𝗈𝗇𝗍𝗎𝖺𝖼̧𝖺̃𝗈",
-}
+NOMES_CANAIS = {}
 
 
 class Missoes(commands.Cog):
@@ -90,7 +87,7 @@ class Missoes(commands.Cog):
                 log.warning("Sem permissão para renomear o canal %s para %s.", canal.id, nome_novo)
                 continue
             try:
-                await canal.edit(name=nome_novo, reason="Padronização do sistema para Pontuação da NÊMESIS")
+                await canal.edit(name=nome_novo, reason="Padronização do sistema de missões da NÊMESIS")
             except discord.HTTPException:
                 log.exception("Falha ao renomear o canal %s.", canal.id)
 
