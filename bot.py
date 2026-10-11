@@ -88,13 +88,13 @@ def _descobrir_cogs() -> list:
         return []
 
     # configuracao.py já fornece o comando /definir-status.
-    # customizacao.py registra outro Cog com o mesmo nome e comando,
-    # causando "Cog named Customizacao already loaded".
+    # customizacao.py duplica o Cog/comando existente.
+    # pontuacao_pve.py é legado: o ranking PvE separado foi removido da estrutura oficial.
     nomes = [
         modulo.name
         for modulo in pkgutil.iter_modules([str(pasta_cogs)])
         if not modulo.name.startswith("_")
-        and modulo.name != "customizacao"
+        and modulo.name not in {"customizacao", "pontuacao_pve"}
     ]
 
     return [
