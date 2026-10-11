@@ -35,6 +35,19 @@ class BotaoParticipar(discord.ui.View):
         self.encerrado = encerrado
         self.participantes_total = participantes
 
+        for item in self.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            if item.custom_id == "sorteio_participar_btn":
+                item.label = (
+                    "🎁 Encerrado"
+                    if encerrado
+                    else f"🎁 Participar ({participantes})"
+                )
+                item.disabled = encerrado
+            elif item.custom_id == "sorteio_participantes_btn":
+                item.label = f"👥 Participantes ({participantes})"
+
     async def obter_sorteio(
         self,
         mensagem_id: int,
@@ -831,11 +844,20 @@ class Sorteios(commands.Cog):
         self,
         sorteio: dict,
     ):
-        canal = self.bot.get_channel(
-            sorteio.get("canal_id")
-        )
+        try:
+            canal_id = int(sorteio.get("canal_id") or 0)
+        except (TypeError, ValueError):
+            return
 
-        if not canal:
+        canal = self.bot.get_channel(canal_id)
+        if canal is None:
+            try:
+                canal = await self.bot.fetch_channel(canal_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                print(f"[SORTEIOS] Canal {canal_id} inacessível ao atualizar mensagem: {erro}")
+                return
+
+        if not isinstance(canal, discord.TextChannel):
             return
 
         try:
@@ -1033,6 +1055,23 @@ class Sorteios(commands.Cog):
         if sorteio.get("encerrado"):
             return
 
+        try:
+            canal_id = int(sorteio.get("canal_id") or 0)
+        except (TypeError, ValueError):
+            canal_id = 0
+
+        canal = self.bot.get_channel(canal_id) if canal_id else None
+        if canal is None and canal_id:
+            try:
+                canal = await self.bot.fetch_channel(canal_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                print(f"[SORTEIOS] Não encerrei {sorteio.get('id')}: canal {canal_id} inacessível: {erro}")
+                return
+
+        if not isinstance(canal, discord.TextChannel):
+            print(f"[SORTEIOS] Não encerrei {sorteio.get('id')}: canal de anúncio indisponível.")
+            return
+
         participantes = list(
             sorteio.get(
                 "participantes",
@@ -1080,12 +1119,8 @@ class Sorteios(commands.Cog):
             sorteio
         )
 
-        canal = self.bot.get_channel(
-            sorteio.get("canal_id")
-        )
-
-        if not canal:
-            return
+        # O canal foi resolvido antes de marcar o sorteio como encerrado.
+        # Assim, falhas temporárias de cache/API permitem nova tentativa no próximo ciclo.
 
         # =====================================================
         # SEM PARTICIPANTES
