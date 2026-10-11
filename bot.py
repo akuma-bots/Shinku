@@ -8,6 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
 from aiohttp import web
@@ -75,6 +76,40 @@ bot = commands.Bot(
     command_prefix="!",
     intents=intents,
 )
+
+
+@bot.tree.error
+async def tratar_erro_comando(
+    interaction: discord.Interaction,
+    erro: app_commands.AppCommandError,
+):
+    """Registra falhas de slash commands e retorna uma mensagem segura ao usuário."""
+    original = getattr(erro, "original", erro)
+
+    if isinstance(erro, app_commands.MissingPermissions):
+        mensagem = "Você não tem as permissões necessárias para usar este comando."
+    elif isinstance(erro, app_commands.CommandOnCooldown):
+        mensagem = f"Este comando está em cooldown. Tente novamente em {erro.retry_after:.1f} s."
+    elif isinstance(erro, app_commands.CheckFailure):
+        mensagem = "Você não atende aos requisitos para usar este comando."
+    else:
+        mensagem = "Ocorreu um erro ao executar o comando. A equipe técnica foi registrada para investigar."
+        logging.error(
+            "Falha em slash command %s (usuário=%s, servidor=%s): %s",
+            getattr(interaction.command, "qualified_name", "desconhecido"),
+            getattr(interaction.user, "id", "desconhecido"),
+            getattr(interaction.guild, "id", "DM"),
+            original,
+            exc_info=(type(original), original, original.__traceback__),
+        )
+
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(mensagem, ephemeral=True)
+        else:
+            await interaction.response.send_message(mensagem, ephemeral=True)
+    except (discord.HTTPException, discord.InteractionResponded):
+        logging.exception("Não foi possível responder ao erro do comando.")
 
 
 # ============================================================
