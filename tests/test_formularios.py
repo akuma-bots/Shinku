@@ -25,7 +25,7 @@ class TestFormularios(unittest.TestCase):
         cog_formularios.SESSOES_FORMULARIOS[(1, 2, "antiga")] = {
             "formulario": {},
             "respostas": [],
-            "atualizado_em": 100,
+            "atualizado_em": 50,
         }
         cog_formularios.SESSOES_FORMULARIOS[(1, 2, "recente")] = {
             "formulario": {},
