@@ -150,10 +150,17 @@ class ModalFormulario(discord.ui.Modal):
             return
 
         SESSOES_FORMULARIOS.pop(chave, None)
+        guild = interaction.guild or interaction.client.get_guild(int(guild_id))
+        if guild is None:
+            await interaction.response.send_message(
+                "Não consegui identificar o servidor desta candidatura. Tente novamente pelo canal do formulário.",
+                ephemeral=True,
+            )
+            return
         cog = interaction.client.get_cog("Formularios")
-        resposta = await formularios.criar_resposta(interaction.guild.id, self.formulario["id"],
+        resposta = await formularios.criar_resposta(guild.id, self.formulario["id"],
                                                       interaction.user.id, todas_respostas)
-        await cog.notificar_cargos(interaction.guild, self.formulario, resposta)
+        await cog.notificar_cargos(guild, self.formulario, resposta)
         await interaction.response.send_message("✅ Sua candidatura foi enviada!", ephemeral=True)
 
 
