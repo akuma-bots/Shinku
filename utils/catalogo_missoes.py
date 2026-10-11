@@ -95,15 +95,24 @@ async def salvar_mensagem_discord(
     guild_id: int,
     missao_id: str,
     canal_id: int,
-    mensagem_id: int,
+    mensagem_ids,
 ) -> None:
-    """Persiste os IDs da mensagem para editar a mesma publicação após reinícios."""
+    """Persiste todas as mensagens de uma missão, mantendo compatibilidade com IDs antigos."""
+    if isinstance(mensagem_ids, (str, int)):
+        ids = [int(mensagem_ids)]
+    else:
+        ids = [int(valor) for valor in (mensagem_ids or [])]
+
+    if not ids:
+        raise ValueError("É necessário salvar pelo menos um ID de mensagem.")
+
     dados = await carregar(ARQUIVO_MENSAGENS_DISCORD, {})
     if not isinstance(dados, dict):
         dados = {}
     guild = dados.setdefault(str(guild_id), {})
     guild[str(missao_id)] = {
         "discord_channel_id": int(canal_id),
-        "discord_message_id": int(mensagem_id),
+        "discord_message_id": ids[0],
+        "discord_message_ids": ids,
     }
     await salvar(ARQUIVO_MENSAGENS_DISCORD, dados)
