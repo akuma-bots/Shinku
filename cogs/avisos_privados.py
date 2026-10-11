@@ -40,8 +40,16 @@ class AvisosPrivados(commands.Cog):
         name="avisos-privados",
         description="Ativa ou desativa o recebimento de novidades da NÊMESIS por mensagem privada.",
     )
-    @app_commands.describe(receber="Ative para receber avisos privados; desative para parar.")
-    async def avisos_privados(self, interaction: discord.Interaction, receber: bool):
+    @app_commands.describe(receber="Escolha se deseja receber avisos privados.")
+    @app_commands.choices(receber=[
+        app_commands.Choice(name="Ativar", value="ativar"),
+        app_commands.Choice(name="Desativar", value="desativar"),
+    ])
+    async def avisos_privados(
+        self,
+        interaction: discord.Interaction,
+        receber: app_commands.Choice[str],
+    ):
         if interaction.guild_id is None or interaction.guild is None:
             await interaction.response.send_message(
                 "Use este comando dentro do servidor da NÊMESIS.", ephemeral=True
@@ -50,8 +58,9 @@ class AvisosPrivados(commands.Cog):
 
         try:
             dados = await self._carregar_estado()
+            ativar = receber.value == "ativar"
             dados, estado = definir_inscricao(
-                dados, interaction.guild_id, interaction.user.id, receber
+                dados, interaction.guild_id, interaction.user.id, ativar
             )
             await salvar(ARQUIVO, dados)
         except Exception:
@@ -65,11 +74,11 @@ class AvisosPrivados(commands.Cog):
             )
             return
 
-        if receber:
+        if receber.value == "ativar":
             texto = (
                 "Você ativou os avisos privados da NÊMESIS. "
                 "Você receberá comunicados sobre novidades, sistemas, eventos e avisos importantes. "
-                "Para parar, use `/avisos-privados` com **receber: Não**."
+                "Para parar, use `/avisos-privados` e escolha **Desativar**."
             )
         else:
             texto = "Avisos privados desativados. Você não receberá novos comunicados por DM."
@@ -156,8 +165,18 @@ class AvisosPrivados(commands.Cog):
         for indice, user_id in enumerate(inscritos):
             membro = guild.get_member(int(user_id))
             if membro is None:
-                ausentes += 1
-                continue
+                try:
+                    membro = await guild.fetch_member(int(user_id))
+                except discord.NotFound:
+                    ausentes += 1
+                    continue
+                except discord.HTTPException as erro:
+                    falhas += 1
+                    logger.warning(
+                        "Falha ao localizar inscrito (guild=%s, user=%s, status=%s)",
+                        guild.id, user_id, getattr(erro, "status", "desconhecido"),
+                    )
+                    continue
 
             try:
                 await membro.send(
