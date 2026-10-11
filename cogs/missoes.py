@@ -7,7 +7,6 @@ from utils.guild_config import get_config
 from utils.perfis import (
     get_perfil,
     _salvar_perfil,
-    sincronizar_perfil_site,
     _sincronizar_site,
     calcular_patente_atual,
     definir_patente,
