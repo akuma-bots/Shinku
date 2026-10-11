@@ -92,7 +92,34 @@ class Missoes(commands.Cog):
                 log.exception("Falha ao renomear o canal %s.", canal.id)
 
     @staticmethod
-    def _montar_embed(atividade: dict) -> discord.Embed:
+    def _dividir_descricao(descricao: str, limite: int = 3800) -> list[str]:
+        """Divide descrições longas em blocos compatíveis com o limite do Discord."""
+        texto = str(descricao or "Consulte a descrição com a liderança.").strip()
+        if len(texto) > 20000:
+            texto = texto[:20000]
+
+        partes = []
+        while texto:
+            if len(texto) <= limite:
+                partes.append(texto)
+                break
+
+            corte = texto.rfind(chr(10), 0, limite)
+            if corte < limite // 2:
+                corte = texto.rfind(" ", 0, limite)
+            if corte < limite // 2:
+                corte = limite
+
+            parte = texto[:corte].rstrip()
+            if parte:
+                partes.append(parte)
+            texto = texto[corte:].lstrip()
+
+        return partes or ["Consulte a descrição com a liderança."]
+
+    @classmethod
+    def _montar_embeds(cls, atividade: dict) -> list[discord.Embed]:
+        """Monta uma ou mais mensagens para descrições de até 20.000 caracteres."""
         tipo = TIPOS.get(str(atividade.get("tipo", "missao")).lower(), TIPOS["missao"])
         ativa = atividade.get("ativa", True)
         try:
@@ -100,28 +127,46 @@ class Missoes(commands.Cog):
         except (TypeError, ValueError):
             recompensa = 0
 
-        embed = discord.Embed(
-            title=f"NÊMESIS — {atividade.get('titulo', 'Missão')}",
-            description=atividade.get("descricao") or "Consulte a descrição com a liderança.",
-            color=0x5865F2 if ativa else 0x747F8D,
-        )
-        embed.add_field(name="Categoria", value=tipo["nome"], inline=True)
-        embed.add_field(name="ID da missão", value=f"`{atividade.get('id', '—')}`", inline=True)
-        embed.add_field(name="Recompensa", value=f"+{recompensa} de pontuação e +{recompensa} XP", inline=False)
-        if ativa:
-            embed.add_field(
-                name="Como concluir",
-                value=(
-                    "Conclua a atividade e envie uma captura de tela como prova usando "
-                    f"`/missao-completar missao_id:{atividade.get('id', '')}`."
-                ),
-                inline=False,
+        titulo_base = f"NÊMESIS — {atividade.get('titulo', 'Missão')}"[:256]
+        partes = cls._dividir_descricao(atividade.get("descricao"))
+        embeds = []
+
+        for indice, parte in enumerate(partes, start=1):
+            if indice == 1:
+                titulo = titulo_base
+            else:
+                sufixo = f" — continuação {indice}/{len(partes)}"
+                titulo = f"{titulo_base[:256 - len(sufixo)]}{sufixo}"
+
+            embed = discord.Embed(
+                title=titulo,
+                description=parte,
+                color=0x5865F2 if ativa else 0x747F8D,
             )
-            embed.set_footer(text="Missão padrão gerenciada pelo GitHub • A publicação é atualizada pelo bot")
-        else:
-            embed.add_field(name="Status", value="Esta missão está encerrada.", inline=False)
-            embed.set_footer(text="Missão encerrada • A publicação permanece no canal como histórico")
-        return embed
+
+            if indice == 1:
+                embed.add_field(name="Categoria", value=tipo["nome"], inline=True)
+                embed.add_field(name="ID da missão", value=f"`{atividade.get('id', '—')}`", inline=True)
+                embed.add_field(name="Recompensa", value=f"+{recompensa} de pontuação e +{recompensa} XP", inline=False)
+                if ativa:
+                    embed.add_field(
+                        name="Como concluir",
+                        value=(
+                            "Conclua a atividade e envie uma captura de tela como prova usando "
+                            f"`/missao-completar missao_id:{atividade.get('id', '')}`."
+                        ),
+                        inline=False,
+                    )
+                    embed.set_footer(text="Missão padrão gerenciada pelo GitHub • A publicação é atualizada pelo bot")
+                else:
+                    embed.add_field(name="Status", value="Esta missão está encerrada.", inline=False)
+                    embed.set_footer(text="Missão encerrada • A publicação permanece no canal como histórico")
+            else:
+                embed.set_footer(text=f"NÊMESIS • Continuação da descrição da missão • {indice}/{len(partes)}")
+
+            embeds.append(embed)
+
+        return embeds
 
     async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
         """Publica cada missão padrão uma vez e edita a mesma mensagem nos próximos reinícios."""
@@ -163,23 +208,63 @@ class Missoes(commands.Cog):
                         resultado["falhas"] += 1
                         continue
 
-                embed = self._montar_embed(atividade)
-                try:
-                    if mensagem is not None:
-                        await mensagem.edit(embed=embed)
-                        resultado["atualizadas"] += 1
-                    else:
-                        mensagem = await canal.send(embed=embed)
-                        resultado["publicadas"] += 1
+                embeds = self._montar_embeds(atividade)
+                ids_mensagens = registro_mensagem.get("discord_message_ids") or []
+                if not ids_mensagens and mensagem_id:
+                    ids_mensagens = [mensagem_id]
+
+                mensagens_atualizadas = []
+                falhou = False
+                for indice, embed in enumerate(embeds):
+                    mensagem_parte = None
+                    if indice < len(ids_mensagens):
+                        try:
+                            mensagem_parte = await canal.fetch_message(int(ids_mensagens[indice]))
+                        except discord.NotFound:
+                            mensagem_parte = None
+                        except (discord.Forbidden, discord.HTTPException) as erro_busca:
+                            log.warning("Falha ao buscar parte %s da missão %s: %s", indice + 1, atividade.get("id"), erro_busca)
+                            falhou = True
+                            break
+
                     try:
-                        if not mensagem.pinned:
-                            await mensagem.pin(reason="Missão padrão permanente da NÊMESIS")
-                    except discord.HTTPException as erro_fixar:
-                        log.warning("Não foi possível fixar a missão %s; a mensagem continuará no canal: %s", atividade.get("id"), erro_fixar)
-                    await salvar_mensagem_discord(guild.id, str(atividade["id"]), canal.id, mensagem.id)
-                except (discord.Forbidden, discord.HTTPException) as erro:
-                    log.exception("Não foi possível publicar/atualizar a missão %s: %s", atividade.get("id"), erro)
+                        if mensagem_parte is not None:
+                            await mensagem_parte.edit(embed=embed)
+                            resultado["atualizadas"] += 1
+                        else:
+                            mensagem_parte = await canal.send(embed=embed)
+                            resultado["publicadas"] += 1
+
+                        if indice == 0:
+                            try:
+                                if not mensagem_parte.pinned:
+                                    await mensagem_parte.pin(reason="Missão padrão permanente da NÊMESIS")
+                            except discord.HTTPException as erro_fixar:
+                                log.warning("Não foi possível fixar a missão %s; a mensagem continuará no canal: %s", atividade.get("id"), erro_fixar)
+
+                        mensagens_atualizadas.append(int(mensagem_parte.id))
+                    except (discord.Forbidden, discord.HTTPException) as erro:
+                        log.exception("Não foi possível publicar/atualizar a parte %s da missão %s: %s", indice + 1, atividade.get("id"), erro)
+                        falhou = True
+                        break
+
+                if falhou or not mensagens_atualizadas:
                     resultado["falhas"] += 1
+                    continue
+
+                for id_antigo in ids_mensagens[len(embeds):]:
+                    try:
+                        antiga = await canal.fetch_message(int(id_antigo))
+                        await antiga.delete()
+                    except (TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        pass
+
+                await salvar_mensagem_discord(
+                    guild.id,
+                    str(atividade["id"]),
+                    canal.id,
+                    mensagens_atualizadas,
+                )
 
             log.info(
                 "Catálogo de missões sincronizado: %s publicadas, %s atualizadas, %s falhas.",
