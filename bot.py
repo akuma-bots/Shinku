@@ -369,7 +369,6 @@ async def iniciar_servidor_web():
 
 
     async def handle(request):
-
         return web.Response(
             text=(
                 f"{bot.user or 'Bot NÊMESIS'} "
@@ -377,11 +376,21 @@ async def iniciar_servidor_web():
             )
         )
 
+    async def health(request):
+        return web.json_response({
+            "status": "online" if bot.is_ready() else "starting",
+            "commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+            "guild_id": str(NEMESIS_GUILD_ID),
+            "storage": "upstash" if USANDO_UPSTASH else "local",
+            "loaded_cogs": sorted(bot.cogs.keys()),
+            "failed_cogs": [
+                item.get("cog")
+                for item in getattr(bot, "cogs_falhos", [])
+            ],
+        })
 
-    app.router.add_get(
-        "/",
-        handle,
-    )
+    app.router.add_get("/", handle)
+    app.router.add_get("/health", health)
 
 
     runner = web.AppRunner(app)
@@ -438,25 +447,27 @@ async def main():
         )
 
     async with bot:
+        bot.cogs_falhos = []
 
         for cog in COGS:
-
             try:
-
-                await bot.load_extension(
-                    cog
-                )
-
-                print(
-                    f"Cog carregado: {cog}"
-                )
-
+                await bot.load_extension(cog)
+                print(f"Cog carregado: {cog}")
             except Exception as erro:
+                bot.cogs_falhos.append({
+                    "cog": cog,
+                    "erro": str(erro),
+                })
+                logging.exception("Falha ao carregar o cog %s", cog)
 
-                print(
-                    f"Falha ao carregar "
-                    f"{cog}: {erro}"
-                )
+        if bot.cogs_falhos:
+            logging.error(
+                "Inicialização incompleta: %s cog(s) falharam: %s",
+                len(bot.cogs_falhos),
+                ", ".join(item["cog"] for item in bot.cogs_falhos),
+            )
+        else:
+            logging.info("Todos os %s cogs foram carregados.", len(bot.cogs))
 
 
         await asyncio.gather(
