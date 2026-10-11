@@ -10,6 +10,7 @@ from utils.catalogo_missoes import (
     carregar_catalogo,
     sincronizar_catalogo,
     salvar_mensagem_discord,
+    obter_mensagem_discord,
 )
 from utils.guild_config import get_config
 from utils.perfis import (
@@ -152,8 +153,9 @@ class Missoes(commands.Cog):
                     continue
 
                 mensagem = None
-                mensagem_id = atividade.get("discord_message_id")
-                canal_salvo_id = atividade.get("discord_channel_id")
+                registro_mensagem = await obter_mensagem_discord(guild.id, str(atividade["id"]))
+                mensagem_id = registro_mensagem.get("discord_message_id") or atividade.get("discord_message_id")
+                canal_salvo_id = registro_mensagem.get("discord_channel_id") or atividade.get("discord_channel_id")
                 if mensagem_id and str(canal_salvo_id) == str(canal.id):
                     try:
                         mensagem = await canal.fetch_message(int(mensagem_id))
