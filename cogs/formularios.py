@@ -71,7 +71,7 @@ def _embeds_painel(formulario: dict) -> list[discord.Embed]:
         if len(restante) <= limite:
             partes.append(restante)
             break
-        corte = restante.rfind("\\n", 0, limite)
+        corte = restante.rfind("\n", 0, limite)
         if corte < limite // 2:
             corte = restante.rfind(" ", 0, limite)
         if corte < limite // 2:
