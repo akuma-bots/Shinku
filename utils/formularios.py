@@ -428,6 +428,13 @@ async def definir_status_resposta(
     if not alvo:
         return None
 
+    if status not in {"aprovada", "recusada"}:
+        raise ValueError("Status de candidatura inválido.")
+
+    # Impede que um clique repetido sobrescreva uma decisão já persistida.
+    if alvo.get("status") != "pendente":
+        return None
+
     alvo["status"] = status
     alvo["revisor_id"] = revisor_id
     alvo["atualizado_em"] = time.time()
