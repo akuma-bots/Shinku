@@ -135,9 +135,11 @@ def _normalizar_config(config: dict) -> dict:
     # --------------------------------------------------------
 
     for campo in CAMPOS_ID:
-        resultado[campo] = _normalizar_id(
-            resultado.get(campo)
-        )
+        valor = _normalizar_id(resultado.get(campo))
+        # Valores vazios no storage não devem apagar os canais padrão.
+        if valor is None and campo in PADRAO:
+            valor = _normalizar_id(PADRAO.get(campo))
+        resultado[campo] = valor
 
     # --------------------------------------------------------
     # Canais de cargo automático
