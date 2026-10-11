@@ -195,7 +195,29 @@ class Desafios(commands.Cog):
                 await interaction.response.send_message(f"Você não tem {aposta_xp} XP pra apostar.", ephemeral=True)
                 return
 
-        desafio = await desafios.criar(interaction.guild.id, interaction.user.id, membro.id, aposta_xp)
+        try:
+            desafio = await desafios.criar(
+                interaction.guild.id,
+                interaction.user.id,
+                membro.id,
+                aposta_xp,
+            )
+        except Exception as erro:
+            if aposta_xp > 0:
+                try:
+                    await _devolver_xp(
+                        interaction.guild.id,
+                        interaction.user.id,
+                        aposta_xp,
+                    )
+                except Exception:
+                    print("[Desafios] Não consegui devolver a aposta após falha ao criar o desafio.")
+            print(f"[Desafios] Falha ao criar desafio: {erro}")
+            await interaction.response.send_message(
+                "❌ Não consegui registrar o desafio no armazenamento. Se havia uma aposta, tente conferir seu XP antes de repetir.",
+                ephemeral=True,
+            )
+            return
 
         embed = discord.Embed(
             title="⚔️ Desafio proposto!",
@@ -212,17 +234,20 @@ class Desafios(commands.Cog):
                 view=_view_desafio(desafio["id"]),
             )
         except (discord.Forbidden, discord.HTTPException) as erro:
+            if aposta_xp > 0:
+                try:
+                    await _devolver_xp(
+                        interaction.guild.id,
+                        interaction.user.id,
+                        aposta_xp,
+                    )
+                except Exception as erro_reembolso:
+                    print(f"[Desafios] Falha ao devolver aposta: {erro_reembolso}")
             await desafios.definir_status(
                 interaction.guild.id,
                 desafio["id"],
                 "cancelado",
             )
-            if aposta_xp > 0:
-                await _devolver_xp(
-                    interaction.guild.id,
-                    interaction.user.id,
-                    aposta_xp,
-                )
             print(f"[Desafios] Falha ao publicar desafio: {erro}")
             await interaction.response.send_message(
                 "❌ Não consegui publicar o desafio. Sua aposta foi devolvida; confira as permissões do bot no canal.",
@@ -284,9 +309,9 @@ class Desafios(commands.Cog):
             aviso.set_footer(text=f"Ao terminar, use /luta-completar desafio_id:{desafio_id}")
             await canal.send(embed=aviso)
         else:
+            await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
             if desafio["aposta_xp"] > 0:
                 await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
-            await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
             embed = interaction.message.embeds[0]
             embed.color = 0x99AAB5
             embed.add_field(name="🚫 Recusado", value="O desafio foi recusado.", inline=False)
