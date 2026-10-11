@@ -1,4 +1,5 @@
 import logging
+import time
 
 import discord
 from discord import app_commands
@@ -12,7 +13,32 @@ PREFIXO_APROVAR = "formulario:aprovar:"
 PREFIXO_RECUSAR = "formulario:recusar:"
 PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
+TEMPO_SESSAO_FORMULARIO = 15 * 60
+LIMITE_SESSOES_FORMULARIO = 5000
 CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
+
+
+def _limpar_sessoes_formularios(agora: float | None = None) -> None:
+    """Remove sessões abandonadas e limita o uso de memória do processo."""
+    agora = time.time() if agora is None else agora
+    expiracao = agora - TEMPO_SESSAO_FORMULARIO
+
+    for chave, sessao in list(SESSOES_FORMULARIOS.items()):
+        try:
+            atualizado = float(sessao.get("atualizado_em", 0))
+        except (AttributeError, TypeError, ValueError):
+            atualizado = 0
+        if atualizado < expiracao:
+            SESSOES_FORMULARIOS.pop(chave, None)
+
+    if len(SESSOES_FORMULARIOS) > LIMITE_SESSOES_FORMULARIO:
+        ordenadas = sorted(
+            SESSOES_FORMULARIOS.items(),
+            key=lambda item: float(item[1].get("atualizado_em", 0)),
+        )
+        excesso = len(SESSOES_FORMULARIOS) - LIMITE_SESSOES_FORMULARIO
+        for chave, _ in ordenadas[:excesso]:
+            SESSOES_FORMULARIOS.pop(chave, None)
 ARQUIVO_PAINEIS_DISCORD = "formularios_discord.json"
 GUILD_NEMESIS_ID = 1543381737961160910
 
@@ -146,10 +172,13 @@ class ModalFormulario(discord.ui.Modal):
         guild_id = interaction.guild.id if interaction.guild else int(self.formulario.get("guild_id") or GUILD_NEMESIS_ID)
         chave = (int(guild_id), int(interaction.user.id), str(self.formulario["id"]))
         if proxima_pagina < len(_paginas_modal(self.formulario)):
+            _limpar_sessoes_formularios()
             SESSOES_FORMULARIOS[chave] = {
                 "formulario": self.formulario,
                 "respostas": todas_respostas,
+                "atualizado_em": time.time(),
             }
+            _limpar_sessoes_formularios()
             view = discord.ui.View(timeout=None)
             view.add_item(discord.ui.Button(
                 label=f"Continuar para etapa {proxima_pagina + 1}",
@@ -564,6 +593,7 @@ class Formularios(commands.Cog):
             if interaction.user.id != usuario_id:
                 await interaction.response.send_message("Somente a pessoa que iniciou o formulário pode continuar.", ephemeral=True)
                 return
+            _limpar_sessoes_formularios()
             chave = (interaction.guild.id, interaction.user.id, formulario_id)
             sessao = SESSOES_FORMULARIOS.get(chave)
             if not sessao:
