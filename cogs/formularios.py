@@ -522,15 +522,23 @@ class Formularios(commands.Cog):
             )
             return
 
-        embed = discord.Embed(title=formulario["titulo_painel"], description=formulario["descricao_painel"], color=0x5865F2)
-        if formulario["banner_url"]:
-            embed.set_image(url=formulario["banner_url"])
-
-        view = discord.ui.View(timeout=None)
-        view.add_item(discord.ui.Button(label="Candidatar-se", style=discord.ButtonStyle.primary, emoji="📝",
-                                         custom_id=f"{PREFIXO_ABRIR}{formulario_id}"))
-        await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Painel publicado.", ephemeral=True)
+        embeds = _embeds_painel(formulario)
+        view = _view_painel(formulario)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            for indice, embed in enumerate(embeds):
+                await interaction.channel.send(
+                    embed=embed,
+                    view=view if indice == 0 else None,
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception("Falha ao publicar painel manual do formulário %s.", formulario_id)
+            await interaction.followup.send(
+                "Não consegui publicar todas as partes do painel. Verifique as permissões do bot no canal.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send("✅ Painel publicado.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
