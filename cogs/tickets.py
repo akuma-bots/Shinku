@@ -78,10 +78,11 @@ async def fechar_canal_ticket(
 
     try:
         # Registra o fechamento no armazenamento compartilhado
-        ticket = await tickets.get_ticket_por_canal(canal.id)
+        ticket = await tickets.get_ticket_por_canal(canal.guild.id, canal.id)
 
         if ticket:
             await tickets.fechar_ticket(
+                canal.guild.id,
                 ticket["id"],
                 fechado_por_id=fechado_por_id,
                 motivo=motivo,
@@ -103,6 +104,7 @@ async def fechar_canal_ticket(
 
             if ticket:
                 await tickets.fechar_ticket(
+                    canal.guild.id,
                     ticket["id"],
                     fechado_por_id=fechado_por_id,
                     motivo=motivo,
@@ -564,6 +566,7 @@ class Tickets(commands.Cog):
             # Canal foi apagado manualmente. Fecha o registro antigo
             # antes de permitir um novo.
             await tickets.fechar_ticket(
+                interaction.guild.id,
                 ticket_aberto["id"],
                 fechado_por_id=interaction.user.id,
                 motivo="Canal do ticket não foi encontrado.",
@@ -651,6 +654,7 @@ class Tickets(commands.Cog):
 
         if ticket_atual and eh_suporte:
             await tickets.registrar_atendimento(
+                message.guild.id,
                 ticket_atual["id"],
                 message.author.id,
             )
@@ -743,4 +747,63 @@ class Tickets(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def verificar_inatividade(self):
-        agora = time.time
+        agora = time.time()
+
+        for guild in self.bot.guilds:
+            try:
+                abertos = await tickets.listar_tickets(
+                    guild.id,
+                    status="aberto",
+                )
+
+                for ticket in abertos:
+                    try:
+                        canal_id = int(ticket.get("canal_id") or 0)
+                    except (TypeError, ValueError):
+                        canal_id = 0
+
+                    if not canal_id:
+                        continue
+
+                    canal = guild.get_channel(canal_id)
+                    if canal is None:
+                        try:
+                            canal = await guild.fetch_channel(canal_id)
+                        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                            await tickets.fechar_ticket(
+                                guild.id,
+                                ticket["id"],
+                                motivo="Canal do ticket removido ou inacessível.",
+                            )
+                            continue
+
+                    if not isinstance(canal, discord.TextChannel):
+                        continue
+
+                    ultima = ULTIMA_ATIVIDADE.get(canal.id)
+                    if ultima is None:
+                        # Após reiniciar, inicia a contagem no primeiro ciclo,
+                        # evitando fechar tickets antigos sem verificar atividade.
+                        ULTIMA_ATIVIDADE[canal.id] = agora
+                        continue
+
+                    if agora - ultima >= TEMPO_INATIVIDADE_SEGUNDOS:
+                        await fechar_canal_ticket(
+                            canal,
+                            "Fechado automaticamente por 10 minutos de inatividade.",
+                            delay=5,
+                        )
+
+            except Exception as erro:
+                print(
+                    "[Tickets] Falha ao verificar inatividade "
+                    f"no servidor {guild.id}: {erro}"
+                )
+
+    @verificar_inatividade.before_loop
+    async def antes_de_verificar_inatividade(self):
+        await self.bot.wait_until_ready()
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Tickets(bot))
