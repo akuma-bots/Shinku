@@ -118,29 +118,51 @@ CAMINHO_CACHE_COMANDOS = (
 
 
 def _assinatura_comandos() -> str:
+    """
+    Gera uma assinatura determinística da árvore inteira de comandos.
+    Inclui subcomandos e detalhes dos parâmetros para que alterações
+    internas em grupos também provoquem uma nova sincronização.
+    """
     comandos = []
 
-    for comando in bot.tree.get_commands():
-        parametros = sorted(
-            getattr(parametro, "name", "")
-            for parametro in getattr(
-                comando,
-                "parameters",
-                [],
-            )
-        )
+    def registrar(comando, caminho=""):
+        nome = getattr(comando, "name", "")
+        nome_completo = f"{caminho} {nome}".strip()
+        parametros = []
 
-        comandos.append(
-            f"{comando.name}:"
-            f"{comando.description}:"
-            f"{','.join(parametros)}"
-        )
+        for parametro in getattr(comando, "parameters", []):
+            tipo = getattr(parametro, "type", None)
+            parametros.append({
+                "name": getattr(parametro, "name", ""),
+                "description": getattr(parametro, "description", ""),
+                "required": bool(getattr(parametro, "required", False)),
+                "type": getattr(tipo, "value", str(tipo) if tipo is not None else ""),
+            })
 
-    texto = "|".join(sorted(comandos))
+        comandos.append({
+            "name": nome_completo,
+            "description": getattr(comando, "description", ""),
+            "parameters": parametros,
+        })
 
-    return hashlib.sha256(
-        texto.encode("utf-8")
-    ).hexdigest()
+        filhos = getattr(comando, "commands", [])
+        for filho in sorted(filhos, key=lambda item: getattr(item, "name", "")):
+            registrar(filho, nome_completo)
+
+    for comando in sorted(
+        bot.tree.get_commands(),
+        key=lambda item: getattr(item, "name", ""),
+    ):
+        registrar(comando)
+
+    texto = json.dumps(
+        comandos,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    return hashlib.sha256(texto.encode("utf-8")).hexdigest()
 
 
 def _carregar_cache_comandos() -> dict:
@@ -254,23 +276,18 @@ async def on_ready():
     if not cache.get("globais_limpos"):
 
         try:
-
             await bot.http.bulk_upsert_global_commands(
                 bot.application_id,
                 [],
             )
+            cache["globais_limpos"] = True
+            print("Comandos globais antigos removidos.")
 
-            print(
-                "Comandos globais antigos removidos."
-            )
-
-        except Exception as erro:
-
-            print(
-                f"Erro ao limpar comandos globais: {erro}"
-            )
-
-        cache["globais_limpos"] = True
+        except Exception:
+            # Não marcar como concluído: a próxima inicialização deve
+            # tentar novamente em vez de deixar comandos globais órfãos.
+            cache["globais_limpos"] = False
+            logging.exception("Erro ao limpar comandos globais antigos.")
 
 
     precisa_sincronizar = (
