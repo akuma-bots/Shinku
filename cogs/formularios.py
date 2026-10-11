@@ -54,22 +54,43 @@ def _perguntas_flat(formulario: dict) -> list:
     ]
 
 
-def _embed_painel(formulario: dict) -> discord.Embed:
-    titulo = formulario.get("titulo_painel") or formulario.get("nome") or "Formulário"
-    descricao = formulario.get("descricao_painel") or "Preencha o formulário pelo botão abaixo."
-    # O Discord aceita até 4.096 caracteres na descrição da embed.
-    descricao = str(descricao).strip() or "Leia as informações e envie sua candidatura pelo botão abaixo."
-    if len(descricao) > 4096:
-        trecho = descricao[:4093]
-        ultimo_espaco = trecho.rfind(" ")
-        if ultimo_espaco > 3800:
-            trecho = trecho[:ultimo_espaco]
-        descricao = trecho.rstrip() + "..."
-    embed = discord.Embed(title=str(titulo)[:256], description=descricao, color=0x5865F2)
-    if formulario.get("banner_url"):
-        embed.set_image(url=str(formulario["banner_url"]))
-    embed.set_footer(text="NÊMESIS • Formulário sincronizado com o site")
-    return embed
+def _embeds_painel(formulario: dict) -> list[discord.Embed]:
+    """Monta todas as partes da descrição sem descartar texto acima do limite do Discord."""
+    titulo = str(formulario.get("titulo_painel") or formulario.get("nome") or "Formulário")[:256]
+    descricao = str(
+        formulario.get("descricao_painel")
+        or "Leia as informações e envie sua candidatura pelo botão abaixo."
+    ).strip() or "Leia as informações e envie sua candidatura pelo botão abaixo."
+
+    # O Discord limita a descrição de cada embed a 4.096 caracteres.
+    # Dividimos em blocos menores e publicamos cada parte em uma mensagem própria.
+    limite = 3800
+    partes = []
+    restante = descricao
+    while restante:
+        if len(restante) <= limite:
+            partes.append(restante)
+            break
+        corte = restante.rfind("\\n", 0, limite)
+        if corte < limite // 2:
+            corte = restante.rfind(" ", 0, limite)
+        if corte < limite // 2:
+            corte = limite
+        partes.append(restante[:corte].rstrip())
+        restante = restante[corte:].lstrip()
+
+    if not partes:
+        partes = ["Leia as informações e envie sua candidatura pelo botão abaixo."]
+
+    embeds = []
+    for indice, parte in enumerate(partes, start=1):
+        titulo_parte = titulo if indice == 1 else f"{titulo[:230]} (continuação {indice}/{len(partes)})"
+        embed = discord.Embed(title=titulo_parte, description=parte, color=0x5865F2)
+        if indice == 1 and formulario.get("banner_url"):
+            embed.set_image(url=str(formulario["banner_url"]))
+        embed.set_footer(text=f"NÊMESIS • Formulário sincronizado com o site • {indice}/{len(partes)}")
+        embeds.append(embed)
+    return embeds
 
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
@@ -211,31 +232,59 @@ class Formularios(commands.Cog):
         for item in lista:
             formulario_id = str(item["id"])
             registro = registros.get(formulario_id, {})
-            mensagem = None
-            if isinstance(registro, dict) and registro.get("message_id"):
-                try:
-                    mensagem = await canal.fetch_message(int(registro["message_id"]))
-                except discord.NotFound:
-                    mensagem = None
-                except (discord.Forbidden, discord.HTTPException):
-                    continue
-
-            embed = _embed_painel(item)
+            embeds = _embeds_painel(item)
             view = _view_painel(item)
-            if mensagem is None:
+
+            # Compatibilidade com o formato antigo (um único message_id).
+            ids_mensagens = []
+            if isinstance(registro, dict):
+                ids_mensagens = registro.get("message_ids") or []
+                if not ids_mensagens and registro.get("message_id"):
+                    ids_mensagens = [registro["message_id"]]
+
+            mensagens = []
+            for indice, embed in enumerate(embeds):
+                mensagem = None
+                if indice < len(ids_mensagens):
+                    try:
+                        mensagem = await canal.fetch_message(int(ids_mensagens[indice]))
+                    except discord.NotFound:
+                        mensagem = None
+                    except (discord.Forbidden, discord.HTTPException):
+                        continue
+
                 try:
-                    mensagem = await canal.send(embed=embed, view=view)
+                    if mensagem is None:
+                        mensagem = await canal.send(
+                            embed=embed,
+                            view=view if indice == 0 else None,
+                        )
+                    else:
+                        await mensagem.edit(
+                            embed=embed,
+                            view=view if indice == 0 else None,
+                        )
+                    mensagens.append(int(mensagem.id))
                 except (discord.Forbidden, discord.HTTPException):
-                    continue
-            else:
+                    # Não apaga registros antigos se o Discord recusar a operação.
+                    mensagens = []
+                    break
+
+            if not mensagens:
+                continue
+
+            # Remove mensagens excedentes se a descrição ficou menor após uma edição.
+            for id_antigo in ids_mensagens[len(embeds):]:
                 try:
-                    await mensagem.edit(embed=embed, view=view)
-                except (discord.Forbidden, discord.HTTPException):
-                    continue
+                    antiga = await canal.fetch_message(int(id_antigo))
+                    await antiga.delete()
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    pass
 
             registros[formulario_id] = {
                 "channel_id": int(canal.id),
-                "message_id": int(mensagem.id),
+                "message_id": mensagens[0],
+                "message_ids": mensagens,
             }
 
         for formulario_id in list(registros):
