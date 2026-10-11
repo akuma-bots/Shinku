@@ -119,7 +119,18 @@ class Missoes(commands.Cog):
 
         config = await get_config(guild.id)
         canal_id = config.get(f"canal_provas_{tipo}_id")
+        try:
+            canal_id = int(canal_id) if canal_id else None
+        except (TypeError, ValueError):
+            canal_id = None
+
         canal = guild.get_channel(canal_id) if canal_id else None
+        if canal is None and canal_id:
+            try:
+                canal = await guild.fetch_channel(canal_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                print(f"[Missoes] Falha ao resolver canal de provas {canal_id}: {erro}")
+
         if not isinstance(canal, discord.TextChannel):
             await interaction.followup.send("❌ O canal de provas desse tipo ainda não foi configurado.", ephemeral=True)
             return
