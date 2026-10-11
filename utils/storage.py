@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from pathlib import Path
 from threading import Lock
 
@@ -15,7 +16,8 @@ DATA_DIR = (
 )
 
 DATA_DIR.mkdir(
-    exist_ok=True
+    parents=True,
+    exist_ok=True,
 )
 
 _lock = Lock()
@@ -83,13 +85,13 @@ async def _comando_redis(*args):
 
                 try:
                     dados = await resposta.json()
-                except Exception:
+                except Exception as erro:
                     texto = await resposta.text()
 
                     raise ErroStorage(
                         "O Upstash retornou uma resposta inválida: "
                         f"{texto}"
-                    )
+                    ) from erro
 
                 if resposta.status != 200:
                     raise ErroStorage(
@@ -97,16 +99,26 @@ async def _comando_redis(*args):
                         f"({resposta.status}): {dados}"
                     )
 
-                return dados.get("result")
+                if not isinstance(dados, dict):
+                    raise ErroStorage(
+                        "O Upstash retornou uma estrutura inválida."
+                    )
 
-    except aiohttp.ClientError as erro:
-        raise ErroStorage(
-            f"Falha de conexão com o Upstash: {erro}"
-        ) from erro
+                if dados.get("error"):
+                    raise ErroStorage(
+                        f"Erro retornado pelo Redis: {dados['error']}"
+                    )
+
+                return dados.get("result")
 
     except asyncio.TimeoutError as erro:
         raise ErroStorage(
             "Tempo limite excedido ao acessar o Upstash."
+        ) from erro
+
+    except aiohttp.ClientError as erro:
+        raise ErroStorage(
+            f"Falha de conexão com o Upstash: {erro}"
         ) from erro
 
 
