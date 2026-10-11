@@ -1,0 +1,39 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from utils import storage
+
+
+class TestStorageLocal(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+        self.data_dir = Path(self.tempdir.name)
+        self.patch_dir = patch.object(storage, "DATA_DIR", self.data_dir)
+        self.patch_dir.start()
+        self.addCleanup(self.patch_dir.stop)
+
+    def test_rejeita_caminho_fora_do_diretorio_de_dados(self):
+        for nome in ("../segredo.json", "/tmp/segredo.json", "subpasta/arquivo.json"):
+            with self.subTest(nome=nome):
+                with self.assertRaises(storage.ErroStorage):
+                    storage._path(nome)
+
+    def test_salvamento_atomico_preserva_json_valido(self):
+        destino = storage._path("estado.json")
+        storage._salvar_local("estado.json", {"membros": [1, 2, 3]})
+
+        self.assertEqual(json.loads(destino.read_text(encoding="utf-8")), {"membros": [1, 2, 3]})
+        self.assertEqual(list(self.data_dir.glob("*.tmp")), [])
+
+    def test_arquivo_ausente_recebe_padrao(self):
+        resultado = storage._carregar_local("novo.json", {"ativo": True})
+        self.assertEqual(resultado, {"ativo": True})
+        self.assertEqual(json.loads((self.data_dir / "novo.json").read_text(encoding="utf-8")), {"ativo": True})
+
+
+if __name__ == "__main__":
+    unittest.main()
