@@ -382,7 +382,7 @@ class Desafios(commands.Cog):
             ("Provas PvP", "canal_provas_pvp_id", 1545853928736952420),
             ("Ranking", "canal_ranking_id", 1545834182406574241),
             ("Provas de missões", "canal_provas_missao_id", 1556543417843056641),
-            ("Provas de pontuação", "canal_provas_contribuicao_id", 1556543628296593448),
+            ("Provas de contribuições", "canal_provas_contribuicao_id", 1556543628296593448),
             ("Provas especiais", "canal_provas_especial_id", 1556543872534839336),
             ("Auditoria", "canal_auditoria_id", 1545837705609617428),
         ]
