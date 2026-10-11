@@ -22,12 +22,13 @@ TIPOS_VALIDOS = {
 def _normalizar_tipo(tipo: str) -> str:
     valor = str(tipo or "").strip().lower()
 
-    if valor in ("missao", "missões", "missoes"):
+    if valor in ("missao", "missões", "missoes", "pvp"):
         return "missao"
 
     if valor in (
         "contribuicao",
         "contribuição",
+        "pve",
         "contribuicoes",
         "contribuições",
         "pontuacao",
