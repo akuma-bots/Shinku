@@ -44,6 +44,20 @@ async def get_perfil(
         {},
     )
 
+    # Recupera estatísticas antigas do ranking se o perfil do bot ainda não existir.
+    if not perfil:
+        competitivo = await carregar(
+            ARQUIVO_COMPETITIVO,
+            {"catalogo": [], "perfis": {}},
+        )
+        perfil_site = competitivo.get("perfis", {}).get(str(user_id), {})
+        if isinstance(perfil_site, dict):
+            perfil = {
+                chave: perfil_site[chave]
+                for chave in PADRAO_PERFIL
+                if chave in perfil_site
+            }
+
     return {
         **PADRAO_PERFIL,
         **perfil,
