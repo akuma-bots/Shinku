@@ -152,6 +152,15 @@ class Desafios(commands.Cog):
                 )
                 return
 
+        canal_id = config.get("canal_desafios_id")
+        try:
+            canal = interaction.guild.get_channel(int(canal_id)) if canal_id else interaction.channel
+        except (ValueError, TypeError):
+            canal = None
+        if canal is None or not hasattr(canal, "send"):
+            await interaction.response.send_message("❌ Canal de desafios não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
+            return
+
         if aposta_xp > 0:
             ok = await _remover_xp(interaction.guild.id, interaction.user.id, aposta_xp)
             if not ok:
@@ -159,9 +168,6 @@ class Desafios(commands.Cog):
                 return
 
         desafio = await desafios.criar(interaction.guild.id, interaction.user.id, membro.id, aposta_xp)
-
-        canal_id = config.get("canal_desafios_id")
-        canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
 
         embed = discord.Embed(
             title="⚔️ Desafio proposto!",
@@ -215,7 +221,13 @@ class Desafios(commands.Cog):
 
             config = await get_config(interaction.guild.id)
             canal_id = config.get("canal_lutas_id")
-            canal = interaction.guild.get_channel(canal_id) if canal_id else interaction.channel
+            try:
+                canal = interaction.guild.get_channel(int(canal_id)) if canal_id else interaction.channel
+            except (ValueError, TypeError):
+                canal = None
+            if canal is None or not hasattr(canal, "send"):
+                await interaction.followup.send("⚠️ Canal de lutas não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
+                return
             aviso = discord.Embed(
                 title="🥊 Luta em andamento",
                 description=f"<@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
