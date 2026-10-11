@@ -2,6 +2,10 @@ import json
 from pathlib import Path
 
 from utils import missoes as armazenamento
+from utils.storage import carregar, salvar
+
+
+ARQUIVO_MENSAGENS_DISCORD = "missoes_discord.json"
 
 
 CAMINHO_CATALOGO = (
@@ -79,6 +83,14 @@ async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
     return atualizadas
 
 
+async def obter_mensagem_discord(guild_id: int, missao_id: str) -> dict:
+    """Busca os IDs em storage separado para que o painel do site não os apague."""
+    dados = await carregar(ARQUIVO_MENSAGENS_DISCORD, {})
+    guild = dados.get(str(guild_id), {})
+    registro = guild.get(str(missao_id), {})
+    return registro if isinstance(registro, dict) else {}
+
+
 async def salvar_mensagem_discord(
     guild_id: int,
     missao_id: str,
@@ -86,17 +98,12 @@ async def salvar_mensagem_discord(
     mensagem_id: int,
 ) -> None:
     """Persiste os IDs da mensagem para editar a mesma publicação após reinícios."""
-    guild_data = await armazenamento._guild(guild_id)
-    missao = next(
-        (
-            item for item in guild_data.get("missoes", [])
-            if str(item.get("id")) == str(missao_id)
-        ),
-        None,
-    )
-    if missao is None:
-        return
-
-    missao["discord_channel_id"] = int(canal_id)
-    missao["discord_message_id"] = int(mensagem_id)
-    await armazenamento._salvar_guild(guild_id, guild_data)
+    dados = await carregar(ARQUIVO_MENSAGENS_DISCORD, {})
+    if not isinstance(dados, dict):
+        dados = {}
+    guild = dados.setdefault(str(guild_id), {})
+    guild[str(missao_id)] = {
+        "discord_channel_id": int(canal_id),
+        "discord_message_id": int(mensagem_id),
+    }
+    await salvar(ARQUIVO_MENSAGENS_DISCORD, dados)
