@@ -174,6 +174,11 @@ class Missoes(commands.Cog):
                     else:
                         mensagem = await canal.send(embed=embed)
                         resultado["publicadas"] += 1
+                    try:
+                        if not mensagem.pinned:
+                            await mensagem.pin(reason="Missão padrão permanente da NÊMESIS")
+                    except discord.Forbidden:
+                        log.warning("Sem permissão para fixar a missão %s; a mensagem continuará no canal.", atividade.get("id"))
                     await salvar_mensagem_discord(guild.id, str(atividade["id"]), canal.id, mensagem.id)
                 except (discord.Forbidden, discord.HTTPException) as erro:
                     log.exception("Não foi possível publicar/atualizar a missão %s: %s", atividade.get("id"), erro)
