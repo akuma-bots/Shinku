@@ -1,3 +1,5 @@
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -176,15 +178,29 @@ class ModalFormulario(discord.ui.Modal):
         await interaction.response.send_message("✅ Sua candidatura foi enviada!", ephemeral=True)
 
 
-def _embed_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> discord.Embed:
-    embed = discord.Embed(title=f"📥 Nova candidatura — {formulario['nome']}", color=0x5865F2)
-    embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
+def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> list[discord.Embed]:
+    """Divide candidaturas longas para respeitar o limite de 25 campos por embed."""
+    titulo_base = f"📥 Nova candidatura — {formulario.get('nome') or 'Formulário'}"
     perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
-    for pergunta, resp in zip(perguntas, resposta["respostas"]):
-        embed.add_field(name=pergunta[:256], value=resp[:1024], inline=False)
-    embed.set_footer(text=f"ID: {resposta['id']} • {guild.name}")
-    return embed
+    respostas = resposta.get("respostas") or []
+    pares = list(zip(perguntas, respostas))
 
+    # Cada embed recebe o campo do candidato e até 24 respostas (limite total: 25).
+    blocos = [pares[i:i + 24] for i in range(0, len(pares), 24)] or [[]]
+    embeds = []
+    for indice, bloco in enumerate(blocos, start=1):
+        titulo = titulo_base if len(blocos) == 1 else f"{titulo_base[:220]} ({indice}/{len(blocos)})"
+        embed = discord.Embed(title=titulo[:256], color=0x5865F2)
+        embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
+        for pergunta, resp in bloco:
+            embed.add_field(
+                name=str(pergunta or "Pergunta")[:256],
+                value=str(resp if resp is not None else "—")[:1024] or "—",
+                inline=False,
+            )
+        embed.set_footer(text=f"ID: {resposta['id']} • {guild.name}")
+        embeds.append(embed)
+    return embeds
 
 def _view_resposta(resposta_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
@@ -306,10 +322,10 @@ class Formularios(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
-        embed = _embed_resposta(formulario, resposta, guild)
+        embeds = _embeds_resposta(formulario, resposta, guild)
         view = _view_resposta(resposta["id"])
 
-        # Publica todas as candidaturas no canal fixo da NÊMESIS.
+        # Publica todas as partes da candidatura; os botões ficam na primeira.
         canal_candidaturas = guild.get_channel(1545835428530360401)
         if canal_candidaturas is None:
             try:
@@ -317,14 +333,19 @@ class Formularios(commands.Cog):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 canal_candidaturas = None
         if canal_candidaturas is not None:
-            try:
-                await canal_candidaturas.send(embed=embed, view=view)
-            except (discord.Forbidden, discord.HTTPException):
-                pass
+            for indice, embed in enumerate(embeds):
+                try:
+                    await canal_candidaturas.send(
+                        embed=embed,
+                        view=view if indice == 0 else None,
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    logging.exception("Falha ao publicar candidatura %s no canal.", resposta.get("id"))
+                    break
 
         # Mantém também as notificações por DM para os cargos configurados.
         notificados = set()
-        for cargo_id in formulario["cargos_notificar"]:
+        for cargo_id in formulario.get("cargos_notificar", []):
             try:
                 cargo_id_int = int(cargo_id)
             except (TypeError, ValueError):
@@ -336,10 +357,17 @@ class Formularios(commands.Cog):
                 if membro.id in notificados or membro.bot:
                     continue
                 notificados.add(membro.id)
-                try:
-                    await membro.send(embed=embed, view=view)
-                except discord.Forbidden:
-                    pass  # DM fechada — a pessoa simplesmente não recebe
+                for indice, embed in enumerate(embeds):
+                    try:
+                        await membro.send(
+                            embed=embed,
+                            view=view if indice == 0 else None,
+                        )
+                    except discord.Forbidden:
+                        break  # DM fechada — a pessoa simplesmente não recebe
+                    except discord.HTTPException:
+                        logging.exception("Falha ao enviar candidatura %s por DM.", resposta.get("id"))
+                        break
 
     @app_commands.command(name="formulario-criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
     @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
