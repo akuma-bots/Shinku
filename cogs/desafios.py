@@ -5,7 +5,7 @@ from discord.ext import commands
 
 from utils import desafios
 from utils.guild_config import get_config, set_config
-from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
+from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil, sincronizar_perfil_site
 
 XP_VITORIA_PVP = 50
 COOLDOWN_PADRAO_MINUTOS = 15
@@ -27,11 +27,19 @@ async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int
     pv["kills"] += 1
     pv["xp"] += XP_VITORIA_PVP + xp_extra_vencedor
     await _salvar_perfil(guild_id, vencedor_id, pv)
+    try:
+        await sincronizar_perfil_site(guild_id, vencedor_id)
+    except Exception:
+        pass
 
     pp = await get_perfil(guild_id, perdedor_id)
     pp["derrotas"] += 1
     pp["deaths"] += 1
     await _salvar_perfil(guild_id, perdedor_id, pp)
+    try:
+        await sincronizar_perfil_site(guild_id, perdedor_id)
+    except Exception:
+        pass
 
     return pv, patente_antiga
 
