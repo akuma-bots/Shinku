@@ -35,5 +35,14 @@ class TestStorageLocal(unittest.TestCase):
         self.assertEqual(json.loads((self.data_dir / "novo.json").read_text(encoding="utf-8")), {"ativo": True})
 
 
+class TestStorageConfiguracao(unittest.IsolatedAsyncioTestCase):
+    async def test_upstash_parcial_nao_cai_silenciosamente_no_disco(self):
+        with patch.object(storage, "UPSTASH_CONFIG_INCOMPLETA", True), patch.object(storage, "USANDO_UPSTASH", False):
+            with self.assertRaises(storage.ErroStorage):
+                await storage.carregar("estado.json", {})
+            with self.assertRaises(storage.ErroStorage):
+                await storage.salvar("estado.json", {})
+
+
 if __name__ == "__main__":
     unittest.main()
