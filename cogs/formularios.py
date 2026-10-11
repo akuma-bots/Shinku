@@ -228,7 +228,11 @@ class Formularios(commands.Cog):
 
         notificados = set()
         for cargo_id in formulario["cargos_notificar"]:
-            cargo = guild.get_role(cargo_id)
+            try:
+                cargo_id_int = int(cargo_id)
+            except (TypeError, ValueError):
+                continue
+            cargo = guild.get_role(cargo_id_int)
             if not cargo:
                 continue
             for membro in cargo.members:
@@ -302,8 +306,12 @@ class Formularios(commands.Cog):
 
         blocos = []
         for i, pagina in enumerate(formulario["paginas"], start=1):
-            perguntas_texto = "\n".join(f"  {j}. {p}" for j, p in enumerate(pagina, start=1))
-            blocos.append(f"**Página {i}**\n{perguntas_texto}")
+            perguntas_pagina = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina
+            perguntas_texto = "\n".join(
+                f"  {j}. {_texto_pergunta(p)}" for j, p in enumerate(perguntas_pagina, start=1)
+            )
+            titulo_pagina = pagina.get("titulo") if isinstance(pagina, dict) else f"Página {i}"
+            blocos.append(f"**{titulo_pagina or f'Página {i}'}**\n{perguntas_texto}")
         embed = discord.Embed(title=f"📋 Páginas — {formulario['nome']}", description="\n\n".join(blocos), color=0x5865F2)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
