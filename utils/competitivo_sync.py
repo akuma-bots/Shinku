@@ -18,7 +18,7 @@ async def somar_pontos_competitivo(
     """
     Atualiza o mesmo competitivo.json usado pelo Dashboard da NÊMESIS.
 
-    O delta é somado ao P.C. existente. Assim, alterações feitas
+    O delta é somado à pontuação existente. Assim, alterações feitas
     manualmente pelo Dashboard não são sobrescritas pelo bot.
     """
 
