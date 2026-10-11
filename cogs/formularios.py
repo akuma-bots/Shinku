@@ -306,13 +306,23 @@ class Formularios(commands.Cog):
         for formulario_id in list(registros):
             if formulario_id in ids_atuais:
                 continue
+
             registro = registros.get(formulario_id, {})
-            if isinstance(registro, dict) and registro.get("message_id"):
+            ids_antigos = []
+            if isinstance(registro, dict):
+                ids_antigos = registro.get("message_ids") or []
+                if not ids_antigos and registro.get("message_id"):
+                    ids_antigos = [registro["message_id"]]
+
+            # Apaga também as mensagens de continuação quando o formulário
+            # é removido do site, mantendo compatibilidade com registros antigos.
+            for mensagem_id in ids_antigos:
                 try:
-                    mensagem = await canal.fetch_message(int(registro["message_id"]))
+                    mensagem = await canal.fetch_message(int(mensagem_id))
                     await mensagem.delete()
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    pass
+                except (TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    continue
+
             registros.pop(formulario_id, None)
 
         await salvar(ARQUIVO_PAINEIS_DISCORD, dados_paineis)
