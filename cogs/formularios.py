@@ -253,6 +253,20 @@ class Formularios(commands.Cog):
         embed = _embed_resposta(formulario, resposta, guild)
         view = _view_resposta(resposta["id"])
 
+        # Publica todas as candidaturas no canal fixo da NÊMESIS.
+        canal_candidaturas = guild.get_channel(1545835428530360401)
+        if canal_candidaturas is None:
+            try:
+                canal_candidaturas = await guild.fetch_channel(1545835428530360401)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                canal_candidaturas = None
+        if canal_candidaturas is not None:
+            try:
+                await canal_candidaturas.send(embed=embed, view=view)
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+
+        # Mantém também as notificações por DM para os cargos configurados.
         notificados = set()
         for cargo_id in formulario["cargos_notificar"]:
             try:
