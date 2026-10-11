@@ -307,6 +307,25 @@ async def salvar(
 
 
 # =========================================================
+# VERIFICAÇÃO DA CONEXÃO COMPARTILHADA
+# =========================================================
+
+async def verificar_conexao_compartilhada() -> bool:
+    """
+    Confirma que o bot consegue acessar o Redis compartilhado
+    com o Dashboard. Não retorna nem registra credenciais.
+    """
+    resultado = await _comando_redis("PING")
+
+    if str(resultado).upper() != "PONG":
+        raise ErroStorage(
+            "O Upstash não confirmou a conexão compartilhada."
+        )
+
+    return True
+
+
+# =========================================================
 # CONFIGURAÇÕES ESTÁTICAS
 # =========================================================
 
