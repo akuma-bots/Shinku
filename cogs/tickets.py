@@ -100,7 +100,7 @@ async def fechar_canal_ticket(
         # Mesmo que o canal já tenha sido apagado, tenta manter
         # o registro persistente como fechado.
         try:
-            ticket = await tickets.get_ticket_por_canal(canal.id)
+            ticket = await tickets.get_ticket_por_canal(canal.guild.id, canal.id)
 
             if ticket:
                 await tickets.fechar_ticket(
