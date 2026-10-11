@@ -7,12 +7,10 @@ from discord.ext import commands
 SISTEMAS = {
     "Missoes": ("🎯", "Missões"),
     "Desafios": ("⚔️", "PvP / Desafios"),
-    "PvE": ("👹", "Pontuação"),
     "Guerras": ("🏰", "Guerras"),
     "Perfil": ("🎖️", "Perfil & Patentes"),
     "PerfilCard": ("🖼️", "Perfil Visual"),
     "RankingGeral": ("🌍", "Ranking Geral"),
-    "PontuacaoPvE": ("🗡️", "Pontuação"),
     "Recordes": ("🏅", "Recordes"),
     "Temporadas": ("🏁", "Temporadas"),
     "Gangues": ("🏴", "Gangues"),
