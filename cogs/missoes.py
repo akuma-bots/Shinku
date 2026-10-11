@@ -8,6 +8,7 @@ from utils.perfis import (
     get_perfil,
     _salvar_perfil,
     sincronizar_perfil_site,
+    _sincronizar_site,
     calcular_patente_atual,
     definir_patente,
 )
@@ -65,11 +66,16 @@ class Missoes(commands.Cog):
 
         membro = guild.get_member(autor_id)
         try:
-            await sincronizar_perfil_site(
-                guild.id, autor_id, membro.display_name if membro else ""
+            # A recompensa da missão também conta como P.C. no ranking compartilhado.
+            # O Dashboard e o TOP 10 leem o mesmo competitivo.json.
+            await _sincronizar_site(
+                user_id=autor_id,
+                perfil=perfil,
+                nome=membro.display_name if membro else "",
+                delta_pontos=recompensa,
             )
-        except Exception:
-            pass
+        except Exception as erro:
+            print(f"[Missoes] Falha ao sincronizar P.C. de {autor_id}: {erro}")
 
         texto = f"✅ <@{autor_id}> recebeu **+{recompensa} XP**."
         nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
