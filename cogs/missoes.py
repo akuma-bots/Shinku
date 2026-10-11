@@ -118,18 +118,32 @@ class Missoes(commands.Cog):
             return
 
         config = await get_config(guild.id)
-        canal_id = config.get(f"canal_provas_{tipo}_id")
-        try:
-            canal_id = int(canal_id) if canal_id else None
-        except (TypeError, ValueError):
-            canal_id = None
-
-        canal = guild.get_channel(canal_id) if canal_id else None
-        if canal is None and canal_id:
+        padroes = {
+            "missao": 1556543417843056641,
+            "contribuicao": 1556543628296593448,
+            "especial": 1556543872534839336,
+        }
+        candidatos = [config.get(f"canal_provas_{tipo}_id"), padroes.get(tipo)]
+        canal = None
+        vistos = set()
+        for valor in candidatos:
             try:
-                canal = await guild.fetch_channel(canal_id)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
-                print(f"[Missoes] Falha ao resolver canal de provas {canal_id}: {erro}")
+                identificador = int(valor) if valor else None
+            except (TypeError, ValueError):
+                identificador = None
+            if not identificador or identificador in vistos:
+                continue
+            vistos.add(identificador)
+            canal = guild.get_channel(identificador)
+            if canal is None:
+                try:
+                    canal = await guild.fetch_channel(identificador)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                    print(f"[Missoes] Falha ao resolver canal de provas {identificador}: {erro}")
+                    canal = None
+            if isinstance(canal, discord.TextChannel):
+                break
+            canal = None
 
         if not isinstance(canal, discord.TextChannel):
             await interaction.followup.send("❌ O canal de provas desse tipo ainda não foi configurado.", ephemeral=True)
