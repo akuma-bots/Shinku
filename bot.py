@@ -87,10 +87,14 @@ def _descobrir_cogs() -> list:
     if not pasta_cogs.exists():
         return []
 
+    # configuracao.py já fornece o comando /definir-status.
+    # customizacao.py registra outro Cog com o mesmo nome e comando,
+    # causando "Cog named Customizacao already loaded".
     nomes = [
         modulo.name
         for modulo in pkgutil.iter_modules([str(pasta_cogs)])
         if not modulo.name.startswith("_")
+        and modulo.name != "customizacao"
     ]
 
     return [
