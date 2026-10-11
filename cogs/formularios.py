@@ -47,10 +47,11 @@ def _texto_pergunta(pergunta) -> str:
 
 
 def _perguntas_flat(formulario: dict) -> list:
-    resultado = []
-    for indice in range(len(formulario.get("paginas") or [])):
-        resultado.extend(_perguntas_pagina(formulario, indice))
-    return resultado
+    return [
+        pergunta
+        for pagina in _paginas_modal(formulario)
+        for pergunta in pagina["perguntas"]
+    ]
 
 
 def _embed_painel(formulario: dict) -> discord.Embed:
