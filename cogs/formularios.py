@@ -8,19 +8,36 @@ from utils.storage import carregar, salvar
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
 PREFIXO_RECUSAR = "formulario:recusar:"
+PREFIXO_CONTINUAR = "formulario:continuar:"
+SESSOES_FORMULARIOS = {}
 CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
 ARQUIVO_PAINEIS_DISCORD = "formularios_discord.json"
 GUILD_NEMESIS_ID = 1543381737961160910
 
 
+def _paginas_modal(formulario: dict) -> list:
+    """Divide cada etapa do site em blocos de até cinco perguntas (limite do Discord)."""
+    resultado = []
+    for indice, pagina in enumerate(formulario.get("paginas") or [], start=1):
+        if isinstance(pagina, dict):
+            perguntas = pagina.get("perguntas") or []
+            titulo = pagina.get("titulo") or f"Etapa {indice}"
+        else:
+            perguntas = pagina if isinstance(pagina, list) else []
+            titulo = f"Etapa {indice}"
+        for inicio in range(0, len(perguntas), 5):
+            resultado.append({
+                "titulo": titulo,
+                "perguntas": perguntas[inicio:inicio + 5],
+            })
+    return resultado
+
+
 def _perguntas_pagina(formulario: dict, indice: int) -> list:
-    paginas = formulario.get("paginas") or []
+    paginas = _paginas_modal(formulario)
     if not 0 <= indice < len(paginas):
         return []
-    pagina = paginas[indice]
-    if isinstance(pagina, dict):
-        return pagina.get("perguntas") or []
-    return pagina if isinstance(pagina, list) else []
+    return paginas[indice]["perguntas"]
 
 
 def _texto_pergunta(pergunta) -> str:
@@ -41,11 +58,12 @@ def _embed_painel(formulario: dict) -> discord.Embed:
     descricao = formulario.get("descricao_painel") or "Preencha o formulário pelo botão abaixo."
     embed = discord.Embed(title=str(titulo)[:256], description=str(descricao)[:3500], color=0x5865F2)
     linhas = []
-    for numero_pagina, _pagina in enumerate(formulario.get("paginas") or [], start=1):
-        perguntas = _perguntas_pagina(formulario, numero_pagina - 1)
+    for numero_pagina, pagina in enumerate(formulario.get("paginas") or [], start=1):
+        perguntas = pagina.get("perguntas") or [] if isinstance(pagina, dict) else (pagina if isinstance(pagina, list) else [])
         if not perguntas:
             continue
-        linhas.append(f"**Etapa {numero_pagina}**")
+        titulo_etapa = pagina.get("titulo") or f"Etapa {numero_pagina}" if isinstance(pagina, dict) else f"Etapa {numero_pagina}"
+        linhas.append(f"**{titulo_etapa}**")
         for pergunta in perguntas:
             texto = _texto_pergunta(pergunta)
             if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha":
@@ -65,7 +83,7 @@ def _embed_painel(formulario: dict) -> discord.Embed:
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     ativo = formulario.get("ativo") is not False
-    tem_perguntas = any(_perguntas_pagina(formulario, i) for i in range(len(formulario.get("paginas") or [])))
+    tem_perguntas = bool(_perguntas_flat(formulario))
     view.add_item(discord.ui.Button(
         label="Preencher formulário", style=discord.ButtonStyle.primary, emoji="📝",
         custom_id=f"{PREFIXO_ABRIR}{formulario.get('id', '')}",
@@ -80,9 +98,9 @@ class ModalFormulario(discord.ui.Modal):
     automaticamente — encadeando os modais até completar o formulário
     inteiro. As respostas vão sendo acumuladas de página em página."""
 
-    def __init__(self, formulario: dict, pagina_indice: int = 0, respostas_acumuladas: list = None):
+    def __init__(self, formulario: dict, pagina_indice: int = 0, respostas_acumuladas: list = None, usuario_id: int = None):
         pagina = _perguntas_pagina(formulario, pagina_indice)
-        total_paginas = len(formulario["paginas"])
+        total_paginas = len(_paginas_modal(formulario))
         titulo = str(formulario.get("nome") or formulario.get("titulo_painel") or "Formulário")[:34]
         if total_paginas > 1:
             titulo = f"{titulo} ({pagina_indice + 1}/{total_paginas})"[:45]
@@ -91,6 +109,7 @@ class ModalFormulario(discord.ui.Modal):
         self.formulario = formulario
         self.pagina_indice = pagina_indice
         self.respostas_acumuladas = respostas_acumuladas or []
+        self.usuario_id = usuario_id
         self.inputs = []
         for pergunta in pagina[:5]:
             texto = _texto_pergunta(pergunta)
@@ -110,10 +129,27 @@ class ModalFormulario(discord.ui.Modal):
         todas_respostas = self.respostas_acumuladas + respostas_desta_pagina
 
         proxima_pagina = self.pagina_indice + 1
-        if proxima_pagina < len(self.formulario["paginas"]):
-            await interaction.response.send_modal(ModalFormulario(self.formulario, proxima_pagina, todas_respostas))
+        guild_id = interaction.guild.id if interaction.guild else int(self.formulario.get("guild_id") or GUILD_NEMESIS_ID)
+        chave = (int(guild_id), int(interaction.user.id), str(self.formulario["id"]))
+        if proxima_pagina < len(_paginas_modal(self.formulario)):
+            SESSOES_FORMULARIOS[chave] = {
+                "formulario": self.formulario,
+                "respostas": todas_respostas,
+            }
+            view = discord.ui.View(timeout=None)
+            view.add_item(discord.ui.Button(
+                label=f"Continuar para etapa {proxima_pagina + 1}",
+                style=discord.ButtonStyle.primary,
+                custom_id=f"{PREFIXO_CONTINUAR}{self.formulario['id']}:{proxima_pagina}:{interaction.user.id}",
+            ))
+            await interaction.response.send_message(
+                f"Etapa {self.pagina_indice + 1} concluída. Continue para responder às próximas perguntas.",
+                view=view,
+                ephemeral=True,
+            )
             return
 
+        SESSOES_FORMULARIOS.pop(chave, None)
         cog = interaction.client.get_cog("Formularios")
         resposta = await formularios.criar_resposta(interaction.guild.id, self.formulario["id"],
                                                       interaction.user.id, todas_respostas)
@@ -392,13 +428,44 @@ class Formularios(commands.Cog):
             return
         custom_id = interaction.data.get("custom_id", "")
 
+        if custom_id.startswith(PREFIXO_CONTINUAR):
+            if interaction.guild is None:
+                await interaction.response.send_message("Abra a continuação no servidor da NÊMESIS.", ephemeral=True)
+                return
+            partes = custom_id[len(PREFIXO_CONTINUAR):].rsplit(":", 2)
+            if len(partes) != 3:
+                await interaction.response.send_message("Este botão de continuação é inválido.", ephemeral=True)
+                return
+            formulario_id, indice_texto, usuario_texto = partes
+            try:
+                indice = int(indice_texto)
+                usuario_id = int(usuario_texto)
+            except ValueError:
+                await interaction.response.send_message("Este botão de continuação é inválido.", ephemeral=True)
+                return
+            if interaction.user.id != usuario_id:
+                await interaction.response.send_message("Somente a pessoa que iniciou o formulário pode continuar.", ephemeral=True)
+                return
+            chave = (interaction.guild.id, interaction.user.id, formulario_id)
+            sessao = SESSOES_FORMULARIOS.get(chave)
+            if not sessao:
+                await interaction.response.send_message("Sua sessão de formulário expirou. Abra o formulário novamente.", ephemeral=True)
+                return
+            await interaction.response.send_modal(
+                ModalFormulario(sessao["formulario"], indice, sessao["respostas"], usuario_id=interaction.user.id)
+            )
+            return
+
         if custom_id.startswith(PREFIXO_ABRIR):
+            if interaction.guild is None:
+                await interaction.response.send_message("Abra este formulário no servidor da NÊMESIS.", ephemeral=True)
+                return
             formulario_id = custom_id[len(PREFIXO_ABRIR):]
             formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
-            if not formulario or not formulario["paginas"]:
-                await interaction.response.send_message("Esse formulário não existe mais ou não tem perguntas.", ephemeral=True)
+            if not formulario or not _perguntas_flat(formulario) or formulario.get("ativo") is False:
+                await interaction.response.send_message("Esse formulário não está disponível ou ainda não tem perguntas.", ephemeral=True)
                 return
-            await interaction.response.send_modal(ModalFormulario(formulario))
+            await interaction.response.send_modal(ModalFormulario(formulario, usuario_id=interaction.user.id))
             return
 
         if custom_id.startswith(PREFIXO_APROVAR) or custom_id.startswith(PREFIXO_RECUSAR):
