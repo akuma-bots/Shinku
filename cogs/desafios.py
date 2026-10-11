@@ -11,24 +11,36 @@ XP_VITORIA_PVP = 50
 COOLDOWN_PADRAO_MINUTOS = 15
 
 
-async def _resolver_canal(guild: discord.Guild, canal_id, fallback=None):
-    """Resolve o canal pela cache e, se necessário, consulta a API do Discord."""
-    if not canal_id:
+async def _resolver_canal(
+    guild: discord.Guild,
+    canal_id,
+    fallback=None,
+    fallback_id=None,
+):
+    """Resolve o canal configurado, tenta o padrão e usa o canal atual como último recurso."""
+    vistos = set()
+    for valor in (canal_id, fallback_id):
+        if valor in (None, ""):
+            continue
+        try:
+            identificador = int(valor)
+        except (TypeError, ValueError):
+            continue
+        if identificador in vistos:
+            continue
+        vistos.add(identificador)
+        canal = guild.get_channel(identificador)
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(identificador)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                print("[Desafios] Falha ao resolver canal " + str(identificador) + ": " + str(erro))
+                continue
+        if canal is not None and callable(getattr(canal, "send", None)):
+            return canal
+    if fallback is not None and callable(getattr(fallback, "send", None)):
         return fallback
-    try:
-        canal_id = int(canal_id)
-    except (TypeError, ValueError):
-        return None
-
-    canal = guild.get_channel(canal_id)
-    if canal is not None:
-        return canal
-
-    try:
-        return await guild.fetch_channel(canal_id)
-    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-        return None
-
+    return None
 
 def _view_desafio(desafio_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
@@ -172,7 +184,7 @@ class Desafios(commands.Cog):
                 return
 
         canal_id = config.get("canal_desafios_id")
-        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel)
+        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545834386128375909)
         if canal is None or not hasattr(canal, "send"):
             await interaction.response.send_message("❌ Canal de desafios não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
             return
@@ -237,7 +249,7 @@ class Desafios(commands.Cog):
 
             config = await get_config(interaction.guild.id)
             canal_id = config.get("canal_lutas_id")
-            canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel)
+            canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545834447944028170)
             if canal is None or not hasattr(canal, "send"):
                 await interaction.followup.send("⚠️ Canal de lutas não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
                 return
@@ -278,7 +290,7 @@ class Desafios(commands.Cog):
 
         config = await get_config(interaction.guild.id)
         canal_id = config.get("canal_provas_pvp_id")
-        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel)
+        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545853928736952420)
         if canal is None or not hasattr(canal, "send"):
             await interaction.response.send_message(
                 "❌ Canal de provas PvP não encontrado. Confira o ID padrão em utils/guild_config.py.",
