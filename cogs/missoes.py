@@ -1,8 +1,16 @@
+import asyncio
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from utils import missoes
+from utils.catalogo_missoes import (
+    carregar_catalogo,
+    sincronizar_catalogo,
+    salvar_mensagem_discord,
+)
 from utils.guild_config import get_config
 from utils.perfis import (
     get_perfil,
@@ -12,22 +20,192 @@ from utils.perfis import (
     definir_patente,
 )
 
+
+log = logging.getLogger(__name__)
+
 TIPOS = {
     "missao": {"nome": "Missão", "emoji": "🎯"},
-    "contribuicao": {"nome": "Contribuição", "emoji": "🤝"},
+    # O valor interno antigo é mantido para compatibilidade com os dados existentes.
+    "contribuicao": {"nome": "Pontuação", "emoji": "✦"},
     "especial": {"nome": "Missão especial", "emoji": "⭐"},
+}
+
+CANAIS_PADRAO = {
+    "canal_missoes_missao_id": 1556543214885019668,
+    "canal_missoes_contribuicao_id": 1556543539213639760,
+    "canal_missoes_especial_id": 1556543708478972015,
+    "canal_provas_missao_id": 1556543417843056641,
+    "canal_provas_contribuicao_id": 1556543628296593448,
+    "canal_provas_especial_id": 1556543872534839336,
+}
+
+NOMES_CANAIS = {
+    "canal_missoes_contribuicao_id": "・𝖯𝗈𝗇𝗍𝗎𝖺𝖼̧𝖺̃𝗈",
+    "canal_provas_contribuicao_id": "・𝖯𝗋𝗈𝗏𝖺𝗌-𝖽𝖾-𝖯𝗈𝗇𝗍𝗎𝖺𝖼̧𝖺̃𝗈",
 }
 
 
 class Missoes(commands.Cog):
-    """Missões da NÊMESIS: envio de provas, revisão e recompensa de XP."""
+    """Missões permanentes definidas no GitHub e revisão de provas."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._sync_lock = asyncio.Lock()
         if not hasattr(bot, "processadores_revisao"):
             bot.processadores_revisao = {}
         for tipo in ("missao", "contribuicao", "especial"):
             bot.processadores_revisao[tipo] = self.processar_aprovacao
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        guild = self.bot.get_guild(1543381737961160910)
+        if guild is None:
+            log.warning("Missões padrão: servidor NÊMESIS não encontrado no cache.")
+            return
+        await self.sincronizar_missoes_discord(guild)
+
+    async def _resolver_canal(self, guild: discord.Guild, canal_id: int):
+        canal = guild.get_channel(int(canal_id))
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(int(canal_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                log.warning("Não foi possível resolver o canal %s: %s", canal_id, erro)
+                return None
+        return canal if isinstance(canal, discord.TextChannel) else None
+
+    async def _renomear_canais_pontuacao(self, guild: discord.Guild, config: dict):
+        bot_member = guild.me
+        if bot_member is None:
+            return
+        for chave, nome_novo in NOMES_CANAIS.items():
+            canal_id = config.get(chave) or CANAIS_PADRAO.get(chave)
+            if not canal_id:
+                continue
+            canal = await self._resolver_canal(guild, canal_id)
+            if canal is None or canal.name == nome_novo:
+                continue
+            if not canal.permissions_for(bot_member).manage_channels:
+                log.warning("Sem permissão para renomear o canal %s para %s.", canal.id, nome_novo)
+                continue
+            try:
+                await canal.edit(name=nome_novo, reason="Padronização do sistema para Pontuação da NÊMESIS")
+            except discord.HTTPException:
+                log.exception("Falha ao renomear o canal %s.", canal.id)
+
+    @staticmethod
+    def _montar_embed(atividade: dict) -> discord.Embed:
+        tipo = TIPOS.get(str(atividade.get("tipo", "missao")).lower(), TIPOS["missao"])
+        ativa = atividade.get("ativa", True)
+        try:
+            recompensa = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
+        except (TypeError, ValueError):
+            recompensa = 0
+
+        embed = discord.Embed(
+            title=f"NÊMESIS — {atividade.get('titulo', 'Missão')}",
+            description=atividade.get("descricao") or "Consulte a descrição com a liderança.",
+            color=0x5865F2 if ativa else 0x747F8D,
+        )
+        embed.add_field(name="Categoria", value=tipo["nome"], inline=True)
+        embed.add_field(name="ID da missão", value=f"`{atividade.get('id', '—')}`", inline=True)
+        embed.add_field(name="Recompensa", value=f"+{recompensa} de pontuação e +{recompensa} XP", inline=False)
+        if ativa:
+            embed.add_field(
+                name="Como concluir",
+                value=(
+                    "Conclua a atividade e envie uma captura de tela como prova usando "
+                    f"`/missao-completar missao_id:{atividade.get('id', '')}`."
+                ),
+                inline=False,
+            )
+            embed.set_footer(text="Missão padrão gerenciada pelo GitHub • A publicação é atualizada pelo bot")
+        else:
+            embed.add_field(name="Status", value="Esta missão está encerrada.", inline=False)
+            embed.set_footer(text="Missão encerrada • A publicação permanece no canal como histórico")
+        return embed
+
+    async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
+        """Publica cada missão padrão uma vez e edita a mesma mensagem nos próximos reinícios."""
+        if self._sync_lock.locked():
+            return {"atualizadas": 0, "publicadas": 0, "falhas": 0, "ignorada": True}
+
+        async with self._sync_lock:
+            catalogo = carregar_catalogo()
+            atividades = await sincronizar_catalogo(guild.id, catalogo)
+            config = await get_config(guild.id)
+            await self._renomear_canais_pontuacao(guild, config)
+
+            resultado = {"atualizadas": 0, "publicadas": 0, "falhas": 0}
+            for atividade in atividades:
+                chave_canal = atividade.get("canal_config", "")
+                canal_id = config.get(chave_canal) or CANAIS_PADRAO.get(chave_canal)
+                if not canal_id:
+                    log.error("Missão %s sem canal configurado (%s).", atividade.get("id"), chave_canal)
+                    resultado["falhas"] += 1
+                    continue
+
+                canal = await self._resolver_canal(guild, canal_id)
+                if canal is None:
+                    log.error("Canal da missão %s não encontrado: %s", atividade.get("id"), canal_id)
+                    resultado["falhas"] += 1
+                    continue
+
+                mensagem = None
+                mensagem_id = atividade.get("discord_message_id")
+                canal_salvo_id = atividade.get("discord_channel_id")
+                if mensagem_id and str(canal_salvo_id) == str(canal.id):
+                    try:
+                        mensagem = await canal.fetch_message(int(mensagem_id))
+                    except discord.NotFound:
+                        mensagem = None
+                    except (discord.Forbidden, discord.HTTPException) as erro:
+                        log.warning("Falha ao buscar mensagem da missão %s: %s", atividade.get("id"), erro)
+                        resultado["falhas"] += 1
+                        continue
+
+                embed = self._montar_embed(atividade)
+                try:
+                    if mensagem is not None:
+                        await mensagem.edit(embed=embed)
+                        resultado["atualizadas"] += 1
+                    else:
+                        mensagem = await canal.send(embed=embed)
+                        resultado["publicadas"] += 1
+                    await salvar_mensagem_discord(guild.id, str(atividade["id"]), canal.id, mensagem.id)
+                except (discord.Forbidden, discord.HTTPException) as erro:
+                    log.exception("Não foi possível publicar/atualizar a missão %s: %s", atividade.get("id"), erro)
+                    resultado["falhas"] += 1
+
+            log.info(
+                "Catálogo de missões sincronizado: %s publicadas, %s atualizadas, %s falhas.",
+                resultado["publicadas"], resultado["atualizadas"], resultado["falhas"],
+            )
+            return resultado
+
+    @app_commands.command(
+        name="missoes-sincronizar",
+        description="Publica ou atualiza as missões padrão nos canais oficiais.",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def missoes_sincronizar(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        if interaction.guild is None:
+            await interaction.followup.send("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        try:
+            resultado = await self.sincronizar_missoes_discord(interaction.guild)
+        except Exception as erro:
+            log.exception("Erro na sincronização manual das missões.")
+            await interaction.followup.send(f"Falha ao sincronizar as missões: `{type(erro).__name__}`.", ephemeral=True)
+            return
+        await interaction.followup.send(
+            "Sincronização concluída. "
+            f"Publicadas: **{resultado.get('publicadas', 0)}** · "
+            f"Atualizadas: **{resultado.get('atualizadas', 0)}** · "
+            f"Falhas: **{resultado.get('falhas', 0)}**.",
+            ephemeral=True,
+        )
 
     async def processar_aprovacao(self, guild: discord.Guild, revisao: dict) -> str:
         atividade = await missoes.get(guild.id, revisao.get("referencia_id", ""))
@@ -65,8 +243,6 @@ class Missoes(commands.Cog):
 
         membro = guild.get_member(autor_id)
         try:
-            # A recompensa da missão também conta como P.C. no ranking compartilhado.
-            # O Dashboard e o TOP 10 leem o mesmo competitivo.json.
             await _sincronizar_site(
                 user_id=autor_id,
                 perfil=perfil,
@@ -74,9 +250,9 @@ class Missoes(commands.Cog):
                 delta_pontos=recompensa,
             )
         except Exception as erro:
-            print(f"[Missoes] Falha ao sincronizar P.C. de {autor_id}: {erro}")
+            log.exception("Falha ao sincronizar pontuação de %s: %s", autor_id, erro)
 
-        texto = f"✅ <@{autor_id}> recebeu **+{recompensa} XP**."
+        texto = f"✅ <@{autor_id}> recebeu **+{recompensa} XP** e **+{recompensa} de pontuação**."
         nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
         if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
             await definir_patente(guild.id, autor_id, nova_patente["nome"])
@@ -92,7 +268,7 @@ class Missoes(commands.Cog):
 
     @app_commands.command(name="missao-completar", description="Envia uma prova de conclusão de missão.")
     @app_commands.describe(
-        missao_id="ID da missão, contribuição ou missão especial",
+        missao_id="ID da missão, pontuação ou missão especial",
         print="Imagem comprovando a conclusão",
     )
     async def missao_completar(
@@ -118,34 +294,14 @@ class Missoes(commands.Cog):
             return
 
         config = await get_config(guild.id)
-        padroes = {
-            "missao": 1556543417843056641,
-            "contribuicao": 1556543628296593448,
-            "especial": 1556543872534839336,
-        }
-        candidatos = [config.get(f"canal_provas_{tipo}_id"), padroes.get(tipo)]
-        canal = None
-        vistos = set()
-        for valor in candidatos:
-            try:
-                identificador = int(valor) if valor else None
-            except (TypeError, ValueError):
-                identificador = None
-            if not identificador or identificador in vistos:
-                continue
-            vistos.add(identificador)
-            canal = guild.get_channel(identificador)
-            if canal is None:
-                try:
-                    canal = await guild.fetch_channel(identificador)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
-                    print(f"[Missoes] Falha ao resolver canal de provas {identificador}: {erro}")
-                    canal = None
-            if isinstance(canal, discord.TextChannel):
-                break
-            canal = None
-
-        if not isinstance(canal, discord.TextChannel):
+        chave_prova = {
+            "missao": "canal_provas_missao_id",
+            "contribuicao": "canal_provas_contribuicao_id",
+            "especial": "canal_provas_especial_id",
+        }[tipo]
+        canal_id = config.get(chave_prova) or CANAIS_PADRAO.get(chave_prova)
+        canal = await self._resolver_canal(guild, canal_id) if canal_id else None
+        if canal is None:
             await interaction.followup.send("❌ O canal de provas desse tipo ainda não foi configurado.", ephemeral=True)
             return
 
@@ -163,7 +319,11 @@ class Missoes(commands.Cog):
             referencia_id=str(atividade["id"]),
             print_url=print.url,
             titulo=f"{info['emoji']} {info['nome']} — {atividade.get('titulo', 'Atividade')}",
-            descricao=f"Prova enviada por {interaction.user.mention}. Recompensa: {int(atividade.get('recompensa_xp', atividade.get('pontos', 0)) or 0)} XP.",
+            descricao=(
+                f"Prova enviada por {interaction.user.mention}. "
+                f"Recompensa: +{int(atividade.get('recompensa_xp', atividade.get('pontos', 0)) or 0)} "
+                "de pontuação e XP."
+            ),
         )
         await interaction.followup.send(
             f"✅ Sua prova foi enviada para {canal.mention} e aguarda revisão da staff.",
