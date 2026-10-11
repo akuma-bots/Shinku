@@ -1,0 +1,77 @@
+{
+  "versao": 1,
+  "missoes": [
+    {
+      "id": "NM001",
+      "tipo": "missao",
+      "titulo": "Treinamento de Combate",
+      "descricao": "Realize um treinamento PvP com outro membro da NÊMESIS. Envie uma captura de tela que comprove a atividade.",
+      "recompensa_xp": 25,
+      "canal_config": "canal_missoes_missao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM002",
+      "tipo": "missao",
+      "titulo": "Participação em Atividade",
+      "descricao": "Participe de uma atividade oficial organizada pela NÊMESIS e envie uma captura de tela como prova.",
+      "recompensa_xp": 20,
+      "canal_config": "canal_missoes_missao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM003",
+      "tipo": "missao",
+      "titulo": "Vitória em Combate",
+      "descricao": "Conquiste uma vitória em combate dentro do jogo e envie uma captura de tela que permita verificar o resultado.",
+      "recompensa_xp": 15,
+      "canal_config": "canal_missoes_missao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM004",
+      "tipo": "contribuicao",
+      "titulo": "Apoio a um Membro",
+      "descricao": "Ajude outro integrante com treinamento, orientação ou integração à NÊMESIS. A prova deve mostrar a atividade realizada.",
+      "recompensa_xp": 20,
+      "canal_config": "canal_missoes_contribuicao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM005",
+      "tipo": "contribuicao",
+      "titulo": "Divulgação da NÊMESIS",
+      "descricao": "Divulgue a NÊMESIS em um espaço que permita divulgação e envie uma captura de tela mostrando a publicação.",
+      "recompensa_xp": 25,
+      "canal_config": "canal_missoes_contribuicao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM006",
+      "tipo": "contribuicao",
+      "titulo": "Recrutamento Validado",
+      "descricao": "Traga um novo integrante para o servidor. Envie a prova solicitada pela equipe para validar a participação do recrutado.",
+      "recompensa_xp": 30,
+      "canal_config": "canal_missoes_contribuicao_id",
+      "ativa": true
+    },
+    {
+      "id": "NM007",
+      "tipo": "especial",
+      "titulo": "Operação Especial",
+      "descricao": "Participe de uma operação especial anunciada pela liderança. Envie a captura de tela solicitada no anúncio da operação.",
+      "recompensa_xp": 75,
+      "canal_config": "canal_missoes_especial_id",
+      "ativa": true
+    },
+    {
+      "id": "NM008",
+      "tipo": "especial",
+      "titulo": "Evento Especial",
+      "descricao": "Participe de um evento especial oficial da NÊMESIS e envie uma captura de tela que comprove sua presença e participação.",
+      "recompensa_xp": 60,
+      "canal_config": "canal_missoes_especial_id",
+      "ativa": true
+    }
+  ]
+}
