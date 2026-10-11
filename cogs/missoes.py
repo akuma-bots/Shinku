@@ -177,8 +177,8 @@ class Missoes(commands.Cog):
                     try:
                         if not mensagem.pinned:
                             await mensagem.pin(reason="Missão padrão permanente da NÊMESIS")
-                    except discord.Forbidden:
-                        log.warning("Sem permissão para fixar a missão %s; a mensagem continuará no canal.", atividade.get("id"))
+                    except discord.HTTPException as erro_fixar:
+                        log.warning("Não foi possível fixar a missão %s; a mensagem continuará no canal: %s", atividade.get("id"), erro_fixar)
                     await salvar_mensagem_discord(guild.id, str(atividade["id"]), canal.id, mensagem.id)
                 except (discord.Forbidden, discord.HTTPException) as erro:
                     log.exception("Não foi possível publicar/atualizar a missão %s: %s", atividade.get("id"), erro)
