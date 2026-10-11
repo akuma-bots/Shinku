@@ -227,7 +227,7 @@ class RankingGeral(
             f"║        {guild.name} | "
             f"{_negrito('TOP 10')}        ║\n"
             "╚═════════════════════════════════╝\n\n"
-            f"「 {_negrito('RANKING DE P.C.')} 」\n\n"
+            f"「 {_negrito('RANKING DE PONTUAÇÃO')} 」\n\n"
         )
 
 
@@ -235,7 +235,7 @@ class RankingGeral(
 
             descricao = (
                 cabecalho
-                + "Nenhum membro possui P.C. "
+                + "Nenhum membro possui pontuação "
                   "registrado ainda."
             )
 
@@ -265,7 +265,7 @@ class RankingGeral(
             linhas_top.append(
                 f"│           "
                 f"{_negrito(str(pontos))} "
-                f"{_negrito('P.C.')}"
+                f"{_negrito('PONTUAÇÃO')}"
             )
 
             if i != len(top):
@@ -288,7 +288,7 @@ class RankingGeral(
             "╰──────────────────────────────────────╯\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"「 {_negrito('ATUALIZAÇÃO')} 」\n\n"
-            "O placar utiliza o mesmo P.C. "
+            "O placar utiliza a mesma pontuação "
             "armazenado pelo Dashboard da NÊMESIS.\n\n"
             "Alterações feitas no site serão "
             "refletidas no próximo ciclo de "
@@ -524,7 +524,7 @@ class RankingGeral(
 
         await interaction.response.send_message(
             "O ranking agora usa exclusivamente "
-            "o P.C. compartilhado do Dashboard. "
+            "a pontuação compartilhada do Dashboard. "
             "Os pesos antigos não alteram o placar.",
             ephemeral=True,
         )
@@ -533,7 +533,7 @@ class RankingGeral(
     @app_commands.command(
         name="ranking-geral",
         description=(
-            "Mostra o Top 10 atual de P.C."
+            "Mostra o Top 10 atual de pontuação."
         ),
     )
     async def ranking_geral(
