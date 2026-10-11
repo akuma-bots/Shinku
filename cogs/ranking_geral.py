@@ -358,16 +358,31 @@ class RankingGeral(
         except (TypeError, ValueError):
             return
 
-        canal = guild.get_channel(canal_id)
-        if canal is None:
+        candidatos = [canal_id, 1545834182406574241]
+        canal = None
+        vistos = set()
+        for valor in candidatos:
             try:
-                canal = await guild.fetch_channel(canal_id)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
-                print(f"[RankingGeral] Canal {canal_id} inacessível: {erro}")
-                return
+                identificador = int(valor) if valor else None
+            except (TypeError, ValueError):
+                identificador = None
+            if not identificador or identificador in vistos:
+                continue
+            vistos.add(identificador)
+            canal = guild.get_channel(identificador)
+            if canal is None:
+                try:
+                    canal = await guild.fetch_channel(identificador)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
+                    print(f"[RankingGeral] Canal {identificador} inacessível: {erro}")
+                    canal = None
+            if canal is not None and callable(getattr(canal, "send", None)):
+                canal_id = identificador
+                break
+            canal = None
 
-        if not callable(getattr(canal, "send", None)):
-            print(f"[RankingGeral] ID {canal_id} não é um canal que aceita mensagens.")
+        if canal is None:
+            print("[RankingGeral] Nenhum canal de ranking configurado/acessível.")
             return
 
         embed = await self._montar_embed(
