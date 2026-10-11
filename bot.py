@@ -338,10 +338,18 @@ async def monitorar_integracao():
                     "bot_name": str(bot.user) if bot.user else "NÊMESIS",
                     "guild_name": servidor.name if servidor else None,
                     "online": bool(servidor and bot.is_ready()),
+                    "storage_backend": "upstash" if USANDO_UPSTASH else "local",
+                    "ready": bot.is_ready(),
                     "updated_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
-            logging.info("Heartbeat de integração com o Dashboard atualizado.")
+            logging.info(
+                "Heartbeat Dashboard: online=%s guild_id=%s guild_encontrada=%s storage=%s",
+                bool(servidor and bot.is_ready()),
+                NEMESIS_GUILD_ID,
+                bool(servidor),
+                "upstash" if USANDO_UPSTASH else "local",
+            )
         except Exception:
             logging.exception("Falha ao atualizar heartbeat de integração.")
         await asyncio.sleep(60)
