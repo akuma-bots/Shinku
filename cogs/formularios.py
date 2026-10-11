@@ -58,23 +58,6 @@ def _embed_painel(formulario: dict) -> discord.Embed:
     titulo = formulario.get("titulo_painel") or formulario.get("nome") or "Formulário"
     descricao = formulario.get("descricao_painel") or "Preencha o formulário pelo botão abaixo."
     embed = discord.Embed(title=str(titulo)[:256], description=str(descricao)[:3500], color=0x5865F2)
-    linhas = []
-    for numero_pagina, pagina in enumerate(formulario.get("paginas") or [], start=1):
-        perguntas = pagina.get("perguntas") or [] if isinstance(pagina, dict) else (pagina if isinstance(pagina, list) else [])
-        if not perguntas:
-            continue
-        titulo_etapa = pagina.get("titulo") or f"Etapa {numero_pagina}" if isinstance(pagina, dict) else f"Etapa {numero_pagina}"
-        linhas.append(f"**{titulo_etapa}**")
-        for pergunta in perguntas:
-            texto = _texto_pergunta(pergunta)
-            if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha":
-                opcoes = pergunta.get("opcoes") or []
-                if opcoes:
-                    texto += " — Opções: " + ", ".join(str(opcao) for opcao in opcoes[:10])
-            linhas.append(f"• {texto}")
-    if linhas:
-        resumo = "\n".join(linhas)
-        embed.add_field(name="Perguntas do formulário", value=resumo[:1024], inline=False)
     if formulario.get("banner_url"):
         embed.set_image(url=str(formulario["banner_url"]))
     embed.set_footer(text="NÊMESIS • Formulário sincronizado com o site")
