@@ -99,13 +99,16 @@ def _embeds_painel(formulario: dict) -> list[discord.Embed]:
         if len(restante) <= limite:
             partes.append(restante)
             break
-        corte = restante.rfind("\n", 0, limite)
+        corte = restante.rfind("\\n", 0, limite)
         if corte < limite // 2:
             corte = restante.rfind(" ", 0, limite)
         if corte < limite // 2:
             corte = limite
-        partes.append(restante[:corte].rstrip())
-        restante = restante[corte:].lstrip()
+        elif corte < limite:
+            # Inclui o separador no bloco anterior para preservar o texto original.
+            corte += 1
+        partes.append(restante[:corte])
+        restante = restante[corte:]
 
     if not partes:
         partes = ["Leia as informações e envie sua candidatura pelo botão abaixo."]
