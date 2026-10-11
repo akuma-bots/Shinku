@@ -57,12 +57,19 @@ def _perguntas_flat(formulario: dict) -> list:
 def _embed_painel(formulario: dict) -> discord.Embed:
     titulo = formulario.get("titulo_painel") or formulario.get("nome") or "Formulário"
     descricao = formulario.get("descricao_painel") or "Preencha o formulário pelo botão abaixo."
-    # O Discord aceita até 4.096 caracteres na descrição da embed.\n    # Não usar um limite artificial de 3.500, que cortava textos válidos.\n    descricao = str(descricao).strip() or "Leia as informações e envie sua candidatura pelo botão abaixo."\n    if len(descricao) > 4096:\n        # Preserva o máximo permitido e evita terminar no meio de uma palavra.\n        trecho = descricao[:4093]\n        ultimo_espaco = trecho.rfind(" ")\n        if ultimo_espaco > 3800:\n            trecho = trecho[:ultimo_espaco]\n        descricao = trecho.rstrip() + "..."\n    embed = discord.Embed(title=str(titulo)[:256], description=descricao, color=0x5865F2)
+    # O Discord aceita até 4.096 caracteres na descrição da embed.
+    descricao = str(descricao).strip() or "Leia as informações e envie sua candidatura pelo botão abaixo."
+    if len(descricao) > 4096:
+        trecho = descricao[:4093]
+        ultimo_espaco = trecho.rfind(" ")
+        if ultimo_espaco > 3800:
+            trecho = trecho[:ultimo_espaco]
+        descricao = trecho.rstrip() + "..."
+    embed = discord.Embed(title=str(titulo)[:256], description=descricao, color=0x5865F2)
     if formulario.get("banner_url"):
         embed.set_image(url=str(formulario["banner_url"]))
     embed.set_footer(text="NÊMESIS • Formulário sincronizado com o site")
     return embed
-
 
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
