@@ -1044,6 +1044,21 @@ class Sorteios(commands.Cog):
             ephemeral=True,
         )
 
+    async def _reabrir_apos_falha_de_anuncio(
+        self,
+        sorteio: dict,
+        erro: Exception,
+    ):
+        sorteio["encerrado"] = False
+        sorteio["vencedores_ids"] = []
+        sorteio["encerrado_em"] = None
+        await self.salvar_sorteio(sorteio)
+        await self.atualizar_mensagem(sorteio)
+        print(
+            f"[SORTEIOS] Falha ao anunciar resultado de "
+            f"{sorteio.get('id')}; o encerramento será tentado novamente: {erro}"
+        )
+
     # =========================================================
     # SORTEAR VENCEDORES
     # =========================================================
@@ -1142,9 +1157,11 @@ class Sorteios(commands.Cog):
                 text="NÊMESIS • Sorteios"
             )
 
-            await canal.send(
-                embed=embed
-            )
+            try:
+                await canal.send(embed=embed)
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
+                return
 
             return
 
@@ -1182,14 +1199,13 @@ class Sorteios(commands.Cog):
             text="NÊMESIS • Sorteios"
         )
 
-        await canal.send(
-            content=(
-                mencoes
-                if vencedores_ids
-                else None
-            ),
-            embed=embed,
-        )
+        try:
+            await canal.send(
+                content=mencoes if vencedores_ids else None,
+                embed=embed,
+            )
+        except (discord.Forbidden, discord.HTTPException) as erro:
+            await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
 
     # =========================================================
     # ENCERRAMENTO AUTOMÁTICO
