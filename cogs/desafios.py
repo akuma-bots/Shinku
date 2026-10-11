@@ -342,5 +342,89 @@ class Desafios(commands.Cog):
         await interaction.followup.send(f"✅ Resultado enviado para revisão em {canal.mention}.", ephemeral=True)
 
 
+    @app_commands.command(
+        name="diagnostico-canais",
+        description="Verifica canais padrão, IDs configurados e permissões do bot.",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def diagnostico_canais(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        guild = interaction.guild
+        config = await get_config(guild.id)
+        canais = [
+            ("Desafios", "canal_desafios_id", 1545834386128375909),
+            ("Lutas", "canal_lutas_id", 1545834447944028170),
+            ("Provas PvP", "canal_provas_pvp_id", 1545853928736952420),
+            ("Ranking", "canal_ranking_id", 1545834182406574241),
+            ("Provas de missões", "canal_provas_missao_id", 1556543417843056641),
+            ("Provas de contribuições", "canal_provas_contribuicao_id", 1556543628296593448),
+            ("Provas especiais", "canal_provas_especial_id", 1556543872534839336),
+            ("Auditoria", "canal_auditoria_id", 1545837705609617428),
+        ]
+        linhas = []
+        bot_member = guild.me
+
+        for nome, chave, padrao in canais:
+            configurado = config.get(chave)
+            candidatos = []
+            if configurado:
+                candidatos.append(("configurado", configurado))
+            candidatos.append(("padrão", padrao))
+            vistos = set()
+            resolvido = None
+            origem = None
+
+            for fonte, valor in candidatos:
+                try:
+                    canal_id = int(valor)
+                except (TypeError, ValueError):
+                    continue
+                if canal_id in vistos:
+                    continue
+                vistos.add(canal_id)
+                canal = guild.get_channel(canal_id)
+                if canal is None:
+                    try:
+                        canal = await guild.fetch_channel(canal_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        continue
+                if callable(getattr(canal, "send", None)):
+                    resolvido = canal
+                    origem = fonte
+                    break
+
+            if resolvido is None:
+                linhas.append(f"❌ **{nome}** — canal configurado/padrão não encontrado.")
+                continue
+
+            permissoes = resolvido.permissions_for(bot_member) if bot_member else None
+            if permissoes is None:
+                linhas.append(f"⚠️ **{nome}** — {resolvido.mention}: não consegui verificar permissões.")
+                continue
+
+            faltas = []
+            if not permissoes.view_channel:
+                faltas.append("Ver canal")
+            if not permissoes.send_messages:
+                faltas.append("Enviar mensagens")
+            if not permissoes.embed_links:
+                faltas.append("Inserir links/embeds")
+
+            if faltas:
+                linhas.append(
+                    f"⚠️ **{nome}** — {resolvido.mention} ({origem}); faltam: {', '.join(faltas)}."
+                )
+            else:
+                nota = "configurado" if origem == "configurado" else "usando padrão"
+                linhas.append(f"✅ **{nome}** — {resolvido.mention} ({nota}).")
+
+        embed = discord.Embed(
+            title="Diagnóstico de canais — NÊMESIS",
+            description="\\n".join(linhas),
+            color=0x57F287 if all("❌" not in linha and "⚠️" not in linha for linha in linhas) else 0xFEE75C,
+        )
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Desafios(bot))
