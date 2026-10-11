@@ -205,9 +205,32 @@ class Desafios(commands.Cog):
         if aposta_xp > 0:
             embed.add_field(name="💰 Aposta", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
         embed.set_footer(text=f"ID: {desafio['id']}")
-        msg = await canal.send(content=membro.mention, embed=embed, view=_view_desafio(desafio["id"]))
-        await desafios.definir_mensagem(interaction.guild.id, desafio["id"], canal.id, msg.id)
+        try:
+            msg = await canal.send(
+                content=membro.mention,
+                embed=embed,
+                view=_view_desafio(desafio["id"]),
+            )
+        except (discord.Forbidden, discord.HTTPException) as erro:
+            await desafios.definir_status(
+                interaction.guild.id,
+                desafio["id"],
+                "cancelado",
+            )
+            if aposta_xp > 0:
+                await _devolver_xp(
+                    interaction.guild.id,
+                    interaction.user.id,
+                    aposta_xp,
+                )
+            print(f"[Desafios] Falha ao publicar desafio: {erro}")
+            await interaction.response.send_message(
+                "❌ Não consegui publicar o desafio. Sua aposta foi devolvida; confira as permissões do bot no canal.",
+                ephemeral=True,
+            )
+            return
 
+        await desafios.definir_mensagem(interaction.guild.id, desafio["id"], canal.id, msg.id)
         await interaction.response.send_message(f"✅ Desafio enviado em {canal.mention}.", ephemeral=True)
 
     @commands.Cog.listener()
@@ -286,7 +309,6 @@ class Desafios(commands.Cog):
             return
 
         perdedor_id = desafio["desafiado_id"] if vencedor.id == desafio["desafiante_id"] else desafio["desafiante_id"]
-        await desafios.definir_resultado(interaction.guild.id, desafio_id, vencedor.id, perdedor_id)
 
         config = await get_config(interaction.guild.id)
         canal_id = config.get("canal_provas_pvp_id")
@@ -303,13 +325,21 @@ class Desafios(commands.Cog):
             await interaction.response.send_message("⚠️ O sistema de revisão não está carregado. Avise um admin.", ephemeral=True)
             return
 
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await desafios.definir_resultado(
+            interaction.guild.id,
+            desafio_id,
+            vencedor.id,
+            perdedor_id,
+        )
+
         await revisoes_cog.abrir_revisao(
             interaction.guild, canal,
             tipo="pvp", autor_id=interaction.user.id, referencia_id=desafio_id,
             print_url=print.url, titulo=f"Luta: <@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
             descricao=f"Vencedor indicado: {vencedor.mention}",
         )
-        await interaction.response.send_message(f"✅ Resultado enviado para revisão em {canal.mention}.", ephemeral=True)
+        await interaction.followup.send(f"✅ Resultado enviado para revisão em {canal.mention}.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
