@@ -20,6 +20,7 @@ SISTEMAS = {
     "Revisoes": ("📋", "Revisão de Provas"),
     "Auditoria": ("🧾", "Auditoria"),
     "Ajuda": ("📖", "Ajuda"),
+    "AvisosPrivados": ("🔔", "Avisos Privados"),
 }
 
 
