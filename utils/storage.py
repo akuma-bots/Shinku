@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import tempfile
 from pathlib import Path
 from threading import Lock
 
@@ -128,10 +129,48 @@ async def _comando_redis(*args):
 
 def _path(nome_arquivo: str) -> Path:
     """
-    Retorna o caminho de um arquivo dentro de data/.
+    Retorna um caminho validado dentro de data/.
+    Os nomes de arquivos são internos; rejeitamos separadores para impedir
+    que uma configuração acidental escape do diretório de dados.
     """
+    if not isinstance(nome_arquivo, str) or not nome_arquivo.strip():
+        raise ErroStorage("O nome do arquivo de armazenamento é inválido.")
 
-    return DATA_DIR / nome_arquivo
+    nome = nome_arquivo.strip()
+    if nome in {".", ".."} or Path(nome).name != nome or "/" in nome or "\\" in nome:
+        raise ErroStorage("O arquivo de armazenamento precisa estar dentro de data/.")
+
+    caminho = (DATA_DIR / nome).resolve()
+    if caminho.parent != DATA_DIR.resolve():
+        raise ErroStorage("O caminho do armazenamento está fora de data/.")
+
+    return caminho
+
+
+def _escrever_json_atomico(caminho: Path, dados) -> None:
+    """Escreve JSON em arquivo temporário e substitui o destino atomicamente."""
+    temporario = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=DATA_DIR,
+            prefix=f".{caminho.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as arquivo:
+            temporario = Path(arquivo.name)
+            json.dump(dados, arquivo, ensure_ascii=False, indent=2)
+            arquivo.flush()
+            os.fsync(arquivo.fileno())
+
+        os.replace(temporario, caminho)
+    finally:
+        if temporario is not None and temporario.exists():
+            try:
+                temporario.unlink()
+            except OSError:
+                pass
 
 
 def _carregar_local(
@@ -152,15 +191,7 @@ def _carregar_local(
 
         if not caminho.exists():
 
-            caminho.write_text(
-                json.dumps(
-                    padrao,
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-
+            _escrever_json_atomico(caminho, padrao)
             return padrao
 
         try:
@@ -196,19 +227,7 @@ def _salvar_local(
     )
 
     with _lock:
-
-        with open(
-            caminho,
-            "w",
-            encoding="utf-8",
-        ) as arquivo:
-
-            json.dump(
-                dados,
-                arquivo,
-                ensure_ascii=False,
-                indent=2,
-            )
+        _escrever_json_atomico(caminho, dados)
 
 
 # =========================================================
