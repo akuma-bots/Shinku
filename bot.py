@@ -12,11 +12,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from aiohttp import web
 
-from utils.storage import (
-    USANDO_UPSTASH,
-    salvar,
-    verificar_conexao_compartilhada,
-)
 
 
 logging.basicConfig(
@@ -31,6 +26,12 @@ logging.basicConfig(
 
 CAMINHO_ENV = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=CAMINHO_ENV)
+
+from utils.storage import (
+    USANDO_UPSTASH,
+    salvar,
+    verificar_conexao_compartilhada,
+)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 NEMESIS_GUILD_ID = os.getenv("NEMESIS_GUILD_ID")
