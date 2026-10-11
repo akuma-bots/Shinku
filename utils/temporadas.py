@@ -262,7 +262,7 @@ async def _sincronizar_perfil_site(
 ):
     """
     Atualiza o perfil competitivo compartilhado
-    pelo Dashboard sem alterar P.C. ou Elo existentes.
+    pelo Dashboard sem alterar a pontuação ou o Elo existentes.
     """
 
     dados = await carregar(
