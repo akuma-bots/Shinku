@@ -170,12 +170,10 @@ async def somar_pontos_competitivo(
     if nome:
         perfil["nome"] = nome
 
-    perfil["pontos"] = (
-        int(perfil.get("pontos", 0) or 0)
-        + int(delta)
-    )
+    pontos_anteriores = int(perfil.get("pontos", 0) or 0)
+    perfil["pontos"] = pontos_anteriores + int(delta)
     perfil["pontos_temporada"] = (
-        int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0)
+        int(perfil.get("pontos_temporada", pontos_anteriores) or 0)
         + int(delta)
     )
     perfil.setdefault("tempo_top_global_segundos", 0)
