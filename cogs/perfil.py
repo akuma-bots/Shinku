@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from utils.storage import carregar
 from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_patente, kdr, ARQUIVO_PERFIS
+from utils.competitivo_sync import ARQUIVO_COMPETITIVO
 
 
 class Perfil(commands.Cog):
@@ -21,6 +22,41 @@ class Perfil(commands.Cog):
         p = await get_perfil(interaction.guild.id, alvo.id)
         patentes = await get_patentes(interaction.guild.id)
 
+        competitivo = await carregar(
+            ARQUIVO_COMPETITIVO,
+            {"catalogo": [], "perfis": {}},
+        )
+        perfis_competitivos = competitivo.get("perfis", {})
+        perfil_global = perfis_competitivos.get(str(alvo.id), {})
+        estado_temporada = competitivo.get("temporada_global", {})
+        ordenados = sorted(
+            (
+                (str(uid), dados)
+                for uid, dados in perfis_competitivos.items()
+                if isinstance(dados, dict)
+            ),
+            key=lambda item: (
+                int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                int(item[1].get("vitorias", 0) or 0),
+            ),
+            reverse=True,
+        )
+        posicao_global = next(
+            (i for i, (uid, _) in enumerate(ordenados, start=1) if uid == str(alvo.id)),
+            None,
+        )
+        pontos_temporada = int(
+            perfil_global.get("pontos_temporada", perfil_global.get("pontos", 0)) or 0
+        )
+        tempo_top = max(0, int(perfil_global.get("tempo_top_global_segundos", 0) or 0))
+        minutos_top = tempo_top // 60
+        horas_top, minutos_restantes = divmod(minutos_top, 60)
+        dias_top, horas_restantes = divmod(horas_top, 24)
+        tempo_top_texto = (
+            f"{dias_top}d {horas_restantes}h {minutos_restantes}min"
+            if dias_top else f"{horas_top}h {minutos_restantes}min"
+        )
+
         proxima = next((pt for pt in patentes if pt["xp_minimo"] > p["xp"]), None)
         progresso = f"\nPróxima patente: **{proxima['nome']}** em {proxima['xp_minimo'] - p['xp']} XP" if proxima else ""
 
@@ -28,6 +64,10 @@ class Perfil(commands.Cog):
         embed.set_thumbnail(url=alvo.display_avatar.url)
         embed.add_field(name="Patente", value=p["patente"] or "Sem patente", inline=True)
         embed.add_field(name="XP", value=str(p["xp"]) + progresso, inline=True)
+        embed.add_field(name="Top Global", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
+        embed.add_field(name="Pontos da temporada", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
+        embed.add_field(name="Temporada", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
+        embed.add_field(name="Tempo no Top 10", value=tempo_top_texto, inline=True)
         embed.add_field(name="Vitórias", value=str(p["vitorias"]), inline=True)
         embed.add_field(name="Derrotas", value=str(p["derrotas"]), inline=True)
         embed.add_field(name="MVPs", value=str(p["mvps"]), inline=True)
