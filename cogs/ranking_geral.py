@@ -21,6 +21,7 @@ from utils.perfis import (
 from utils.competitivo_sync import (
     ARQUIVO_COMPETITIVO,
     migrar_perfil_se_necessario,
+    registrar_tempo_top_global,
 )
 
 
@@ -160,13 +161,7 @@ class RankingGeral(
             guild
         )
 
-        dados = await carregar(
-            ARQUIVO_COMPETITIVO,
-            {
-                "catalogo": [],
-                "perfis": {},
-            },
-        )
+        dados = await registrar_tempo_top_global()
 
         perfis = dados.get(
             "perfis",
@@ -190,25 +185,24 @@ class RankingGeral(
 
             pontos = int(
                 perfil.get(
-                    "pontos",
-                    0,
+                    "pontos_temporada",
+                    perfil.get("pontos", 0),
                 )
                 or 0
             )
-
-            vitorias = int(
-                perfil.get(
-                    "vitorias",
-                    0,
-                )
-                or 0
-            )
+            xp = int(perfil.get("xp", 0) or 0)
+            vitorias = int(perfil.get("vitorias", 0) or 0)
+            derrotas = int(perfil.get("derrotas", 0) or 0)
+            tempo_top = int(perfil.get("tempo_top_global_segundos", 0) or 0)
 
             pontuados.append(
                 (
                     user_id,
                     pontos,
                     vitorias,
+                    xp,
+                    derrotas,
+                    tempo_top,
                 )
             )
 
@@ -227,7 +221,18 @@ class RankingGeral(
             f"║        {guild.name} | "
             f"{_negrito('TOP 10')}        ║\n"
             "╚═════════════════════════════════╝\n\n"
-            f"「 {_negrito('RANKING DE PONTUAÇÃO')} 」\n\n"
+            f"「 {_negrito('RANKING GLOBAL — TEMPORADA')} 」\n"
+        )
+
+        estado_temporada = dados.get("temporada_global", {})
+        inicio_temporada = float(estado_temporada.get("inicio_timestamp") or 0)
+        fim_temporada = inicio_temporada + int(estado_temporada.get("duracao_dias", 30) or 30) * 86400
+        restante = max(0, int(fim_temporada - __import__("time").time()))
+        dias_restantes, resto = divmod(restante, 86400)
+        horas_restantes = resto // 3600
+        cabecalho += (
+            f"Temporada **#{int(estado_temporada.get('numero', 1) or 1)}**"
+            f" — reinicia em **{dias_restantes}d {horas_restantes}h**.\n\n"
         )
 
 
@@ -250,7 +255,10 @@ class RankingGeral(
         for i, (
             uid,
             pontos,
-            _vitorias,
+            vitorias,
+            xp,
+            derrotas,
+            tempo_top,
         ) in enumerate(
             top,
             start=1,
@@ -262,10 +270,17 @@ class RankingGeral(
                 f" — <@{uid}>"
             )
 
+            minutos_top = tempo_top // 60
+            horas_top, minutos_restantes = divmod(minutos_top, 60)
             linhas_top.append(
-                f"│           "
-                f"{_negrito(str(pontos))} "
-                f"{_negrito('PONTUAÇÃO')}"
+                f"│           {_negrito(str(pontos))} PONTOS SAZONAIS"
+            )
+            linhas_top.append(
+                f"│           XP {_negrito(str(xp))} | "
+                f"V {_negrito(str(vitorias))} | D {_negrito(str(derrotas))}"
+            )
+            linhas_top.append(
+                f"│           TOP 10: {_negrito(f'{horas_top}h {minutos_restantes}min')}"
             )
 
             if i != len(top):
@@ -288,11 +303,10 @@ class RankingGeral(
             "╰──────────────────────────────────────╯\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"「 {_negrito('ATUALIZAÇÃO')} 」\n\n"
-            "O placar utiliza a mesma pontuação "
-            "armazenado pelo Dashboard da NÊMESIS.\n\n"
-            "Alterações feitas no site serão "
-            "refletidas no próximo ciclo de "
-            "atualização do bot.\n\n"
+            "XP, vitórias e derrotas são estatísticas acumuladas. "
+            "A pontuação sazonal reinicia automaticamente a cada 30 dias; "
+            "o histórico das temporadas fica preservado.\n\n"
+            "O ranking usa os dados compartilhados com o Dashboard da NÊMESIS.\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"「 {guild.name} | "
             f"{_negrito('TOP 10')} 」"
