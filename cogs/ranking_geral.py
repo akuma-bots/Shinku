@@ -326,6 +326,12 @@ class RankingGeral(
         self,
     ):
 
+        try:
+            # A temporada global continua avançando mesmo sem canal de ranking configurado.
+            await registrar_tempo_top_global()
+        except Exception as erro:
+            print(f"[RankingGeral] Falha ao atualizar temporada global: {erro}")
+
         for guild in self.bot.guilds:
 
             try:
