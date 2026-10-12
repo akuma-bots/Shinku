@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from urllib.parse import urlparse
 
 import discord
 from discord import app_commands
@@ -23,6 +24,46 @@ from utils.perfis import (
 
 
 log = logging.getLogger(__name__)
+
+
+class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar provas da missão"):
+    missao_id = discord.ui.TextInput(
+        label="ID da missão",
+        placeholder="Ex.: M-001",
+        required=True,
+        max_length=50,
+    )
+    imagem_url = discord.ui.TextInput(
+        label="Link da imagem da prova (Discord)",
+        placeholder="Envie a imagem no Discord e cole o link da imagem",
+        required=True,
+        max_length=1000,
+    )
+
+    def __init__(self, cog):
+        super().__init__(timeout=300)
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.receber_prova_modal(interaction, str(self.missao_id.value), str(self.imagem_url.value))
+
+
+class EnviarProvaMissaoView(discord.ui.View):
+    """Botão persistente para abrir o formulário de envio de provas."""
+
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(
+        label="ENVIAR PROVAS",
+        style=discord.ButtonStyle.primary,
+        emoji="📨",
+        custom_id="nemesis:missao:enviar_provas",
+    )
+    async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
+
 
 TIPOS = {
     "missao": {"nome": "Missão", "emoji": "🎯"},
@@ -49,6 +90,8 @@ class Missoes(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._sync_lock = asyncio.Lock()
+        # O custom_id fixo mantém o botão funcional mesmo após reinícios do bot.
+        self.bot.add_view(EnviarProvaMissaoView(self))
         if not hasattr(bot, "processadores_revisao"):
             bot.processadores_revisao = {}
         for tipo in ("missao", "contribuicao", "especial"):
@@ -155,8 +198,8 @@ class Missoes(commands.Cog):
                     embed.add_field(
                         name="Como concluir",
                         value=(
-                            "Conclua a atividade e envie uma captura de tela como prova usando "
-                            f"`/missao-completar missao_id:{atividade.get('id', '')}`."
+                            "Conclua a atividade e clique em **ENVIAR PROVAS**. "
+                            "Informe o ID da missão e o link da imagem para enviar sua prova à staff."
                         ),
                         inline=False,
                     )
@@ -232,10 +275,20 @@ class Missoes(commands.Cog):
 
                     try:
                         if mensagem_parte is not None:
-                            await mensagem_parte.edit(embed=embed)
+                            await mensagem_parte.edit(
+                                embed=embed,
+                                view=EnviarProvaMissaoView(self)
+                                if indice == 0 and atividade.get("ativa", True)
+                                else None,
+                            )
                             resultado["atualizadas"] += 1
                         else:
-                            mensagem_parte = await canal.send(embed=embed)
+                            mensagem_parte = await canal.send(
+                                embed=embed,
+                                view=EnviarProvaMissaoView(self)
+                                if indice == 0 and atividade.get("ativa", True)
+                                else None,
+                            )
                             resultado["publicadas"] += 1
 
                         if indice == 0:
@@ -358,67 +411,125 @@ class Missoes(commands.Cog):
             texto += f" Nova patente: **{nova_patente['nome']}**."
         return texto
 
-    @app_commands.command(name="missao-completar", description="Envia uma prova de conclusão de missão.")
-    @app_commands.describe(
-        missao_id="ID da missão, pontuação ou missão especial",
-        print="Imagem comprovando a conclusão",
-    )
-    async def missao_completar(
+    async def receber_prova_modal(
         self,
         interaction: discord.Interaction,
         missao_id: str,
-        print: discord.Attachment,
+        imagem_url: str,
     ):
+        """Valida a missão e encaminha a prova para revisão da staff."""
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
         if guild is None:
-            await interaction.followup.send("❌ Use este comando dentro do servidor.", ephemeral=True)
+            await interaction.followup.send("❌ Use este botão dentro do servidor da NÊMESIS.", ephemeral=True)
             return
 
-        atividade = await missoes.get(guild.id, missao_id)
+        atividade = await missoes.get(guild.id, missao_id.strip())
         if not atividade or not atividade.get("ativa", True):
-            await interaction.followup.send("❌ Não encontrei uma atividade ativa com esse ID.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ Não encontrei uma missão ativa com esse ID. Confira o ID na publicação da missão.",
+                ephemeral=True,
+            )
             return
 
         tipo = str(atividade.get("tipo", "missao")).lower()
         if tipo not in TIPOS:
-            await interaction.followup.send("❌ Tipo de atividade inválido. Peça à staff para corrigir a configuração.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ O tipo desta atividade está inválido. Avise a staff.",
+                ephemeral=True,
+            )
             return
 
-        config = await get_config(guild.id)
+        url = imagem_url.strip()
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if (
+            parsed.scheme != "https"
+            or host not in {"cdn.discordapp.com", "media.discordapp.net"}
+            or not parsed.path
+        ):
+            await interaction.followup.send(
+                "❌ O link precisa ser de uma imagem hospedada no Discord. Envie a imagem em um canal permitido, abra a imagem, copie o link e cole aqui.",
+                ephemeral=True,
+            )
+            return
+
+        revisoes_cog = self.bot.get_cog("Revisoes")
+        if not revisoes_cog:
+            await interaction.followup.send(
+                "❌ O sistema de revisão não está carregado. Avise a staff.",
+                ephemeral=True,
+            )
+            return
+
+        from utils import revisoes
+
+        pendentes = await revisoes.listar(guild.id, status="pendente")
+        ja_enviada = any(
+            int(item.get("autor_id", 0) or 0) == interaction.user.id
+            and str(item.get("referencia_id", "")) == str(atividade["id"])
+            and item.get("tipo") == "missao"
+            for item in pendentes
+        )
+        if ja_enviada:
+            await interaction.followup.send(
+                "⏳ Você já tem uma prova pendente para esta missão. Aguarde a análise da staff antes de enviar outra.",
+                ephemeral=True,
+            )
+            return
+
+        info = TIPOS[tipo]
+        recompensa = max(
+            0,
+            int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0),
+        )
+        canal_config = await get_config(guild.id)
         chave_prova = {
             "missao": "canal_provas_missao_id",
             "contribuicao": "canal_provas_contribuicao_id",
             "especial": "canal_provas_especial_id",
         }[tipo]
-        canal_id = config.get(chave_prova) or CANAIS_PADRAO.get(chave_prova)
+        canal_id = canal_config.get(chave_prova) or CANAIS_PADRAO.get(chave_prova)
         canal = await self._resolver_canal(guild, canal_id) if canal_id else None
         if canal is None:
-            await interaction.followup.send("❌ O canal de provas desse tipo ainda não foi configurado.", ephemeral=True)
+            await interaction.followup.send(
+                "❌ O canal de provas deste tipo não foi encontrado. Avise a staff.",
+                ephemeral=True,
+            )
             return
 
-        revisoes_cog = self.bot.get_cog("Revisoes")
-        if not revisoes_cog:
-            await interaction.followup.send("❌ O sistema de revisão não está carregado. Avise a staff.", ephemeral=True)
+        try:
+            await revisoes_cog.abrir_revisao(
+                guild,
+                canal,
+                tipo="missao",
+                autor_id=interaction.user.id,
+                referencia_id=str(atividade["id"]),
+                print_url=url,
+                titulo=f"{info['emoji']} {info['nome']} — {atividade.get('titulo', 'Atividade')}",
+                descricao=(
+                    f"Prova enviada por {interaction.user.mention}. "
+                    f"ID da missão: `{atividade['id']}`. "
+                    f"Recompensa após aprovação: +{recompensa} de pontuação e +{recompensa} XP."
+                ),
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Falha ao criar revisão da missão %s.", atividade.get("id"))
+            await interaction.followup.send(
+                "❌ Não consegui publicar a prova para revisão. Verifique se o bot tem permissão para enviar mensagens e Embeds no canal de provas.",
+                ephemeral=True,
+            )
+            return
+        except Exception:
+            log.exception("Erro inesperado ao receber prova da missão %s.", atividade.get("id"))
+            await interaction.followup.send(
+                "❌ Ocorreu um erro ao enviar sua prova. Tente novamente mais tarde.",
+                ephemeral=True,
+            )
             return
 
-        info = TIPOS[tipo]
-        await revisoes_cog.abrir_revisao(
-            guild,
-            canal,
-            tipo="missao",
-            autor_id=interaction.user.id,
-            referencia_id=str(atividade["id"]),
-            print_url=print.url,
-            titulo=f"{info['emoji']} {info['nome']} — {atividade.get('titulo', 'Atividade')}",
-            descricao=(
-                f"Prova enviada por {interaction.user.mention}. "
-                f"Recompensa: +{int(atividade.get('recompensa_xp', atividade.get('pontos', 0)) or 0)} "
-                "de pontuação e XP."
-            ),
-        )
         await interaction.followup.send(
-            f"✅ Sua prova foi enviada para {canal.mention} e aguarda revisão da staff.",
+            f"✅ Prova enviada para {canal.mention}. A recompensa será aplicada somente após a aprovação da staff.",
             ephemeral=True,
         )
 
