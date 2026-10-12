@@ -1,6 +1,7 @@
 import hashlib
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
 
@@ -43,6 +44,75 @@ def _view_revisao(revisao_id: str) -> discord.ui.View:
     return view
 
 
+STATUS_LABELS = {
+    "pendente": ("⏳ Pendentes", 0xFEE75C),
+    "aprovada": ("✅ Aprovadas", 0x57F287),
+    "rejeitada": ("❌ Recusadas", 0xED4245),
+}
+
+
+def _embed_painel_provas(guild: discord.Guild, status: str, itens: list[dict]) -> discord.Embed:
+    label, cor = STATUS_LABELS[status]
+    embed = discord.Embed(
+        title=f"✦・NÊMESIS — ACOMPANHAMENTO DE PROVAS",
+        description=f"**Filtro:** {label}\n**Registros encontrados:** {len(itens)}",
+        color=cor,
+    )
+    if not itens:
+        embed.add_field(name="Nenhuma prova encontrada", value="Não há provas com este status.", inline=False)
+        return embed
+
+    for item in itens[:10]:
+        tipo = str(item.get("tipo", "—")).upper()
+        autor = f"<@{item.get('autor_id')}>" if item.get("autor_id") else "Desconhecido"
+        referencia = str(item.get("referencia_id") or "—")
+        enviado = item.get("timestamp")
+        data = f"<t:{int(enviado)}:R>" if isinstance(enviado, (int, float)) else "Data indisponível"
+        revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "—"
+        embed.add_field(
+            name=f"{item.get('titulo', 'Prova sem título')}"[:256],
+            value=(
+                f"**ID da prova:** `{item.get('id', '—')}`\n"
+                f"**ID da missão/atividade:** `{referencia}`\n"
+                f"**Membro:** {autor} • **Tipo:** {tipo}\n"
+                f"**Enviada:** {data} • **Revisor:** {revisor}"
+            )[:1024],
+            inline=False,
+        )
+    if len(itens) > 10:
+        embed.set_footer(text=f"Mostrando 10 de {len(itens)} registros. Use o filtro para consultar cada status.")
+    return embed
+
+
+class FiltroPainelProvas(discord.ui.Select):
+    def __init__(self, cog: "Revisoes", guild_id: int, owner_id: int, status: str = "pendente"):
+        self.cog = cog
+        self.guild_id = guild_id
+        self.owner_id = owner_id
+        options = [
+            discord.SelectOption(label="Pendentes", value="pendente", emoji="⏳", default=status == "pendente"),
+            discord.SelectOption(label="Aprovadas", value="aprovada", emoji="✅", default=status == "aprovada"),
+            discord.SelectOption(label="Recusadas", value="rejeitada", emoji="❌", default=status == "rejeitada"),
+        ]
+        super().__init__(placeholder="Filtrar provas por status", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("Este painel foi aberto por outro administrador.", ephemeral=True)
+            return
+        status = self.values[0]
+        itens = await revisoes.listar(self.guild_id, status=status)
+        itens.sort(key=lambda x: float(x.get("timestamp", 0) or 0), reverse=True)
+        view = PainelProvasView(self.cog, self.guild_id, self.owner_id, status)
+        await interaction.response.edit_message(embed=_embed_painel_provas(interaction.guild, status, itens), view=view)
+
+
+class PainelProvasView(discord.ui.View):
+    def __init__(self, cog: "Revisoes", guild_id: int, owner_id: int, status: str = "pendente"):
+        super().__init__(timeout=300)
+        self.add_item(FiltroPainelProvas(cog, guild_id, owner_id, status))
+
+
 class Revisoes(commands.Cog):
     """Motor de aprovação manual por print. Outros cogs (missões, PvP, PvE)
     chamam `abrir_revisao(...)` pra criar a pendência e postar o embed com
@@ -55,6 +125,24 @@ class Revisoes(commands.Cog):
         self.bot = bot
         if not hasattr(bot, "processadores_revisao"):
             bot.processadores_revisao = {}
+
+
+    @app_commands.command(name="painel-provas", description="Acompanhar provas de missões e atividades por status.")
+    @app_commands.default_permissions(administrator=True)
+    async def painel_provas(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Só administradores podem abrir este painel.", ephemeral=True)
+            return
+        itens = await revisoes.listar(interaction.guild.id, status="pendente")
+        itens.sort(key=lambda x: float(x.get("timestamp", 0) or 0), reverse=True)
+        await interaction.response.send_message(
+            embed=_embed_painel_provas(interaction.guild, "pendente", itens),
+            view=PainelProvasView(self, interaction.guild.id, interaction.user.id),
+            ephemeral=True,
+        )
 
     async def abrir_revisao(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
