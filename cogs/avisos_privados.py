@@ -150,12 +150,31 @@ class AvisosPrivados(commands.Cog):
             return
 
         embed = discord.Embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — {tipo.value} · {titulo}",
-            description=mensagem,
+            description=(
+                "╭────────────── ◈ ──────────────╮\n"
+                "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  COMUNICADO OFICIAL**\n"
+                "╰────────────── ◈ ──────────────╯\n\n"
+                f"**{titulo}**\n"
+                f"{mensagem}\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Este comunicado foi enviado pela equipe da NÊMESIS aos membros inscritos."
+            ),
             color=0xB3132B,
             timestamp=datetime.now(timezone.utc),
         )
-        embed.set_footer(text="NÊMESIS • Avisos privados | Para deixar de receber, use /avisos-privados")
+        embed.add_field(
+            name="◈ CATEGORIA",
+            value=f"**{tipo.value}**",
+            inline=True,
+        )
+        embed.add_field(
+            name="◈ ENVIADO POR",
+            value=interaction.user.mention,
+            inline=True,
+        )
+        embed.set_footer(
+            text="NÊMESIS • Comunicados privados | Para deixar de receber, use /avisos-privados"
+        )
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         enviados = 0
