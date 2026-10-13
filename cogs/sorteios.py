@@ -594,10 +594,10 @@ class Sorteios(commands.Cog):
             acao
             == "sorteio_participantes"
         ):
-            participantes = sorteio.get(
-                "participantes",
-                [],
-            )
+            participantes = sorteio.get("participantes", [])
+            if not isinstance(participantes, list):
+                participantes = []
+            sorteio["participantes"] = participantes
 
             if not participantes:
                 await interaction.response.send_message(
