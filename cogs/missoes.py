@@ -90,6 +90,7 @@ class Missoes(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._sync_lock = asyncio.Lock()
+        self._reward_lock = asyncio.Lock()
         # O custom_id fixo mantém o botão funcional mesmo após reinícios do bot.
         self.bot.add_view(EnviarProvaMissaoView(self))
         if not hasattr(bot, "processadores_revisao"):
@@ -376,7 +377,9 @@ class Missoes(commands.Cog):
         if not atividade:
             return "⚠️ A atividade original não foi encontrada; nenhuma recompensa foi aplicada."
 
-        revisao_id = str(revisao.get("id", ""))
+        revisao_id = str(revisao.get("id", "")).strip()
+        if not revisao_id:
+            return "⚠️ Esta revisão não possui um identificador válido; nenhuma recompensa foi aplicada."
         if revisao_id in atividade.get("recompensas_aplicadas", []):
             return "Esta revisão já foi contabilizada; nenhuma recompensa duplicada foi aplicada."
 
@@ -389,9 +392,17 @@ class Missoes(commands.Cog):
         except (TypeError, ValueError):
             recompensa = 0
 
-        perfil = await get_perfil(guild.id, autor_id)
-        perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
-        await _salvar_perfil(guild.id, autor_id, perfil)
+        # O ID da revisão é salvo junto com o XP para que uma repetição após falha
+        # não credite a mesma recompensa novamente.
+        async with self._reward_lock:
+            perfil = await get_perfil(guild.id, autor_id)
+            eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
+            recompensa_aplicada = revisao_id not in eventos_aplicados
+            if recompensa_aplicada:
+                perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
+                eventos_aplicados.append(revisao_id)
+                perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
+                await _salvar_perfil(guild.id, autor_id, perfil)
 
         # Recompensa aprovada também avança a progressão independente da gangue.
         progressao = self.bot.get_cog("ProgressaoGangue")
@@ -428,12 +439,16 @@ class Missoes(commands.Cog):
                 user_id=autor_id,
                 perfil=perfil,
                 nome=membro.display_name if membro else "",
-                delta_pontos=recompensa,
+                delta_pontos=recompensa if recompensa_aplicada else 0,
             )
         except Exception as erro:
             log.exception("Falha ao sincronizar pontuação de %s: %s", autor_id, erro)
 
-        texto = f"✅ <@{autor_id}> recebeu **+{recompensa} XP** e **+{recompensa} de pontuação**."
+        texto = (
+            f"✅ <@{autor_id}> recebeu **+{recompensa} XP** e **+{recompensa} de pontuação**."
+            if recompensa_aplicada
+            else f"ℹ️ A recompensa de <@{autor_id}> já estava registrada; nenhuma pontuação duplicada foi adicionada."
+        )
         nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
         if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
             await definir_patente(guild.id, autor_id, nova_patente["nome"])
