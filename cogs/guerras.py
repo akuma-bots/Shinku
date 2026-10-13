@@ -146,26 +146,26 @@ class Guerras(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="⚔️ Guerra agendada!",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  GUERRA AGENDADA",
             description=(
                 f"**{gangue_a}** vs **{gangue_b}**"
             ),
-            color=0xED4245,
+            color=0xB51F32,
         )
 
         embed.add_field(
-            name="Quando",
+            name="◈ DATA / HORÁRIO",
             value=quando,
         )
 
         embed.add_field(
-            name="ID",
+            name="◈ CÓDIGO DA GUERRA",
             value=f"`{registro_id}`",
             inline=True,
         )
 
         embed.set_footer(
-            text=f"Agendada por {interaction.user}"
+            text=f"NÊMESIS • OPERAÇÕES OFICIAIS • Agendada por {interaction.user}"
         )
 
         try:
@@ -380,13 +380,13 @@ class Guerras(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="🏆 Resultado registrado",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RESULTADO OFICIAL",
             description=(
                 f"**{gangue_a}** {placar_a} x "
                 f"{placar_b} **{gangue_b}**\n"
                 f"Vencedor: **{vencedor}**"
             ),
-            color=0x57F287,
+            color=0xB51F32,
         )
 
         if mvp:
@@ -472,9 +472,9 @@ class Guerras(commands.Cog):
         ]
 
         embed = discord.Embed(
-            title="📜 Histórico de guerras",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ARQUIVO DE GUERRAS",
             description="\n".join(linhas),
-            color=0x5865F2,
+            color=0xB51F32,
         )
 
         await interaction.response.send_message(
@@ -580,9 +580,9 @@ class Guerras(commands.Cog):
         ]
 
         embed = discord.Embed(
-            title=f"🏆 Ranking — Temporada {alvo}",
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  GUERRAS / TEMPORADA {alvo}",
             description="\n".join(linhas),
-            color=0xFEE75C,
+            color=0xB51F32,
         )
 
         await interaction.response.send_message(
