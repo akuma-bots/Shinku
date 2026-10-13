@@ -9,6 +9,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 from utils.perfis import (
     registrar_resultado_guerra,
+    registrar_empate_guerra,
     calcular_patente_atual,
     definir_patente,
 )
@@ -23,7 +24,7 @@ def _extrair_mencoes(texto: str) -> list:
 
     return [
         int(m)
-        for m in re.findall(r"<@!?(\\d+)>", texto)
+        for m in re.findall(r"<@!?(\d+)>", texto)
     ]
 
 
@@ -91,7 +92,9 @@ class Guerras(commands.Cog):
     @app_commands.describe(
         gangue_a="Nome da primeira gangue",
         gangue_b="Nome da segunda gangue",
-        quando="Quando vai ser (texto livre, ex: 'sábado 20h')",
+        quando="Quando vai ser (ex: sábado 20h)",
+        formato="Formato da guerra (ex: 5v5 MD3)",
+        servidor="Jogo ou servidor onde será disputada",
     )
     @app_commands.checks.has_permissions(
         manage_guild=True
@@ -102,6 +105,8 @@ class Guerras(commands.Cog):
         gangue_a: str,
         gangue_b: str,
         quando: str,
+        formato: str = None,
+        servidor: str = None,
     ):
         config = await get_config(
             interaction.guild.id
@@ -123,6 +128,10 @@ class Guerras(commands.Cog):
             )
             return
 
+        if not gangue_a.strip() or not gangue_b.strip() or gangue_a.strip().casefold() == gangue_b.strip().casefold():
+            await interaction.response.send_message("❌ Informe duas gangues diferentes.", ephemeral=True)
+            return
+
         registro_id = str(uuid.uuid4())[:8]
 
         agendamento = {
@@ -130,7 +139,9 @@ class Guerras(commands.Cog):
             "guild_id": interaction.guild.id,
             "gangue_a": gangue_a,
             "gangue_b": gangue_b,
-            "quando": quando,
+            "quando": quando.strip(),
+            "formato": formato.strip() if formato else None,
+            "servidor": servidor.strip() if servidor else None,
             "agendado_por_id": interaction.user.id,
             "canal_id": canal.id,
             "timestamp": time.time(),
@@ -153,10 +164,11 @@ class Guerras(commands.Cog):
             color=0xB51F32,
         )
 
-        embed.add_field(
-            name="◈ DATA / HORÁRIO",
-            value=quando,
-        )
+        embed.add_field(name="◈ DATA / HORÁRIO", value=quando.strip()[:1024], inline=True)
+        if formato:
+            embed.add_field(name="◈ FORMATO", value=formato.strip()[:1024], inline=True)
+        if servidor:
+            embed.add_field(name="◈ JOGO / SERVIDOR", value=servidor.strip()[:1024], inline=True)
 
         embed.add_field(
             name="◈ CÓDIGO DA GUERRA",
@@ -209,6 +221,10 @@ class Guerras(commands.Cog):
         mvp="Quem foi o MVP da guerra (opcional)",
         participantes_a="Mencione os participantes da gangue A, separados por espaço",
         participantes_b="Mencione os participantes da gangue B, separados por espaço",
+        prova_url="Link da prova/print da guerra (opcional)",
+        formato="Formato disputado (ex: 5v5 MD3)",
+        servidor="Jogo ou servidor usado",
+        arbitro="Staff que acompanhou a guerra (opcional)",
     )
     @app_commands.checks.has_permissions(
         manage_guild=True
@@ -223,7 +239,37 @@ class Guerras(commands.Cog):
         mvp: discord.Member = None,
         participantes_a: str = None,
         participantes_b: str = None,
+        prova_url: str = None,
+        formato: str = None,
+        servidor: str = None,
+        arbitro: discord.Member = None,
     ):
+        if not interaction.guild:
+            await interaction.response.send_message("Este comando só pode ser usado dentro do servidor.", ephemeral=True)
+            return
+        gangue_a = gangue_a.strip()
+        gangue_b = gangue_b.strip()
+        if not gangue_a or not gangue_b or gangue_a.casefold() == gangue_b.casefold():
+            await interaction.response.send_message("❌ Informe duas gangues diferentes.", ephemeral=True)
+            return
+        if placar_a < 0 or placar_b < 0:
+            await interaction.response.send_message("❌ O placar não pode ser negativo.", ephemeral=True)
+            return
+        if prova_url and not re.match(r"^https?://\S+$", prova_url.strip(), re.IGNORECASE):
+            await interaction.response.send_message("❌ O link da prova precisa começar com http:// ou https://.", ephemeral=True)
+            return
+        ids_a = list(dict.fromkeys(_extrair_mencoes(participantes_a)))
+        ids_b = list(dict.fromkeys(_extrair_mencoes(participantes_b)))
+        if not ids_a or not ids_b:
+            await interaction.response.send_message("❌ Informe pelo menos um participante de cada gangue para atualizar o histórico individual.", ephemeral=True)
+            return
+        if set(ids_a) & set(ids_b):
+            await interaction.response.send_message("❌ Um participante não pode estar nas duas gangues.", ephemeral=True)
+            return
+        todos_ids = set(ids_a + ids_b)
+        if mvp and mvp.id not in todos_ids:
+            await interaction.response.send_message("❌ O MVP precisa estar entre os participantes informados.", ephemeral=True)
+            return
         await interaction.response.defer()
 
         if placar_a > placar_b:
@@ -233,14 +279,6 @@ class Guerras(commands.Cog):
         else:
             vencedor = "Empate"
 
-        ids_a = _extrair_mencoes(
-            participantes_a
-        )
-
-        ids_b = _extrair_mencoes(
-            participantes_b
-        )
-
         medalhas_ganhas_texto = []
         promocoes_texto = []
 
@@ -248,6 +286,7 @@ class Guerras(commands.Cog):
             ids,
             gangue,
             venceu,
+            empatou=False,
         ):
             for user_id in ids:
                 foi_mvp = (
@@ -255,14 +294,10 @@ class Guerras(commands.Cog):
                     and mvp.id == user_id
                 )
 
-                resultado = (
-                    await registrar_resultado_guerra(
-                        interaction.guild.id,
-                        user_id,
-                        venceu,
-                        foi_mvp,
-                    )
-                )
+                if empatou:
+                    resultado = await registrar_empate_guerra(interaction.guild.id, user_id, foi_mvp)
+                else:
+                    resultado = await registrar_resultado_guerra(interaction.guild.id, user_id, venceu, foi_mvp)
 
                 if resultado["medalhas_novas"]:
                     medalhas_ganhas_texto.append(
@@ -322,17 +357,9 @@ class Guerras(commands.Cog):
                         f"**{nova_patente['nome']}**"
                     )
 
-        await _processar(
-            ids_a,
-            gangue_a,
-            vencedor == gangue_a,
-        )
-
-        await _processar(
-            ids_b,
-            gangue_b,
-            vencedor == gangue_b,
-        )
+        empate = vencedor == "Empate"
+        await _processar(ids_a, gangue_a, vencedor == gangue_a, empate)
+        await _processar(ids_b, gangue_b, vencedor == gangue_b, empate)
 
         dados = await self._dados_guild(
             interaction.guild.id
@@ -347,6 +374,10 @@ class Guerras(commands.Cog):
             "placar_b": placar_b,
             "vencedor": vencedor,
             "mvp_id": mvp.id if mvp else None,
+            "prova_url": prova_url.strip() if prova_url else None,
+            "formato": formato.strip() if formato else None,
+            "servidor": servidor.strip() if servidor else None,
+            "arbitro_id": arbitro.id if arbitro else None,
             "participantes_a": ids_a,
             "participantes_b": ids_b,
             "temporada": dados["temporada_atual"],
@@ -390,11 +421,16 @@ class Guerras(commands.Cog):
         )
 
         if mvp:
-            embed.add_field(
-                name="MVP",
-                value=mvp.mention,
-                inline=False,
-            )
+            embed.add_field(name="MVP", value=mvp.mention, inline=True)
+        if formato:
+            embed.add_field(name="Formato", value=formato.strip()[:1024], inline=True)
+        if servidor:
+            embed.add_field(name="Jogo / servidor", value=servidor.strip()[:1024], inline=True)
+        if arbitro:
+            embed.add_field(name="Staff responsável", value=arbitro.mention, inline=True)
+        if prova_url:
+            embed.add_field(name="Prova oficial", value=f"[Abrir evidência]({prova_url.strip()})", inline=False)
+        embed.add_field(name="Participantes", value=f"**{gangue_a}:** {len(ids_a)} jogador(es)\n**{gangue_b}:** {len(ids_b)} jogador(es)", inline=False)
 
         if medalhas_ganhas_texto:
             embed.add_field(
@@ -448,7 +484,7 @@ class Guerras(commands.Cog):
 
         guerras = sorted(
             guerras,
-            key=lambda g: g["timestamp"],
+            key=lambda g: g.get("timestamp", 0),
             reverse=True,
         )[:10]
 
@@ -459,17 +495,21 @@ class Guerras(commands.Cog):
             )
             return
 
-        linhas = [
-            (
-                f"**{g['gangue_a']}** "
-                f"{g['placar_a']} x "
-                f"{g['placar_b']} "
-                f"**{g['gangue_b']}** — "
-                f"vencedor: {g['vencedor']} "
-                f"(temporada {g['temporada']})"
+        linhas = []
+        for g in guerras:
+            linha = (
+                f"**{g.get('gangue_a', 'Gangue A')}** "
+                f"{g.get('placar_a', 0)} x "
+                f"{g.get('placar_b', 0)} "
+                f"**{g.get('gangue_b', 'Gangue B')}** — "
+                f"vencedor: {g.get('vencedor', 'Não informado')} "
+                f"(temporada {g.get('temporada', 1)})"
             )
-            for g in guerras
-        ]
+            if g.get("formato"):
+                linha += f" · {g['formato']}"
+            if g.get("prova_url"):
+                linha += f" · [prova]({g['prova_url']})"
+            linhas.append(linha)
 
         embed = discord.Embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ARQUIVO DE GUERRAS",
