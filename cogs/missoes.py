@@ -393,6 +393,23 @@ class Missoes(commands.Cog):
         perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
         await _salvar_perfil(guild.id, autor_id, perfil)
 
+        # Recompensa aprovada também avança a progressão independente da gangue.
+        progressao = self.bot.get_cog("ProgressaoGangue")
+        if progressao is not None and recompensa > 0:
+            try:
+                tipo_progressao = str(atividade.get("tipo", "missao")).lower()
+                if tipo_progressao not in {"missao", "contribuicao", "especial"}:
+                    tipo_progressao = "missao"
+                await progressao.registrar_recompensa(
+                    guild=guild,
+                    user_id=autor_id,
+                    quantidade=recompensa,
+                    tipo=tipo_progressao,
+                    evento_id=revisao_id,
+                )
+            except Exception as erro:
+                log.exception("Falha ao registrar recompensa na progressão da gangue para %s: %s", autor_id, erro)
+
         dados_guild = await missoes._guild(guild.id)
         alvo = next(
             (item for item in dados_guild.get("missoes", [])
