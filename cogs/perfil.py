@@ -60,21 +60,21 @@ class Perfil(commands.Cog):
         proxima = next((pt for pt in patentes if pt["xp_minimo"] > p["xp"]), None)
         progresso = f"\nPróxima patente: **{proxima['nome']}** em {proxima['xp_minimo'] - p['xp']} XP" if proxima else ""
 
-        embed = discord.Embed(title=f"🎖️ Perfil de {alvo.display_name}", color=0x5865F2)
+        embed = discord.Embed(title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PERFIL DE {alvo.display_name.upper()}"[:256], color=0xB51F32)
         embed.set_thumbnail(url=alvo.display_avatar.url)
-        embed.add_field(name="Patente", value=p["patente"] or "Sem patente", inline=True)
-        embed.add_field(name="XP", value=str(p["xp"]) + progresso, inline=True)
-        embed.add_field(name="Top Global", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
-        embed.add_field(name="Pontos da temporada", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
-        embed.add_field(name="Temporada", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
-        embed.add_field(name="Tempo no Top 10", value=tempo_top_texto, inline=True)
-        embed.add_field(name="Vitórias", value=str(p["vitorias"]), inline=True)
-        embed.add_field(name="Derrotas", value=str(p["derrotas"]), inline=True)
-        embed.add_field(name="MVPs", value=str(p["mvps"]), inline=True)
+        embed.add_field(name="◈ PATENTE", value=p["patente"] or "Sem patente", inline=True)
+        embed.add_field(name="◈ XP", value=str(p["xp"]) + progresso, inline=True)
+        embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
+        embed.add_field(name="◈ P.C. DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
+        embed.add_field(name="◈ TEMPORADA", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
+        embed.add_field(name="◈ TEMPO NO TOP 10", value=tempo_top_texto, inline=True)
+        embed.add_field(name="◈ VITÓRIAS", value=str(p["vitorias"]), inline=True)
+        embed.add_field(name="◈ DERROTAS", value=str(p["derrotas"]), inline=True)
+        embed.add_field(name="◈ MVPs", value=str(p["mvps"]), inline=True)
         embed.add_field(name="Sequência atual / recorde", value=f"{p['sequencia_atual']} / {p['maior_sequencia']}", inline=True)
         if p["kills"] or p["deaths"]:
             embed.add_field(name="KDR (PvP)", value=f"{kdr(p)} ({p['kills']}/{p['deaths']})", inline=True)
-        embed.add_field(name="Medalhas", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
+        embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
 
         await interaction.response.send_message(embed=embed)
 
@@ -108,7 +108,7 @@ class Perfil(commands.Cog):
             await interaction.response.send_message("Nenhuma patente configurada ainda.", ephemeral=True)
             return
         linhas = [f"**{p['nome']}** — a partir de {p['xp_minimo']} XP" + (f" (cargo: <@&{p['cargo_id']}>)" if p.get("cargo_id") else "") for p in patentes]
-        embed = discord.Embed(title="🎖️ Patentes configuradas", description="\n".join(linhas), color=0x5865F2)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  HIERARQUIA DE PATENTES", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
@@ -152,7 +152,7 @@ class Perfil(commands.Cog):
         nomes_metrica = {"vitorias": "vitórias", "mvps": "MVPs", "maior_sequencia": "maior sequência", "xp": "XP"}
         linhas = [f"**#{i+1}** <@{uid}> — {perfil.get(metrica, 0)} {nomes_metrica[metrica]}" for i, (uid, perfil) in enumerate(top)]
 
-        embed = discord.Embed(title=f"🏆 Ranking por {nomes_metrica[metrica]}", description="\n".join(linhas), color=0xFEE75C)
+        embed = discord.Embed(title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING / {nomes_metrica[metrica].upper()}", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
 
