@@ -228,9 +228,11 @@ class Tickets(commands.Cog):
         bot.add_view(FecharTicketView())
 
         self.verificar_inatividade.start()
+        self.verificar_painel_permanente.start()
 
     def cog_unload(self):
         self.verificar_inatividade.cancel()
+        self.verificar_painel_permanente.cancel()
 
     async def _criar_canal_ticket(
         self,
@@ -794,6 +796,56 @@ class Tickets(commands.Cog):
                 message,
                 "Este assunto precisa da revisão de um atendente humano.",
             )
+
+    @tasks.loop(seconds=300)
+    async def verificar_painel_permanente(self):
+        for guild in self.bot.guilds:
+            try:
+                config = await get_config(guild.id)
+                canal_id = config.get("ticket_painel_canal_id")
+                mensagem_id = config.get("ticket_painel_mensagem_id")
+
+                if not canal_id:
+                    continue
+
+                canal = guild.get_channel(int(canal_id))
+                if not isinstance(canal, discord.TextChannel):
+                    continue
+
+                if mensagem_id:
+                    try:
+                        await canal.fetch_message(int(mensagem_id))
+                        continue
+                    except discord.NotFound:
+                        pass
+                    except (discord.Forbidden, discord.HTTPException):
+                        continue
+
+                embed = await _montar_embed_painel(guild.id)
+                view = await _montar_select(guild.id)
+                mensagem = await canal.send(
+                    embed=embed,
+                    view=view,
+                )
+                try:
+                    await mensagem.pin(
+                        reason="Restaurando o painel permanente de tickets NÊMESIS"
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+
+                await set_config(
+                    guild.id,
+                    ticket_painel_mensagem_id=mensagem.id,
+                )
+            except Exception as erro:
+                print(
+                    f"[Tickets] Falha ao restaurar painel no servidor {guild.id}: {erro}"
+                )
+
+    @verificar_painel_permanente.before_loop
+    async def antes_de_verificar_painel_permanente(self):
+        await self.bot.wait_until_ready()
 
     @tasks.loop(seconds=60)
     async def verificar_inatividade(self):
