@@ -98,6 +98,56 @@ class ProgressaoGangue(commands.Cog):
             guild.setdefault("membros", {})[str(user_id)] = perfil
             await self._salvar_dados(dados)
 
+    async def _registrar_xp_atomico(
+        self,
+        guild_id: int,
+        user_id: int,
+        quantidade: int,
+        *,
+        evento_id: str = "",
+        tipo: str = "",
+        contar_mensagem: bool = False,
+    ) -> tuple[dict, dict, dict, bool]:
+        """Atualiza XP e contadores em uma única seção crítica; deduplica eventos identificados."""
+        quantidade = max(0, int(quantidade))
+        async with self._lock:
+            dados = await self._dados()
+            guild = dados.setdefault(str(guild_id), {})
+            membros = guild.setdefault("membros", {})
+            perfil = membros.setdefault(str(user_id), {
+                "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
+                "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+            })
+            perfil.setdefault("xp", 0)
+            perfil.setdefault("mensagens", 0)
+            perfil.setdefault("missoes", 0)
+            perfil.setdefault("guerras", 0)
+            perfil.setdefault("rank_no", 10)
+            perfil.setdefault("eventos_recompensa", [])
+            eventos = perfil["eventos_recompensa"]
+            if evento_id and evento_id in eventos:
+                rank = rank_por_xp(max(0, int(perfil.get("xp", 0) or 0)))
+                return dict(perfil), rank, rank, False
+
+            rank_antigo = rank_por_xp(max(0, int(perfil.get("xp", 0) or 0)))
+            perfil["xp"] = max(0, int(perfil.get("xp", 0) or 0)) + quantidade
+            if contar_mensagem:
+                perfil["mensagens"] = int(perfil.get("mensagens", 0) or 0) + 1
+                perfil["ultimo_xp"] = time.time()
+            if tipo in {"missao", "especial"}:
+                perfil["missoes"] = int(perfil.get("missoes", 0) or 0) + 1
+            elif tipo == "guerra":
+                perfil["guerras"] = int(perfil.get("guerras", 0) or 0) + 1
+            if evento_id:
+                eventos.append(evento_id)
+                perfil["eventos_recompensa"] = eventos[-1000:]
+
+            rank_novo = rank_por_xp(perfil["xp"])
+            perfil["rank_no"] = rank_novo["no"]
+            membros[str(user_id)] = perfil
+            await self._salvar_dados(dados)
+            return dict(perfil), rank_antigo, rank_novo, True
+
     async def _transferir_xp(self, guild_id: int, origem_id: int, destino_id: int, quantidade: int) -> tuple[dict, dict]:
         """Executa a transferência como uma única operação de leitura/alteração/gravação."""
         async with self._lock:
@@ -268,39 +318,26 @@ class ProgressaoGangue(commands.Cog):
         if agora - self._cooldowns.get(chave, 0) < COOLDOWN_MENSAGENS:
             return
         self._cooldowns[chave] = agora
-        perfil = await self._perfil(message.guild.id, message.author.id)
-        rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
-        perfil["xp"] = int(perfil.get("xp", 0)) + XP_POR_MENSAGEM
-        perfil["mensagens"] = int(perfil.get("mensagens", 0)) + 1
-        perfil["ultimo_xp"] = agora
-        rank_novo = rank_por_xp(perfil["xp"])
-        perfil["rank_no"] = rank_novo["no"]
-        await self._atualizar_perfil(message.guild.id, message.author.id, perfil)
+        perfil, rank_antigo, rank_novo, aplicada = await self._registrar_xp_atomico(
+            message.guild.id, message.author.id, XP_POR_MENSAGEM, contar_mensagem=True,
+        )
+        if not aplicada:
+            return
         if rank_novo["no"] != rank_antigo["no"]:
             await self._aplicar_cargo_rank(message.guild, message.author, rank_novo)
             await self._anunciar_rank(message.guild, message.author, rank_novo, perfil["xp"])
 
     async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao", evento_id: str = ""):
-        """Integra recompensas aprovadas à progressão sem duplicar a mesma revisão."""
+        """Aplica recompensa com deduplicação e atualização atômica do saldo."""
         quantidade = max(0, int(quantidade))
         if quantidade <= 0:
             return
-        perfil = await self._perfil(guild.id, user_id)
-        eventos = list(perfil.get("eventos_recompensa", []))
-        if evento_id and evento_id in eventos:
+        perfil, rank_antigo, rank_novo, aplicada = await self._registrar_xp_atomico(
+            guild.id, user_id, quantidade, evento_id=evento_id, tipo=tipo,
+        )
+        if not aplicada:
+            log.info("Recompensa duplicada ignorada: guild=%s user=%s evento=%s", guild.id, user_id, evento_id)
             return
-        rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
-        perfil["xp"] = int(perfil.get("xp", 0)) + quantidade
-        if tipo in {"missao", "especial"}:
-            perfil["missoes"] = int(perfil.get("missoes", 0)) + 1
-        elif tipo == "guerra":
-            perfil["guerras"] = int(perfil.get("guerras", 0)) + 1
-        if evento_id:
-            eventos.append(evento_id)
-            perfil["eventos_recompensa"] = eventos[-1000:]
-        rank_novo = rank_por_xp(perfil["xp"])
-        perfil["rank_no"] = rank_novo["no"]
-        await self._atualizar_perfil(guild.id, user_id, perfil)
         membro = guild.get_member(user_id)
         if membro is not None:
             await self._aplicar_cargo_rank(guild, membro, rank_novo)
