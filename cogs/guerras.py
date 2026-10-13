@@ -515,8 +515,23 @@ class Guerras(commands.Cog):
         embed.set_footer(text=f"Encerrada por {interaction.user} • Temporada {registro.get('temporada', 1)}")
         canal = await self._canal_guerras(interaction)
         try:
-            mensagem = await canal.send(embed=embed)
-            registro["mensagem_final_id"], registro["canal_id"] = mensagem.id, canal.id
+            mensagem = None
+            if registro.get("mensagem_id") and str(registro.get("canal_id")) == str(canal.id):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["mensagem_id"]))
+                except discord.NotFound:
+                    mensagem = None
+
+            # Mantém um único painel por guerra: o encerramento substitui
+            # a mensagem de placar, em vez de deixar um painel antigo ativo.
+            if mensagem is not None:
+                await mensagem.edit(embed=embed)
+            else:
+                mensagem = await canal.send(embed=embed)
+
+            registro["mensagem_id"] = mensagem.id
+            registro["mensagem_final_id"] = mensagem.id
+            registro["canal_id"] = canal.id
             await self._salvar_dados_guild(interaction.guild.id, dados)
         except (discord.Forbidden, discord.HTTPException):
             # Se o relatório não puder ser publicado, reabre o registro para permitir nova tentativa.
