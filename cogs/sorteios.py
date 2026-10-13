@@ -1117,7 +1117,15 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         sorteio["encerrado"] = False
         sorteio["resultado_sorteado"] = True
         await self.salvar_sorteio(sorteio)
-        await self.atualizar_mensagem(sorteio)
+        try:
+            await self.atualizar_mensagem(sorteio)
+        except Exception as erro_atualizacao:
+            # O estado pendente já foi persistido; o próximo ciclo tentará
+            # novamente sem alterar a seleção de vencedores.
+            print(
+                f"[SORTEIOS] Não consegui atualizar o painel do sorteio "
+                f"{sorteio.get('id')}: {erro_atualizacao}"
+            )
         print(
             f"[SORTEIOS] Falha ao anunciar resultado de "
             f"{sorteio.get('id')}; o encerramento será tentado novamente: {erro}"
@@ -1192,10 +1200,13 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             sorteio.clear()
             sorteio.update(atual)
 
-        # Atualiza os botões da mensagem original.
-        await self.atualizar_mensagem(
-            sorteio
-        )
+        # Atualiza os botões da mensagem original. Se a edição falhar depois
+        # de persistir o encerramento, reabre o sorteio para o próximo ciclo.
+        try:
+            await self.atualizar_mensagem(sorteio)
+        except Exception as erro:
+            await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
+            return
 
         # O canal foi resolvido antes de marcar o sorteio como encerrado.
         # Assim, falhas temporárias de cache/API permitem nova tentativa no próximo ciclo.
