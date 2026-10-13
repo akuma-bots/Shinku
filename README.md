@@ -96,6 +96,6 @@ O workflow é uma primeira barreira de qualidade; não substitui testes funciona
 ## Tutoriais e avisos automáticos
 
 - O comando `/tutorial` abre uma central interativa de tutoriais por sistema.
-- As novidades oficiais de versões novas são obrigatórias e enviadas por DM a todos os membros humanos do servidor, sem opção de inscrição ou cancelamento. Membros com DMs bloqueadas podem não receber a mensagem; isso não interrompe o envio aos demais. `/avisos-privados` continua controlando apenas comunicados manuais direcionados aos inscritos.
+- As novidades oficiais e os comunicados manuais são enviados por DM a todos os membros humanos, sem opção de inscrição ou cancelamento. A equipe autorizada usa `/avisos-enviar` para publicar um comunicado para todos. Membros com DMs bloqueadas podem não receber a mensagem; o bot registra essas falhas.
 - Ao publicar uma nova versão com novidades para anunciar, atualize `config/novidades.json`: altere `release_id` para um identificador novo e revise `titulo`, `tipo` e `mensagem`. O bot registra os usuários processados no armazenamento compartilhado para não reenviar a mesma versão após reiniciar.
 - Para vincular o Roblox, o membro usa `/roblox-vincular`, adiciona temporariamente o código à descrição do perfil Roblox e confirma com `/roblox-confirmar`. A mesma conta Roblox não pode ser vinculada a dois membros diferentes.
