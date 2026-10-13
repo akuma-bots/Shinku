@@ -286,7 +286,7 @@ class Guerras(commands.Cog):
             inimiga = guerra.get("gangue_inimiga", guerra.get("gangue_b", "Gangue desconhecida"))
             pn = guerra.get("placar_nemesis", guerra.get("placar_a", 0))
             pi = guerra.get("placar_inimiga", guerra.get("placar_b", 0))
-            resultado = guerra.get("resultado") or _resultado(int(pn), int(pi))
+            resultado = "EM ANDAMENTO" if guerra.get("status") == "ativa" else (guerra.get("resultado") or _resultado(int(pn), int(pi)))
             linha = f"**{guerra.get('id', 'SEM-ID')}** · **NÊMESIS {pn} × {pi} {discord.utils.escape_markdown(inimiga)}** — {resultado}"
             if guerra.get("prova_url"):
                 linha += f" · [prova]({guerra['prova_url']})"
@@ -310,6 +310,8 @@ class Guerras(commands.Cog):
         dados = await self._dados_guild(interaction.guild.id)
         stats = {}
         for guerra in dados.get("guerras", []):
+            if guerra.get("status") == "ativa":
+                continue
             nome = str(guerra.get("gangue_inimiga", guerra.get("gangue_b", ""))).strip()
             if not nome:
                 continue
