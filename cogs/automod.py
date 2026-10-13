@@ -365,6 +365,112 @@ def porcentagem_maiusculas(
     )
 
 
+
+class PainelPunicao(discord.ui.View):
+    """Botões persistentes para a moderação decidir a gravidade."""
+
+    def __init__(self, bot: commands.Bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+
+    async def escolher_nivel(self, interaction: discord.Interaction, nivel: int):
+        if interaction.guild is None or interaction.message is None:
+            await interaction.response.send_message(
+                "Este painel só pode ser usado dentro do servidor.",
+                ephemeral=True,
+            )
+            return
+
+        membro_staff = interaction.user
+        if not isinstance(membro_staff, discord.Member) or not (
+            membro_staff.guild_permissions.administrator
+            or membro_staff.guild_permissions.manage_guild
+            or membro_staff.guild_permissions.manage_messages
+            or membro_staff.guild_permissions.kick_members
+            or membro_staff.guild_permissions.ban_members
+        ):
+            await interaction.response.send_message(
+                "Você não tem permissão para aplicar punições por este painel.",
+                ephemeral=True,
+            )
+            return
+
+        if not interaction.message.embeds:
+            await interaction.response.send_message(
+                "Não foi possível localizar os dados desta infração.",
+                ephemeral=True,
+            )
+            return
+
+        embed = interaction.message.embeds[0]
+        if any(field.name == "Decisão da moderação" for field in embed.fields):
+            await interaction.response.send_message(
+                "Esta infração já foi analisada pela moderação.",
+                ephemeral=True,
+            )
+            return
+
+        descricao = embed.description or ""
+        alvo_match = re.search(r"\*\*Usuário:\*\*\s*<@!?(\d+)>", descricao)
+        infracao_match = re.search(r"\*\*Infração:\*\*\s*([^\n]+)", descricao)
+        if not alvo_match:
+            await interaction.response.send_message(
+                "Não consegui identificar o infrator neste registro.",
+                ephemeral=True,
+            )
+            return
+
+        alvo_id = int(alvo_match.group(1))
+        motivo = infracao_match.group(1).strip() if infracao_match else "Infração registrada pela AutoMod"
+        cog = self.bot.get_cog("AutoMod")
+        if cog is None:
+            await interaction.response.send_message(
+                "O sistema de moderação não está disponível no momento.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await cog.punir_por_nivel(
+                interaction=interaction,
+                alvo_id=alvo_id,
+                nivel=nivel,
+                motivo=motivo,
+                embed=embed,
+            )
+            await interaction.followup.send(
+                f"Punção aplicada: nível {nivel} — {NIVEIS[nivel]['nome']}.",
+                ephemeral=True,
+            )
+        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
+            print(f"[AUTOMOD][ERRO] Falha ao aplicar punição manual: {erro}")
+            await interaction.followup.send(
+                "Não consegui aplicar essa punição. Verifique as permissões do bot e a hierarquia de cargos.",
+                ephemeral=True,
+            )
+
+    @discord.ui.button(label="Nível 1", style=discord.ButtonStyle.secondary, custom_id="nemesis_automod_punir_nivel_1")
+    async def nivel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.escolher_nivel(interaction, 1)
+
+    @discord.ui.button(label="Nível 2", style=discord.ButtonStyle.primary, custom_id="nemesis_automod_punir_nivel_2")
+    async def nivel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.escolher_nivel(interaction, 2)
+
+    @discord.ui.button(label="Nível 3", style=discord.ButtonStyle.primary, custom_id="nemesis_automod_punir_nivel_3")
+    async def nivel_3(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.escolher_nivel(interaction, 3)
+
+    @discord.ui.button(label="Nível 4", style=discord.ButtonStyle.danger, custom_id="nemesis_automod_punir_nivel_4")
+    async def nivel_4(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.escolher_nivel(interaction, 4)
+
+    @discord.ui.button(label="Nível 5", style=discord.ButtonStyle.danger, custom_id="nemesis_automod_punir_nivel_5")
+    async def nivel_5(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.escolher_nivel(interaction, 5)
+
+
 # ============================================================
 # AUTOMOD
 # ============================================================
@@ -1263,7 +1369,7 @@ class AutoMod(commands.Cog):
                 )
                 return
 
-            await canal.send(embed=embed)
+            await canal.send(embed=embed, view=PainelPunicao(self.bot))
 
         except Exception as erro:
 
@@ -1281,189 +1387,101 @@ class AutoMod(commands.Cog):
         message,
         infracao,
     ):
-
-        membro = message.author
-
-        nivel = infracao["nivel"]
-
-        print(
-            "[AUTOMOD] INFRAÇÃO DETECTADA | "
-            f"Servidor={message.guild.id} | "
-            f"Usuário={membro} ({membro.id}) | "
-            f"Nível={nivel} "
-            f"({NIVEIS[nivel]['nome']}) | "
-            f"Tipo={infracao['tipo']} | "
-            f"Regra={infracao['regra_titulo']}"
-        )
-
-        await self.registrar_historico(
-            message,
-            infracao,
-        )
+        """Registra a ocorrência e aguarda a decisão da moderação nos botões."""
 
         try:
+            await message.delete()
+        except discord.HTTPException:
+            pass
 
-            # ------------------------------------------------
-            # NÍVEL 1
-            # ------------------------------------------------
+        await self.aviso(message, infracao)
 
-            if nivel == 1:
+    async def punir_por_nivel(
+        self,
+        interaction: discord.Interaction,
+        alvo_id: int,
+        nivel: int,
+        motivo: str,
+        embed: discord.Embed,
+    ):
+        guild = interaction.guild
+        if guild is None:
+            raise ValueError("Servidor não encontrado.")
 
+        alvo = guild.get_member(alvo_id)
+        if alvo is None:
+            try:
+                alvo = await guild.fetch_member(alvo_id)
+            except discord.NotFound:
+                alvo = None
+
+        justificativa = f"Nêmesis | Nível {nivel} | {motivo}"
+        tipo_historico = {
+            1: "warn",
+            2: "mute",
+            3: "kick",
+            4: "ban",
+            5: "ban",
+        }[nivel]
+
+        if nivel == 1:
+            if alvo is not None:
                 try:
-                    await message.delete()
-
-                except discord.HTTPException:
+                    await alvo.send(
+                        f"Você recebeu uma advertência na NÊMESIS. Motivo: {motivo}"
+                    )
+                except (discord.Forbidden, discord.HTTPException):
                     pass
-
-                await self.aviso(
-                    message,
-                    infracao,
-                )
-
-                return
-
-            # ------------------------------------------------
-            # NÍVEL 2
-            # ------------------------------------------------
-
-            if nivel == 2:
-
-                try:
-                    await message.delete()
-
-                except discord.HTTPException:
-                    pass
-
-                if isinstance(
-                    membro,
-                    discord.Member,
-                ):
-
-                    try:
-
-                        await membro.timeout(
-                            datetime.timedelta(
-                                minutes=10
-                            ),
-                            reason=(
-                                "AutoMod: "
-                                f"{infracao['tipo']}"
-                            ),
-                        )
-
-                    except (
-                        discord.Forbidden,
-                        discord.HTTPException,
-                    ) as erro:
-
-                        print(
-                            "[AUTOMOD][ERRO] "
-                            f"Timeout: {erro}"
-                        )
-
-                await self.aviso(
-                    message,
-                    infracao,
-                )
-
-                return
-
-            # ------------------------------------------------
-            # NÍVEL 3
-            # ------------------------------------------------
-
-            if (
-                nivel == 3
-                and isinstance(
-                    membro,
-                    discord.Member,
-                )
-            ):
-
-                try:
-                    await message.delete()
-
-                except discord.HTTPException:
-                    pass
-
-                try:
-
-                    await membro.kick(
-                        reason=(
-                            "AutoMod: "
-                            f"{infracao['tipo']}"
-                        )
-                    )
-
-                except (
-                    discord.Forbidden,
-                    discord.HTTPException,
-                ) as erro:
-
-                    print(
-                        "[AUTOMOD][ERRO] "
-                        f"Expulsão: {erro}"
-                    )
-
-                await self.aviso(
-                    message,
-                    infracao,
-                )
-
-                return
-
-            # ------------------------------------------------
-            # NÍVEL 4 E 5
-            # ------------------------------------------------
-
-            if (
-                nivel in (4, 5)
-                and isinstance(
-                    membro,
-                    discord.Member,
-                )
-            ):
-
-                try:
-
-                    await membro.ban(
-                        reason=(
-                            "AutoMod: "
-                            f"{infracao['tipo']}"
-                        ),
-                        delete_message_days=1,
-                    )
-
-                    if nivel == 4:
-
-                        await self.registrar_banimento_temporario(
-                            message.guild.id,
-                            membro.id,
-                            86400,
-                        )
-
-                except (
-                    discord.Forbidden,
-                    discord.HTTPException,
-                ) as erro:
-
-                    print(
-                        "[AUTOMOD][ERRO] "
-                        f"Banimento: {erro}"
-                    )
-
-                await self.aviso(
-                    message,
-                    infracao,
-                )
-
-        except Exception as erro:
-
-            print(
-                "[AUTOMOD][ERRO CRÍTICO] "
-                "Falha ao aplicar punição: "
-                f"{erro}"
+            medida = "Advertência"
+        elif nivel == 2:
+            if not isinstance(alvo, discord.Member):
+                raise ValueError("O infrator não está no servidor para receber silenciamento.")
+            await alvo.timeout(datetime.timedelta(minutes=10), reason=justificativa)
+            medida = "Silenciamento por 10 minutos"
+        elif nivel == 3:
+            if not isinstance(alvo, discord.Member):
+                raise ValueError("O infrator não está no servidor para ser expulso.")
+            await alvo.kick(reason=justificativa)
+            medida = "Expulsão do servidor"
+        elif nivel == 4:
+            await guild.ban(
+                alvo if alvo is not None else discord.Object(id=alvo_id),
+                reason=justificativa,
+                delete_message_days=0,
             )
+            await self.registrar_banimento_temporario(
+                guild.id,
+                alvo_id,
+                86400,
+            )
+            medida = "Banimento temporário de 24 horas"
+        else:
+            await guild.ban(
+                alvo if alvo is not None else discord.Object(id=alvo_id),
+                reason=justificativa,
+                delete_message_days=0,
+            )
+            medida = "Banimento permanente"
+
+        await registrar_punicao(
+            guild.id,
+            alvo_id,
+            tipo_historico,
+            motivo,
+            interaction.user.id,
+        )
+
+        embed.add_field(
+            name="Decisão da moderação",
+            value=(
+                f"**Nível escolhido:** {nivel} — {NIVEIS[nivel]['nome']}\n"
+                f"**Punição:** {medida}\n"
+                f"**Responsável:** {interaction.user.mention}"
+            ),
+            inline=False,
+        )
+        embed.color = discord.Color.red() if nivel >= 3 else discord.Color.gold()
+        await interaction.message.edit(embed=embed, view=None)
 
     # ========================================================
     # BANIMENTOS TEMPORÁRIOS
@@ -1969,6 +1987,7 @@ async def setup(
     await bot.add_cog(
         AutoMod(bot)
     )
+    bot.add_view(PainelPunicao(bot))
 
     print(
         "[AUTOMOD] Cog registrado no bot."
