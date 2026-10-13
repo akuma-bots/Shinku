@@ -470,14 +470,20 @@ class ConfirmarDecisaoView(discord.ui.View):
                 resultado = f"Decisão confirmada: nível {self.nivel} — {NIVEIS[self.nivel]['nome']}."
             for item in self.children:
                 item.disabled = True
-            await interaction.edit_original_response(content=resultado, view=self)
-            await interaction.followup.send(resultado, ephemeral=True)
+            try:
+                await interaction.message.edit(content=resultado, view=self)
+            except (discord.HTTPException, AttributeError):
+                pass
+            await interaction.delete_original_response()
         except Exception as erro:
             print(f"[AUTOMOD][ERRO] Falha na decisão confirmada: {erro}")
-            await interaction.followup.send(
-                "Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
-                ephemeral=True,
-            )
+            try:
+                await interaction.edit_original_response(
+                    content="Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
+                    view=None,
+                )
+            except discord.HTTPException:
+                pass
         finally:
             cog.decisoes_em_andamento.discard(chave_decisao)
 
