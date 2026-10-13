@@ -286,7 +286,7 @@ class Guerras(commands.Cog):
             inimiga = guerra.get("gangue_inimiga", guerra.get("gangue_b", "Gangue desconhecida"))
             pn = guerra.get("placar_nemesis", guerra.get("placar_a", 0))
             pi = guerra.get("placar_inimiga", guerra.get("placar_b", 0))
-            resultado = "EM ANDAMENTO" if guerra.get("status") == "ativa" else (guerra.get("resultado") or _resultado(int(pn), int(pi)))
+            resultado = "EM ANDAMENTO" if guerra.get("status") == "ativa" else ("CANCELADA" if guerra.get("status") == "cancelada" else (guerra.get("resultado") or _resultado(int(pn), int(pi))))
             linha = f"**{guerra.get('id', 'SEM-ID')}** · **NÊMESIS {pn} × {pi} {discord.utils.escape_markdown(inimiga)}** — {resultado}"
             if guerra.get("prova_url"):
                 linha += f" · [prova]({guerra['prova_url']})"
@@ -310,7 +310,7 @@ class Guerras(commands.Cog):
         dados = await self._dados_guild(interaction.guild.id)
         stats = {}
         for guerra in dados.get("guerras", []):
-            if guerra.get("status") == "ativa":
+            if guerra.get("status") in {"ativa", "cancelada"}:
                 continue
             nome = str(guerra.get("gangue_inimiga", guerra.get("gangue_b", ""))).strip()
             if not nome:
@@ -523,6 +523,47 @@ class Guerras(commands.Cog):
         embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRAS EM ANDAMENTO", description="\n".join(linhas), color=COR_NEMESIS)
         embed.set_footer(text=f"{len(ativas)} guerra(s) ativa(s)")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+    @app_commands.command(name="guerra-cancelar", description="Cancela uma guerra ativa sem apagar o registro do histórico.")
+    @app_commands.describe(codigo="Código da guerra ativa", motivo="Motivo do cancelamento")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def guerra_cancelar(self, interaction: discord.Interaction, codigo: str, motivo: str):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        motivo = motivo.strip()
+        if not motivo or len(motivo) > 500:
+            await interaction.response.send_message("Informe um motivo de até 500 caracteres.", ephemeral=True)
+            return
+        dados = await self._dados_guild(interaction.guild.id)
+        registro = next((g for g in dados.get("guerras", []) if str(g.get("id", "")).upper() == codigo.strip().upper()), None)
+        if not registro:
+            await interaction.response.send_message("Não encontrei uma guerra com esse código.", ephemeral=True)
+            return
+        if registro.get("status") != "ativa":
+            await interaction.response.send_message("Só é possível cancelar guerras em andamento.", ephemeral=True)
+            return
+        registro["status"] = "cancelada"
+        registro["resultado"] = "CANCELADA"
+        registro["motivo_cancelamento"] = motivo
+        registro["cancelada_em"] = time.time()
+        registro["cancelada_por_id"] = interaction.user.id
+        await self._salvar_dados_guild(interaction.guild.id, dados)
+        nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA CANCELADA",
+            description=f"Confronto contra **{discord.utils.escape_markdown(nome)}** cancelado.\nCódigo: **{registro['id']}**\nMotivo: {discord.utils.escape_markdown(motivo)}",
+            color=0x777777, timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text=f"Cancelada por {interaction.user}")
+        canal = await self._canal_guerras(interaction)
+        try:
+            await canal.send(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message("Guerra cancelada no histórico, mas não consegui publicar o aviso.", ephemeral=True)
+            return
+        await interaction.response.send_message(f"Guerra {registro['id']} cancelada. O registro foi preservado para auditoria.", ephemeral=True)
 
     @app_commands.command(
         name="guerra-remover",
