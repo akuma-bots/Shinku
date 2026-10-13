@@ -2010,11 +2010,11 @@ class AutoMod(commands.Cog):
         app_commands.Choice(name="Banimento permanente", value="ban_permanente"),
     ])
     @app_commands.default_permissions(administrator=True)
-    async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 1, 8760] | None = None):
+    async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 0, 8760] = 0):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
             return
-        if duracao is None:
+        if not duracao:
             duracao = 24 if medida.value == "ban_temp" else 10 if medida.value == "timeout" else 0
         config = await get_config(interaction.guild.id)
         niveis = dict(config.get("automod_niveis") or {})
