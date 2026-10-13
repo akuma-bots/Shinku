@@ -157,168 +157,79 @@ class RankingGeral(
         self,
         guild: discord.Guild,
     ) -> discord.Embed:
-
-        await self._sincronizar_migracao(
-            guild
-        )
-
+        await self._sincronizar_migracao(guild)
         dados = await registrar_tempo_top_global()
-
-        perfis = dados.get(
-            "perfis",
-            {},
-        )
-
+        perfis = dados.get("perfis", {})
         pontuados = []
 
         for uid, perfil in perfis.items():
-
             try:
-
                 user_id = int(uid)
-
-            except (
-                TypeError,
-                ValueError,
-            ):
-
+            except (TypeError, ValueError):
                 continue
-
-            pontos = int(
-                perfil.get(
-                    "pontos_temporada",
-                    perfil.get("pontos", 0),
-                )
-                or 0
-            )
+            pontos = int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0)
             xp = int(perfil.get("xp", 0) or 0)
             vitorias = int(perfil.get("vitorias", 0) or 0)
             derrotas = int(perfil.get("derrotas", 0) or 0)
             tempo_top = int(perfil.get("tempo_top_global_segundos", 0) or 0)
+            pontuados.append((user_id, pontos, vitorias, xp, derrotas, tempo_top))
 
-            pontuados.append(
-                (
-                    user_id,
-                    pontos,
-                    vitorias,
-                    xp,
-                    derrotas,
-                    tempo_top,
-                )
-            )
-
-        top = sorted(
-            pontuados,
-            key=lambda item: (
-                item[1],
-                item[2],
-            ),
-            reverse=True,
-        )[:10]
-
+        top = sorted(pontuados, key=lambda item: (item[1], item[2]), reverse=True)[:10]
+        estado = dados.get("temporada_global", {})
+        inicio = float(estado.get("inicio_timestamp") or 0)
+        duracao = int(estado.get("duracao_dias", 30) or 30) * 86400
+        restante = max(0, int(inicio + duracao - __import__("time").time()))
+        dias, resto = divmod(restante, 86400)
+        horas = resto // 3600
+        numero_temporada = int(estado.get("numero", 1) or 1)
 
         cabecalho = (
-            "╔═════════════════════════════════╗\n"
-            f"║        {guild.name} | "
-            f"{_negrito('TOP 10')}        ║\n"
-            "╚═════════════════════════════════╝\n\n"
-            f"「 {_negrito('RANKING GLOBAL — TEMPORADA')} 」\n"
+            "╔══════════════════════════════════════╗\n"
+            "║       𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  TOP GLOBAL       ║\n"
+            "╚══════════════════════════════════════╝\n\n"
+            f"**TEMPORADA #{numero_temporada}**  ━  Reinicia em **{dias}d {horas}h**\n"
+            "A pontuação sazonal define a posição. XP, vitórias, derrotas e tempo no Top 10 aparecem como estatísticas.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         )
-
-        estado_temporada = dados.get("temporada_global", {})
-        inicio_temporada = float(estado_temporada.get("inicio_timestamp") or 0)
-        fim_temporada = inicio_temporada + int(estado_temporada.get("duracao_dias", 30) or 30) * 86400
-        restante = max(0, int(fim_temporada - __import__("time").time()))
-        dias_restantes, resto = divmod(restante, 86400)
-        horas_restantes = resto // 3600
-        cabecalho += (
-            f"Temporada **#{int(estado_temporada.get('numero', 1) or 1)}**"
-            f" — reinicia em **{dias_restantes}d {horas_restantes}h**.\n\n"
-        )
-
 
         if not top:
-
-            descricao = (
-                cabecalho
-                + "Nenhum membro possui pontuação "
-                  "registrado ainda."
-            )
-
             return discord.Embed(
-                description=descricao,
-                color=0xFFD700,
+                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
+                description=(
+                    f"{cabecalho}\n\n"
+                    "Ainda não há jogadores pontuados nesta temporada.\n"
+                    "Participe das missões e atividades oficiais para entrar na classificação."
+                ),
+                color=0xB51F32,
             )
 
-
-        linhas_top = []
-
-        for i, (
-            uid,
-            pontos,
-            vitorias,
-            xp,
-            derrotas,
-            tempo_top,
-        ) in enumerate(
-            top,
-            start=1,
-        ):
-
-            linhas_top.append(
-                f"│ {_negrito('No.')}"
-                f"{_negrito(f'{i:02d}')}"
-                f" — <@{uid}>"
+        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+        linhas = []
+        for posicao, (uid, pontos, vitorias, xp, derrotas, tempo_top) in enumerate(top, start=1):
+            minutos = max(0, tempo_top) // 60
+            horas_top, minutos_restantes = divmod(minutos, 60)
+            tempo_texto = f"{horas_top}h {minutos_restantes}min"
+            selo = medalhas.get(posicao, f"**{posicao:02d}.**")
+            linhas.append(
+                f"{selo} <@{uid}>\n"
+                f"┊ **{pontos:,} P.C.**".replace(",", ".")
+                + f"  ┊  **{vitorias} V** / **{derrotas} D**\n"
+                + f"┊ XP **{xp:,}**".replace(",", ".")
+                + f"  ┊  Top 10 **{tempo_texto}**"
             )
 
-            minutos_top = tempo_top // 60
-            horas_top, minutos_restantes = divmod(minutos_top, 60)
-            linhas_top.append(
-                f"│           {_negrito(str(pontos))} PONTOS SAZONAIS"
-            )
-            linhas_top.append(
-                f"│           XP {_negrito(str(xp))} | "
-                f"V {_negrito(str(vitorias))} | D {_negrito(str(derrotas))}"
-            )
-            linhas_top.append(
-                f"│           TOP 10: {_negrito(f'{horas_top}h {minutos_restantes}min')}"
-            )
-
-            if i != len(top):
-
-                linhas_top.append("│")
-
-
-        corpo = "\n".join(
-            linhas_top
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
+            description=(
+                f"{cabecalho}\n\n"
+                + "\n\n".join(linhas)
+                + "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "A pontuação sazonal reinicia a cada 30 dias. O histórico das temporadas concluídas é preservado."
+            ),
+            color=0xB51F32,
         )
-
-
-        descricao = (
-            f"{cabecalho}"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"{_negrito('TOP 10')} — "
-            f"{_negrito('CLASSIFICAÇÃO')}\n\n"
-            "╭──────────────────────────────────────╮\n"
-            f"{corpo}\n"
-            "╰──────────────────────────────────────╯\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"「 {_negrito('ATUALIZAÇÃO')} 」\n\n"
-            "XP, vitórias e derrotas são estatísticas acumuladas. "
-            "A pontuação sazonal reinicia automaticamente a cada 30 dias; "
-            "o histórico das temporadas fica preservado.\n\n"
-            "O ranking usa os dados compartilhados com o Dashboard da NÊMESIS.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"「 {guild.name} | "
-            f"{_negrito('TOP 10')} 」"
-        )
-
-
-        return discord.Embed(
-            description=descricao,
-            color=0xFFD700,
-        )
-
+        embed.set_footer(text=f"{guild.name}  •  NÊMESIS COMPETITIVO  •  Atualização automática")
+        return embed
 
     @tasks.loop(
         minutes=INTERVALO_RANKING_MINUTOS
