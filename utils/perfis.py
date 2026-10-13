@@ -12,6 +12,7 @@ PADRAO_PERFIL = {
     "patente": None,
     "vitorias": 0,
     "derrotas": 0,
+    "empates": 0,
     "kills": 0,
     "deaths": 0,
     "mvps": 0,
@@ -476,6 +477,40 @@ async def registrar_resultado_guerra(
         delta_pontos=delta_pontos,
     )
 
+    return {
+        "perfil": perfil,
+        "competitivo": competitivo,
+        "medalhas_novas": medalhas_novas,
+        "patente_antiga": patente_antiga,
+    }
+
+
+async def registrar_empate_guerra(
+    guild_id: int,
+    user_id: int,
+    foi_mvp: bool = False,
+) -> dict:
+    """Registra empate sem contabilizar vitória ou derrota."""
+    perfil = await get_perfil(guild_id, user_id)
+    patente_antiga = perfil["patente"]
+    perfil["empates"] = int(perfil.get("empates", 0) or 0) + 1
+    perfil["sequencia_atual"] = 0
+    perfil["xp"] += 15
+
+    if foi_mvp:
+        perfil["mvps"] += 1
+        perfil["xp"] += XP_BONUS_MVP
+
+    medalhas_novas = _checar_novas_medalhas(perfil)
+    perfil["medalhas"].extend(medalhas_novas)
+    await _salvar_perfil(guild_id, user_id, perfil)
+
+    delta_pontos = 15 + (XP_BONUS_MVP if foi_mvp else 0)
+    competitivo = await _sincronizar_site(
+        user_id=user_id,
+        perfil=perfil,
+        delta_pontos=delta_pontos,
+    )
     return {
         "perfil": perfil,
         "competitivo": competitivo,
