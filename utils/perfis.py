@@ -99,6 +99,7 @@ async def _sincronizar_site(
     perfil: dict,
     nome: str = "",
     delta_pontos: int = 0,
+    evento_id: str = "",
 ) -> dict:
     """
     Sincroniza o perfil do Bot com o competitivo.json
@@ -120,6 +121,7 @@ async def _sincronizar_site(
             "derrotas",
             0,
         ),
+        evento_id=evento_id,
     )
 
     competitivo["xp"] = int(
