@@ -6,9 +6,9 @@ from discord.ext import commands
 def _cor_para_int(valor: str) -> int:
     valor = (valor or "").strip().lstrip("#")
     try:
-        return int(valor, 16) if valor else 0x5865F2
+        return int(valor, 16) if valor else 0xB51F32
     except ValueError:
-        return 0x5865F2
+        return 0xB51F32
 
 
 def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
@@ -25,7 +25,7 @@ def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
     return view if tem_botao else None
 
 
-class EmbedModal(discord.ui.Modal, title="Criar embed — até 20 mil caracteres"):
+class EmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CRIAR MODELO"):
     parte1 = discord.ui.TextInput(label="Descrição — parte 1/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
     parte2 = discord.ui.TextInput(label="Descrição — parte 2/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
     parte3 = discord.ui.TextInput(label="Descrição — parte 3/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -36,7 +36,7 @@ class EmbedModal(discord.ui.Modal, title="Criar embed — até 20 mil caracteres
         self,
         canal: discord.TextChannel,
         titulo="",
-        cor="5865F2",
+        cor="B51F32",
         imagem="",
         rodape="",
         botao1_texto=None,
@@ -124,7 +124,7 @@ class EmbedModal(discord.ui.Modal, title="Criar embed — até 20 mil caracteres
         await interaction.followup.send(mensagem, ephemeral=True)
 
 
-class EditarEmbedModal(discord.ui.Modal, title="Editar embed"):
+class EditarEmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ EDITAR MODELO"):
     titulo = discord.ui.TextInput(label="Título", required=False, max_length=256)
     descricao = discord.ui.TextInput(label="Descrição", style=discord.TextStyle.paragraph, required=False, max_length=4000)
     cor = discord.ui.TextInput(label="Cor em hex (ex: FF0000)", required=False, max_length=7)
@@ -172,7 +172,7 @@ class Embeds(commands.Cog):
     @app_commands.describe(
         canal="Canal onde as mensagens serão enviadas (padrão: este canal)",
         titulo="Título da embed (opcional)",
-        cor="Cor em hexadecimal, por exemplo 5865F2",
+        cor="Cor em hexadecimal, por exemplo B51F32",
         imagem="URL da imagem/banner (opcional)",
         rodape="Texto do rodapé (opcional)",
         botao1_texto="Texto do primeiro botão de link (opcional)",
@@ -186,7 +186,7 @@ class Embeds(commands.Cog):
         interaction: discord.Interaction,
         canal: discord.TextChannel = None,
         titulo: str = None,
-        cor: str = "5865F2",
+        cor: str = "B51F32",
         imagem: str = None,
         rodape: str = None,
         botao1_texto: str = None,
