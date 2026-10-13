@@ -9,6 +9,7 @@ from discord.ext import commands, tasks
 
 from utils.punicoes import historico_punicoes, registrar_punicao
 from utils.storage import carregar, salvar
+from utils.guild_config import get_config, set_config
 
 
 CANAL_REGRAS_ID = 1545831172796583987
@@ -366,166 +367,175 @@ def porcentagem_maiusculas(
 
 
 
+def membro_pode_moderar(membro) -> bool:
+    return isinstance(membro, discord.Member) and (
+        membro.guild_permissions.administrator
+        or membro.guild_permissions.manage_guild
+        or membro.guild_permissions.manage_messages
+        or membro.guild_permissions.kick_members
+        or membro.guild_permissions.ban_members
+    )
+
+
+class ModalMotivoDecisao(discord.ui.Modal):
+    def __init__(self, bot: commands.Bot, nivel: int, guild_id: int, channel_id: int, message_id: int, alvo_id: int):
+        super().__init__(title="Justificar decisão da moderação", timeout=300)
+        self.bot = bot
+        self.nivel = nivel
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.message_id = message_id
+        self.alvo_id = alvo_id
+        self.motivo = discord.ui.TextInput(
+            label="Motivo da decisão",
+            placeholder="Descreva por que a punição será aplicada ou dispensada...",
+            min_length=5,
+            max_length=700,
+            required=True,
+            style=discord.TextStyle.paragraph,
+        )
+        self.add_item(self.motivo)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not membro_pode_moderar(interaction.user):
+            await interaction.response.send_message("Você não tem permissão para decidir sobre esta infração.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "Confirme a decisão abaixo. A ação só será aplicada após a confirmação.",
+            view=ConfirmarDecisaoView(
+                self.bot, self.guild_id, self.channel_id, self.message_id,
+                self.alvo_id, self.nivel, str(self.motivo.value).strip(),
+            ),
+            ephemeral=True,
+        )
+
+
+class ConfirmarDecisaoView(discord.ui.View):
+    def __init__(self, bot: commands.Bot, guild_id: int, channel_id: int, message_id: int, alvo_id: int, nivel: int, motivo: str):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.channel_id = channel_id
+        self.message_id = message_id
+        self.alvo_id = alvo_id
+        self.nivel = nivel
+        self.motivo = motivo
+
+    @discord.ui.button(label="Confirmar decisão", style=discord.ButtonStyle.danger, emoji="🔒")
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not membro_pode_moderar(interaction.user):
+            await interaction.response.send_message("Você não tem permissão para confirmar esta decisão.", ephemeral=True)
+            return
+        guild = self.bot.get_guild(self.guild_id)
+        if guild is None:
+            await interaction.response.send_message("Servidor não encontrado.", ephemeral=True)
+            return
+        canal = guild.get_channel(self.channel_id)
+        if canal is None:
+            try:
+                canal = await self.bot.fetch_channel(self.channel_id)
+            except discord.HTTPException:
+                canal = None
+        if not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message("Canal da infração não encontrado.", ephemeral=True)
+            return
+        try:
+            mensagem = await canal.fetch_message(self.message_id)
+        except discord.HTTPException:
+            await interaction.response.send_message("O registro da infração não está mais acessível.", ephemeral=True)
+            return
+        if not mensagem.embeds:
+            await interaction.response.send_message("O registro não contém os dados da infração.", ephemeral=True)
+            return
+        embed = mensagem.embeds[0]
+        if any(field.name == "Decisão da moderação" for field in embed.fields):
+            await interaction.response.send_message("Esta infração já foi analisada pela moderação.", ephemeral=True)
+            return
+        cog = self.bot.get_cog("AutoMod")
+        if cog is None:
+            await interaction.response.send_message("O AutoMod não está disponível.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            if self.nivel == 0:
+                await cog.registrar_nao_punir(interaction, self.alvo_id, self.motivo, embed, mensagem)
+                resultado = "Decisão registrada: não punir."
+            else:
+                await cog.punir_por_nivel(interaction, self.alvo_id, self.nivel, self.motivo, embed, mensagem)
+                resultado = f"Decisão confirmada: nível {self.nivel} — {NIVEIS[self.nivel]['nome']}."
+            for item in self.children:
+                item.disabled = True
+            await interaction.edit_original_response(content=resultado, view=self)
+            await interaction.followup.send(resultado, ephemeral=True)
+        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
+            print(f"[AUTOMOD][ERRO] Falha na decisão confirmada: {erro}")
+            await interaction.followup.send(
+                "Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
+                ephemeral=True,
+            )
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖️")
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(content="Decisão cancelada. Nenhuma punição foi aplicada.", view=self)
+
+
 class PainelPunicao(discord.ui.View):
-    """Botões persistentes para a moderação decidir a gravidade."""
+    """Painel persistente: toda decisão abre justificativa e confirmação."""
 
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=None)
         self.bot = bot
 
-    async def escolher_nivel(self, interaction: discord.Interaction, nivel: int):
+    async def iniciar_decisao(self, interaction: discord.Interaction, nivel: int):
         if interaction.guild is None or interaction.message is None:
-            await interaction.response.send_message(
-                "Este painel só pode ser usado dentro do servidor.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("Este painel só pode ser usado dentro do servidor.", ephemeral=True)
             return
-
-        membro_staff = interaction.user
-        if not isinstance(membro_staff, discord.Member) or not (
-            membro_staff.guild_permissions.administrator
-            or membro_staff.guild_permissions.manage_guild
-            or membro_staff.guild_permissions.manage_messages
-            or membro_staff.guild_permissions.kick_members
-            or membro_staff.guild_permissions.ban_members
-        ):
-            await interaction.response.send_message(
-                "Você não tem permissão para aplicar punições por este painel.",
-                ephemeral=True,
-            )
+        if not membro_pode_moderar(interaction.user):
+            await interaction.response.send_message("Você não tem permissão para decidir sobre esta infração.", ephemeral=True)
             return
-
         if not interaction.message.embeds:
-            await interaction.response.send_message(
-                "Não foi possível localizar os dados desta infração.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("Não foi possível localizar os dados desta infração.", ephemeral=True)
             return
-
         embed = interaction.message.embeds[0]
         if any(field.name == "Decisão da moderação" for field in embed.fields):
-            await interaction.response.send_message(
-                "Esta infração já foi analisada pela moderação.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("Esta infração já foi analisada pela moderação.", ephemeral=True)
             return
-
-        descricao = embed.description or ""
-        alvo_match = re.search(r"\*\*Usuário:\*\*\s*<@!?(\d+)>", descricao)
-        infracao_match = re.search(r"\*\*Infração:\*\*\s*([^\n]+)", descricao)
+        alvo_match = re.search(r"\*\*Usuário:\*\*\s*<@!?(\d+)>", embed.description or "")
         if not alvo_match:
-            await interaction.response.send_message(
-                "Não consegui identificar o infrator neste registro.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("Não consegui identificar o infrator neste registro.", ephemeral=True)
             return
-
-        alvo_id = int(alvo_match.group(1))
-        motivo = infracao_match.group(1).strip() if infracao_match else "Infração registrada pela AutoMod"
-        cog = self.bot.get_cog("AutoMod")
-        if cog is None:
-            await interaction.response.send_message(
-                "O sistema de moderação não está disponível no momento.",
-                ephemeral=True,
+        await interaction.response.send_modal(
+            ModalMotivoDecisao(
+                self.bot, nivel, interaction.guild.id, interaction.channel_id,
+                interaction.message.id, int(alvo_match.group(1)),
             )
-            return
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            await cog.punir_por_nivel(
-                interaction=interaction,
-                alvo_id=alvo_id,
-                nivel=nivel,
-                motivo=motivo,
-                embed=embed,
-            )
-            await interaction.followup.send(
-                f"Punção aplicada: nível {nivel} — {NIVEIS[nivel]['nome']}.",
-                ephemeral=True,
-            )
-        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
-            print(f"[AUTOMOD][ERRO] Falha ao aplicar punição manual: {erro}")
-            await interaction.followup.send(
-                "Não consegui aplicar essa punição. Verifique as permissões do bot e a hierarquia de cargos.",
-                ephemeral=True,
-            )
+        )
 
     @discord.ui.button(label="Nível 1", style=discord.ButtonStyle.secondary, custom_id="nemesis_automod_punir_nivel_1")
     async def nivel_1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.escolher_nivel(interaction, 1)
+        await self.iniciar_decisao(interaction, 1)
 
     @discord.ui.button(label="Nível 2", style=discord.ButtonStyle.primary, custom_id="nemesis_automod_punir_nivel_2")
     async def nivel_2(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.escolher_nivel(interaction, 2)
+        await self.iniciar_decisao(interaction, 2)
 
     @discord.ui.button(label="Nível 3", style=discord.ButtonStyle.primary, custom_id="nemesis_automod_punir_nivel_3")
     async def nivel_3(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.escolher_nivel(interaction, 3)
+        await self.iniciar_decisao(interaction, 3)
 
     @discord.ui.button(label="Nível 4", style=discord.ButtonStyle.danger, custom_id="nemesis_automod_punir_nivel_4")
     async def nivel_4(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.escolher_nivel(interaction, 4)
+        await self.iniciar_decisao(interaction, 4)
 
     @discord.ui.button(label="Nível 5", style=discord.ButtonStyle.danger, custom_id="nemesis_automod_punir_nivel_5")
     async def nivel_5(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.escolher_nivel(interaction, 5)
+        await self.iniciar_decisao(interaction, 5)
 
-
-    @discord.ui.button(
-        label="Não punir",
-        emoji="✅",
-        style=discord.ButtonStyle.success,
-        custom_id="nemesis_automod_nao_punir",
-        row=1,
-    )
+    @discord.ui.button(label="Não punir", emoji="✅", style=discord.ButtonStyle.success, custom_id="nemesis_automod_nao_punir", row=1)
     async def nao_punir(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.guild is None or interaction.message is None:
-            await interaction.response.send_message(
-                "Este painel só pode ser usado dentro do servidor.",
-                ephemeral=True,
-            )
-            return
-
-        membro_staff = interaction.user
-        if not isinstance(membro_staff, discord.Member) or not (
-            membro_staff.guild_permissions.administrator
-            or membro_staff.guild_permissions.manage_guild
-            or membro_staff.guild_permissions.manage_messages
-            or membro_staff.guild_permissions.kick_members
-            or membro_staff.guild_permissions.ban_members
-        ):
-            await interaction.response.send_message(
-                "Você não tem permissão para decidir sobre esta infração.",
-                ephemeral=True,
-            )
-            return
-
-        if not interaction.message.embeds:
-            await interaction.response.send_message(
-                "Não foi possível localizar os dados desta infração.",
-                ephemeral=True,
-            )
-            return
-
-        embed = interaction.message.embeds[0]
-        if any(field.name == "Decisão da moderação" for field in embed.fields):
-            await interaction.response.send_message(
-                "Esta infração já foi analisada pela moderação.",
-                ephemeral=True,
-            )
-            return
-
-        embed.add_field(
-            name="Decisão da moderação",
-            value=(
-                "**Resultado:** Não punido\n"
-                f"**Responsável:** {interaction.user.mention}\n"
-                "**Motivo:** A moderação decidiu não aplicar punição."
-            ),
-            inline=False,
-        )
-        embed.color = discord.Color.green()
-        await interaction.response.edit_message(embed=embed, view=None)
+        await self.iniciar_decisao(interaction, 0)
 
 
 # ============================================================
@@ -1453,6 +1463,30 @@ class AutoMod(commands.Cog):
 
         await self.aviso(message, infracao)
 
+    async def enviar_auditoria(self, guild: discord.Guild, embed: discord.Embed):
+        try:
+            config = await get_config(guild.id)
+            canal_id = int(config.get("canal_auditoria_id") or 1545837705609617428)
+            canal = guild.get_channel(canal_id)
+            if canal is None:
+                canal = await self.bot.fetch_channel(canal_id)
+            if isinstance(canal, discord.TextChannel):
+                await canal.send(embed=embed)
+        except Exception as erro:
+            print(f"[AUTOMOD][AUDITORIA] Não foi possível enviar log: {erro}")
+
+    async def registrar_decisao(self, guild_id: int, alvo_id: int, tipo: str, nivel: int, motivo: str, moderador_id: int, infracao: str):
+        arquivo = "automod_decisoes.json"
+        dados = await carregar(arquivo, {})
+        lista = dados.setdefault(str(guild_id), [])
+        lista.append({
+            "guild_id": guild_id, "membro_id": alvo_id, "tipo": tipo,
+            "nivel": nivel, "motivo": motivo[:700], "moderador_id": moderador_id,
+            "infracao": infracao[:200], "timestamp": time.time(),
+        })
+        dados[str(guild_id)] = lista[-5000:]
+        await salvar(arquivo, dados)
+
     async def punir_por_nivel(
         self,
         interaction: discord.Interaction,
@@ -1460,11 +1494,18 @@ class AutoMod(commands.Cog):
         nivel: int,
         motivo: str,
         embed: discord.Embed,
+        mensagem: discord.Message,
     ):
         guild = interaction.guild
         if guild is None:
             raise ValueError("Servidor não encontrado.")
+        if nivel not in NIVEIS:
+            raise ValueError("Nível de punição inválido.")
 
+        config = await get_config(guild.id)
+        custom = (config.get("automod_niveis") or {}).get(str(nivel), {})
+        medida = custom.get("medida") or {1: "warn", 2: "timeout", 3: "kick", 4: "ban_temp", 5: "ban_permanente"}[nivel]
+        duracao = int(custom.get("duracao") or (10 if nivel == 2 else 24 if nivel == 4 else 0))
         alvo = guild.get_member(alvo_id)
         if alvo is None:
             try:
@@ -1472,73 +1513,109 @@ class AutoMod(commands.Cog):
             except discord.NotFound:
                 alvo = None
 
-        justificativa = f"Nêmesis | Nível {nivel} | {motivo}"
-        tipo_historico = {
-            1: "warn",
-            2: "mute",
-            3: "kick",
-            4: "ban",
-            5: "ban",
-        }[nivel]
+        infracao_match = re.search(r"\*\*Infração:\*\*\s*([^\n]+)", embed.description or "")
+        infracao_nome = infracao_match.group(1).strip() if infracao_match else "Infração AutoMod"
+        justificativa = f"NÊMESIS | Nível {nivel} | {motivo}"
 
-        if nivel == 1:
-            if alvo is not None:
-                try:
-                    await alvo.send(
-                        f"Você recebeu uma advertência na NÊMESIS. Motivo: {motivo}"
-                    )
-                except (discord.Forbidden, discord.HTTPException):
-                    pass
-            medida = "Advertência"
-        elif nivel == 2:
+        if medida == "warn":
+            tipo_historico = "warn"
+            medida_texto = "Advertência"
+        elif medida == "timeout":
             if not isinstance(alvo, discord.Member):
-                raise ValueError("O infrator não está no servidor para receber silenciamento.")
-            await alvo.timeout(datetime.timedelta(minutes=10), reason=justificativa)
-            medida = "Silenciamento por 10 minutos"
-        elif nivel == 3:
+                raise ValueError("O infrator não está no servidor para receber timeout.")
+            duracao = max(1, min(duracao or 10, 40320))
+            await alvo.timeout(datetime.timedelta(minutes=duracao), reason=justificativa)
+            tipo_historico = "mute"
+            medida_texto = f"Timeout por {duracao} minuto(s)"
+        elif medida == "kick":
             if not isinstance(alvo, discord.Member):
                 raise ValueError("O infrator não está no servidor para ser expulso.")
             await alvo.kick(reason=justificativa)
-            medida = "Expulsão do servidor"
-        elif nivel == 4:
-            await guild.ban(
-                alvo if alvo is not None else discord.Object(id=alvo_id),
-                reason=justificativa,
-                delete_message_days=0,
-            )
-            await self.registrar_banimento_temporario(
-                guild.id,
-                alvo_id,
-                86400,
-            )
-            medida = "Banimento temporário de 24 horas"
+            tipo_historico = "kick"
+            medida_texto = "Expulsão do servidor"
+        elif medida == "ban_temp":
+            duracao = max(1, min(duracao or 24, 8760))
+            await guild.ban(alvo if alvo is not None else discord.Object(id=alvo_id), reason=justificativa, delete_message_seconds=0)
+            await self.registrar_banimento_temporario(guild.id, alvo_id, duracao * 3600)
+            tipo_historico = "ban"
+            medida_texto = f"Banimento temporário de {duracao} hora(s)"
+        elif medida == "ban_permanente":
+            await guild.ban(alvo if alvo is not None else discord.Object(id=alvo_id), reason=justificativa, delete_message_seconds=0)
+            tipo_historico = "ban"
+            medida_texto = "Banimento permanente"
         else:
-            await guild.ban(
-                alvo if alvo is not None else discord.Object(id=alvo_id),
-                reason=justificativa,
-                delete_message_days=0,
-            )
-            medida = "Banimento permanente"
+            raise ValueError("A medida configurada para este nível é inválida.")
 
-        await registrar_punicao(
-            guild.id,
-            alvo_id,
-            tipo_historico,
-            motivo,
-            interaction.user.id,
-        )
+        await registrar_punicao(guild.id, alvo_id, tipo_historico, motivo, interaction.user.id)
+        await self.registrar_decisao(guild.id, alvo_id, "punido", nivel, motivo, interaction.user.id, infracao_nome)
 
         embed.add_field(
             name="Decisão da moderação",
             value=(
+                f"**Resultado:** Punido — {medida_texto}\n"
                 f"**Nível escolhido:** {nivel} — {NIVEIS[nivel]['nome']}\n"
-                f"**Punição:** {medida}\n"
-                f"**Responsável:** {interaction.user.mention}"
+                f"**Responsável:** {interaction.user.mention}\n"
+                f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}"
             ),
             inline=False,
         )
         embed.color = discord.Color.red() if nivel >= 3 else discord.Color.gold()
-        await interaction.message.edit(embed=embed, view=None)
+        await mensagem.edit(embed=embed, view=None)
+
+        try:
+            if alvo is not None:
+                extra = f"\nDuração: {duracao} hora(s)." if medida == "ban_temp" else f"\nDuração: {duracao} minuto(s)." if medida == "timeout" else ""
+                await alvo.send(
+                    f"**NÊMESIS — Decisão de moderação**\n"
+                    f"Infração: {infracao_nome}\nMedida: {medida_texto}\nMotivo: {motivo[:700]}{extra}"
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+        log = discord.Embed(
+            title="🛡️ Auditoria — AutoMod",
+            description=(
+                f"**Resultado:** Punido\n**Membro:** <@{alvo_id}> ({alvo_id})\n"
+                f"**Infração:** {infracao_nome}\n**Nível:** {nivel}\n"
+                f"**Medida:** {medida_texto}\n**Moderador:** {interaction.user.mention}\n"
+                f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}\n"
+                f"**Registro:** [Abrir infração]({mensagem.jump_url})"
+            ),
+            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+        )
+        await self.enviar_auditoria(guild, log)
+
+    async def registrar_nao_punir(self, interaction: discord.Interaction, alvo_id: int, motivo: str, embed: discord.Embed, mensagem: discord.Message):
+        guild = interaction.guild
+        if guild is None:
+            raise ValueError("Servidor não encontrado.")
+        infracao_match = re.search(r"\*\*Infração:\*\*\s*([^\n]+)", embed.description or "")
+        infracao_nome = infracao_match.group(1).strip() if infracao_match else "Infração AutoMod"
+        await self.registrar_decisao(guild.id, alvo_id, "nao_punido", 0, motivo, interaction.user.id, infracao_nome)
+        embed.add_field(
+            name="Decisão da moderação",
+            value=(
+                "**Resultado:** Não punido\n"
+                f"**Responsável:** {interaction.user.mention}\n"
+                f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}"
+            ),
+            inline=False,
+        )
+        embed.color = discord.Color.green()
+        await mensagem.edit(embed=embed, view=None)
+        log = discord.Embed(
+            title="🛡️ Auditoria — AutoMod",
+            description=(
+                f"**Resultado:** Não punido\n**Membro:** <@{alvo_id}> ({alvo_id})\n"
+                f"**Infração:** {infracao_nome}\n**Moderador:** {interaction.user.mention}\n"
+                f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}\n"
+                f"**Registro:** [Abrir infração]({mensagem.jump_url})"
+            ),
+            color=discord.Color.green(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+        )
+        await self.enviar_auditoria(guild, log)
 
     # ========================================================
     # BANIMENTOS TEMPORÁRIOS
@@ -1855,6 +1932,68 @@ class AutoMod(commands.Cog):
             self.punicoes_em_andamento.discard(
                 membro.id
             )
+
+    # ========================================================
+    # ESTATÍSTICAS DE MODERAÇÃO
+    # ========================================================
+
+    @app_commands.command(name="automod-estatisticas", description="Mostra as estatísticas de moderação da NÊMESIS.")
+    @app_commands.default_permissions(manage_guild=True)
+    async def automod_estatisticas(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        decisoes = await carregar("automod_decisoes.json", {})
+        registros = decisoes.get(str(interaction.guild.id), [])
+        agora = time.time()
+        ultimos_7 = [r for r in registros if agora - float(r.get("timestamp", 0)) <= 7 * 86400]
+        ultimos_30 = [r for r in registros if agora - float(r.get("timestamp", 0)) <= 30 * 86400]
+        punidos = sum(1 for r in ultimos_30 if r.get("tipo") == "punido")
+        nao_punidos = sum(1 for r in ultimos_30 if r.get("tipo") == "nao_punido")
+        niveis = {n: sum(1 for r in ultimos_30 if r.get("tipo") == "punido" and int(r.get("nivel", 0)) == n) for n in range(1, 6)}
+        reincidentes = {}
+        for r in ultimos_30:
+            if r.get("tipo") == "punido":
+                uid = str(r.get("membro_id"))
+                reincidentes[uid] = reincidentes.get(uid, 0) + 1
+        repetidos = sum(1 for total in reincidentes.values() if total >= 2)
+        embed = discord.Embed(title="📊 NÊMESIS — Estatísticas da moderação", color=discord.Color.blurple())
+        embed.add_field(name="Últimos 7 dias", value=f"Decisões: **{len(ultimos_7)}**", inline=True)
+        embed.add_field(name="Últimos 30 dias", value=f"Decisões: **{len(ultimos_30)}**", inline=True)
+        embed.add_field(name="Punições / Não punidos", value=f"**{punidos}** / **{nao_punidos}**", inline=True)
+        embed.add_field(name="Níveis aplicados (30 dias)", value="\n".join(f"Nível {n}: **{niveis[n]}**" for n in range(1, 6)), inline=True)
+        embed.add_field(name="Membros punidos 2+ vezes", value=f"**{repetidos}**", inline=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    # ========================================================
+    # CONFIGURAÇÃO DOS NÍVEIS
+    # ========================================================
+
+    @app_commands.command(name="automod-configurar-nivel", description="Configura a medida e duração de um nível do AutoMod.")
+    @app_commands.describe(nivel="Nível entre 1 e 5", medida="Medida a aplicar nesse nível", duracao="Minutos para timeout ou horas para banimento temporário")
+    @app_commands.choices(medida=[
+        app_commands.Choice(name="Advertência", value="warn"),
+        app_commands.Choice(name="Timeout", value="timeout"),
+        app_commands.Choice(name="Expulsão", value="kick"),
+        app_commands.Choice(name="Banimento temporário", value="ban_temp"),
+        app_commands.Choice(name="Banimento permanente", value="ban_permanente"),
+    ])
+    @app_commands.default_permissions(administrator=True)
+    async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 1, 8760] = 10):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        config = await get_config(interaction.guild.id)
+        niveis = dict(config.get("automod_niveis") or {})
+        niveis[str(nivel)] = {"medida": medida.value, "duracao": int(duracao)}
+        await set_config(interaction.guild.id, automod_niveis=niveis)
+        unidade = "hora(s)" if medida.value == "ban_temp" else "minuto(s)" if medida.value == "timeout" else "unidade(s) (não usada por esta medida)"
+        await interaction.response.send_message(
+            f"Configuração salva para o nível {nivel} — **{NIVEIS[nivel]['nome']}**.\n"
+            f"**Medida:** {medida.name}\n**Duração configurada:** {duracao} {unidade}.\n"
+            "A configuração é persistida no armazenamento compartilhado.",
+            ephemeral=True,
+        )
 
     # ========================================================
     # COMANDO — REGRAS
