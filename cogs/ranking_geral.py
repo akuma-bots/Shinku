@@ -646,9 +646,9 @@ class RankingGeral(
         await salvar(ARQUIVO_COMPETITIVO, competitivo)
 
         await interaction.followup.send(
-            "RESET COMPLETO EXECUTADO.\\n"
-            f"Perfis locais zerados: **{quantidade_local}**.\\n"
-            f"Perfis do Top Global/site zerados: **{quantidade_global}**.\\n"
+            "RESET COMPLETO EXECUTADO.\n"
+            f"Perfis locais zerados: **{quantidade_local}**.\n"
+            f"Perfis do Top Global/site zerados: **{quantidade_global}**.\n"
             "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
             "tempo no Top 10 foram zerados. O histórico sazonal foi limpo e "
             "uma nova temporada de 30 dias foi iniciada. O catálogo foi preservado.",
