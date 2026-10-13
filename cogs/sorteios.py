@@ -149,12 +149,11 @@ class BotaoParticipar(discord.ui.View):
         interaction: discord.Interaction,
         sorteio: dict,
     ):
-        quantidade = len(
-            sorteio.get(
-                "participantes",
-                [],
-            )
-        )
+        participantes = sorteio.get("participantes", [])
+        if not isinstance(participantes, list):
+            participantes = []
+            sorteio["participantes"] = participantes
+        quantidade = len(participantes)
 
         view = BotaoParticipar(
             participantes=quantidade,
@@ -243,10 +242,9 @@ class BotaoParticipar(discord.ui.View):
             )
             return
 
-        participantes = sorteio.get(
-            "participantes",
-            [],
-        )
+        participantes = sorteio.get("participantes", [])
+        if not isinstance(participantes, list):
+            participantes = []
 
         if not participantes:
             await interaction.response.send_message(
