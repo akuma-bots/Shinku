@@ -78,16 +78,13 @@ class Novidades(commands.Cog):
                     "processados": [],
                     "concluido": False,
                 })
-                # Um release marcado como concluído por uma versão antiga pode ter sido
-                # enviado apenas aos inscritos. Só encerrar se todos os destinatários atuais
-                # já estiverem registrados, garantindo a migração para envio obrigatório.
+                processados = set(str(uid) for uid in release_estado.get("processados", []))
+                # Um release concluído pela versão antiga pode ter sido enviado apenas
+                # aos inscritos. Só encerrar quando todos os destinatários atuais constarem.
                 if release_estado.get("concluido") and all(
-                    str(uid) in set(str(x) for x in release_estado.get("processados", []))
-                    for uid in destinatarios
+                    str(uid) in processados for uid in destinatarios
                 ):
                     return
-
-                processados = set(str(uid) for uid in release_estado.get("processados", []))
                 embed = discord.Embed(
                     description=(
                         "╭────────────── ◈ ──────────────╮\n"
