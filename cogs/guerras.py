@@ -28,7 +28,7 @@ def _resultado(placar_nemesis: int, placar_inimiga: int) -> str:
     return "EMPATE"
 
 
-class Guerras(commands.Cog):
+class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras oficiais da NÊMESIS"):
     """Sistema oficial de registro, regras e histórico de guerras da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
@@ -71,7 +71,7 @@ class Guerras(commands.Cog):
         return embed
 
     @app_commands.command(
-        name="guerra-registrar",
+        name="registrar",
         description="Registra o placar oficial da NÊMESIS contra uma gangue inimiga.",
     )
     @app_commands.describe(
@@ -193,7 +193,7 @@ class Guerras(commands.Cog):
         )
 
     @app_commands.command(
-        name="guerra-regras",
+        name="regras",
         description="Mostra as regras oficiais para guerras da NÊMESIS.",
     )
     async def guerra_regras(self, interaction: discord.Interaction):
@@ -206,7 +206,7 @@ class Guerras(commands.Cog):
         )
 
     @app_commands.command(
-        name="guerra-regras-definir",
+        name="regras-definir",
         description="Define as regras oficiais de guerra (staff).",
     )
     @app_commands.describe(
@@ -256,7 +256,7 @@ class Guerras(commands.Cog):
         )
 
     @app_commands.command(
-        name="guerra-historico",
+        name="historico",
         description="Mostra os registros recentes de guerras da NÊMESIS.",
     )
     @app_commands.describe(gangue="Filtra pelo nome da gangue adversária (opcional)")
@@ -300,7 +300,7 @@ class Guerras(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
-        name="guerra-ranking-gangues",
+        name="ranking-gangues",
         description="Mostra o desempenho da NÊMESIS contra cada gangue registrada.",
     )
     async def guerra_ranking_gangues(self, interaction: discord.Interaction):
@@ -350,7 +350,7 @@ class Guerras(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
 
-    @app_commands.command(name="guerra-iniciar", description="Abre uma guerra e permite acompanhar o placar até o encerramento.")
+    @app_commands.command(name="iniciar", description="Abre uma guerra e permite acompanhar o placar até o encerramento.")
     @app_commands.describe(gangue_inimiga="Nome da gangue adversária", formato="Formato combinado", observacoes="Observações iniciais")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def guerra_iniciar(self, interaction: discord.Interaction, gangue_inimiga: str, formato: str = None, observacoes: str = None):
@@ -403,7 +403,7 @@ class Guerras(commands.Cog):
             return
         await interaction.followup.send(f"Guerra aberta contra **{discord.utils.escape_markdown(nome)}**. Código: **{codigo}**. Use /guerra-placar para atualizar e /guerra-encerrar ao finalizar.", ephemeral=True)
 
-    @app_commands.command(name="guerra-placar", description="Atualiza o placar de uma guerra em andamento.")
+    @app_commands.command(name="placar", description="Atualiza o placar de uma guerra em andamento.")
     @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar atual da NÊMESIS", placar_inimiga="Placar atual da gangue adversária", observacoes="Observação opcional")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def guerra_placar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], observacoes: str = None):
@@ -468,7 +468,7 @@ class Guerras(commands.Cog):
             return
         await interaction.followup.send(f"Placar da guerra {registro['id']} atualizado. O histórico das alterações foi preservado.", ephemeral=True)
 
-    @app_commands.command(name="guerra-encerrar", description="Encerra uma guerra ativa e publica o resultado definitivo.")
+    @app_commands.command(name="encerrar", description="Encerra uma guerra ativa e publica o resultado definitivo.")
     @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar final da NÊMESIS", placar_inimiga="Placar final da gangue adversária", prova_url="Link da prova (opcional)", observacoes="Observações finais (opcional)")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def guerra_encerrar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], prova_url: str = None, observacoes: str = None):
@@ -546,7 +546,7 @@ class Guerras(commands.Cog):
             return
         await interaction.followup.send(f"Guerra {registro['id']} encerrada. Resultado: **{resultado}**.", ephemeral=True)
 
-    @app_commands.command(name="guerra-em-andamento", description="Lista os confrontos que ainda estão ativos.")
+    @app_commands.command(name="em-andamento", description="Lista os confrontos que ainda estão ativos.")
     async def guerra_em_andamento(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -568,7 +568,7 @@ class Guerras(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-    @app_commands.command(name="guerra-cancelar", description="Cancela uma guerra ativa sem apagar o registro do histórico.")
+    @app_commands.command(name="cancelar", description="Cancela uma guerra ativa sem apagar o registro do histórico.")
     @app_commands.describe(codigo="Código da guerra ativa", motivo="Motivo do cancelamento")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def guerra_cancelar(self, interaction: discord.Interaction, codigo: str, motivo: str):
@@ -626,7 +626,7 @@ class Guerras(commands.Cog):
         await interaction.followup.send(f"Guerra {registro['id']} cancelada. O registro foi preservado para auditoria.", ephemeral=True)
 
     @app_commands.command(
-        name="guerra-remover",
+        name="remover",
         description="Remove do histórico um registro de guerra incorreto (staff).",
     )
     @app_commands.describe(codigo="Código exibido no registro oficial")
