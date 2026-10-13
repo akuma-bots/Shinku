@@ -269,6 +269,29 @@ async def rejeitar(
         return alvo
 
 
+async def reabrir_apos_falha_aplicacao(
+    guild_id: int,
+    revisao_id: str,
+    erro_tipo: str = "Erro",
+):
+    """Devolve uma aprovação com falha para pendente, permitindo nova tentativa."""
+    async with _REVISOES_LOCK:
+        lista = await listar(guild_id)
+        alvo = next(
+            (item for item in lista if item.get("id") == revisao_id),
+            None,
+        )
+        if not alvo or alvo.get("status") != "aprovada":
+            return None
+
+        alvo["status"] = "pendente"
+        alvo["falha_aplicacao_tipo"] = str(erro_tipo)[:100]
+        alvo["falha_aplicacao_em"] = time.time()
+        alvo["atualizado_em"] = time.time()
+        await _salvar_guild(guild_id, lista)
+        return alvo
+
+
 async def sincronizar_todos_site(
     guild_id: int,
 ) -> int:
