@@ -471,6 +471,63 @@ class PainelPunicao(discord.ui.View):
         await self.escolher_nivel(interaction, 5)
 
 
+    @discord.ui.button(
+        label="Não punir",
+        emoji="✅",
+        style=discord.ButtonStyle.success,
+        custom_id="nemesis_automod_nao_punir",
+        row=1,
+    )
+    async def nao_punir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild is None or interaction.message is None:
+            await interaction.response.send_message(
+                "Este painel só pode ser usado dentro do servidor.",
+                ephemeral=True,
+            )
+            return
+
+        membro_staff = interaction.user
+        if not isinstance(membro_staff, discord.Member) or not (
+            membro_staff.guild_permissions.administrator
+            or membro_staff.guild_permissions.manage_guild
+            or membro_staff.guild_permissions.manage_messages
+            or membro_staff.guild_permissions.kick_members
+            or membro_staff.guild_permissions.ban_members
+        ):
+            await interaction.response.send_message(
+                "Você não tem permissão para decidir sobre esta infração.",
+                ephemeral=True,
+            )
+            return
+
+        if not interaction.message.embeds:
+            await interaction.response.send_message(
+                "Não foi possível localizar os dados desta infração.",
+                ephemeral=True,
+            )
+            return
+
+        embed = interaction.message.embeds[0]
+        if any(field.name == "Decisão da moderação" for field in embed.fields):
+            await interaction.response.send_message(
+                "Esta infração já foi analisada pela moderação.",
+                ephemeral=True,
+            )
+            return
+
+        embed.add_field(
+            name="Decisão da moderação",
+            value=(
+                "**Resultado:** Não punido\n"
+                f"**Responsável:** {interaction.user.mention}\n"
+                "**Motivo:** A moderação decidiu não aplicar punição."
+            ),
+            inline=False,
+        )
+        embed.color = discord.Color.green()
+        await interaction.response.edit_message(embed=embed, view=None)
+
+
 # ============================================================
 # AUTOMOD
 # ============================================================
