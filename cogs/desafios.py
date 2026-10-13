@@ -134,9 +134,10 @@ class Desafios(commands.Cog):
         desafio = await desafios.get(guild.id, revisao["referencia_id"])
         if not desafio:
             return "⚠️ Desafio original não foi encontrado."
-        if desafio.get("status") == "concluido":
-            return "Este resultado PvP já havia sido aplicado; nenhuma recompensa foi duplicada."
-        if desafio.get("status") not in {"aguardando_revisao", "aceito"}:
+        # Mesmo que o status já esteja concluído, uma tentativa anterior pode
+        # ter falhado ao aplicar patente/recordes após salvar as estatísticas.
+        # O ledger por desafio impede duplicar XP, vitórias e derrotas.
+        if desafio.get("status") not in {"aguardando_revisao", "aceito", "concluido"}:
             return f"⚠️ O desafio está no estado `{desafio.get('status', 'desconhecido')}` e não pode ser processado."
 
         xp_extra = int(desafio.get("aposta_xp", 0) or 0) * 2
