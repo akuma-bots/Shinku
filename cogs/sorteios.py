@@ -18,6 +18,30 @@ COR_SUCESSO = 0x57F287
 COR_ERRO = 0xED4245
 
 
+def _selecionar_vencedores(
+    participantes: list,
+    quantidade_solicitada: int,
+    vencedores_salvos=None,
+    resultado_ja_sorteado: bool = False,
+) -> list[int]:
+    """Seleciona uma vez e mantém a seleção estável durante tentativas de anúncio."""
+    if resultado_ja_sorteado and isinstance(vencedores_salvos, list):
+        participantes_ids = {int(uid) for uid in participantes if str(uid).isdigit()}
+        resultado = []
+        for user_id in vencedores_salvos:
+            try:
+                user_id = int(user_id)
+            except (TypeError, ValueError):
+                continue
+            if user_id in participantes_ids and user_id not in resultado:
+                resultado.append(user_id)
+        return resultado
+
+    participantes_ids = [int(uid) for uid in participantes if str(uid).isdigit()]
+    quantidade = max(0, min(len(participantes_ids), int(quantidade_solicitada)))
+    return random.sample(participantes_ids, quantidade) if quantidade else []
+
+
 def timestamp_discord(
     timestamp: float,
     formato: str = "F",
@@ -1174,18 +1198,12 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             except (TypeError, ValueError):
                 quantidade_solicitada = 1
 
-            quantidade_real = min(quantidade_solicitada, len(participantes))
-            vencedores_salvos = atual.get("vencedores_ids")
-            resultado_ja_sorteado = atual.get("resultado_sorteado") is True
-            if resultado_ja_sorteado and isinstance(vencedores_salvos, list):
-                # Reutiliza a seleção anterior após falha de anúncio.
-                vencedores_ids = [
-                    int(user_id)
-                    for user_id in vencedores_salvos
-                    if str(user_id).isdigit() and int(user_id) in participantes
-                ]
-            else:
-                vencedores_ids = random.sample(participantes, quantidade_real) if quantidade_real > 0 else []
+            vencedores_ids = _selecionar_vencedores(
+                participantes,
+                quantidade_solicitada,
+                vencedores_salvos=atual.get("vencedores_ids"),
+                resultado_ja_sorteado=atual.get("resultado_sorteado") is True,
+            )
             agora = time.time()
 
             atual["encerrado"] = True
