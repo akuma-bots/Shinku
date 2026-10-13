@@ -201,6 +201,7 @@ async def somar_pontos_competitivo(
     delta: int = 0,
     vitorias: int | None = None,
     derrotas: int | None = None,
+    evento_id: str = "",
 ) -> dict:
     """
     Atualiza o mesmo competitivo.json usado pelo Dashboard da NÊMESIS.
@@ -233,11 +234,23 @@ async def somar_pontos_competitivo(
     if nome:
         perfil["nome"] = nome
 
+    eventos = perfil.get("eventos_pontos_aplicados", [])
+    if not isinstance(eventos, list):
+        eventos = []
+    evento_id = str(evento_id or "").strip()
+    delta_efetivo = int(delta)
+    if evento_id:
+        if evento_id in eventos:
+            delta_efetivo = 0
+        else:
+            eventos.append(evento_id)
+            perfil["eventos_pontos_aplicados"] = eventos[-1000:]
+
     pontos_anteriores = int(perfil.get("pontos", 0) or 0)
-    perfil["pontos"] = pontos_anteriores + int(delta)
+    perfil["pontos"] = pontos_anteriores + delta_efetivo
     perfil["pontos_temporada"] = (
         int(perfil.get("pontos_temporada", pontos_anteriores) or 0)
-        + int(delta)
+        + delta_efetivo
     )
     perfil.setdefault("tempo_top_global_segundos", 0)
     perfil.setdefault("em_top_global", False)
