@@ -22,7 +22,7 @@ FRASES_FECHAR = [
 
 TEMPO_INATIVIDADE_SEGUNDOS = 10 * 60  # 10 minutos
 
-CUSTOM_ID_SELECT = "ticket:abrir_select"
+CUSTOM_ID_SELECT = "ticket:abrir_select"\nTICKET_PAINEL_CANAL_ID = 1545836351596011570
 
 TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO ・✦"
 DESCRICAO_PADRAO = (
@@ -356,9 +356,10 @@ class Tickets(commands.Cog):
             )
             config = await get_config(interaction.guild.id)
 
-        canal_id = config.get("ticket_painel_canal_id")
+        # O painel oficial da NÊMESIS sempre fica no canal padrão de atendimento.
+        canal_id = TICKET_PAINEL_CANAL_ID
         mensagem_id = config.get("ticket_painel_mensagem_id")
-        canal_painel = interaction.guild.get_channel(int(canal_id)) if canal_id else None
+        canal_painel = interaction.guild.get_channel(canal_id)
         mensagem_painel = None
 
         if canal_painel and mensagem_id:
@@ -367,10 +368,20 @@ class Tickets(commands.Cog):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 mensagem_painel = None
 
-        # O painel fica fixado no primeiro canal configurado. Reexecutar
-        # o comando atualiza a mensagem existente em vez de criar cópias.
+        if canal_painel is None:
+            await interaction.response.send_message(
+                f"Não encontrei o canal padrão <#{TICKET_PAINEL_CANAL_ID}>. "
+                "Verifique se o bot tem acesso a esse canal.",
+                ephemeral=True,
+            )
+            return
+
+        # Reutiliza o painel salvo. Se ele estava em outro canal ou foi
+        # apagado, publica uma nova mensagem no canal oficial configurado.
+        if mensagem_painel is not None and int(config.get("ticket_painel_canal_id") or 0) != canal_painel.id:
+            mensagem_painel = None
+
         if mensagem_painel is None:
-            canal_painel = interaction.channel
             view = await _montar_select(interaction.guild.id)
             embed = await _montar_embed_painel(interaction.guild.id)
             mensagem_painel = await canal_painel.send(embed=embed, view=view)
@@ -802,12 +813,8 @@ class Tickets(commands.Cog):
         for guild in self.bot.guilds:
             try:
                 config = await get_config(guild.id)
-                canal_id = config.get("ticket_painel_canal_id")
+                canal_id = TICKET_PAINEL_CANAL_ID
                 mensagem_id = config.get("ticket_painel_mensagem_id")
-
-                if not canal_id:
-                    continue
-
                 canal = guild.get_channel(int(canal_id))
                 if not isinstance(canal, discord.TextChannel):
                     continue
@@ -836,6 +843,7 @@ class Tickets(commands.Cog):
 
                 await set_config(
                     guild.id,
+                    ticket_painel_canal_id=canal.id,
                     ticket_painel_mensagem_id=mensagem.id,
                 )
             except Exception as erro:
