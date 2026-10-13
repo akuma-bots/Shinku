@@ -1,0 +1,84 @@
+name: Validar bot NÊMESIS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validar sintaxe de todos os módulos
+        run: python -m compileall -q bot.py cogs utils
+
+      - name: Validar arquivos JSON e catálogo de missões
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          arquivos = sorted(Path(".").rglob("*.json"))
+          invalidos = []
+          for arquivo in arquivos:
+              if any(parte in {".git", ".venv", "venv", "__pycache__"} for parte in arquivo.parts):
+                  continue
+              try:
+                  with arquivo.open("r", encoding="utf-8") as f:
+                      json.load(f)
+              except (OSError, json.JSONDecodeError) as erro:
+                  invalidos.append(f"{arquivo}: {erro}")
+
+          if invalidos:
+              raise SystemExit("\n".join(invalidos))
+
+          catalogo_path = Path("config/missoes_padrao.json")
+          catalogo = json.loads(catalogo_path.read_text(encoding="utf-8"))
+          missoes = catalogo.get("missoes")
+          if not isinstance(missoes, list):
+              raise SystemExit("O catálogo de missões precisa conter uma lista 'missoes'.")
+
+          ids = []
+          tipos = {"missao", "contribuicao", "especial"}
+          for indice, missao in enumerate(missoes, start=1):
+              if not isinstance(missao, dict):
+                  raise SystemExit(f"Missão #{indice} não é um objeto.")
+              missao_id = str(missao.get("id", "")).strip()
+              if not missao_id:
+                  raise SystemExit(f"Missão #{indice} não tem ID.")
+              if missao_id in ids:
+                  raise SystemExit(f"ID de missão duplicado: {missao_id}")
+              ids.append(missao_id)
+              if missao.get("tipo") not in tipos:
+                  raise SystemExit(f"Tipo inválido na missão {missao_id}: {missao.get('tipo')}")
+              if not str(missao.get("titulo", "")).strip():
+                  raise SystemExit(f"Missão {missao_id} não tem título.")
+              try:
+                  recompensa = int(missao.get("recompensa_xp", 0))
+              except (TypeError, ValueError):
+                  raise SystemExit(f"Recompensa inválida na missão {missao_id}.")
+              if recompensa < 0:
+                  raise SystemExit(f"Recompensa negativa na missão {missao_id}.")
+
+          print(f"Validação concluída: {len(arquivos)} JSON(s), {len(ids)} missões e sintaxe Python válida.")
+          PY
