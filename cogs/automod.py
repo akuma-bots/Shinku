@@ -12,6 +12,7 @@ from utils.storage import carregar, salvar
 
 
 CANAL_REGRAS_ID = 1545831172796583987
+CANAL_INFRACOES_ID = 1545838433229082655
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
 
@@ -1232,7 +1233,11 @@ class AutoMod(commands.Cog):
                 f"**Regra:** "
                 f"{infracao['regra_titulo']}\n"
                 f"**Medida:** "
-                f"{NIVEIS[nivel]['punicao']}"
+                f"{NIVEIS[nivel]['punicao']}\n"
+                f"**Canal da ocorrência:** "
+                f"<#{message.channel.id}>\n"
+                f"**Mensagem:** "
+                f"{discord.utils.escape_markdown(message.content[:700] or '[sem texto]')}"
             ),
             color=discord.Color.orange(),
             timestamp=datetime.datetime.now(
@@ -1242,10 +1247,23 @@ class AutoMod(commands.Cog):
 
         try:
 
-            await message.channel.send(
-                embed=embed,
-                delete_after=8,
+            canal = message.guild.get_channel(
+                CANAL_INFRACOES_ID
             )
+
+            if canal is None:
+                canal = await self.bot.fetch_channel(
+                    CANAL_INFRACOES_ID
+                )
+
+            if not isinstance(canal, discord.TextChannel):
+                print(
+                    "[AUTOMOD][ERRO] "
+                    f"Canal de infrações inválido: {CANAL_INFRACOES_ID}"
+                )
+                return
+
+            await canal.send(embed=embed)
 
         except Exception as erro:
 
@@ -1387,6 +1405,11 @@ class AutoMod(commands.Cog):
                         f"Expulsão: {erro}"
                     )
 
+                await self.aviso(
+                    message,
+                    infracao,
+                )
+
                 return
 
             # ------------------------------------------------
@@ -1428,6 +1451,11 @@ class AutoMod(commands.Cog):
                         "[AUTOMOD][ERRO] "
                         f"Banimento: {erro}"
                     )
+
+                await self.aviso(
+                    message,
+                    infracao,
+                )
 
         except Exception as erro:
 
