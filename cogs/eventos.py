@@ -347,7 +347,7 @@ class Eventos(commands.Cog):
                 evento.description
                 or "Sem descrição."
             ),
-            color=0x5865F2,
+            color=0xB51F32,
         )
 
         embed.add_field(
