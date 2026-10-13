@@ -218,7 +218,7 @@ class FecharTicketView(discord.ui.View):
         )
 
 
-class Tickets(commands.Cog):
+class Tickets(commands.GroupCog, group_name="ticket", group_description="Comandos da central de atendimento da NÊMESIS."):
     """
     Sistema de tickets por categoria.
 
