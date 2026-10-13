@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 
@@ -6,6 +7,7 @@ from utils.storage import carregar, salvar
 
 ARQUIVO_DESAFIOS = "desafios.json"
 ARQUIVO_COMPETITIVO = "competitivo.json"
+_DESAFIOS_TRANSICAO_LOCK = asyncio.Lock()
 
 PADRAO_COMPETITIVO = {
     "catalogo": [],
@@ -182,35 +184,36 @@ async def definir_status(
     desafio_id: str,
     status: str,
 ):
-    lista = (
-        await _tudo()
-    ).get(
-        str(guild_id),
-        [],
-    )
+    async with _DESAFIOS_TRANSICAO_LOCK:
+        lista = (
+            await _tudo()
+        ).get(
+            str(guild_id),
+            [],
+        )
 
-    alvo = next(
-        (
-            d
-            for d in lista
-            if d.get("id") == desafio_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                d
+                for d in lista
+                if d.get("id") == desafio_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
 
-    alvo["status"] = status
+        alvo["status"] = status
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    await _sincronizar_desafio_site(alvo)
+        await _sincronizar_desafio_site(alvo)
 
-    return alvo
+        return alvo
 
 
 async def definir_resultado(
@@ -219,37 +222,40 @@ async def definir_resultado(
     vencedor_id: int,
     perdedor_id: int,
 ):
-    lista = (
-        await _tudo()
-    ).get(
-        str(guild_id),
-        [],
-    )
+    async with _DESAFIOS_TRANSICAO_LOCK:
+        lista = (
+            await _tudo()
+        ).get(
+            str(guild_id),
+            [],
+        )
 
-    alvo = next(
-        (
-            d
-            for d in lista
-            if d.get("id") == desafio_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                d
+                for d in lista
+                if d.get("id") == desafio_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
+        if alvo.get("status") != "aceito":
+            return None
 
-    alvo["vencedor_id"] = vencedor_id
-    alvo["perdedor_id"] = perdedor_id
-    alvo["status"] = "aguardando_revisao"
+        alvo["vencedor_id"] = vencedor_id
+        alvo["perdedor_id"] = perdedor_id
+        alvo["status"] = "aguardando_revisao"
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    await _sincronizar_desafio_site(alvo)
+        await _sincronizar_desafio_site(alvo)
 
-    return alvo
+        return alvo
 
 
 async def sincronizar_todos_site(
