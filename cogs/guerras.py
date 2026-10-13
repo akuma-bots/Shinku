@@ -603,9 +603,25 @@ class Guerras(commands.Cog):
         embed.set_footer(text=f"Cancelada por {interaction.user}")
         canal = await self._canal_guerras(interaction)
         try:
-            await canal.send(embed=embed)
+            mensagem = None
+            if registro.get("mensagem_id") and str(registro.get("canal_id")) == str(canal.id):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["mensagem_id"]))
+                except discord.NotFound:
+                    mensagem = None
+
+            # O painel é atualizado no próprio lugar, evitando mostrar uma
+            # guerra cancelada junto de uma mensagem antiga ainda ativa.
+            if mensagem is not None:
+                await mensagem.edit(embed=embed)
+            else:
+                mensagem = await canal.send(embed=embed)
+
+            registro["mensagem_id"] = mensagem.id
+            registro["canal_id"] = canal.id
+            await self._salvar_dados_guild(interaction.guild.id, dados)
         except (discord.Forbidden, discord.HTTPException):
-            await interaction.followup.send("Guerra cancelada no histórico, mas não consegui publicar o aviso.", ephemeral=True)
+            await interaction.followup.send("Guerra cancelada no histórico, mas não consegui atualizar/publicar o painel.", ephemeral=True)
             return
         await interaction.followup.send(f"Guerra {registro['id']} cancelada. O registro foi preservado para auditoria.", ephemeral=True)
 
