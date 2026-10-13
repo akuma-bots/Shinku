@@ -522,6 +522,73 @@ class Guerras(commands.Cog):
         )
 
     @app_commands.command(
+        name="guerra-ranking-gangues",
+        description="Mostra o ranking de gangues por resultados oficiais.",
+    )
+    @app_commands.describe(
+        temporada="Filtra uma temporada específica (opcional)",
+    )
+    async def guerra_ranking_gangues(
+        self,
+        interaction: discord.Interaction,
+        temporada: int = None,
+    ):
+        dados = await self._dados_guild(interaction.guild.id)
+        estatisticas = {}
+
+        for guerra in dados.get("guerras", []):
+            if temporada is not None and guerra.get("temporada", 1) != temporada:
+                continue
+            nome_a = str(guerra.get("gangue_a", "")).strip()
+            nome_b = str(guerra.get("gangue_b", "")).strip()
+            if not nome_a or not nome_b:
+                continue
+
+            chave_a, chave_b = nome_a.casefold(), nome_b.casefold()
+            estatisticas.setdefault(chave_a, {"nome": nome_a, "vitorias": 0, "derrotas": 0, "empates": 0, "guerras": 0})
+            estatisticas.setdefault(chave_b, {"nome": nome_b, "vitorias": 0, "derrotas": 0, "empates": 0, "guerras": 0})
+            a, b = estatisticas[chave_a], estatisticas[chave_b]
+            a["guerras"] += 1
+            b["guerras"] += 1
+            vencedor = str(guerra.get("vencedor", ""))
+
+            if vencedor.casefold() == nome_a.casefold():
+                a["vitorias"] += 1
+                b["derrotas"] += 1
+            elif vencedor.casefold() == nome_b.casefold():
+                b["vitorias"] += 1
+                a["derrotas"] += 1
+            else:
+                a["empates"] += 1
+                b["empates"] += 1
+
+        ranking = sorted(
+            estatisticas.values(),
+            key=lambda item: (item["vitorias"], item["empates"], item["guerras"]),
+            reverse=True,
+        )[:10]
+
+        if not ranking:
+            alvo = f" na temporada {temporada}" if temporada is not None else ""
+            await interaction.response.send_message(
+                f"Nenhuma guerra registrada{alvo}.",
+                ephemeral=True,
+            )
+            return
+
+        linhas = [
+            f"**#{i + 1} · {item['nome']}** — {item['vitorias']}V / {item['derrotas']}D / {item['empates']}E · {item['guerras']} guerra(s)"
+            for i, item in enumerate(ranking)
+        ]
+        sufixo = f" · TEMPORADA {temporada}" if temporada is not None else " · GERAL"
+        embed = discord.Embed(
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING DE GANGUES{sufixo}",
+            description="\\n".join(linhas),
+            color=0xB51F32,
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
         name="temporada-nova",
         description=(
             "Encerra a temporada atual e começa uma nova "
