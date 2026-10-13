@@ -236,6 +236,27 @@ class ProgressaoGangue(commands.Cog):
             await self._aplicar_cargo_rank(message.guild, message.author, rank_novo)
             await self._anunciar_rank(message.guild, message.author, rank_novo, perfil["xp"])
 
+    async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao"):
+        """Integra recompensas já aprovadas de missões/contribuições à progressão da gangue."""
+        quantidade = max(0, int(quantidade))
+        if quantidade <= 0:
+            return
+        perfil = await self._perfil(guild.id, user_id)
+        rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
+        perfil["xp"] = int(perfil.get("xp", 0)) + quantidade
+        if tipo == "missao":
+            perfil["missoes"] = int(perfil.get("missoes", 0)) + 1
+        elif tipo == "guerra":
+            perfil["guerras"] = int(perfil.get("guerras", 0)) + 1
+        rank_novo = rank_por_xp(perfil["xp"])
+        perfil["rank_no"] = rank_novo["no"]
+        await self._atualizar_perfil(guild.id, user_id, perfil)
+        membro = guild.get_member(user_id)
+        if membro is not None:
+            await self._aplicar_cargo_rank(guild, membro, rank_novo)
+            if rank_novo["no"] != rank_antigo["no"]:
+                await self._anunciar_rank(guild, membro, rank_novo, perfil["xp"])
+
     @app_commands.command(name="gangue-perfil", description="Mostra o progresso de um membro na hierarquia da NÊMESIS.")
     @app_commands.describe(membro="Membro para consultar; padrão: você")
     async def gangue_perfil(self, interaction: discord.Interaction, membro: discord.Member = None):
