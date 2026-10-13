@@ -72,7 +72,33 @@ intents.members = True
 intents.presences = True
 
 
-bot = commands.Bot(
+class NemesisBot(commands.Bot):
+    """Registra todos os comandos de Cogs diretamente no servidor da NÊMESIS.
+
+    Comandos globais têm um limite de 100 por aplicação. Como este bot é
+    exclusivo de um servidor, o escopo de servidor evita esse limite global.
+    """
+
+    async def add_cog(
+        self,
+        cog,
+        *,
+        override=False,
+        guild=discord.utils.MISSING,
+        guilds=discord.utils.MISSING,
+    ):
+        if guild is discord.utils.MISSING and guilds is discord.utils.MISSING:
+            guild = discord.Object(id=NEMESIS_GUILD_ID)
+
+        return await super().add_cog(
+            cog,
+            override=override,
+            guild=guild,
+            guilds=guilds,
+        )
+
+
+bot = NemesisBot(
     command_prefix="!",
     intents=intents,
 )
@@ -152,7 +178,7 @@ CAMINHO_CACHE_COMANDOS = (
 )
 
 
-def _assinatura_comandos() -> str:
+def _assinatura_comandos(guild=None) -> str:
     """
     Gera uma assinatura determinística da árvore inteira de comandos.
     Inclui subcomandos e detalhes dos parâmetros para que alterações
@@ -185,7 +211,7 @@ def _assinatura_comandos() -> str:
             registrar(filho, nome_completo)
 
     for comando in sorted(
-        bot.tree.get_commands(),
+        bot.tree.get_commands(guild=guild),
         key=lambda item: getattr(item, "name", ""),
     ):
         registrar(comando)
@@ -304,7 +330,7 @@ async def on_ready():
 
     cache = _carregar_cache_comandos()
 
-    assinatura_atual = _assinatura_comandos()
+    assinatura_atual = _assinatura_comandos(servidor)
 
 
     # Remove registros globais antigos.
@@ -337,13 +363,9 @@ async def on_ready():
 
         try:
 
-            bot.tree.copy_global_to(
-                guild=servidor
-            )
-
-            sincronizados = await bot.tree.sync(
-                guild=servidor
-            )
+            # Os comandos já foram registrados no escopo da NÊMESIS
+            # por NemesisBot.add_cog; não copie comandos globais para cá.
+            sincronizados = await bot.tree.sync(guild=servidor)
 
             print(
                 f"{len(sincronizados)} comandos "
@@ -445,7 +467,11 @@ async def iniciar_servidor_web():
             "storage": "upstash" if USANDO_UPSTASH else "local",
             "loaded_cogs": sorted(bot.cogs.keys()),
             "loaded_cog_count": len(bot.cogs),
-            "command_count": len(bot.tree.get_commands()),
+            "command_count": len(
+                bot.tree.get_commands(guild=bot.get_guild(NEMESIS_GUILD_ID))
+                if bot.get_guild(NEMESIS_GUILD_ID) is not None
+                else bot.tree.get_commands()
+            ),
             "failed_cogs": falhas,
         }, status=200 if status == "online" else 503 if status == "degraded" else 202)
 
