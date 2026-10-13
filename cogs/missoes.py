@@ -165,7 +165,7 @@ class Missoes(commands.Cog):
 
     @classmethod
     def _montar_embeds(cls, atividade: dict) -> list[discord.Embed]:
-        """Monta uma ou mais mensagens para descrições de até 20.000 caracteres."""
+        """Cria o cartão oficial de missão, preservando descrições longas integralmente."""
         tipo = TIPOS.get(str(atividade.get("tipo", "missao")).lower(), TIPOS["missao"])
         ativa = atividade.get("ativa", True)
         try:
@@ -173,42 +173,61 @@ class Missoes(commands.Cog):
         except (TypeError, ValueError):
             recompensa = 0
 
-        titulo_base = f"NÊMESIS — {atividade.get('titulo', 'Missão')}"[:256]
-        partes = cls._dividir_descricao(atividade.get("descricao"))
+        titulo_base = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  {atividade.get('titulo', 'Missão')}"[:256]
+        descricao_original = str(atividade.get("descricao") or "").strip()
+        if not descricao_original:
+            descricao_original = "Esta missão ainda não possui uma descrição detalhada."
+
+        partes = cls._dividir_descricao(descricao_original)
         embeds = []
+        cor = 0xB51F32 if ativa else 0x454545
 
         for indice, parte in enumerate(partes, start=1):
-            if indice == 1:
-                titulo = titulo_base
-            else:
-                sufixo = f" — continuação {indice}/{len(partes)}"
-                titulo = f"{titulo_base[:256 - len(sufixo)]}{sufixo}"
-
+            sufixo = f"  ━  PARTE {indice}/{len(partes)}" if len(partes) > 1 else ""
+            titulo = f"{titulo_base[:256 - len(sufixo)]}{sufixo}"
             embed = discord.Embed(
                 title=titulo,
-                description=parte,
-                color=0x5865F2 if ativa else 0x747F8D,
+                description=(
+                    "╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
+                    f"   {'MISSÃO DISPONÍVEL' if ativa else 'MISSÃO ENCERRADA'}\n"
+                    "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+                    f"{parte}"
+                ),
+                color=cor,
             )
 
             if indice == 1:
-                embed.add_field(name="Categoria", value=tipo["nome"], inline=True)
-                embed.add_field(name="ID da missão", value=f"`{atividade.get('id', '—')}`", inline=True)
-                embed.add_field(name="Recompensa", value=f"+{recompensa} de pontuação e +{recompensa} XP", inline=False)
+                embed.add_field(
+                    name="◈ CLASSIFICAÇÃO",
+                    value=f"**{tipo['nome']}**\nID: {atividade.get('id', '—')}",
+                    inline=True,
+                )
+                embed.add_field(
+                    name="◈ RECOMPENSA",
+                    value=f"**{recompensa:,} P.C.**\n**{recompensa:,} XP**".replace(",", "."),
+                    inline=True,
+                )
                 if ativa:
                     embed.add_field(
-                        name="Como concluir",
+                        name="◈ PROCEDIMENTO",
                         value=(
-                            "Conclua a atividade e clique em **ENVIAR PROVAS**. "
-                            "Informe o ID da missão e o link da imagem para enviar sua prova à staff."
+                            "1. Leia todos os requisitos da missão.\n"
+                            "2. Conclua a atividade no jogo.\n"
+                            "3. Clique em **ENVIAR PROVAS** e informe o ID da missão e o link da evidência.\n"
+                            "4. Aguarde a análise da staff; a recompensa é liberada após aprovação."
                         ),
                         inline=False,
                     )
-                    embed.set_footer(text="Missão padrão gerenciada pelo GitHub • A publicação é atualizada pelo bot")
+                    embed.set_footer(text="NÊMESIS  •  OPERAÇÕES OFICIAIS  •  Envio sujeito à validação da staff")
                 else:
-                    embed.add_field(name="Status", value="Esta missão está encerrada.", inline=False)
-                    embed.set_footer(text="Missão encerrada • A publicação permanece no canal como histórico")
+                    embed.add_field(
+                        name="◈ SITUAÇÃO",
+                        value="Esta operação foi encerrada. A publicação permanece disponível apenas para consulta.",
+                        inline=False,
+                    )
+                    embed.set_footer(text="NÊMESIS  •  ARQUIVO DE OPERAÇÕES")
             else:
-                embed.set_footer(text=f"NÊMESIS • Continuação da descrição da missão • {indice}/{len(partes)}")
+                embed.set_footer(text=f"NÊMESIS  •  CONTINUAÇÃO DA MISSÃO  •  {indice}/{len(partes)}")
 
             embeds.append(embed)
 
