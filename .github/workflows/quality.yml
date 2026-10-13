@@ -34,7 +34,7 @@ jobs:
         run: python -m compileall -q bot.py cogs utils tests
 
       - name: Executar testes de invariantes
-        run: pytest -q
+        run: PYTHONPATH=. pytest -q
 
       - name: Validar arquivos JSON e catálogo de missões
         run: |
