@@ -1400,6 +1400,23 @@ class AutoMod(commands.Cog):
     ):
 
         nivel = infracao["nivel"]
+        medida_exibida = NIVEIS[nivel]["punicao"]
+        try:
+            config = await get_config(message.guild.id)
+            custom = (config.get("automod_niveis") or {}).get(str(nivel), {})
+            medida = custom.get("medida")
+            duracao = int(custom.get("duracao") or (10 if nivel == 2 else 24 if nivel == 4 else 0))
+            nomes_medidas = {
+                "warn": "Advertência",
+                "timeout": f"Timeout ({duracao} minuto(s))",
+                "kick": "Expulsão",
+                "ban_temp": f"Banimento temporário ({duracao} hora(s))",
+                "ban_permanente": "Banimento permanente",
+            }
+            if medida in nomes_medidas:
+                medida_exibida = nomes_medidas[medida]
+        except Exception as erro:
+            print(f"[AUTOMOD][CONFIG] Não foi possível ler a medida configurada: {erro}")
 
         embed = discord.Embed(
             title="⚠️ AutoMod — Infração detectada",
@@ -1414,7 +1431,7 @@ class AutoMod(commands.Cog):
                 f"**Regra:** "
                 f"{infracao['regra_titulo']}\n"
                 f"**Medida:** "
-                f"{NIVEIS[nivel]['punicao']}\n"
+                f"{medida_exibida}\n"
                 f"**Canal da ocorrência:** "
                 f"<#{message.channel.id}>\n"
                 f"**Mensagem:** "
@@ -1987,18 +2004,21 @@ class AutoMod(commands.Cog):
         app_commands.Choice(name="Banimento permanente", value="ban_permanente"),
     ])
     @app_commands.default_permissions(administrator=True)
-    async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 1, 8760] = 10):
+    async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 1, 8760] | None = None):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
             return
+        if duracao is None:
+            duracao = 24 if medida.value == "ban_temp" else 10 if medida.value == "timeout" else 0
         config = await get_config(interaction.guild.id)
         niveis = dict(config.get("automod_niveis") or {})
         niveis[str(nivel)] = {"medida": medida.value, "duracao": int(duracao)}
         await set_config(interaction.guild.id, automod_niveis=niveis)
-        unidade = "hora(s)" if medida.value == "ban_temp" else "minuto(s)" if medida.value == "timeout" else "unidade(s) (não usada por esta medida)"
+        unidade = "hora(s)" if medida.value == "ban_temp" else "minuto(s)" if medida.value == "timeout" else "não aplicável"
+        duracao_texto = f"{duracao} {unidade}" if medida.value in {"ban_temp", "timeout"} else "sem duração"
         await interaction.response.send_message(
             f"Configuração salva para o nível {nivel} — **{NIVEIS[nivel]['nome']}**.\n"
-            f"**Medida:** {medida.name}\n**Duração configurada:** {duracao} {unidade}.\n"
+            f"**Medida:** {medida.name}\n**Duração:** {duracao_texto}.\n"
             "A configuração é persistida no armazenamento compartilhado.",
             ephemeral=True,
         )
