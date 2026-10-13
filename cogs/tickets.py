@@ -3,7 +3,6 @@ import asyncio
 import logging
 import unicodedata
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 from utils.storage import carregar_config
 from utils.guild_config import get_config, set_config
@@ -218,7 +217,7 @@ class FecharTicketView(discord.ui.View):
         )
 
 
-class Tickets(commands.GroupCog, group_name="ticket", group_description="Comandos da central de atendimento da NÊMESIS."):
+class Tickets(commands.Cog):
     """
     Sistema de tickets por categoria.
 
@@ -374,250 +373,6 @@ class Tickets(commands.GroupCog, group_name="ticket", group_description="Comando
             )
 
         return canal
-
-    @app_commands.command(
-        name="ticket-painel",
-        description=(
-            "Publica o painel de abertura de tickets "
-            "(menu por categoria) neste canal."
-        ),
-    )
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def ticket_painel(
-        self,
-        interaction: discord.Interaction,
-    ):
-        config = await get_config(interaction.guild.id)
-
-        # Migração única para a lista oficial: remove categorias antigas,
-        # aplica Alianças e mantém somente as oito categorias aprovadas.
-        if not config.get("ticket_modelo_v3"):
-            await tickets.set_tipos(
-                interaction.guild.id,
-                list(tickets.TIPOS_PADRAO),
-            )
-            await set_config(
-                interaction.guild.id,
-                ticket_modelo_v2=True,
-                ticket_modelo_v3=True,
-            )
-            config = await get_config(interaction.guild.id)
-
-        # O painel oficial da NÊMESIS sempre fica no canal padrão de atendimento.
-        canal_id = TICKET_PAINEL_CANAL_ID
-        mensagem_id = config.get("ticket_painel_mensagem_id")
-        canal_painel = interaction.guild.get_channel(canal_id)
-        mensagem_painel = None
-
-        if canal_painel and mensagem_id:
-            try:
-                mensagem_painel = await canal_painel.fetch_message(int(mensagem_id))
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                mensagem_painel = None
-
-        if canal_painel is None:
-            await interaction.response.send_message(
-                f"Não encontrei o canal padrão <#{TICKET_PAINEL_CANAL_ID}>. "
-                "Verifique se o bot tem acesso a esse canal.",
-                ephemeral=True,
-            )
-            return
-
-        # Reutiliza o painel salvo. Se ele estava em outro canal ou foi
-        # apagado, publica uma nova mensagem no canal oficial configurado.
-        if mensagem_painel is not None and int(config.get("ticket_painel_canal_id") or 0) != canal_painel.id:
-            mensagem_painel = None
-
-        if mensagem_painel is None:
-            view = await _montar_select(interaction.guild.id)
-            embed = await _montar_embed_painel(interaction.guild.id)
-            mensagem_painel = await canal_painel.send(embed=embed, view=view)
-            await set_config(
-                interaction.guild.id,
-                ticket_painel_canal_id=canal_painel.id,
-                ticket_painel_mensagem_id=mensagem_painel.id,
-            )
-        else:
-            view = await _montar_select(interaction.guild.id)
-            embed = await _montar_embed_painel(interaction.guild.id)
-            await mensagem_painel.edit(embed=embed, view=view)
-
-        try:
-            await mensagem_painel.pin(reason="Painel oficial permanente de tickets NÊMESIS")
-        except (discord.Forbidden, discord.HTTPException):
-            pass
-
-        await interaction.response.send_message(
-            f"✅ Painel oficial configurado em {canal_painel.mention}. "
-            "A mensagem foi atualizada no mesmo local e será reutilizada nas próximas atualizações.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="ticket-painel-customizar",
-        description="Define título, descrição e banner do painel de tickets.",
-    )
-    @app_commands.describe(
-        titulo="Título do painel (deixe em branco pra manter o atual)",
-        descricao="Descrição do painel (deixe em branco pra manter a atual)",
-        banner="Imagem de banner (opcional)",
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def ticket_painel_customizar(
-        self,
-        interaction: discord.Interaction,
-        titulo: str = None,
-        descricao: str = None,
-        banner: discord.Attachment = None,
-    ):
-        campos = {}
-
-        if titulo is not None:
-            campos["ticket_painel_titulo"] = titulo
-
-        if descricao is not None:
-            campos["ticket_painel_descricao"] = descricao
-
-        if banner is not None:
-            campos["ticket_painel_banner_url"] = banner.url
-
-        if not campos:
-            await interaction.response.send_message(
-                "Você não passou nada pra alterar.",
-                ephemeral=True,
-            )
-            return
-
-        await set_config(
-            interaction.guild.id,
-            **campos,
-        )
-
-        await interaction.response.send_message(
-            "✅ Painel customizado. Rode `/ticket-painel` de novo "
-            "pra publicar a versão atualizada.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="ticket-painel-resetar",
-        description=(
-            "Volta o título, descrição e banner do painel pro padrão."
-        ),
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def ticket_painel_resetar(
-        self,
-        interaction: discord.Interaction,
-    ):
-        await set_config(
-            interaction.guild.id,
-            ticket_painel_titulo="",
-            ticket_painel_descricao="",
-            ticket_painel_banner_url="",
-        )
-
-        await interaction.response.send_message(
-            "✅ Painel restaurado pro padrão. "
-            "Rode `/ticket-painel` de novo pra publicar.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="ticket-tipo-adicionar",
-        description="Adiciona (ou atualiza) uma categoria de ticket no menu.",
-    )
-    @app_commands.describe(
-        label="Nome mostrado no menu",
-        descricao="Descrição curta (aparece embaixo do nome)",
-        emoji="Emoji da categoria (opcional)",
-        usa_ia="Se essa categoria usa a resposta automática por IA",
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def ticket_tipo_adicionar(
-        self,
-        interaction: discord.Interaction,
-        label: str,
-        descricao: str,
-        emoji: str = None,
-        usa_ia: bool = False,
-    ):
-        tipo = await tickets.adicionar_tipo(
-            interaction.guild.id,
-            label,
-            descricao,
-            emoji,
-            usa_ia,
-        )
-
-        await interaction.response.send_message(
-            f"✅ Categoria **{tipo['label']}** salva. "
-            "Rode `/ticket-painel` de novo pra atualizar o menu já publicado.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="ticket-tipo-remover",
-        description="Remove uma categoria de ticket do menu.",
-    )
-    @app_commands.describe(
-        valor="Identificador da categoria (aparece em /ticket-tipo-listar)"
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def ticket_tipo_remover(
-        self,
-        interaction: discord.Interaction,
-        valor: str,
-    ):
-        ok = await tickets.remover_tipo(
-            interaction.guild.id,
-            valor,
-        )
-
-        if not ok:
-            await interaction.response.send_message(
-                "Não achei nenhuma categoria com esse identificador.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.send_message(
-            "🗑️ Categoria removida. "
-            "Rode `/ticket-painel` de novo pra atualizar o menu.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="ticket-tipo-listar",
-        description="Lista as categorias de ticket configuradas.",
-    )
-    async def ticket_tipo_listar(
-        self,
-        interaction: discord.Interaction,
-    ):
-        tipos = await tickets.get_tipos(
-            interaction.guild.id
-        )
-
-        linhas = [
-            (
-                f"{t.get('emoji', '🎫')} **{t['label']}** "
-                f"(`{t['valor']}`) — IA: "
-                f"{'sim' if t['usa_ia'] else 'não'}"
-            )
-            for t in tipos
-        ]
-
-        embed = discord.Embed(
-            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE ATENDIMENTO",
-            description="\n".join(linhas),
-            color=0xB51F32,
-        )
-
-        await interaction.response.send_message(
-            embed=embed,
-            ephemeral=True,
-        )
 
     @commands.Cog.listener()
     async def on_interaction(
@@ -873,6 +628,20 @@ class Tickets(commands.GroupCog, group_name="ticket", group_description="Comando
         for guild in self.bot.guilds:
             try:
                 config = await get_config(guild.id)
+
+                # Migra o menu padrão sem exigir comandos administrativos.
+                if not config.get("ticket_modelo_v3"):
+                    await tickets.set_tipos(
+                        guild.id,
+                        list(tickets.TIPOS_PADRAO),
+                    )
+                    await set_config(
+                        guild.id,
+                        ticket_modelo_v2=True,
+                        ticket_modelo_v3=True,
+                    )
+                    config = await get_config(guild.id)
+
                 canal_id = TICKET_PAINEL_CANAL_ID
                 mensagem_id = config.get("ticket_painel_mensagem_id")
                 canal = guild.get_channel(int(canal_id))
