@@ -97,6 +97,69 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
     return dados
 
 
+async def reiniciar_temporada_global(agora: float | None = None) -> dict:
+    """Fecha a temporada atual e inicia outra sem apagar estatísticas acumuladas."""
+    import time
+
+    agora = float(agora or time.time())
+    dados = await carregar(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO.copy())
+    dados.setdefault("catalogo", [])
+    dados.setdefault("perfis", {})
+    estado = dados.get("temporada_global") or {}
+    inicio = float(estado.get("inicio_timestamp") or agora)
+    numero_atual = int(estado.get("numero", 1) or 1)
+
+    ordenados = sorted(
+        (
+            (str(uid), perfil)
+            for uid, perfil in dados["perfis"].items()
+            if isinstance(perfil, dict)
+        ),
+        key=lambda item: (
+            int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+            int(item[1].get("vitorias", 0) or 0),
+        ),
+        reverse=True,
+    )
+
+    historico = estado.setdefault("historico", [])
+    historico.append({
+        "numero": numero_atual,
+        "inicio_timestamp": inicio,
+        "fim_timestamp": agora,
+        "top": [
+            {
+                "discordId": uid,
+                "nome": perfil.get("nome", ""),
+                "pontos": int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0),
+                "xp": int(perfil.get("xp", 0) or 0),
+                "vitorias": int(perfil.get("vitorias", 0) or 0),
+                "derrotas": int(perfil.get("derrotas", 0) or 0),
+            }
+            for uid, perfil in ordenados[:LIMITE_TOP_GLOBAL]
+        ],
+    })
+
+    estado.update({
+        "numero": numero_atual + 1,
+        "inicio_timestamp": agora,
+        "duracao_dias": 30,
+        "historico": historico,
+    })
+
+    for perfil in dados["perfis"].values():
+        if not isinstance(perfil, dict):
+            continue
+        perfil["pontos_temporada"] = 0
+        perfil["em_top_global"] = False
+        perfil["ultima_verificacao_top_global"] = agora
+        perfil.setdefault("tempo_top_global_segundos", 0)
+
+    dados["temporada_global"] = estado
+    await salvar(ARQUIVO_COMPETITIVO, dados)
+    return dados
+
+
 async def registrar_tempo_top_global(agora: float | None = None, limite: int = 10) -> dict:
     """Acumula tempo apenas durante intervalos em que o perfil permaneceu no Top 10."""
     import time
