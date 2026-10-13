@@ -524,16 +524,12 @@ class ProgressaoGangue(commands.Cog):
         if len(motivo.strip()) < 5 or len(motivo) > 300:
             await interaction.response.send_message("Informe um motivo entre 5 e 300 caracteres.", ephemeral=True)
             return
-        perfil = await self._perfil(interaction.guild.id, membro.id)
-        rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
-        perfil["xp"] = int(perfil.get("xp", 0)) + int(quantidade)
-        if atividade.value == "missao":
-            perfil["missoes"] = int(perfil.get("missoes", 0)) + 1
-        elif atividade.value == "guerra":
-            perfil["guerras"] = int(perfil.get("guerras", 0)) + 1
-        rank_novo = rank_por_xp(perfil["xp"])
-        perfil["rank_no"] = rank_novo["no"]
-        await self._atualizar_perfil(interaction.guild.id, membro.id, perfil)
+        perfil, rank_antigo, rank_novo, aplicada = await self._registrar_xp_atomico(
+            interaction.guild.id,
+            membro.id,
+            int(quantidade),
+            tipo=atividade.value,
+        )
         await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
         if rank_novo["no"] != rank_antigo["no"]:
             await self._anunciar_rank(interaction.guild, membro, rank_novo, perfil["xp"])
