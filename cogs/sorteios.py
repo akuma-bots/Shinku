@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 import random
@@ -22,6 +23,59 @@ def timestamp_discord(
     formato: str = "F",
 ) -> str:
     return f"<t:{int(timestamp)}:{formato}>"
+
+
+# Serializa alterações de participantes dentro do processo para evitar que
+# cliques simultâneos sobrescrevam inscrições umas das outras.
+_SORTEIOS_LOCK = asyncio.Lock()
+
+
+async def _registrar_participacao(
+    sorteio_id: str | None,
+    usuario_id: int,
+    mensagem_id: int | None = None,
+) -> tuple[str, dict | None]:
+    async with _SORTEIOS_LOCK:
+        todos = await carregar(ARQUIVO, {})
+        if not isinstance(todos, dict):
+            return "indisponivel", None
+
+        sorteio = todos.get(str(sorteio_id)) if sorteio_id else None
+        if sorteio is None and mensagem_id is not None:
+            sorteio = next(
+                (
+                    item for item in todos.values()
+                    if str(item.get("mensagem_id")) == str(mensagem_id)
+                ),
+                None,
+            )
+
+        if not isinstance(sorteio, dict):
+            return "nao_encontrado", None
+        if mensagem_id is not None and str(sorteio.get("mensagem_id")) != str(mensagem_id):
+            return "mensagem_invalida", None
+        if sorteio.get("encerrado"):
+            return "encerrado", sorteio
+        try:
+            fim = float(sorteio.get("fim", 0) or 0)
+        except (TypeError, ValueError):
+            return "indisponivel", sorteio
+        if time.time() >= fim:
+            return "expirado", sorteio
+
+        participantes = sorteio.get("participantes")
+        if not isinstance(participantes, list):
+            participantes = []
+            sorteio["participantes"] = participantes
+
+        if any(str(uid) == str(usuario_id) for uid in participantes):
+            return "duplicado", sorteio
+
+        participantes.append(int(usuario_id))
+        sorteio["atualizado_em"] = time.time()
+        todos[str(sorteio["id"])] = sorteio
+        await salvar(ARQUIVO, todos)
+        return "ok", sorteio
 
 
 class BotaoParticipar(discord.ui.View):
@@ -133,50 +187,25 @@ class BotaoParticipar(discord.ui.View):
             )
             return
 
-        if sorteio.get("encerrado"):
+        status, sorteio = await _registrar_participacao(
+            str(sorteio.get("id")),
+            interaction.user.id,
+            mensagem_id=interaction.message.id,
+        )
+        mensagens = {
+            "nao_encontrado": "Não foi possível encontrar este sorteio.",
+            "mensagem_invalida": "Este botão não pertence a este sorteio.",
+            "encerrado": "Este sorteio já foi encerrado.",
+            "expirado": "O período de participação deste sorteio já terminou.",
+            "duplicado": "Você já está participando deste sorteio.",
+            "indisponivel": "Não foi possível registrar sua participação agora.",
+        }
+        if status != "ok":
             await interaction.response.send_message(
-                "Este sorteio já foi encerrado.",
+                mensagens.get(status, "Não foi possível registrar sua participação."),
                 ephemeral=True,
             )
             return
-
-        fim = float(
-            sorteio.get(
-                "fim",
-                0,
-            )
-        )
-
-        if time.time() >= fim:
-            await interaction.response.send_message(
-                "O período de participação deste sorteio já terminou.",
-                ephemeral=True,
-            )
-            return
-
-        participantes = sorteio.setdefault(
-            "participantes",
-            [],
-        )
-
-        usuario_id = interaction.user.id
-
-        if usuario_id in participantes:
-            await interaction.response.send_message(
-                "Você já está participando deste sorteio.",
-                ephemeral=True,
-            )
-            return
-
-        participantes.append(
-            usuario_id
-        )
-
-        sorteio["atualizado_em"] = time.time()
-
-        await self.salvar_sorteio(
-            sorteio
-        )
 
         await interaction.response.send_message(
             "✓ Você entrou no sorteio. Boa sorte!",
@@ -620,55 +649,29 @@ class Sorteios(commands.Cog):
         # BOTÃO: PARTICIPAR
         # =====================================================
 
-        if sorteio.get("encerrado"):
+        status, sorteio = await _registrar_participacao(
+            str(sorteio.get("id")),
+            interaction.user.id,
+            mensagem_id=interaction.message.id,
+        )
+        mensagens = {
+            "nao_encontrado": "Não foi possível encontrar este sorteio.",
+            "mensagem_invalida": "Este botão não pertence a este sorteio.",
+            "encerrado": "Este sorteio já foi encerrado.",
+            "expirado": "O sorteio terminou; o encerramento automático será processado.",
+            "duplicado": "Você já está participando deste sorteio.",
+            "indisponivel": "Não foi possível registrar sua participação agora.",
+        }
+        if status == "expirado":
+            await self.sortear_vencedores(sorteio)
+            await interaction.response.send_message(mensagens[status], ephemeral=True)
+            return
+        if status != "ok":
             await interaction.response.send_message(
-                "Este sorteio já foi encerrado.",
+                mensagens.get(status, "Não foi possível registrar sua participação."),
                 ephemeral=True,
             )
             return
-
-        fim = float(
-            sorteio.get(
-                "fim",
-                0,
-            )
-        )
-
-        if time.time() >= fim:
-            await self.sortear_vencedores(
-                sorteio
-            )
-
-            await interaction.response.send_message(
-                "O sorteio acabou e os vencedores foram selecionados.",
-                ephemeral=True,
-            )
-
-            return
-
-        participantes = sorteio.setdefault(
-            "participantes",
-            [],
-        )
-
-        usuario_id = interaction.user.id
-
-        if usuario_id in participantes:
-            await interaction.response.send_message(
-                "Você já está participando deste sorteio.",
-                ephemeral=True,
-            )
-            return
-
-        participantes.append(
-            usuario_id
-        )
-
-        sorteio["atualizado_em"] = time.time()
-
-        await self.salvar_sorteio(
-            sorteio
-        )
 
         try:
             await interaction.message.edit(
