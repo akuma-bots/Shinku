@@ -45,7 +45,8 @@ async def _registrar_participacao(
             sorteio = next(
                 (
                     item for item in todos.values()
-                    if str(item.get("mensagem_id")) == str(mensagem_id)
+                    if isinstance(item, dict)
+                    and str(item.get("mensagem_id")) == str(mensagem_id)
                 ),
                 None,
             )
@@ -1028,6 +1029,9 @@ class Sorteios(commands.Cog):
         ativos = []
 
         for sorteio in todos.values():
+
+            if not isinstance(sorteio, dict):
+                continue
 
             if (
                 str(
