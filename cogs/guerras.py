@@ -536,13 +536,14 @@ class Guerras(commands.Cog):
         if not motivo or len(motivo) > 500:
             await interaction.response.send_message("Informe um motivo de até 500 caracteres.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         dados = await self._dados_guild(interaction.guild.id)
         registro = next((g for g in dados.get("guerras", []) if str(g.get("id", "")).upper() == codigo.strip().upper()), None)
         if not registro:
-            await interaction.response.send_message("Não encontrei uma guerra com esse código.", ephemeral=True)
+            await interaction.followup.send("Não encontrei uma guerra com esse código.", ephemeral=True)
             return
         if registro.get("status") != "ativa":
-            await interaction.response.send_message("Só é possível cancelar guerras em andamento.", ephemeral=True)
+            await interaction.followup.send("Só é possível cancelar guerras em andamento.", ephemeral=True)
             return
         registro["status"] = "cancelada"
         registro["resultado"] = "CANCELADA"
@@ -561,9 +562,9 @@ class Guerras(commands.Cog):
         try:
             await canal.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
-            await interaction.response.send_message("Guerra cancelada no histórico, mas não consegui publicar o aviso.", ephemeral=True)
+            await interaction.followup.send("Guerra cancelada no histórico, mas não consegui publicar o aviso.", ephemeral=True)
             return
-        await interaction.response.send_message(f"Guerra {registro['id']} cancelada. O registro foi preservado para auditoria.", ephemeral=True)
+        await interaction.followup.send(f"Guerra {registro['id']} cancelada. O registro foi preservado para auditoria.", ephemeral=True)
 
     @app_commands.command(
         name="guerra-remover",
