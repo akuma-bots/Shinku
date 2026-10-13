@@ -164,7 +164,7 @@ class Guerras(commands.Cog):
         if prova_url:
             embed.add_field(name="PROVA DO RESULTADO", value=f"[Abrir evidência]({prova_url.strip()})", inline=False)
         regras_atuais = dados.get("regras") or REGRAS_PADRAO
-        regras_no_relatorio = "\\n".join(
+        regras_no_relatorio = "\n".join(
             f"{i}. {regra}" for i, regra in enumerate(regras_atuais, 1)
         )[:1000]
         embed.add_field(
@@ -346,6 +346,181 @@ class Guerras(commands.Cog):
             color=COR_NEMESIS,
         )
         await interaction.response.send_message(embed=embed)
+
+
+    @app_commands.command(name="guerra-iniciar", description="Abre uma guerra e permite acompanhar o placar até o encerramento.")
+    @app_commands.describe(gangue_inimiga="Nome da gangue adversária", formato="Formato combinado", observacoes="Observações iniciais")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def guerra_iniciar(self, interaction: discord.Interaction, gangue_inimiga: str, formato: str = None, observacoes: str = None):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        nome = gangue_inimiga.strip()
+        if not nome or len(nome) > 80 or nome.casefold() in {"nêmesis", "nemesis", "n̷êmesis"}:
+            await interaction.response.send_message("Informe uma gangue adversária válida, com até 80 caracteres.", ephemeral=True)
+            return
+        if formato and len(formato.strip()) > 100:
+            await interaction.response.send_message("O formato pode ter até 100 caracteres.", ephemeral=True)
+            return
+        if observacoes and len(observacoes.strip()) > 800:
+            await interaction.response.send_message("As observações podem ter até 800 caracteres.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        dados = await self._dados_guild(interaction.guild.id)
+        ativa = next((g for g in dados["guerras"] if g.get("status") == "ativa" and str(g.get("gangue_inimiga", "")).casefold() == nome.casefold()), None)
+        if ativa:
+            await interaction.followup.send(f"Já existe uma guerra ativa contra {discord.utils.escape_markdown(nome)} (código {ativa.get('id')}).", ephemeral=True)
+            return
+        codigo, agora = uuid.uuid4().hex[:8].upper(), time.time()
+        registro = {
+            "id": codigo, "guild_id": interaction.guild.id, "gangue_a": "NÊMESIS",
+            "gangue_b": nome, "gangue_inimiga": nome, "placar_a": 0, "placar_b": 0,
+            "placar_nemesis": 0, "placar_inimiga": 0, "resultado": "EM ANDAMENTO",
+            "vencedor": None, "prova_url": None, "formato": formato.strip()[:100] if formato else None,
+            "observacoes": observacoes.strip()[:800] if observacoes else None,
+            "temporada": dados.get("temporada_atual", 1), "registrado_por_id": interaction.user.id,
+            "timestamp": agora, "iniciado_em": agora, "status": "ativa",
+        }
+        dados["guerras"].append(registro)
+        await self._salvar_dados_guild(interaction.guild.id, dados)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA INICIADA",
+            description=f"**NÊMESIS**  **0 × 0**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{codigo}**",
+            color=COR_NEMESIS, timestamp=discord.utils.utcnow())
+        if formato:
+            embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(formato.strip()[:100]), inline=True)
+        if observacoes:
+            embed.add_field(name="OBSERVAÇÕES", value=discord.utils.escape_markdown(observacoes.strip()[:800]), inline=False)
+        embed.set_footer(text=f"Temporada {registro['temporada']} • Aberta por {interaction.user}")
+        canal = await self._canal_guerras(interaction)
+        try:
+            mensagem = await canal.send(embed=embed)
+            registro["mensagem_id"], registro["canal_id"] = mensagem.id, canal.id
+            await self._salvar_dados_guild(interaction.guild.id, dados)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send(f"A guerra {codigo} foi salva, mas não consegui publicar no canal. Confira as permissões do bot.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Guerra aberta contra **{discord.utils.escape_markdown(nome)}**. Código: **{codigo}**. Use /guerra-placar para atualizar e /guerra-encerrar ao finalizar.", ephemeral=True)
+
+    @app_commands.command(name="guerra-placar", description="Atualiza o placar de uma guerra em andamento.")
+    @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar atual da NÊMESIS", placar_inimiga="Placar atual da gangue adversária", observacoes="Observação opcional")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def guerra_placar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], observacoes: str = None):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        if observacoes and len(observacoes.strip()) > 500:
+            await interaction.response.send_message("A observação pode ter até 500 caracteres.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        dados = await self._dados_guild(interaction.guild.id)
+        registro = next((g for g in dados["guerras"] if str(g.get("id", "")).upper() == codigo.strip().upper()), None)
+        if not registro:
+            await interaction.followup.send("Não encontrei uma guerra com esse código.", ephemeral=True)
+            return
+        if registro.get("status") != "ativa":
+            await interaction.followup.send("Essa guerra não está ativa. O placar não foi alterado.", ephemeral=True)
+            return
+        registro["placar_a"] = registro["placar_nemesis"] = int(placar_nemesis)
+        registro["placar_b"] = registro["placar_inimiga"] = int(placar_inimiga)
+        registro["resultado"] = "EM ANDAMENTO"
+        registro["atualizado_em"] = time.time()
+        if observacoes and observacoes.strip():
+            registro["ultima_observacao"] = observacoes.strip()[:500]
+        await self._salvar_dados_guild(interaction.guild.id, dados)
+        nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ PLACAR ATUALIZADO",
+            description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{registro['id']}**",
+            color=COR_NEMESIS, timestamp=discord.utils.utcnow())
+        if registro.get("formato"):
+            embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(registro["formato"]), inline=True)
+        if registro.get("ultima_observacao"):
+            embed.add_field(name="ATUALIZAÇÃO", value=discord.utils.escape_markdown(registro["ultima_observacao"]), inline=False)
+        embed.set_footer(text=f"Atualizado por {interaction.user} • Temporada {registro.get('temporada', 1)}")
+        canal = await self._canal_guerras(interaction)
+        try:
+            mensagem = await canal.send(embed=embed)
+            registro["ultima_mensagem_id"] = mensagem.id
+            await self._salvar_dados_guild(interaction.guild.id, dados)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send("Placar salvo no histórico, mas não consegui publicar a atualização.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Placar da guerra {registro['id']} atualizado e publicado.", ephemeral=True)
+
+    @app_commands.command(name="guerra-encerrar", description="Encerra uma guerra ativa e publica o resultado definitivo.")
+    @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar final da NÊMESIS", placar_inimiga="Placar final da gangue adversária", prova_url="Link da prova (opcional)", observacoes="Observações finais (opcional)")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def guerra_encerrar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], prova_url: str = None, observacoes: str = None):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        if prova_url and not re.match(r"^https?://\S+$", prova_url.strip(), re.IGNORECASE):
+            await interaction.response.send_message("O link da prova precisa começar com http:// ou https://.", ephemeral=True)
+            return
+        if observacoes and len(observacoes.strip()) > 800:
+            await interaction.response.send_message("As observações podem ter até 800 caracteres.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        dados = await self._dados_guild(interaction.guild.id)
+        registro = next((g for g in dados["guerras"] if str(g.get("id", "")).upper() == codigo.strip().upper()), None)
+        if not registro:
+            await interaction.followup.send("Não encontrei uma guerra com esse código.", ephemeral=True)
+            return
+        if registro.get("status") != "ativa":
+            await interaction.followup.send("Essa guerra já foi encerrada ou não está ativa.", ephemeral=True)
+            return
+        resultado = _resultado(int(placar_nemesis), int(placar_inimiga))
+        nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
+        registro["placar_a"] = registro["placar_nemesis"] = int(placar_nemesis)
+        registro["placar_b"] = registro["placar_inimiga"] = int(placar_inimiga)
+        registro["resultado"] = resultado
+        registro["vencedor"] = "NÊMESIS" if placar_nemesis > placar_inimiga else (nome if placar_inimiga > placar_nemesis else "Empate")
+        registro["prova_url"] = prova_url.strip() if prova_url else registro.get("prova_url")
+        if observacoes and observacoes.strip():
+            registro["observacoes_finais"] = observacoes.strip()[:800]
+        registro["status"], registro["encerrado_em"], registro["encerrado_por_id"] = "finalizada", time.time(), interaction.user.id
+        await self._salvar_dados_guild(interaction.guild.id, dados)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA ENCERRADA",
+            description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\n**RESULTADO FINAL: {resultado}**\nVencedor: **{discord.utils.escape_markdown(registro['vencedor'])}**\nCódigo: **{registro['id']}**",
+            color=COR_NEMESIS if placar_nemesis >= placar_inimiga else 0x555555, timestamp=discord.utils.utcnow())
+        if registro.get("formato"):
+            embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(registro["formato"]), inline=True)
+        if registro.get("prova_url"):
+            embed.add_field(name="PROVA DO RESULTADO", value=f"[Abrir evidência]({registro['prova_url']})", inline=False)
+        if registro.get("observacoes_finais"):
+            embed.add_field(name="OBSERVAÇÕES FINAIS", value=discord.utils.escape_markdown(registro["observacoes_finais"]), inline=False)
+        regras = dados.get("regras") or REGRAS_PADRAO
+        embed.add_field(name="REGRAS APLICÁVEIS", value="\n".join(f"{i}. {regra}" for i, regra in enumerate(regras, 1))[:1000], inline=False)
+        embed.set_footer(text=f"Encerrada por {interaction.user} • Temporada {registro.get('temporada', 1)}")
+        canal = await self._canal_guerras(interaction)
+        try:
+            mensagem = await canal.send(embed=embed)
+            registro["mensagem_final_id"], registro["canal_id"] = mensagem.id, canal.id
+            await self._salvar_dados_guild(interaction.guild.id, dados)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.followup.send(f"Guerra encerrada e salva como {resultado}, mas não consegui publicar o relatório final.", ephemeral=True)
+            return
+        await interaction.followup.send(f"Guerra {registro['id']} encerrada. Resultado: **{resultado}**.", ephemeral=True)
+
+    @app_commands.command(name="guerra-em-andamento", description="Lista os confrontos que ainda estão ativos.")
+    async def guerra_em_andamento(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        dados = await self._dados_guild(interaction.guild.id)
+        ativas = [g for g in dados.get("guerras", []) if g.get("status") == "ativa"]
+        ativas.sort(key=lambda g: g.get("iniciado_em", g.get("timestamp", 0)))
+        if not ativas:
+            await interaction.response.send_message("Não há guerras em andamento.", ephemeral=True)
+            return
+        linhas = []
+        for guerra in ativas[:15]:
+            nome = guerra.get("gangue_inimiga", guerra.get("gangue_b", "Gangue desconhecida"))
+            pn = guerra.get("placar_nemesis", guerra.get("placar_a", 0))
+            pi = guerra.get("placar_inimiga", guerra.get("placar_b", 0))
+            linhas.append(f"**{guerra.get('id', 'SEM-ID')}** — NÊMESIS **{pn} × {pi}** **{discord.utils.escape_markdown(nome)}**")
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRAS EM ANDAMENTO", description="\n".join(linhas), color=COR_NEMESIS)
+        embed.set_footer(text=f"{len(ativas)} guerra(s) ativa(s)")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="guerra-remover",
