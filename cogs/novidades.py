@@ -1,0 +1,146 @@
+import asyncio
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
+
+import discord
+from discord.ext import commands
+
+from utils.storage import carregar, salvar
+
+
+logger = logging.getLogger(__name__)
+ARQUIVO_INSCRITOS = "avisos_privados.json"
+ARQUIVO_ESTADO = "novidades_automaticas.json"
+CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
+INTERVALO_ENVIO = 1.0
+
+
+class Novidades(commands.Cog):
+    """Entrega uma vez cada release aos membros que optaram por receber DMs."""
+
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self._lock = asyncio.Lock()
+        self._processando = False
+
+    def _ler_release(self) -> dict | None:
+        try:
+            release = json.loads(CAMINHO_RELEASE.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            logger.warning("Manifesto de novidades não encontrado: %s", CAMINHO_RELEASE)
+            return None
+        except (OSError, json.JSONDecodeError):
+            logger.exception("Não foi possível ler o manifesto de novidades.")
+            return None
+
+        if not isinstance(release, dict):
+            return None
+        release_id = str(release.get("release_id", "")).strip()
+        titulo = str(release.get("titulo", "")).strip()
+        mensagem = str(release.get("mensagem", "")).strip()
+        if not release_id or not titulo or not mensagem:
+            logger.error("Manifesto de novidades incompleto; release_id, titulo e mensagem são obrigatórios.")
+            return None
+        return {
+            "release_id": release_id[:100],
+            "titulo": titulo[:200],
+            "mensagem": mensagem[:3500],
+            "tipo": str(release.get("tipo", "Sistemas novos"))[:100],
+        }
+
+    async def _anunciar_release(self, guild: discord.Guild):
+        async with self._lock:
+            if self._processando:
+                return
+            self._processando = True
+            try:
+                release = self._ler_release()
+                if release is None:
+                    return
+
+                inscricoes = await carregar(ARQUIVO_INSCRITOS, {"guilds": {}})
+                estado_guild = inscricoes.get("guilds", {}).get(str(guild.id), {})
+                inscritos = estado_guild.get("inscritos", [])
+                if not isinstance(inscritos, list) or not inscritos:
+                    logger.info("Release %s sem inscritos em avisos privados.", release["release_id"])
+                    return
+
+                estados = await carregar(ARQUIVO_ESTADO, {"guilds": {}})
+                if not isinstance(estados, dict):
+                    estados = {"guilds": {}}
+                estados.setdefault("guilds", {})
+                guild_estado = estados["guilds"].setdefault(str(guild.id), {})
+                release_estado = guild_estado.setdefault(release["release_id"], {
+                    "processados": [],
+                    "concluido": False,
+                })
+                if release_estado.get("concluido"):
+                    return
+
+                processados = set(str(uid) for uid in release_estado.get("processados", []))
+                embed = discord.Embed(
+                    title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — {release['tipo']} · {release['titulo']}",
+                    description=release["mensagem"],
+                    color=0xB3132B,
+                    timestamp=datetime.now(timezone.utc),
+                )
+                embed.set_footer(text="NÊMESIS • Novidades automáticas | /avisos-privados para gerenciar recebimento")
+
+                houve_falha_storage = False
+                for user_id in inscritos:
+                    uid = str(user_id)
+                    if uid in processados:
+                        continue
+
+                    try:
+                        membro = guild.get_member(int(uid))
+                        if membro is None:
+                            membro = await guild.fetch_member(int(uid))
+                        await membro.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                    except discord.Forbidden:
+                        logger.info("DM indisponível para inscrito %s; marcado como processado.", uid)
+                    except discord.NotFound:
+                        logger.info("Inscrito %s não está mais no servidor.", uid)
+                    except (discord.HTTPException, ValueError, TypeError):
+                        logger.exception("Falha ao entregar novidade ao usuário %s.", uid)
+                    except Exception:
+                        logger.exception("Erro inesperado ao entregar novidade ao usuário %s.", uid)
+
+                    processados.add(uid)
+                    release_estado["processados"] = sorted(processados)
+                    guild_estado[release["release_id"]] = release_estado
+                    estados["guilds"][str(guild.id)] = guild_estado
+                    try:
+                        await salvar(ARQUIVO_ESTADO, estados)
+                    except Exception:
+                        houve_falha_storage = True
+                        logger.exception("Falha ao persistir checkpoint do release %s.", release["release_id"])
+                        break
+                    await asyncio.sleep(INTERVALO_ENVIO)
+
+                if not houve_falha_storage and all(str(uid) in processados for uid in inscritos):
+                    release_estado["concluido"] = True
+                    release_estado["concluido_em"] = datetime.now(timezone.utc).isoformat()
+                    guild_estado[release["release_id"]] = release_estado
+                    estados["guilds"][str(guild.id)] = guild_estado
+                    await salvar(ARQUIVO_ESTADO, estados)
+                    logger.info("Entrega do release %s concluída para os inscritos.", release["release_id"])
+            except Exception:
+                logger.exception("Falha ao processar release automático da NÊMESIS.")
+            finally:
+                self._processando = False
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        guild_id = getattr(self.bot, "nemesis_guild_id", None)
+        if guild_id is None:
+            return
+        guild = self.bot.get_guild(int(guild_id))
+        if guild is not None:
+            await self._anunciar_release(guild)
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Novidades(bot))
