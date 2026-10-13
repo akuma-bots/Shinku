@@ -258,7 +258,7 @@ def _view_resposta(resposta_id: str) -> discord.ui.View:
     return view
 
 
-class Formularios(commands.Cog):
+class Formularios(commands.GroupCog, group_name="formularios", group_description="Gerenciamento dos formulários da NÊMESIS"):
     """Sistema de formulários/candidaturas por páginas: cada formulário tem
     seu painel customizável (título, descrição, banner) e é dividido em
     páginas de até 5 perguntas — o bot encadeia os modais automaticamente
@@ -464,7 +464,7 @@ class Formularios(commands.Cog):
                         logging.exception("Falha ao enviar candidatura %s por DM.", resposta.get("id"))
                         break
 
-    @app_commands.command(name="formulario-criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
+    @app_commands.command(name="criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
     @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
                             titulo_painel="Título mostrado no painel", descricao_painel="Descrição mostrada no painel",
                             banner="Imagem de banner do painel (opcional)")
@@ -477,14 +477,14 @@ class Formularios(commands.Cog):
         )
         await interaction.response.send_message(
             f"✅ Formulário **{nome}** criado (ID: `{formulario['id']}`). "
-            f"Agora use `/formulario-pagina-adicionar` pra adicionar as perguntas (até 5 por página, "
-            f"quantas páginas quiser), depois `/formulario-cargo-adicionar` e `/formulario-painel`.",
+            f"Agora use `/formularios pagina-adicionar` pra adicionar as perguntas (até 5 por página, "
+            f"quantas páginas quiser), depois `/formularios cargo-adicionar` e `/formularios painel`.",
             ephemeral=True,
         )
 
-    @app_commands.command(name="formulario-pagina-adicionar", description="Adiciona uma página de perguntas (até 5) a um formulário.")
+    @app_commands.command(name="pagina-adicionar", description="Adiciona uma página de perguntas (até 5) a um formulário.")
     @app_commands.describe(
-        formulario_id="ID do formulário (aparece em /formulario-listar)",
+        formulario_id="ID do formulário (aparece em /formularios listar)",
         pergunta1="1ª pergunta desta página", pergunta2="2ª pergunta (opcional)",
         pergunta3="3ª pergunta (opcional)", pergunta4="4ª pergunta (opcional)", pergunta5="5ª pergunta (opcional)",
     )
@@ -502,7 +502,7 @@ class Formularios(commands.Cog):
             f"Total agora: {len(formulario['paginas'])} página(s).", ephemeral=True,
         )
 
-    @app_commands.command(name="formulario-pagina-remover", description="Remove uma página de um formulário.")
+    @app_commands.command(name="pagina-remover", description="Remove uma página de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário", numero_pagina="Número da página (1, 2, 3...) — veja em /formulario-paginas-listar")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_pagina_remover(self, interaction: discord.Interaction, formulario_id: str, numero_pagina: int):
@@ -512,7 +512,7 @@ class Formularios(commands.Cog):
             return
         await interaction.response.send_message(f"🗑️ Página {numero_pagina} removida.", ephemeral=True)
 
-    @app_commands.command(name="formulario-paginas-listar", description="Lista as páginas e perguntas de um formulário.")
+    @app_commands.command(name="paginas-listar", description="Lista as páginas e perguntas de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_paginas_listar(self, interaction: discord.Interaction, formulario_id: str):
@@ -535,7 +535,7 @@ class Formularios(commands.Cog):
         embed = discord.Embed(title=f"📋 Páginas — {formulario['nome']}", description="\n\n".join(blocos), color=0xB51F32)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="formulario-listar", description="Lista os formulários configurados.")
+    @app_commands.command(name="listar", description="Lista os formulários configurados.")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_listar(self, interaction: discord.Interaction):
         lista = await formularios.listar_formularios(interaction.guild.id)
@@ -551,8 +551,8 @@ class Formularios(commands.Cog):
         embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE FORMULÁRIOS", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="formulario-remover", description="Remove um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário (aparece em /formulario-listar)")
+    @app_commands.command(name="remover", description="Remove um formulário.")
+    @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_remover(self, interaction: discord.Interaction, formulario_id: str):
         ok = await formularios.remover_formulario(interaction.guild.id, formulario_id)
@@ -561,7 +561,7 @@ class Formularios(commands.Cog):
             return
         await interaction.response.send_message("🗑️ Formulário removido.", ephemeral=True)
 
-    @app_commands.command(name="formulario-cargo-adicionar", description="Adiciona um cargo que recebe as candidaturas por DM.")
+    @app_commands.command(name="cargo-adicionar", description="Adiciona um cargo que recebe as candidaturas por DM.")
     @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo que vai receber as candidaturas")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_cargo_adicionar(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
@@ -571,7 +571,7 @@ class Formularios(commands.Cog):
             return
         await interaction.response.send_message(f"✅ {cargo.mention} agora recebe candidaturas desse formulário.", ephemeral=True)
 
-    @app_commands.command(name="formulario-cargo-remover", description="Remove um cargo da lista de notificação de um formulário.")
+    @app_commands.command(name="cargo-remover", description="Remove um cargo da lista de notificação de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo a remover")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_cargo_remover(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
@@ -581,8 +581,8 @@ class Formularios(commands.Cog):
             return
         await interaction.response.send_message(f"✅ {cargo.mention} não recebe mais candidaturas desse formulário.", ephemeral=True)
 
-    @app_commands.command(name="formulario-painel", description="Publica o painel de um formulário neste canal.")
-    @app_commands.describe(formulario_id="ID do formulário (aparece em /formulario-listar)")
+    @app_commands.command(name="painel", description="Publica o painel de um formulário neste canal.")
+    @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_painel(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
@@ -591,7 +591,7 @@ class Formularios(commands.Cog):
             return
         if not formulario["paginas"]:
             await interaction.response.send_message(
-                "Esse formulário ainda não tem nenhuma pergunta. Use `/formulario-pagina-adicionar` primeiro.",
+                "Esse formulário ainda não tem nenhuma pergunta. Use `/formularios pagina-adicionar` primeiro.",
                 ephemeral=True,
             )
             return
