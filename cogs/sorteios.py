@@ -446,7 +446,8 @@ class Sorteios(commands.Cog):
             encerrado=encerrado,
         )
 
-    # =========================================================    # VIEW DO DASHBOARD
+    # =========================================================
+    # VIEW DO DASHBOARD
     # =========================================================
 
     def criar_view_site(
@@ -895,7 +896,8 @@ class Sorteios(commands.Cog):
         self,
         sorteio: dict,
     ):
-        try:            canal_id = int(sorteio.get("canal_id") or 0)
+        try:
+            canal_id = int(sorteio.get("canal_id") or 0)
         except (TypeError, ValueError):
             return
 
@@ -922,12 +924,12 @@ class Sorteios(commands.Cog):
         ):
             return
 
-        quantidade = len(
-            sorteio.get(
-                "participantes",
-                [],
-            )
-        )
+        participantes = sorteio.get("participantes", [])
+        if not isinstance(participantes, list):
+            participantes = []
+        # Dados antigos ou corrompidos não devem derrubar a renderização.
+        sorteio["participantes"] = participantes
+        quantidade = len(participantes)
 
         # Sorteios vindos do Dashboard utilizam
         # os custom_ids vinculados ao ID do sorteio.
