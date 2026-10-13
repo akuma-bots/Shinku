@@ -5,6 +5,8 @@ from utils.storage import carregar
 from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_patente, kdr, ARQUIVO_PERFIS
 from utils.competitivo_sync import ARQUIVO_COMPETITIVO
 
+ARQUIVO_VINCULOS_ROBLOX = "roblox_vinculos.json"
+
 
 class Perfil(commands.Cog):
     """Perfil do jogador (patente, vitórias, derrotas, KDR, medalhas),
@@ -19,8 +21,19 @@ class Perfil(commands.Cog):
     @app_commands.describe(membro="De quem ver o perfil (padrão: você mesmo)")
     async def perfil(self, interaction: discord.Interaction, membro: discord.Member = None):
         alvo = membro or interaction.user
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Use este comando dentro do servidor da NÊMESIS.", ephemeral=True
+            )
+            return
+
         p = await get_perfil(interaction.guild.id, alvo.id)
         patentes = await get_patentes(interaction.guild.id)
+        vinculos_roblox = await carregar(ARQUIVO_VINCULOS_ROBLOX, {})
+        vinculo_roblox = (
+            vinculos_roblox.get(str(interaction.guild.id), {}).get(str(alvo.id), {})
+            if isinstance(vinculos_roblox, dict) else {}
+        )
 
         competitivo = await carregar(
             ARQUIVO_COMPETITIVO,
@@ -74,6 +87,20 @@ class Perfil(commands.Cog):
         embed.add_field(name="Sequência atual / recorde", value=f"{p['sequencia_atual']} / {p['maior_sequencia']}", inline=True)
         if p["kills"] or p["deaths"]:
             embed.add_field(name="KDR (PvP)", value=f"{kdr(p)} ({p['kills']}/{p['deaths']})", inline=True)
+        if isinstance(vinculo_roblox, dict) and vinculo_roblox.get("roblox_id") and vinculo_roblox.get("roblox_username"):
+            roblox_id = int(vinculo_roblox["roblox_id"])
+            nome_roblox = str(vinculo_roblox["roblox_username"])[:100]
+            embed.add_field(
+                name="◈ CONTA ROBLOX VERIFICADA",
+                value=f"**{discord.utils.escape_markdown(nome_roblox)}** · [Abrir perfil](https://www.roblox.com/users/{roblox_id}/profile)",
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="◈ CONTA ROBLOX",
+                value="Não vinculada · use /roblox-vincular para verificar sua conta.",
+                inline=False,
+            )
         embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
 
         await interaction.response.send_message(embed=embed)
