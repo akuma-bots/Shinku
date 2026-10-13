@@ -359,32 +359,6 @@ class ProgressaoGangue(commands.Cog):
         embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING DA GANGUE", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="gangue-adicionar-xp", description="Adiciona XP de progressão a um membro.")
-    @app_commands.describe(membro="Membro que receberá XP", quantidade="Quantidade de XP", motivo="Motivo do reconhecimento")
-    @app_commands.default_permissions(manage_guild=True)
-    async def gangue_adicionar_xp(self, interaction: discord.Interaction, membro: discord.Member, quantidade: app_commands.Range[int, 1, 10000], motivo: str):
-        if interaction.guild is None:
-            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
-            return
-        if len(motivo.strip()) < 5 or len(motivo) > 300:
-            await interaction.response.send_message("Informe um motivo entre 5 e 300 caracteres.", ephemeral=True)
-            return
-        perfil = await self._perfil(interaction.guild.id, membro.id)
-        rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
-        perfil["xp"] = int(perfil.get("xp", 0)) + int(quantidade)
-        rank_novo = rank_por_xp(perfil["xp"])
-        perfil["rank_no"] = rank_novo["no"]
-        await self._atualizar_perfil(interaction.guild.id, membro.id, perfil)
-        await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
-        if rank_novo["no"] != rank_antigo["no"]:
-            await self._anunciar_rank(interaction.guild, membro, rank_novo, perfil["xp"])
-        await interaction.response.send_message(
-            f"XP registrado para {membro.mention}: **+{quantidade} XP**.\n"
-            f"**Motivo:** {discord.utils.escape_markdown(motivo)}\n"
-            f"**Total:** {perfil['xp']:,} XP · **Rank:** No.{rank_novo['no']} — {rank_novo['nome']}".replace(",", "."),
-            ephemeral=True,
-        )
-
     @app_commands.command(name="gangue-banco", description="Consulta seu saldo de XP transferível da NÊMESIS.")
     async def gangue_banco(self, interaction: discord.Interaction):
         if interaction.guild is None:
