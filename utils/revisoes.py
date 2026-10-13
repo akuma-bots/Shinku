@@ -60,37 +60,38 @@ async def criar_pendencia(
     titulo: str,
     descricao: str = None,
 ) -> dict:
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    revisao = {
-        "id": str(uuid.uuid4())[:8],
-        "guild_id": guild_id,
-        "tipo": tipo,
-        "autor_id": autor_id,
-        "referencia_id": referencia_id,
-        "print_url": print_url,
-        "titulo": titulo,
-        "descricao": descricao,
-        "status": "pendente",
-        "revisor_id": None,
-        "motivo_rejeicao": None,
-        "timestamp": time.time(),
-        "mensagem_id": None,
-        "canal_id": None,
-        "hash_imagem": None,
-        "criado_em": time.time(),
-        "atualizado_em": time.time(),
-    }
+        revisao = {
+            "id": str(uuid.uuid4())[:8],
+            "guild_id": guild_id,
+            "tipo": tipo,
+            "autor_id": autor_id,
+            "referencia_id": referencia_id,
+            "print_url": print_url,
+            "titulo": titulo,
+            "descricao": descricao,
+            "status": "pendente",
+            "revisor_id": None,
+            "motivo_rejeicao": None,
+            "timestamp": time.time(),
+            "mensagem_id": None,
+            "canal_id": None,
+            "hash_imagem": None,
+            "criado_em": time.time(),
+            "atualizado_em": time.time(),
+        }
 
-    lista.append(revisao)
+        lista.append(revisao)
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    return revisao
+        return revisao
 
 
 async def get(
@@ -115,31 +116,32 @@ async def definir_mensagem(
     canal_id: int,
     mensagem_id: int,
 ):
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    alvo = next(
-        (
-            revisao
-            for revisao in lista
-            if revisao.get("id") == revisao_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                revisao
+                for revisao in lista
+                if revisao.get("id") == revisao_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
 
-    alvo["canal_id"] = canal_id
-    alvo["mensagem_id"] = mensagem_id
-    alvo["atualizado_em"] = time.time()
+        alvo["canal_id"] = canal_id
+        alvo["mensagem_id"] = mensagem_id
+        alvo["atualizado_em"] = time.time()
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    return alvo
+        return alvo
 
 
 async def definir_hash(
@@ -147,30 +149,31 @@ async def definir_hash(
     revisao_id: str,
     hash_imagem: str,
 ):
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    alvo = next(
-        (
-            revisao
-            for revisao in lista
-            if revisao.get("id") == revisao_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                revisao
+                for revisao in lista
+                if revisao.get("id") == revisao_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
 
-    alvo["hash_imagem"] = hash_imagem
-    alvo["atualizado_em"] = time.time()
+        alvo["hash_imagem"] = hash_imagem
+        alvo["atualizado_em"] = time.time()
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    return alvo
+        return alvo
 
 
 async def buscar_por_hash(
@@ -295,31 +298,32 @@ async def reabrir_apos_falha_aplicacao(
 async def sincronizar_todos_site(
     guild_id: int,
 ) -> int:
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    quantidade = 0
+        quantidade = 0
 
-    for revisao in lista:
+        for revisao in lista:
 
-        if not isinstance(revisao, dict):
-            continue
+            if not isinstance(revisao, dict):
+                continue
 
-        revisao.setdefault(
-            "guild_id",
+            revisao.setdefault(
+                "guild_id",
+                guild_id,
+            )
+
+            revisao.setdefault(
+                "atualizado_em",
+                time.time(),
+            )
+
+            quantidade += 1
+
+        await _salvar_guild(
             guild_id,
+            lista,
         )
 
-        revisao.setdefault(
-            "atualizado_em",
-            time.time(),
-        )
-
-        quantidade += 1
-
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
-
-    return quantidade
+        return quantidade
