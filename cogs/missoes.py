@@ -397,12 +397,13 @@ class Missoes(commands.Cog):
             perfil = await get_perfil(guild.id, autor_id)
             eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
             recompensa_aplicada = revisao_id not in eventos_aplicados and not atividade_ja_aplicada
-            if revisao_id not in eventos_aplicados:
+            marcador_novo = revisao_id not in eventos_aplicados
+            if marcador_novo:
                 eventos_aplicados.append(revisao_id)
                 perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
             if recompensa_aplicada:
                 perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
-            if recompensa_aplicada or revisao_id not in perfil.get("recompensas_missoes_aplicadas", []):
+            if recompensa_aplicada or marcador_novo:
                 await _salvar_perfil(guild.id, autor_id, perfil)
 
         # Recompensa aprovada também avança a progressão independente da gangue.
