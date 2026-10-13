@@ -110,7 +110,7 @@ TUTORIAIS = {
             "Depois da confirmação, você pode remover o código da descrição.",
             "Use /roblox-perfil para consultar o vínculo ou /roblox-desvincular para removê-lo.",
         ],
-        "comandos": "/roblox-vincular · /roblox-confirmar · /roblox-perfil · /roblox-desvincular",
+        "comandos": "/roblox-vincular · /roblox-confirmar · /roblox-perfil · /roblox-identificar · /roblox-desvincular",
     },
     "moderacao": {
         "titulo": "Moderação e conduta",
