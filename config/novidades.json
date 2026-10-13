@@ -1,0 +1,6 @@
+{
+  "release_id": "2026-10-13-tutoriais-perfil-roblox-v1",
+  "tipo": "Sistemas novos",
+  "titulo": "Tutoriais e perfil com Roblox",
+  "mensagem": "A NÊMESIS recebeu uma central interativa de tutoriais para missões, PvP, guerras, revisão de provas, moderação, sorteios, eventos, formulários, tickets e outros sistemas. Também estamos integrando a conta Roblox vinculada ao perfil do Discord para facilitar a identificação dos membros. Use /tutorial para abrir os guias e /roblox-vincular para verificar sua conta. Para controlar os avisos por DM, use /avisos-privados."
+}
