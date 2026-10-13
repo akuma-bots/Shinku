@@ -22,11 +22,11 @@ class PontuacaoPvE(commands.Cog):
     async def _montar_embed(self, guild_id: int) -> discord.Embed:
         top = await pontuacao_pve.obter_ranking(guild_id)
         if not top:
-            return discord.Embed(title="🗡️ Pontuação PvE", description="Ninguém pontuou em PvE ainda.", color=0x57F287)
+            return discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING PvE", description="Ninguém pontuou em PvE ainda.", color=0xB51F32)
 
         linhas = [f"**#{i+1}** <@{uid}> — {pontos} pts" for i, (uid, pontos) in enumerate(top)]
-        embed = discord.Embed(title="🗡️ Pontuação PvE", description="\n".join(linhas), color=0x57F287)
-        embed.set_footer(text="Pontos de missões e encontros PvE aprovados • atualiza a cada 10 min")
+        embed = discord.Embed(title="🗡️ Pontuação PvE", description="\n".join(linhas), color=0xB51F32)
+        embed.set_footer(text="NÊMESIS • PONTUAÇÃO PvE • Apenas provas aprovadas • Atualização automática a cada 10 min")
         return embed
 
     async def _atualizar_painel(self, guild: discord.Guild):
