@@ -204,7 +204,11 @@ class Revisoes(commands.Cog):
                 return
             processador = self.bot.processadores_revisao.get(revisao["tipo"])
             try:
-                resultado_texto = await processador(interaction.guild, revisao) if processador else None
+                if processador is None:
+                    raise RuntimeError(
+                        f"Não existe processador registrado para revisão do tipo {revisao.get('tipo')!r}."
+                    )
+                resultado_texto = await processador(interaction.guild, revisao)
             except Exception as erro:
                 import logging
                 logging.getLogger(__name__).exception(
