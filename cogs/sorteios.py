@@ -1111,9 +1111,11 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         sorteio: dict,
         erro: Exception,
     ):
+        # Preserve os vencedores escolhidos antes da falha. Se o Discord
+        # tiver aceitado a mensagem e a resposta tiver falhado, o retry não
+        # pode sortear pessoas diferentes nem duplicar a seleção.
         sorteio["encerrado"] = False
-        sorteio["vencedores_ids"] = []
-        sorteio["encerrado_em"] = None
+        sorteio["resultado_sorteado"] = True
         await self.salvar_sorteio(sorteio)
         await self.atualizar_mensagem(sorteio)
         print(
@@ -1165,10 +1167,21 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 quantidade_solicitada = 1
 
             quantidade_real = min(quantidade_solicitada, len(participantes))
-            vencedores_ids = random.sample(participantes, quantidade_real) if quantidade_real > 0 else []
+            vencedores_salvos = atual.get("vencedores_ids")
+            resultado_ja_sorteado = atual.get("resultado_sorteado") is True
+            if resultado_ja_sorteado and isinstance(vencedores_salvos, list):
+                # Reutiliza a seleção anterior após falha de anúncio.
+                vencedores_ids = [
+                    int(user_id)
+                    for user_id in vencedores_salvos
+                    if str(user_id).isdigit() and int(user_id) in participantes
+                ]
+            else:
+                vencedores_ids = random.sample(participantes, quantidade_real) if quantidade_real > 0 else []
             agora = time.time()
 
             atual["encerrado"] = True
+            atual["resultado_sorteado"] = True
             atual["vencedores_ids"] = vencedores_ids
             atual["encerrado_em"] = agora
             atual["atualizado_em"] = agora
