@@ -320,6 +320,24 @@ class Formularios(commands.Cog):
                 if not ids_mensagens and registro.get("message_id"):
                     ids_mensagens = [registro["message_id"]]
 
+            # Se o painel não mudou e foi verificado recentemente, evita
+            # consultas repetidas à API do Discord em todos os ciclos de 60 s.
+            # A verificação completa ocorre a cada 5 minutos para reparar mensagens apagadas.
+            verificado_em = 0
+            if isinstance(registro, dict):
+                try:
+                    verificado_em = float(registro.get("verificado_em", 0))
+                except (TypeError, ValueError):
+                    verificado_em = 0
+
+            if (
+                isinstance(registro, dict)
+                and registro.get("assinatura") == assinatura_painel
+                and len(ids_mensagens) == len(embeds)
+                and time.time() - verificado_em < 300
+            ):
+                continue
+
             mensagens = []
             for indice, embed in enumerate(embeds):
                 mensagem = None
@@ -367,6 +385,7 @@ class Formularios(commands.Cog):
                 "message_id": mensagens[0],
                 "message_ids": mensagens,
                 "assinatura": assinatura_painel,
+                "verificado_em": time.time(),
             }
 
         for formulario_id in list(registros):
