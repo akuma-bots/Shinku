@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 
@@ -5,6 +6,7 @@ from utils.storage import carregar, salvar
 
 
 ARQUIVO_REVISOES = "revisoes.json"
+_REVISOES_LOCK = asyncio.Lock()
 
 
 async def _tudo():
@@ -196,35 +198,36 @@ async def aprovar(
     revisao_id: str,
     revisor_id: int,
 ):
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    alvo = next(
-        (
-            revisao
-            for revisao in lista
-            if revisao.get("id") == revisao_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                revisao
+                for revisao in lista
+                if revisao.get("id") == revisao_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
 
-    if alvo.get("status") != "pendente":
-        return None
+        if alvo.get("status") != "pendente":
+            return None
 
-    alvo["status"] = "aprovada"
-    alvo["revisor_id"] = revisor_id
-    alvo["aprovado_em"] = time.time()
-    alvo["atualizado_em"] = time.time()
+        alvo["status"] = "aprovada"
+        alvo["revisor_id"] = revisor_id
+        alvo["aprovado_em"] = time.time()
+        alvo["atualizado_em"] = time.time()
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    return alvo
+        return alvo
 
 
 async def rejeitar(
@@ -233,36 +236,37 @@ async def rejeitar(
     revisor_id: int,
     motivo: str = None,
 ):
+    async with _REVISOES_LOCK:
 
-    lista = await listar(guild_id)
+        lista = await listar(guild_id)
 
-    alvo = next(
-        (
-            revisao
-            for revisao in lista
-            if revisao.get("id") == revisao_id
-        ),
-        None,
-    )
+        alvo = next(
+            (
+                revisao
+                for revisao in lista
+                if revisao.get("id") == revisao_id
+            ),
+            None,
+        )
 
-    if not alvo:
-        return None
+        if not alvo:
+            return None
 
-    if alvo.get("status") != "pendente":
-        return None
+        if alvo.get("status") != "pendente":
+            return None
 
-    alvo["status"] = "rejeitada"
-    alvo["revisor_id"] = revisor_id
-    alvo["motivo_rejeicao"] = motivo
-    alvo["rejeitada_em"] = time.time()
-    alvo["atualizado_em"] = time.time()
+        alvo["status"] = "rejeitada"
+        alvo["revisor_id"] = revisor_id
+        alvo["motivo_rejeicao"] = motivo
+        alvo["rejeitada_em"] = time.time()
+        alvo["atualizado_em"] = time.time()
 
-    await _salvar_guild(
-        guild_id,
-        lista,
-    )
+        await _salvar_guild(
+            guild_id,
+            lista,
+        )
 
-    return alvo
+        return alvo
 
 
 async def sincronizar_todos_site(
