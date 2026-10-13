@@ -46,10 +46,10 @@ TIPOS_PADRAO = [
         "usa_ia": False,
     },
     {
-        "valor": "parcerias",
-        "label": "Parcerias",
+        "valor": "aliancas",
+        "label": "Alianças",
         "emoji": "◇",
-        "descricao": "Solicitações, propostas e assuntos relacionados a alianças e parcerias.",
+        "descricao": "Propostas de aliança, cooperação entre grupos e assuntos diplomáticos da NÊMESIS.",
         "usa_ia": False,
     },
     {
