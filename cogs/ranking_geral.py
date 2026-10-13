@@ -7,7 +7,7 @@ from discord.ext import (
     tasks,
 )
 
-from utils.storage import carregar
+from utils.storage import carregar, salvar
 
 from utils.guild_config import (
     get_config,
@@ -550,6 +550,110 @@ class RankingGeral(
             ephemeral=True,
         )
 
+
+    @app_commands.command(
+        name="resetar-perfis-global",
+        description="Zera os perfis e o Top Global da NÊMESIS.",
+    )
+    @app_commands.describe(
+        confirmacao="Selecione a confirmação para executar o reset completo."
+    )
+    @app_commands.choices(confirmacao=[
+        app_commands.Choice(
+            name="CONFIRMAR RESET COMPLETO",
+            value="CONFIRMAR RESET COMPLETO",
+        )
+    ])
+    @app_commands.checks.has_permissions(administrator=True)
+    async def resetar_perfis_global(
+        self,
+        interaction: discord.Interaction,
+        confirmacao: app_commands.Choice[str],
+    ):
+        if confirmacao.value != "CONFIRMAR RESET COMPLETO":
+            await interaction.response.send_message(
+                "Reset cancelado: confirmação inválida.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        import time
+        agora = time.time()
+
+        # Zera perfis locais usados pelo /perfil em todos os servidores.
+        todos_perfis = await carregar(ARQUIVO_PERFIS, {})
+        quantidade_local = 0
+        campos_zero = {
+            "xp": 0,
+            "vitorias": 0,
+            "derrotas": 0,
+            "kills": 0,
+            "deaths": 0,
+            "mvps": 0,
+            "sequencia_atual": 0,
+            "maior_sequencia": 0,
+            "medalhas": [],
+            "patente": None,
+        }
+        for dados_guilda in todos_perfis.values():
+            if not isinstance(dados_guilda, dict):
+                continue
+            for perfil in dados_guilda.values():
+                if not isinstance(perfil, dict):
+                    continue
+                for campo, valor in campos_zero.items():
+                    perfil[campo] = list(valor) if isinstance(valor, list) else valor
+                quantidade_local += 1
+        await salvar(ARQUIVO_PERFIS, todos_perfis)
+
+        # competitivo.json é compartilhado com o site; preserva catálogo e identidades.
+        competitivo = await carregar(
+            ARQUIVO_COMPETITIVO,
+            {"catalogo": [], "perfis": {}},
+        )
+        competitivo.setdefault("catalogo", [])
+        competitivo.setdefault("perfis", {})
+        quantidade_global = 0
+        for perfil in competitivo["perfis"].values():
+            if not isinstance(perfil, dict):
+                continue
+            perfil["pontos"] = 0
+            perfil["pontos_temporada"] = 0
+            perfil["xp"] = 0
+            perfil["vitorias"] = 0
+            perfil["derrotas"] = 0
+            perfil["kills"] = 0
+            perfil["deaths"] = 0
+            perfil["mvps"] = 0
+            perfil["sequencia_atual"] = 0
+            perfil["maior_sequencia"] = 0
+            perfil["medalhas"] = []
+            perfil["patente"] = None
+            perfil["kdr"] = 0
+            perfil["tempo_top_global_segundos"] = 0
+            perfil["em_top_global"] = False
+            perfil["ultima_verificacao_top_global"] = agora
+            quantidade_global += 1
+
+        competitivo["temporada_global"] = {
+            "numero": 1,
+            "inicio_timestamp": agora,
+            "duracao_dias": 30,
+            "historico": [],
+        }
+        await salvar(ARQUIVO_COMPETITIVO, competitivo)
+
+        await interaction.followup.send(
+            "RESET COMPLETO EXECUTADO.\\n"
+            f"Perfis locais zerados: **{quantidade_local}**.\\n"
+            f"Perfis do Top Global/site zerados: **{quantidade_global}**.\\n"
+            "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
+            "tempo no Top 10 foram zerados. O histórico sazonal foi limpo e "
+            "uma nova temporada de 30 dias foi iniciada. O catálogo foi preservado.",
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="ranking-geral",
