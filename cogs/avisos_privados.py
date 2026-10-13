@@ -38,9 +38,9 @@ class AvisosPrivados(commands.Cog):
 
     @app_commands.command(
         name="avisos-privados",
-        description="Ativa ou desativa o recebimento de novidades da NÊMESIS por mensagem privada.",
+        description="Ativa ou desativa comunicados manuais opcionais por mensagem privada.",
     )
-    @app_commands.describe(receber="Escolha se deseja receber avisos privados.")
+    @app_commands.describe(receber="Escolha se deseja receber comunicados manuais opcionais.")
     @app_commands.choices(receber=[
         app_commands.Choice(name="Ativar", value="ativar"),
         app_commands.Choice(name="Desativar", value="desativar"),
@@ -76,12 +76,11 @@ class AvisosPrivados(commands.Cog):
 
         if receber.value == "ativar":
             texto = (
-                "Você ativou os avisos privados da NÊMESIS. "
-                "Você receberá comunicados sobre novidades, sistemas, eventos e avisos importantes. "
-                "Para parar, use `/avisos-privados` e escolha **Desativar**."
+                "Você ativou os comunicados manuais opcionais da NÊMESIS. "
+                "As novidades oficiais do bot continuam sendo enviadas a todos os membros e não podem ser desativadas por este comando."
             )
         else:
-            texto = "Avisos privados desativados. Você não receberá novos comunicados por DM."
+            texto = "Comunicados manuais opcionais desativados. As novidades oficiais do bot continuam sendo enviadas a todos os membros."
 
         await interaction.response.send_message(texto, ephemeral=True)
 
