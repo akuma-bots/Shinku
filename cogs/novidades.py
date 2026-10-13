@@ -116,7 +116,7 @@ class Novidades(commands.Cog):
                 )
                 embed.add_field(
                     name="◈ ACESSO RÁPIDO",
-                    value="**/tutorial** — guias dos sistemas\n**/help** — central de comandos\n**/avisos-privados** — preferências de DM",
+                    value="**/tutorial** — guias dos sistemas\n**/help** — central de comandos\n",
                     inline=False,
                 )
                 embed.set_footer(
