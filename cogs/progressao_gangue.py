@@ -236,18 +236,24 @@ class ProgressaoGangue(commands.Cog):
             await self._aplicar_cargo_rank(message.guild, message.author, rank_novo)
             await self._anunciar_rank(message.guild, message.author, rank_novo, perfil["xp"])
 
-    async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao"):
-        """Integra recompensas já aprovadas de missões/contribuições à progressão da gangue."""
+    async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao", evento_id: str = ""):
+        """Integra recompensas aprovadas à progressão sem duplicar a mesma revisão."""
         quantidade = max(0, int(quantidade))
         if quantidade <= 0:
             return
         perfil = await self._perfil(guild.id, user_id)
+        eventos = list(perfil.get("eventos_recompensa", []))
+        if evento_id and evento_id in eventos:
+            return
         rank_antigo = rank_por_xp(int(perfil.get("xp", 0)))
         perfil["xp"] = int(perfil.get("xp", 0)) + quantidade
-        if tipo == "missao":
+        if tipo in {"missao", "especial"}:
             perfil["missoes"] = int(perfil.get("missoes", 0)) + 1
         elif tipo == "guerra":
             perfil["guerras"] = int(perfil.get("guerras", 0)) + 1
+        if evento_id:
+            eventos.append(evento_id)
+            perfil["eventos_recompensa"] = eventos[-1000:]
         rank_novo = rank_por_xp(perfil["xp"])
         perfil["rank_no"] = rank_novo["no"]
         await self._atualizar_perfil(guild.id, user_id, perfil)
