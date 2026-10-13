@@ -304,7 +304,7 @@ class TutorialView(discord.ui.View):
         self.add_item(SeletorTutorial(autor_id, selecionado))
 
 
-class Tutorial(commands.Cog):
+class Tutorial(commands.GroupCog, group_name="tutorial", group_description="Tutoriais dos sistemas da NÊMESIS."):
     """Central interativa de orientação dos sistemas da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
