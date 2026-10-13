@@ -429,17 +429,25 @@ async def iniciar_servidor_web():
         )
 
     async def health(request):
+        falhas = [
+            item.get("cog")
+            for item in getattr(bot, "cogs_falhos", [])
+        ]
+        status = (
+            "starting" if not bot.is_ready()
+            else "degraded" if falhas
+            else "online"
+        )
         return web.json_response({
-            "status": "online" if bot.is_ready() else "starting",
+            "status": status,
             "commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
             "guild_id": str(NEMESIS_GUILD_ID),
             "storage": "upstash" if USANDO_UPSTASH else "local",
             "loaded_cogs": sorted(bot.cogs.keys()),
-            "failed_cogs": [
-                item.get("cog")
-                for item in getattr(bot, "cogs_falhos", [])
-            ],
-        })
+            "loaded_cog_count": len(bot.cogs),
+            "command_count": len(bot.tree.get_commands()),
+            "failed_cogs": falhas,
+        }, status=200 if status == "online" else 503 if status == "degraded" else 202)
 
     app.router.add_get("/", handle)
     app.router.add_get("/health", health)
