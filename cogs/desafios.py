@@ -220,12 +220,12 @@ class Desafios(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="⚔️ Desafio proposto!",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  DESAFIO PvP",
             description=f"{interaction.user.mention} desafiou {membro.mention} para uma luta!",
             color=0xED4245,
         )
         if aposta_xp > 0:
-            embed.add_field(name="💰 Aposta", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
+            embed.add_field(name="◈ APOSTA", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
         embed.set_footer(text=f"ID: {desafio['id']}")
         try:
             msg = await canal.send(
@@ -302,7 +302,7 @@ class Desafios(commands.Cog):
                 await interaction.followup.send("⚠️ Canal de lutas não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
                 return
             aviso = discord.Embed(
-                title="🥊 Luta em andamento",
+                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CONFRONTO EM ANDAMENTO",
                 description=f"<@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
                 color=0xED4245,
             )
