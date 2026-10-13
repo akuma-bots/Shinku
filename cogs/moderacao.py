@@ -1,4 +1,5 @@
 import datetime
+import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -15,16 +16,31 @@ class Moderacao(commands.Cog):
         self.bot = bot
 
     async def _log(self, interaction: discord.Interaction, texto: str):
+        """Registra a ação sem transformar uma falha de log em falha do comando."""
         from utils.guild_config import get_config
 
-        config = await get_config(interaction.guild.id)
-        log_id = config["log_channel_id"]
+        if interaction.guild is None:
+            return
 
-        if log_id:
-            canal = interaction.guild.get_channel(log_id)
+        try:
+            config = await get_config(interaction.guild.id)
+            log_id = config.get("log_channel_id") or 1545838386944938024
+            if not log_id:
+                return
 
-            if canal:
-                await canal.send(texto)
+            canal = interaction.guild.get_channel(int(log_id))
+            if canal is None:
+                canal = await interaction.guild.fetch_channel(int(log_id))
+
+            if not callable(getattr(canal, "send", None)):
+                logging.warning("Canal de logs %s não aceita mensagens.", log_id)
+                return
+
+            await canal.send(texto)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+            logging.exception("Não foi possível registrar a ação de moderação no canal de logs.")
+        except Exception:
+            logging.exception("Falha inesperada ao registrar ação de moderação.")
 
     async def _carregar_regras_oficiais(self, guild: discord.Guild):
         """
