@@ -28,14 +28,14 @@ TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO 
 DESCRICAO_PADRAO = (
     "A Central de Atendimento é o canal oficial para tratar de assuntos da "
     "gangue NÊMESIS e da comunidade. Selecione a categoria que melhor "
-    "representa sua solicitação para abrir um atendimento privado com a equipe.\\n\\n"
-    "╭────────────── ◈ ORIENTAÇÕES ◈ ──────────────╮\\n"
-    "・Escolha a categoria correta e explique o caso com clareza.\\n"
-    "・Inclua nomes, contexto, links ou provas quando forem relevantes.\\n"
-    "・Não abra vários tickets para o mesmo assunto.\\n"
-    "・Denúncias e informações sensíveis devem ser tratadas somente no ticket.\\n"
-    "・Aguarde a equipe; não marque cargos repetidamente.\\n"
-    "╰────────────────────────────────────────────╯\\n\\n"
+    "representa sua solicitação para abrir um atendimento privado com a equipe.\n\n"
+    "╭────────────── ◈ ORIENTAÇÕES ◈ ──────────────╮\n"
+    "・Escolha a categoria correta e explique o caso com clareza.\n"
+    "・Inclua nomes, contexto, links ou provas quando forem relevantes.\n"
+    "・Não abra vários tickets para o mesmo assunto.\n"
+    "・Denúncias e informações sensíveis devem ser tratadas somente no ticket.\n"
+    "・Aguarde a equipe; não marque cargos repetidamente.\n"
+    "╰────────────────────────────────────────────╯\n\n"
     "Cada ticket é privado e visível apenas para você e a equipe responsável. "
     "Use este espaço com respeito; solicitações sem contexto podem atrasar o atendimento."
 )
@@ -382,9 +382,14 @@ class Tickets(commands.Cog):
             embed = await _montar_embed_painel(interaction.guild.id)
             await mensagem_painel.edit(embed=embed, view=view)
 
+        try:
+            await mensagem_painel.pin(reason="Painel oficial permanente de tickets NÊMESIS")
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
         await interaction.response.send_message(
             f"✅ Painel oficial configurado em {canal_painel.mention}. "
-            "As próximas atualizações serão feitas nessa mesma mensagem.",
+            "A mensagem foi atualizada no mesmo local e será reutilizada nas próximas atualizações.",
             ephemeral=True,
         )
 
