@@ -380,8 +380,7 @@ class Missoes(commands.Cog):
         revisao_id = str(revisao.get("id", "")).strip()
         if not revisao_id:
             return "⚠️ Esta revisão não possui um identificador válido; nenhuma recompensa foi aplicada."
-        if revisao_id in atividade.get("recompensas_aplicadas", []):
-            return "Esta revisão já foi contabilizada; nenhuma recompensa duplicada foi aplicada."
+        atividade_ja_aplicada = revisao_id in atividade.get("recompensas_aplicadas", [])
 
         autor_id = int(revisao.get("autor_id", 0))
         if not autor_id:
@@ -397,11 +396,13 @@ class Missoes(commands.Cog):
         async with self._reward_lock:
             perfil = await get_perfil(guild.id, autor_id)
             eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
-            recompensa_aplicada = revisao_id not in eventos_aplicados
-            if recompensa_aplicada:
-                perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
+            recompensa_aplicada = revisao_id not in eventos_aplicados and not atividade_ja_aplicada
+            if revisao_id not in eventos_aplicados:
                 eventos_aplicados.append(revisao_id)
                 perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
+            if recompensa_aplicada:
+                perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
+            if recompensa_aplicada or revisao_id not in perfil.get("recompensas_missoes_aplicadas", []):
                 await _salvar_perfil(guild.id, autor_id, perfil)
 
         # Recompensa aprovada também avança a progressão independente da gangue.
@@ -439,7 +440,8 @@ class Missoes(commands.Cog):
                 user_id=autor_id,
                 perfil=perfil,
                 nome=membro.display_name if membro else "",
-                delta_pontos=recompensa if recompensa_aplicada else 0,
+                delta_pontos=recompensa,
+                evento_id=f"missao:{revisao_id}",
             )
         except Exception as erro:
             log.exception("Falha ao sincronizar pontuação de %s: %s", autor_id, erro)
