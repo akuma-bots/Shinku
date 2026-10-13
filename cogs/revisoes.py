@@ -175,8 +175,9 @@ class Revisoes(commands.Cog):
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type != discord.InteractionType.component:
             return
-        custom_id = interaction.data.get("custom_id", "")
-        if not custom_id.startswith("revisao:"):
+        data = interaction.data or {}
+        custom_id = data.get("custom_id", "")
+        if not isinstance(custom_id, str) or not custom_id.startswith("revisao:"):
             return
 
         if interaction.guild is None:
