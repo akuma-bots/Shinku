@@ -205,17 +205,35 @@ class Revisoes(commands.Cog):
             processador = self.bot.processadores_revisao.get(revisao["tipo"])
             try:
                 resultado_texto = await processador(interaction.guild, revisao) if processador else None
-            except Exception:
+            except Exception as erro:
                 import logging
                 logging.getLogger(__name__).exception(
                     "Falha ao aplicar recompensa da revisão %s (tipo=%s).",
                     revisao_id,
                     revisao.get("tipo"),
                 )
-                await interaction.followup.send(
-                    "A aprovação foi registrada, mas houve uma falha ao aplicar a recompensa. A equipe técnica precisa verificar os logs antes de repetir a operação.",
-                    ephemeral=True,
+                try:
+                    reaberta = await revisoes.reabrir_apos_falha_aplicacao(
+                        interaction.guild.id,
+                        revisao_id,
+                        type(erro).__name__,
+                    )
+                except Exception:
+                    reaberta = None
+                    logging.getLogger(__name__).exception(
+                        "Não foi possível reabrir a revisão %s após falha de aplicação.",
+                        revisao_id,
+                    )
+
+                mensagem = (
+                    "A aplicação falhou e a prova voltou para **pendente**. "
+                    "A staff pode clicar em Aprovar novamente após verificar a falha; "
+                    "as recompensas de missões e PvP têm proteção contra duplicação."
+                    if reaberta
+                    else "A aplicação falhou e não consegui reabrir a prova automaticamente. "
+                    "A equipe técnica precisa conferir os logs e o estado da revisão."
                 )
+                await interaction.followup.send(mensagem, ephemeral=True)
                 return
 
             embed = _embed_revisao(revisao)
