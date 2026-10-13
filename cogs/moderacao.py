@@ -199,7 +199,7 @@ class Moderacao(commands.Cog):
         self,
         interaction: discord.Interaction,
         membro: discord.Member,
-        minutos: int,
+        minutos: app_commands.Range[int, 1, 40320],
         motivo: str = "Não especificado"
     ):
         ate = (
