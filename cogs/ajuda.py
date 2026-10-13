@@ -317,9 +317,9 @@ class Ajuda(commands.Cog):
         ):
 
             embed = discord.Embed(
-                title="✦ NÊMESIS — Comandos",
+                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE COMANDOS",
                 description=texto,
-                color=0x5865F2,
+                color=0xB51F32,
             )
 
             embed.set_footer(
