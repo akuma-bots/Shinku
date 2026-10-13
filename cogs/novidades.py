@@ -6,13 +6,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
 
 
 logger = logging.getLogger(__name__)
-ARQUIVO_INSCRITOS = "avisos_privados.json"
 ARQUIVO_ESTADO = "novidades_automaticas.json"
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
 INTERVALO_ENVIO = 1.0
@@ -50,6 +50,112 @@ class Novidades(commands.Cog):
             "mensagem": mensagem[:3500],
             "tipo": str(release.get("tipo", "Sistemas novos"))[:100],
         }
+
+    @app_commands.command(
+        name="avisos-enviar",
+        description="Envia um comunicado privado a todos os membros humanos da NÊMESIS.",
+    )
+    @app_commands.describe(
+        tipo="Categoria do comunicado",
+        titulo="Título mostrado na mensagem",
+        mensagem="Texto do comunicado (máximo de 3000 caracteres)",
+    )
+    @app_commands.choices(tipo=[
+        app_commands.Choice(name="Novidades da NÊMESIS", value="Novidades"),
+        app_commands.Choice(name="Sistemas novos", value="Sistemas novos"),
+        app_commands.Choice(name="Eventos", value="Eventos"),
+        app_commands.Choice(name="Manutenção", value="Manutenção"),
+        app_commands.Choice(name="Aviso importante", value="Aviso importante"),
+    ])
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def avisos_enviar(
+        self,
+        interaction: discord.Interaction,
+        tipo: app_commands.Choice[str],
+        titulo: str,
+        mensagem: str,
+    ):
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "Este comando só pode ser usado no servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        titulo = titulo.strip()
+        mensagem = mensagem.strip()
+        if not titulo or len(titulo) > 200:
+            await interaction.response.send_message(
+                "O título precisa ter entre 1 e 200 caracteres.",
+                ephemeral=True,
+            )
+            return
+        if not mensagem or len(mensagem) > 3000:
+            await interaction.response.send_message(
+                "A mensagem precisa ter entre 1 e 3000 caracteres.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+        except discord.HTTPException:
+            logger.exception("Não foi possível obter a lista completa de membros para aviso privado.")
+            await interaction.followup.send(
+                "Não consegui carregar todos os membros. Nenhum comunicado foi enviado; tente novamente.",
+                ephemeral=True,
+            )
+            return
+
+        embed = discord.Embed(
+            description=(
+                "╭────────────── ◈ ──────────────╮\n"
+                "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  COMUNICADO OFICIAL**\n"
+                "╰────────────── ◈ ──────────────╯\n\n"
+                f"**{titulo}**\n"
+                f"{mensagem}\n\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Este comunicado oficial é enviado a todos os membros humanos da NÊMESIS."
+            ),
+            color=0xB3132B,
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(name="◈ CATEGORIA", value=f"**{tipo.value}**", inline=True)
+        embed.add_field(name="◈ ENVIADO POR", value=interaction.user.mention, inline=True)
+        embed.set_footer(text="NÊMESIS • Comunicados oficiais")
+
+        enviados = 0
+        falhas = 0
+        for indice, membro in enumerate(membros):
+            try:
+                await membro.send(
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                enviados += 1
+            except discord.Forbidden:
+                falhas += 1
+                logger.info("DM indisponível para membro %s; aviso privado não entregue.", membro.id)
+            except discord.HTTPException:
+                falhas += 1
+                logger.exception("Falha ao enviar comunicado privado ao membro %s.", membro.id)
+
+            if indice < len(membros) - 1:
+                await asyncio.sleep(INTERVALO_ENVIO)
+
+        logger.info(
+            "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
+            guild.id, titulo, len(membros), enviados, falhas,
+        )
+        await interaction.followup.send(
+            f"**Comunicado finalizado: {titulo}**\n"
+            f"• Membros humanos encontrados: **{len(membros)}**\n"
+            f"• DMs enviadas: **{enviados}**\n"
+            f"• Falhas (DMs fechadas ou restrições do Discord): **{falhas}**",
+            ephemeral=True,
+        )
 
     async def _anunciar_release(self, guild: discord.Guild):
         async with self._lock:
