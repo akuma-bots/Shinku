@@ -150,7 +150,7 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     embed = discord.Embed(
         title=config.get("ticket_painel_titulo") or TITULO_PADRAO,
         description=config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
-        color=0x5865F2,
+        color=0xB51F32,
     )
 
     banner_url = config.get("ticket_painel_banner_url")
@@ -288,7 +288,7 @@ class Tickets(commands.Cog):
                 "Olá, bem-vindo(a)! Descreva com detalhes o que você "
                 "precisa — nossa equipe vai te atender em breve."
             ),
-            color=0x5865F2,
+            color=0xB51F32,
         )
 
         mensagem = await canal.send(
@@ -500,9 +500,9 @@ class Tickets(commands.Cog):
         ]
 
         embed = discord.Embed(
-            title="🎫 Categorias de ticket",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE ATENDIMENTO",
             description="\n".join(linhas),
-            color=0x5865F2,
+            color=0xB51F32,
         )
 
         await interaction.response.send_message(
@@ -725,7 +725,7 @@ class Tickets(commands.Cog):
 
         embed = discord.Embed(
             description=resultado["resposta"],
-            color=0x5865F2,
+            color=0xB51F32,
         )
 
         embed.set_footer(
