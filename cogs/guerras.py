@@ -583,7 +583,7 @@ class Guerras(commands.Cog):
         sufixo = f" · TEMPORADA {temporada}" if temporada is not None else " · GERAL"
         embed = discord.Embed(
             title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING DE GANGUES{sufixo}",
-            description="\\n".join(linhas),
+            description="\n".join(linhas),
             color=0xB51F32,
         )
         await interaction.response.send_message(embed=embed)
