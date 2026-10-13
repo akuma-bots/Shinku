@@ -24,9 +24,20 @@ TEMPO_INATIVIDADE_SEGUNDOS = 10 * 60  # 10 minutos
 
 CUSTOM_ID_SELECT = "ticket:abrir_select"
 
-TITULO_PADRAO = "🎫 Central de Suporte"
+TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO ・✦"
 DESCRICAO_PADRAO = (
-    "Selecione o tipo de atendimento abaixo pra abrir um ticket com a nossa equipe."
+    "A Central de Atendimento é o canal oficial para tratar de assuntos da "
+    "gangue NÊMESIS e da comunidade. Selecione a categoria que melhor "
+    "representa sua solicitação para abrir um atendimento privado com a equipe.\\n\\n"
+    "╭────────────── ◈ ORIENTAÇÕES ◈ ──────────────╮\\n"
+    "・Escolha a categoria correta e explique o caso com clareza.\\n"
+    "・Inclua nomes, contexto, links ou provas quando forem relevantes.\\n"
+    "・Não abra vários tickets para o mesmo assunto.\\n"
+    "・Denúncias e informações sensíveis devem ser tratadas somente no ticket.\\n"
+    "・Aguarde a equipe; não marque cargos repetidamente.\\n"
+    "╰────────────────────────────────────────────╯\\n\\n"
+    "Cada ticket é privado e visível apenas para você e a equipe responsável. "
+    "Use este espaço com respeito; solicitações sem contexto podem atrasar o atendimento."
 )
 
 
@@ -328,19 +339,52 @@ class Tickets(commands.Cog):
         self,
         interaction: discord.Interaction,
     ):
-        view = await _montar_select(interaction.guild.id)
+        config = await get_config(interaction.guild.id)
 
-        embed = await _montar_embed_painel(
-            interaction.guild.id
-        )
+        # Na primeira configuração, substitui todas as categorias antigas
+        # pelo modelo oficial NÊMESIS; depois, preserva ajustes administrativos.
+        if not config.get("ticket_modelo_v2"):
+            await tickets.set_tipos(
+                interaction.guild.id,
+                list(tickets.TIPOS_PADRAO),
+            )
+            await set_config(
+                interaction.guild.id,
+                ticket_modelo_v2=True,
+            )
+            config = await get_config(interaction.guild.id)
 
-        await interaction.channel.send(
-            embed=embed,
-            view=view,
-        )
+        canal_id = config.get("ticket_painel_canal_id")
+        mensagem_id = config.get("ticket_painel_mensagem_id")
+        canal_painel = interaction.guild.get_channel(int(canal_id)) if canal_id else None
+        mensagem_painel = None
+
+        if canal_painel and mensagem_id:
+            try:
+                mensagem_painel = await canal_painel.fetch_message(int(mensagem_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                mensagem_painel = None
+
+        # O painel fica fixado no primeiro canal configurado. Reexecutar
+        # o comando atualiza a mensagem existente em vez de criar cópias.
+        if mensagem_painel is None:
+            canal_painel = interaction.channel
+            view = await _montar_select(interaction.guild.id)
+            embed = await _montar_embed_painel(interaction.guild.id)
+            mensagem_painel = await canal_painel.send(embed=embed, view=view)
+            await set_config(
+                interaction.guild.id,
+                ticket_painel_canal_id=canal_painel.id,
+                ticket_painel_mensagem_id=mensagem_painel.id,
+            )
+        else:
+            view = await _montar_select(interaction.guild.id)
+            embed = await _montar_embed_painel(interaction.guild.id)
+            await mensagem_painel.edit(embed=embed, view=view)
 
         await interaction.response.send_message(
-            "✅ Painel publicado.",
+            f"✅ Painel oficial configurado em {canal_painel.mention}. "
+            "As próximas atualizações serão feitas nessa mesma mensagem.",
             ephemeral=True,
         )
 
