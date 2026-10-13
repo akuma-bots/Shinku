@@ -389,19 +389,62 @@ class Desafios(commands.Cog):
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        await desafios.definir_resultado(
-            interaction.guild.id,
-            desafio_id,
-            vencedor.id,
-            perdedor_id,
-        )
+        try:
+            resultado_registrado = await desafios.definir_resultado(
+                interaction.guild.id,
+                desafio_id,
+                vencedor.id,
+                perdedor_id,
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao registrar resultado do desafio PvP %s.",
+                desafio_id,
+            )
+            await interaction.followup.send(
+                "Não consegui registrar o resultado no armazenamento. Confira o estado da luta antes de tentar novamente.",
+                ephemeral=True,
+            )
+            return
 
-        await revisoes_cog.abrir_revisao(
-            interaction.guild, canal,
-            tipo="pvp", autor_id=interaction.user.id, referencia_id=desafio_id,
-            print_url=print.url, titulo=f"Luta: <@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
-            descricao=f"Vencedor indicado: {vencedor.mention}",
-        )
+        if not resultado_registrado:
+            await interaction.followup.send(
+                "Esta luta já foi enviada para revisão ou deixou de estar ativa. Não criei outra prova.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            await revisoes_cog.abrir_revisao(
+                interaction.guild, canal,
+                tipo="pvp", autor_id=interaction.user.id, referencia_id=desafio_id,
+                print_url=print.url, titulo=f"Luta: <@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
+                descricao=f"Vencedor indicado: {vencedor.mention}",
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao publicar revisão do desafio PvP %s.",
+                desafio_id,
+            )
+            try:
+                await desafios.definir_status(
+                    interaction.guild.id,
+                    desafio_id,
+                    "aceito",
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Não consegui devolver o desafio %s ao estado aceito.",
+                    desafio_id,
+                )
+            await interaction.followup.send(
+                "Não consegui publicar a prova. Se ela não aparecer no canal de provas, tente enviar o resultado novamente e avise a staff se o problema continuar.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.followup.send(f"✅ Resultado enviado para revisão em {canal.mention}.", ephemeral=True)
 
 
