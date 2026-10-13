@@ -40,7 +40,7 @@ def rank_por_xp(xp: int) -> dict:
 
 
 def proximo_rank(xp: int) -> Optional[dict]:
-    for rank in reversed(RANKS):
+    for rank in RANKS:
         if rank["xp"] > xp:
             return rank
     return None
