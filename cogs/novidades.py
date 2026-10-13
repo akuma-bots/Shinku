@@ -82,12 +82,42 @@ class Novidades(commands.Cog):
 
                 processados = set(str(uid) for uid in release_estado.get("processados", []))
                 embed = discord.Embed(
-                    title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — {release['tipo']} · {release['titulo']}",
-                    description=release["mensagem"],
+                    description=(
+                        "╭────────────── ◈ ──────────────╮\n"
+                        "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE ATUALIZAÇÕES**\n"
+                        "╰────────────── ◈ ──────────────╯\n\n"
+                        f"**{release['titulo']}**\n"
+                        f"{release['mensagem']}\n\n"
+                        "━━━━━━━━━━━━━━━━━━━━\n"
+                        "**◈ O QUE VOCÊ PRECISA SABER**\n"
+                        "Esta mensagem resume as novidades publicadas para a gangue. "
+                        "Consulte /help ou /tutorial para conhecer os comandos e os sistemas."
+                    ),
                     color=0xB3132B,
                     timestamp=datetime.now(timezone.utc),
                 )
-                embed.set_footer(text="NÊMESIS • Novidades automáticas | /avisos-privados para gerenciar recebimento")
+                embed.set_author(
+                    name="NÊMESIS  •  COMUNICADO OFICIAL",
+                    icon_url="https://cdn.discordapp.com/embed/avatars/0.png",
+                )
+                embed.add_field(
+                    name="◈ CATEGORIA",
+                    value=f"**{release['tipo']}**",
+                    inline=True,
+                )
+                embed.add_field(
+                    name="◈ VERSÃO",
+                    value=f"**{release['release_id'][:100]}**",
+                    inline=True,
+                )
+                embed.add_field(
+                    name="◈ ACESSO RÁPIDO",
+                    value="**/tutorial** — guias dos sistemas\n**/help** — central de comandos\n**/avisos-privados** — preferências de DM",
+                    inline=False,
+                )
+                embed.set_footer(
+                    text="NÊMESIS • Atualizações oficiais | Você recebe este aviso por ter ativado as DMs"
+                )
 
                 houve_falha_storage = False
                 for user_id in inscritos:
