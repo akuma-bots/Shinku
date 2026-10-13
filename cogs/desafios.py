@@ -155,18 +155,36 @@ class Desafios(commands.Cog):
             texto += f"\n💰 <@{desafio['vencedor_id']}> ganhou a aposta: +{xp_extra} XP (os {desafio['aposta_xp']} XP de cada lado)."
 
         nova_patente = await calcular_patente_atual(guild.id, pv["xp"])
-        if nova_patente and nova_patente["nome"] != patente_antiga:
-            await definir_patente(guild.id, desafio["vencedor_id"], nova_patente["nome"])
-            membro = guild.get_member(desafio["vencedor_id"])
-            cargo_id = nova_patente.get("cargo_id")
-            if membro and cargo_id:
-                cargo = guild.get_role(cargo_id)
-                if cargo:
-                    try:
-                        await membro.add_roles(cargo, reason="Promoção automática por PvP")
-                    except discord.Forbidden:
-                        pass
+        membro = guild.get_member(int(desafio["vencedor_id"]))
+        patente_mudou = bool(
+            nova_patente and nova_patente["nome"] != patente_antiga
+        )
+        if patente_mudou:
+            await definir_patente(
+                guild.id,
+                int(desafio["vencedor_id"]),
+                nova_patente["nome"],
+            )
             texto += f"\n⬆️ <@{desafio['vencedor_id']}> promovido(a) para **{nova_patente['nome']}**"
+
+        # Verifica o cargo mesmo em uma repetição após falha parcial: o
+        # registro da patente pode ter sido salvo antes de o cargo ser aplicado.
+        cargo_id = nova_patente.get("cargo_id") if nova_patente else None
+        cargo = guild.get_role(int(cargo_id)) if cargo_id else None
+        if membro and cargo and cargo not in membro.roles:
+            try:
+                await membro.add_roles(cargo, reason="Promoção automática por PvP")
+            except discord.Forbidden:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Não foi possível aplicar o cargo de patente %s ao usuário %s.",
+                    cargo.id,
+                    membro.id,
+                )
+                texto += (
+                    f"\n⚠️ As estatísticas foram aplicadas, mas não consegui "
+                    f"atribuir o cargo **{cargo.name}**. Verifique a hierarquia de cargos."
+                )
 
         recordes_cog = self.bot.get_cog("Recordes")
         if recordes_cog:
