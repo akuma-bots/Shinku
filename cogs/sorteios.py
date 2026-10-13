@@ -320,10 +320,11 @@ class Sorteios(commands.Cog):
             ARQUIVO,
             {},
         )
+        if not isinstance(todos, dict):
+            return None
 
-        return todos.get(
-            str(sorteio_id)
-        )
+        sorteio = todos.get(str(sorteio_id))
+        return sorteio if isinstance(sorteio, dict) else None
 
     async def obter_sorteio_por_mensagem(
         self,
@@ -1031,6 +1032,12 @@ class Sorteios(commands.Cog):
             ARQUIVO,
             {},
         )
+        if not isinstance(todos, dict):
+            await interaction.response.send_message(
+                "Não consegui carregar os dados dos sorteios agora.",
+                ephemeral=True,
+            )
+            return
 
         ativos = []
 
