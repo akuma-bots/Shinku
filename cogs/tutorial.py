@@ -13,7 +13,7 @@ TUTORIAIS = {
             "Use /roblox-vincular e depois /roblox-confirmar para associar sua conta Roblox.",
             "Consulte /help para ver os comandos disponíveis para seu cargo.",
         ],
-        "comandos": "/help · /perfil · /roblox-vincular · /avisos-privados",
+        "comandos": "/help · /perfil · /roblox-vincular",
     },
     "missoes": {
         "titulo": "Missões e Contribuições",
