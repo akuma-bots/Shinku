@@ -428,6 +428,15 @@ class Guerras(commands.Cog):
         registro["atualizado_em"] = time.time()
         if observacoes and observacoes.strip():
             registro["ultima_observacao"] = observacoes.strip()[:500]
+        historico_placar = registro.setdefault("historico_placar", [])
+        historico_placar.append({
+            "placar_nemesis": int(placar_nemesis),
+            "placar_inimiga": int(placar_inimiga),
+            "observacao": observacoes.strip()[:500] if observacoes and observacoes.strip() else None,
+            "atualizado_por_id": interaction.user.id,
+            "timestamp": registro["atualizado_em"],
+        })
+        registro["historico_placar"] = historico_placar[-100:]
         await self._salvar_dados_guild(interaction.guild.id, dados)
         nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
         embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ PLACAR ATUALIZADO",
@@ -440,13 +449,24 @@ class Guerras(commands.Cog):
         embed.set_footer(text=f"Atualizado por {interaction.user} • Temporada {registro.get('temporada', 1)}")
         canal = await self._canal_guerras(interaction)
         try:
-            mensagem = await canal.send(embed=embed)
+            mensagem = None
+            if registro.get("mensagem_id") and str(registro.get("canal_id")) == str(canal.id):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["mensagem_id"]))
+                except discord.NotFound:
+                    mensagem = None
+            if mensagem is not None:
+                await mensagem.edit(embed=embed)
+            else:
+                mensagem = await canal.send(embed=embed)
+                registro["mensagem_id"] = mensagem.id
+                registro["canal_id"] = canal.id
             registro["ultima_mensagem_id"] = mensagem.id
             await self._salvar_dados_guild(interaction.guild.id, dados)
         except (discord.Forbidden, discord.HTTPException):
-            await interaction.followup.send("Placar salvo no histórico, mas não consegui publicar a atualização.", ephemeral=True)
+            await interaction.followup.send("Placar salvo no histórico, mas não consegui atualizar o painel da guerra.", ephemeral=True)
             return
-        await interaction.followup.send(f"Placar da guerra {registro['id']} atualizado e publicado.", ephemeral=True)
+        await interaction.followup.send(f"Placar da guerra {registro['id']} atualizado. O histórico das alterações foi preservado.", ephemeral=True)
 
     @app_commands.command(name="guerra-encerrar", description="Encerra uma guerra ativa e publica o resultado definitivo.")
     @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar final da NÊMESIS", placar_inimiga="Placar final da gangue adversária", prova_url="Link da prova (opcional)", observacoes="Observações finais (opcional)")
