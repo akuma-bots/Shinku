@@ -555,7 +555,7 @@ class PainelPunicao(discord.ui.View):
 # AUTOMOD
 # ============================================================
 
-class AutoMod(commands.Cog):
+class AutoMod(commands.GroupCog, group_name="automod", group_description="Configuração e consulta do AutoMod da NÊMESIS."):
 
     def __init__(
         self,
@@ -1968,7 +1968,7 @@ class AutoMod(commands.Cog):
     # ESTATÍSTICAS DE MODERAÇÃO
     # ========================================================
 
-    @app_commands.command(name="automod-estatisticas", description="Mostra as estatísticas de moderação da NÊMESIS.")
+    @app_commands.command(name="estatisticas", description="Mostra as estatísticas de moderação da NÊMESIS.")
     @app_commands.default_permissions(manage_guild=True)
     async def automod_estatisticas(self, interaction: discord.Interaction):
         if interaction.guild is None:
@@ -2000,7 +2000,7 @@ class AutoMod(commands.Cog):
     # CONFIGURAÇÃO DOS NÍVEIS
     # ========================================================
 
-    @app_commands.command(name="automod-configurar-nivel", description="Configura a medida e duração de um nível do AutoMod.")
+    @app_commands.command(name="configurar-nivel", description="Configura a medida e duração de um nível do AutoMod.")
     @app_commands.describe(nivel="Nível entre 1 e 5", medida="Medida a aplicar nesse nível", duracao="Minutos para timeout ou horas para banimento temporário")
     @app_commands.choices(medida=[
         app_commands.Choice(name="Advertência", value="warn"),
@@ -2033,7 +2033,7 @@ class AutoMod(commands.Cog):
     # HISTÓRICO POR MEMBRO
     # ========================================================
 
-    @app_commands.command(name="automod-historico", description="Consulta o histórico recente de decisões de moderação de um membro.")
+    @app_commands.command(name="historico", description="Consulta o histórico recente de decisões de moderação de um membro.")
     @app_commands.describe(membro="Membro cujo histórico será consultado")
     @app_commands.default_permissions(manage_guild=True)
     async def automod_historico(self, interaction: discord.Interaction, membro: discord.Member):
@@ -2075,7 +2075,7 @@ class AutoMod(commands.Cog):
     # ========================================================
 
     @app_commands.command(
-        name="automod-regras",
+        name="regras",
         description=(
             "Mostra as regras utilizadas "
             "pelo AutoMod."
@@ -2151,7 +2151,7 @@ class AutoMod(commands.Cog):
     # ========================================================
 
     @app_commands.command(
-        name="automod-atualizar",
+        name="atualizar",
         description=(
             "Atualiza as regras utilizadas "
             "pelo AutoMod."
@@ -2187,7 +2187,7 @@ class AutoMod(commands.Cog):
     # ========================================================
 
     @app_commands.command(
-        name="automod-status",
+        name="status",
         description=(
             "Verifica o estado do AutoMod."
         ),
