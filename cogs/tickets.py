@@ -331,13 +331,29 @@ class Tickets(commands.Cog):
             )
 
             # Salva o registro depois de publicar a mensagem inicial.
-            await tickets.criar_ticket(
+            ticket_salvo = await tickets.criar_ticket(
                 guild_id=guild.id,
                 usuario_id=user.id,
                 tipo=tipo["valor"],
                 canal_id=canal.id,
                 mensagem_id=mensagem.id,
             )
+
+            # Protege também contra duas instâncias do bot: se a persistência
+            # retornar um ticket anterior, removemos o canal recém-criado.
+            if str(ticket_salvo.get("canal_id")) != str(canal.id):
+                canal_existente_id = int(ticket_salvo.get("canal_id") or 0)
+                try:
+                    await canal.delete(reason="Ticket duplicado detectado")
+                except (discord.Forbidden, discord.HTTPException):
+                    logging.getLogger(__name__).exception(
+                        "Falha ao remover ticket duplicado %s.",
+                        canal.id,
+                    )
+                canal_existente = guild.get_channel(canal_existente_id)
+                if canal_existente is not None:
+                    return canal_existente
+                raise RuntimeError("Já havia um ticket aberto, mas seu canal não foi encontrado.")
         except Exception:
             # Sem registro persistido, não deixamos um canal privado órfão.
             try:
