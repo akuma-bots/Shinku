@@ -33,9 +33,9 @@ class Recordes(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="🏅 Novo recorde!",
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  NOVO RECORDE",
             description=f"{nome}\n<@{user_id}> agora tem **{valor} {unidade}**!",
-            color=0xFEE75C,
+            color=0xB51F32,
         )
         await canal.send(embed=embed)
 
@@ -56,7 +56,7 @@ class Recordes(commands.Cog):
         for categoria, dado in todos.items():
             nome, unidade = NOMES_CATEGORIA.get(categoria, (categoria, ""))
             linhas.append(f"{nome}: <@{dado['user_id']}> — **{dado['valor']} {unidade}**")
-        embed = discord.Embed(title="🏅 Recordes do servidor", description="\n".join(linhas), color=0xFEE75C)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ARQUIVO DE RECORDES", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
 
