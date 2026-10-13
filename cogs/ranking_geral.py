@@ -22,6 +22,7 @@ from utils.competitivo_sync import (
     ARQUIVO_COMPETITIVO,
     migrar_perfil_se_necessario,
     registrar_tempo_top_global,
+    reiniciar_temporada_global,
 )
 
 
@@ -568,6 +569,36 @@ class RankingGeral(
         await interaction.response.send_message(
             embed=embed
         )
+
+
+    @app_commands.command(
+        name="temporada-reiniciar",
+        description="Encerra a temporada atual e inicia outra sem apagar estatísticas acumuladas.",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def temporada_reiniciar(
+        self,
+        interaction: discord.Interaction,
+    ):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            dados = await reiniciar_temporada_global()
+            estado = dados.get("temporada_global", {})
+            numero = int(estado.get("numero", 2) or 2)
+            await interaction.followup.send(
+                f"Temporada reiniciada. A nova temporada é **#{numero}** e dura 30 dias. "
+                "Pontos sazonais foram zerados; o histórico da temporada anterior, "
+                "P.C. acumulados, XP, vitórias, derrotas e tempo no Top 10 foram preservados.",
+                ephemeral=True,
+            )
+            if interaction.guild:
+                await self._atualizar_painel(interaction.guild)
+        except Exception as erro:
+            print(f"[RankingGeral] Falha ao reiniciar temporada: {erro}")
+            await interaction.followup.send(
+                "Não foi possível reiniciar a temporada. Verifique os logs do bot.",
+                ephemeral=True,
+            )
 
 
 async def setup(
