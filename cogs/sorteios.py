@@ -291,7 +291,7 @@ class BotaoParticipar(discord.ui.View):
         )
 
 
-class Sorteios(commands.Cog):
+class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gerenciamento dos sorteios da NÊMESIS."):
 
     def __init__(
         self,
