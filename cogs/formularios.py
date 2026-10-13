@@ -213,6 +213,8 @@ class ModalFormulario(discord.ui.Modal):
             self.formulario["id"],
             interaction.user.id,
             todas_respostas,
+            autor_nome=getattr(interaction.user, "global_name", None)
+            or interaction.user.display_name,
         )
         cog = interaction.client.get_cog("Formularios")
         if cog is not None:
