@@ -1132,47 +1132,35 @@ class Sorteios(commands.Cog):
             print(f"[SORTEIOS] Não encerrei {sorteio.get('id')}: canal de anúncio indisponível.")
             return
 
-        participantes = list(
-            sorteio.get(
-                "participantes",
-                [],
-            )
-        )
+        async with _SORTEIOS_LOCK:
+            todos = await carregar(ARQUIVO, {})
+            atual = todos.get(str(sorteio.get("id"))) if isinstance(todos, dict) else None
+            if not isinstance(atual, dict):
+                print(f"[SORTEIOS] Registro {sorteio.get('id')} não encontrado ao encerrar.")
+                return
+            if atual.get("encerrado"):
+                return
 
-        quantidade_solicitada = int(
-            sorteio.get(
-                "vencedores",
-                1,
-            )
-        )
+            participantes = list(atual.get("participantes", []))
+            try:
+                quantidade_solicitada = max(1, min(100, int(atual.get("vencedores", 1))))
+            except (TypeError, ValueError):
+                quantidade_solicitada = 1
 
-        quantidade_real = min(
-            quantidade_solicitada,
-            len(participantes),
-        )
+            quantidade_real = min(quantidade_solicitada, len(participantes))
+            vencedores_ids = random.sample(participantes, quantidade_real) if quantidade_real > 0 else []
+            agora = time.time()
 
-        vencedores_ids = []
+            atual["encerrado"] = True
+            atual["vencedores_ids"] = vencedores_ids
+            atual["encerrado_em"] = agora
+            atual["atualizado_em"] = agora
+            todos[str(atual["id"])] = atual
+            await salvar(ARQUIVO, todos)
 
-        if quantidade_real > 0:
-            vencedores_ids = random.sample(
-                participantes,
-                quantidade_real,
-            )
-
-        agora = time.time()
-
-        sorteio["encerrado"] = True
-
-        sorteio["vencedores_ids"] = (
-            vencedores_ids
-        )
-
-        sorteio["encerrado_em"] = agora
-        sorteio["atualizado_em"] = agora
-
-        await self.salvar_sorteio(
-            sorteio
-        )
+            # Propaga o estado mais recente ao restante do fluxo de anúncio.
+            sorteio.clear()
+            sorteio.update(atual)
 
         # Atualiza os botões da mensagem original.
         await self.atualizar_mensagem(
