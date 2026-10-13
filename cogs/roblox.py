@@ -162,8 +162,27 @@ class Roblox(commands.Cog):
 
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
         guild_dados = vinculos.setdefault(str(interaction.guild.id), {})
+        roblox_id = int(pendente["roblox_id"])
+        vinculo_existente = next(
+            (
+                discord_id
+                for discord_id, dados in guild_dados.items()
+                if str(discord_id) != str(interaction.user.id)
+                and isinstance(dados, dict)
+                and str(dados.get("roblox_id")) == str(roblox_id)
+            ),
+            None,
+        )
+        if vinculo_existente is not None:
+            await interaction.followup.send(
+                "Esta conta Roblox já está vinculada a outro perfil Discord da NÊMESIS. "
+                "Se você acredita que houve um erro, abra um ticket para a staff verificar.",
+                ephemeral=True,
+            )
+            return
+
         guild_dados[str(interaction.user.id)] = {
-            "roblox_id": pendente["roblox_id"],
+            "roblox_id": roblox_id,
             "roblox_username": pendente["roblox_username"],
         }
         await salvar(ARQUIVO_VINCULOS, vinculos)
@@ -216,6 +235,48 @@ class Roblox(commands.Cog):
 
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={vinculo['roblox_id']}&width=150&height=150&format=png")
         await interaction.followup.send(embed=embed)
+
+    @app_commands.command(
+        name="roblox-identificar",
+        description="Encontra o membro da NÊMESIS que vinculou um nome de usuário Roblox.",
+    )
+    @app_commands.describe(usuario_roblox="Nome exato da conta Roblox já verificada")
+    async def roblox_identificar(self, interaction: discord.Interaction, usuario_roblox: str):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Use este comando dentro do servidor da NÊMESIS.", ephemeral=True
+            )
+            return
+
+        vinculos = await carregar(ARQUIVO_VINCULOS, {})
+        guild_dados = vinculos.get(str(interaction.guild.id), {})
+        procurado = usuario_roblox.strip().casefold()
+        encontrado = next(
+            (
+                (discord_id, dados)
+                for discord_id, dados in guild_dados.items()
+                if isinstance(dados, dict)
+                and str(dados.get("roblox_username", "")).casefold() == procurado
+            ),
+            None,
+        )
+        if encontrado is None:
+            await interaction.response.send_message(
+                "Não encontrei esse nome entre as contas Roblox verificadas da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        discord_id, dados = encontrado
+        membro = interaction.guild.get_member(int(discord_id))
+        nome_membro = membro.mention if membro else f"ID Discord: {discord_id}"
+        roblox_id = int(dados["roblox_id"])
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ IDENTIFICAÇÃO ROBLOX",
+            description=f"Conta Roblox: {dados['roblox_username']} (https://www.roblox.com/users/{roblox_id}/profile)\nMembro Discord: {nome_membro}",
+            color=0xB3132B,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ---------------- Cargo automático por rank do grupo ----------------
 
