@@ -109,9 +109,12 @@ class ProgressaoGangue(commands.Cog):
         config = await self._config(guild.id)
         cargos = config.get("cargos", {})
         cargo_alvo_id = cargos.get(str(rank["no"]))
+        # Não mexe nos cargos atuais enquanto este rank não tiver cargo configurado.
+        if not cargo_alvo_id:
+            return
         ids_progressao = {int(cid) for cid in cargos.values() if str(cid).isdigit()}
-        remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != int(cargo_alvo_id or 0)]
-        adicionar = guild.get_role(int(cargo_alvo_id)) if cargo_alvo_id else None
+        remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != int(cargo_alvo_id)]
+        adicionar = guild.get_role(int(cargo_alvo_id))
         try:
             if remover:
                 await membro.remove_roles(*remover, reason="Atualização automática da progressão da NÊMESIS")
