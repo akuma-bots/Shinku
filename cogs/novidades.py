@@ -117,7 +117,7 @@ class Novidades(commands.Cog):
                     inline=False,
                 )
                 embed.set_footer(
-                    text="NÊMESIS • Atualizações oficiais | Você recebe este aviso por ter ativado as DMs"
+                    text="NÊMESIS • Atualizações oficiais | Envio destinado a todos os membros"
                 )
 
                 houve_falha_storage = False
@@ -132,9 +132,9 @@ class Novidades(commands.Cog):
                             membro = await guild.fetch_member(int(uid))
                         await membro.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
                     except discord.Forbidden:
-                        logger.info("DM indisponível para inscrito %s; marcado como processado.", uid)
+                        logger.info("DM indisponível para membro %s; marcado como processado.", uid)
                     except discord.NotFound:
-                        logger.info("Inscrito %s não está mais no servidor.", uid)
+                        logger.info("Membro %s não está mais no servidor.", uid)
                     except (discord.HTTPException, ValueError, TypeError):
                         logger.exception("Falha ao entregar novidade ao usuário %s.", uid)
                     except Exception:
