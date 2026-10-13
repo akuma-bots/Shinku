@@ -12,7 +12,10 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **PvP:** desafios entre membros, apostas de XP, envio de resultados e revisão.
 - **Guerras:** registro de resultados, guerras em andamento, atualização de placar, regras, cancelamento e histórico.
 - **Progressão da gangue:** XP de participação, ranks, cargos configuráveis e recompensas.
-- **Perfil e competitivo:** XP, patentes, vitórias, derrotas, KDR, P.C., temporadas e rankings.
+- **Perfil e competitivo:** XP, patentes, vitórias, derrotas, KDR, P.C., temporadas e rankings; o perfil também exibe a conta Roblox verificada.
+- **Roblox:** vínculo por código de verificação, consulta de perfil, identificação de membros pelo nome Roblox e sincronização opcional de cargos por rank.
+- **Tutoriais:** central interativa `/tutorial` com guias para missões, PvP, guerras, moderação, provas, sorteios, tickets, eventos, formulários, Roblox e outros sistemas.
+- **Novidades por DM:** releases anunciados automaticamente aos membros que ativaram `/avisos-privados`, com registro persistente para evitar repetição em reinicializações.
 - **Sorteios:** embeds, botões de participação, requisitos informativos, prêmios, término automático e seleção de vencedores.
 - **Recordes, eventos e parcerias:** registros e anúncios nos canais configurados.
 - **Dashboard:** compartilhamento de dados com o site da NÊMESIS por meio do Upstash.
@@ -89,3 +92,10 @@ O workflow é uma primeira barreira de qualidade; não substitui testes funciona
 2. Confira o resultado do workflow de validação.
 3. Teste o comportamento no servidor de desenvolvimento antes de usar recursos administrativos ou recompensas no servidor oficial.
 4. Documente mudanças em comandos, armazenamento e variáveis de ambiente.
+
+## Tutoriais e avisos automáticos
+
+- O comando `/tutorial` abre uma central interativa de tutoriais por sistema.
+- Cada membro controla os comunicados privados com `/avisos-privados`. Por padrão, as novidades automáticas são enviadas apenas a quem optou por recebê-las; DMs fechadas não interrompem o restante do envio.
+- Ao publicar uma nova versão com novidades para anunciar, atualize `config/novidades.json`: altere `release_id` para um identificador novo e revise `titulo`, `tipo` e `mensagem`. O bot registra os usuários processados no armazenamento compartilhado para não reenviar a mesma versão após reiniciar.
+- Para vincular o Roblox, o membro usa `/roblox-vincular`, adiciona temporariamente o código à descrição do perfil Roblox e confirma com `/roblox-confirmar`. A mesma conta Roblox não pode ser vinculada a dois membros diferentes.
