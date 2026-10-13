@@ -1,3 +1,5 @@
+import hashlib
+import json
 import logging
 import time
 
@@ -294,6 +296,21 @@ class Formularios(commands.Cog):
             embeds = _embeds_painel(item)
             view = _view_painel(item)
 
+            # Assinatura do conteúdo publicado. O site é consultado a cada ciclo,
+            # mas o Discord só recebe PATCH quando o painel realmente mudou.
+            assinatura_painel = hashlib.sha256(
+                json.dumps(
+                    {
+                        "embeds": [embed.to_dict() for embed in embeds],
+                        "ativo": item.get("ativo") is not False,
+                        "tem_perguntas": bool(_perguntas_flat(item)),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+
             # Compatibilidade com o formato antigo (um único message_id).
             ids_mensagens = []
             if isinstance(registro, dict):
@@ -319,10 +336,13 @@ class Formularios(commands.Cog):
                             view=view if indice == 0 else None,
                         )
                     else:
-                        await mensagem.edit(
-                            embed=embed,
-                            view=view if indice == 0 else None,
-                        )
+                        # Evita PATCH repetido a cada 60 segundos: a mensagem só
+                        # é editada quando o conteúdo do formulário foi alterado.
+                        if registro.get("assinatura") != assinatura_painel:
+                            await mensagem.edit(
+                                embed=embed,
+                                view=view if indice == 0 else None,
+                            )
                     mensagens.append(int(mensagem.id))
                 except (discord.Forbidden, discord.HTTPException):
                     # Não apaga registros antigos se o Discord recusar a operação.
@@ -344,6 +364,7 @@ class Formularios(commands.Cog):
                 "channel_id": int(canal.id),
                 "message_id": mensagens[0],
                 "message_ids": mensagens,
+                "assinatura": assinatura_painel,
             }
 
         for formulario_id in list(registros):
