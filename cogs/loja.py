@@ -39,7 +39,7 @@ class Loja(commands.Cog):
             await interaction.response.send_message("A loja está vazia no momento.", ephemeral=True)
             return
         linhas = [f"**{i['nome']}** — {i['preco_xp']} XP (ID: `{i['id']}`)\n{i['descricao']}" for i in itens]
-        embed = discord.Embed(title="🛒 Loja de recompensas", description="\n\n".join(linhas), color=0x5865F2)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ARSENAL DE RECOMPENSAS", description="\n\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="loja-comprar", description="Compra um item da loja com seu XP.")
