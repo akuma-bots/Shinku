@@ -343,9 +343,9 @@ class Tickets(commands.Cog):
     ):
         config = await get_config(interaction.guild.id)
 
-        # Na primeira configuração, substitui todas as categorias antigas
-        # pelo modelo oficial NÊMESIS; depois, preserva ajustes administrativos.
-        if not config.get("ticket_modelo_v2"):
+        # Migração única para a lista oficial: remove categorias antigas,
+        # aplica Alianças e mantém somente as oito categorias aprovadas.
+        if not config.get("ticket_modelo_v3"):
             await tickets.set_tipos(
                 interaction.guild.id,
                 list(tickets.TIPOS_PADRAO),
@@ -353,6 +353,7 @@ class Tickets(commands.Cog):
             await set_config(
                 interaction.guild.id,
                 ticket_modelo_v2=True,
+                ticket_modelo_v3=True,
             )
             config = await get_config(interaction.guild.id)
 
