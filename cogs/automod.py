@@ -455,6 +455,11 @@ class ConfirmarDecisaoView(discord.ui.View):
         if cog is None:
             await interaction.response.send_message("O AutoMod não está disponível.", ephemeral=True)
             return
+        chave_decisao = (self.guild_id, self.message_id)
+        if chave_decisao in cog.decisoes_em_andamento:
+            await interaction.response.send_message("Já existe uma decisão em andamento para esta infração.", ephemeral=True)
+            return
+        cog.decisoes_em_andamento.add(chave_decisao)
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
             if self.nivel == 0:
@@ -467,12 +472,14 @@ class ConfirmarDecisaoView(discord.ui.View):
                 item.disabled = True
             await interaction.edit_original_response(content=resultado, view=self)
             await interaction.followup.send(resultado, ephemeral=True)
-        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
+        except Exception as erro:
             print(f"[AUTOMOD][ERRO] Falha na decisão confirmada: {erro}")
             await interaction.followup.send(
                 "Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
                 ephemeral=True,
             )
+        finally:
+            cog.decisoes_em_andamento.discard(chave_decisao)
 
     @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖️")
     async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -566,6 +573,7 @@ class AutoMod(commands.Cog):
         self.regras_cache_timestamp = 0
 
         self.punicoes_em_andamento = set()
+        self.decisoes_em_andamento = set()
 
         self.verificar_banimentos.start()
 
@@ -1994,6 +2002,47 @@ class AutoMod(commands.Cog):
             "A configuração é persistida no armazenamento compartilhado.",
             ephemeral=True,
         )
+
+    # ========================================================
+    # HISTÓRICO POR MEMBRO
+    # ========================================================
+
+    @app_commands.command(name="automod-historico", description="Consulta o histórico recente de decisões de moderação de um membro.")
+    @app_commands.describe(membro="Membro cujo histórico será consultado")
+    @app_commands.default_permissions(manage_guild=True)
+    async def automod_historico(self, interaction: discord.Interaction, membro: discord.Member):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        decisoes = await carregar("automod_decisoes.json", {})
+        registros = [
+            item for item in decisoes.get(str(interaction.guild.id), [])
+            if int(item.get("membro_id", 0)) == membro.id
+        ]
+        registros.sort(key=lambda item: float(item.get("timestamp", 0)), reverse=True)
+        registros = registros[:10]
+        embed = discord.Embed(
+            title="📋 Histórico AutoMod",
+            description=f"**Membro:** {membro.mention}\n**Decisões registradas:** {len([x for x in decisoes.get(str(interaction.guild.id), []) if int(x.get('membro_id', 0)) == membro.id])}",
+            color=discord.Color.blurple(),
+        )
+        if not registros:
+            embed.add_field(name="Histórico", value="Nenhuma decisão registrada pelo novo sistema.", inline=False)
+        else:
+            linhas = []
+            for item in registros:
+                data = datetime.datetime.fromtimestamp(float(item.get("timestamp", 0)), datetime.timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
+                resultado = "Não punido" if item.get("tipo") == "nao_punido" else f"Punido — nível {item.get('nivel', '?')}"
+                linhas.append(f"**{data}** · {resultado}\nInfração: {item.get('infracao', 'Não informada')}\nMotivo: {item.get('motivo', 'Não informado')[:180]}")
+            embed.add_field(name="Últimas decisões", value="\n\n".join(linhas)[:1024], inline=False)
+        punicoes = await historico_punicoes(interaction.guild.id, membro.id, limite=10)
+        if punicoes:
+            linhas_punicoes = []
+            for item in punicoes[:5]:
+                data = datetime.datetime.fromtimestamp(float(item.get("timestamp", 0)), datetime.timezone.utc).strftime("%d/%m/%Y")
+                linhas_punicoes.append(f"• {data} — {item.get('tipo', 'registro')}: {item.get('motivo', 'Sem motivo')[:120]}")
+            embed.add_field(name="Histórico de punições", value="\n".join(linhas_punicoes)[:1024], inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ========================================================
     # COMANDO — REGRAS
