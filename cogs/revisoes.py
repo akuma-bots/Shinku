@@ -196,8 +196,27 @@ class Revisoes(commands.Cog):
 
         if acao == "aprovar":
             revisao = await revisoes.aprovar(interaction.guild.id, revisao_id, interaction.user.id)
+            if not revisao:
+                await interaction.followup.send(
+                    "Esta revisão já foi processada por outra interação. Atualize a mensagem antes de tentar novamente.",
+                    ephemeral=True,
+                )
+                return
             processador = self.bot.processadores_revisao.get(revisao["tipo"])
-            resultado_texto = await processador(interaction.guild, revisao) if processador else None
+            try:
+                resultado_texto = await processador(interaction.guild, revisao) if processador else None
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Falha ao aplicar recompensa da revisão %s (tipo=%s).",
+                    revisao_id,
+                    revisao.get("tipo"),
+                )
+                await interaction.followup.send(
+                    "A aprovação foi registrada, mas houve uma falha ao aplicar a recompensa. A equipe técnica precisa verificar os logs antes de repetir a operação.",
+                    ephemeral=True,
+                )
+                return
 
             embed = _embed_revisao(revisao)
             embed.color = 0x57F287
