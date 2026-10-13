@@ -179,11 +179,19 @@ class Revisoes(commands.Cog):
         if not custom_id.startswith("revisao:"):
             return
 
-        if not interaction.user.guild_permissions.administrator:
+        if interaction.guild is None:
+            return
+
+        permissoes = getattr(interaction.user, "guild_permissions", None)
+        if permissoes is None or not permissoes.administrator:
             await interaction.response.send_message("Só administradores podem revisar isso.", ephemeral=True)
             return
 
-        _, acao, revisao_id = custom_id.split(":", 2)
+        partes = custom_id.split(":", 2)
+        if len(partes) != 3 or partes[1] not in {"aprovar", "rejeitar"} or not partes[2]:
+            await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
+            return
+        _, acao, revisao_id = partes
         revisao = await revisoes.get(interaction.guild.id, revisao_id)
         if not revisao:
             await interaction.response.send_message("Essa revisão não existe mais.", ephemeral=True)
