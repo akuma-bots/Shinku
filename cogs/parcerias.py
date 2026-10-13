@@ -490,9 +490,9 @@ class Parcerias(commands.Cog):
         }
 
         embed = discord.Embed(
-            title=f"🤝 Nova parceria: {nome}",
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  NOVA PARCERIA: {nome}",
             description=descricao,
-            color=0x57F287,
+            color=0xB51F32,
         )
 
         embed.add_field(
@@ -734,7 +734,7 @@ class Parcerias(commands.Cog):
                 description=parceria[
                     "descricao"
                 ],
-                color=0x5865F2,
+                color=0xB51F32,
             )
 
             embed.add_field(
