@@ -338,7 +338,7 @@ class Formularios(commands.Cog):
                     else:
                         # Evita PATCH repetido a cada 60 segundos: a mensagem só
                         # é editada quando o conteúdo do formulário foi alterado.
-                        if registro.get("assinatura") != assinatura_painel:
+                        if not isinstance(registro, dict) or registro.get("assinatura") != assinatura_painel:
                             await mensagem.edit(
                                 embed=embed,
                                 view=view if indice == 0 else None,
