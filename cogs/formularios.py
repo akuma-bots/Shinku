@@ -116,10 +116,10 @@ def _embeds_painel(formulario: dict) -> list[discord.Embed]:
     embeds = []
     for indice, parte in enumerate(partes, start=1):
         titulo_parte = titulo if indice == 1 else f"{titulo[:230]} (continuação {indice}/{len(partes)})"
-        embed = discord.Embed(title=titulo_parte, description=parte, color=0x5865F2)
+        embed = discord.Embed(title=titulo_parte, description=parte, color=0xB51F32)
         if indice == 1 and formulario.get("banner_url"):
             embed.set_image(url=str(formulario["banner_url"]))
-        embed.set_footer(text=f"NÊMESIS • Formulário sincronizado com o site • {indice}/{len(partes)}")
+        embed.set_footer(text=f"NÊMESIS • CENTRAL DE FORMULÁRIOS • {indice}/{len(partes)}")
         embeds.append(embed)
     return embeds
 
@@ -233,7 +233,7 @@ def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> 
     embeds = []
     for indice, bloco in enumerate(blocos, start=1):
         titulo = titulo_base if len(blocos) == 1 else f"{titulo_base[:220]} ({indice}/{len(blocos)})"
-        embed = discord.Embed(title=titulo[:256], color=0x5865F2)
+        embed = discord.Embed(title=titulo[:256], color=0xB51F32)
         embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
         for pergunta, resp in bloco:
             embed.add_field(
@@ -490,7 +490,7 @@ class Formularios(commands.Cog):
             )
             titulo_pagina = pagina.get("titulo") if isinstance(pagina, dict) else f"Página {i}"
             blocos.append(f"**{titulo_pagina or f'Página {i}'}**\n{perguntas_texto}")
-        embed = discord.Embed(title=f"📋 Páginas — {formulario['nome']}", description="\n\n".join(blocos), color=0x5865F2)
+        embed = discord.Embed(title=f"📋 Páginas — {formulario['nome']}", description="\n\n".join(blocos), color=0xB51F32)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="formulario-listar", description="Lista os formulários configurados.")
@@ -506,7 +506,7 @@ class Formularios(commands.Cog):
             f"{len(f['cargos_notificar'])} cargo(s) notificado(s)"
             for f in lista
         ]
-        embed = discord.Embed(title="📋 Formulários configurados", description="\n".join(linhas), color=0x5865F2)
+        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE FORMULÁRIOS", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="formulario-remover", description="Remove um formulário.")
