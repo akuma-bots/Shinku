@@ -51,26 +51,53 @@ def _view_desafio(desafio_id: str) -> discord.ui.View:
     return view
 
 
-async def _atualizar_stats_pvp(guild_id: int, vencedor_id: int, perdedor_id: int, xp_extra_vencedor: int = 0):
+async def _atualizar_stats_pvp(
+    guild_id: int,
+    vencedor_id: int,
+    perdedor_id: int,
+    xp_extra_vencedor: int = 0,
+    desafio_id: str = "",
+):
+    """
+    Aplica as estatísticas uma vez por desafio e por perfil.
+    O marcador é salvo junto com as estatísticas para que uma falha parcial
+    possa ser retomada sem duplicar a recompensa já persistida.
+    """
+    evento_id = f"pvp:{desafio_id}" if desafio_id else ""
+
     pv = await get_perfil(guild_id, vencedor_id)
-    patente_antiga = pv["patente"]
-    pv["vitorias"] += 1
-    pv["kills"] += 1
-    pv["xp"] += XP_VITORIA_PVP + xp_extra_vencedor
-    await _salvar_perfil(guild_id, vencedor_id, pv)
+    patente_antiga = pv.get("patente")
+    eventos_vitoria = pv.get("resultados_pvp_aplicados", [])
+    if not isinstance(eventos_vitoria, list):
+        eventos_vitoria = []
+    if not evento_id or evento_id not in eventos_vitoria:
+        pv["vitorias"] = int(pv.get("vitorias", 0) or 0) + 1
+        pv["kills"] = int(pv.get("kills", 0) or 0) + 1
+        pv["xp"] = int(pv.get("xp", 0) or 0) + XP_VITORIA_PVP + xp_extra_vencedor
+        if evento_id:
+            eventos_vitoria.append(evento_id)
+            pv["resultados_pvp_aplicados"] = eventos_vitoria[-1000:]
+        await _salvar_perfil(guild_id, vencedor_id, pv)
     try:
         await sincronizar_perfil_site(guild_id, vencedor_id)
-    except Exception:
-        pass
+    except Exception as erro:
+        print(f"[PvP] Falha ao sincronizar vencedor {vencedor_id}: {erro}")
 
     pp = await get_perfil(guild_id, perdedor_id)
-    pp["derrotas"] += 1
-    pp["deaths"] += 1
-    await _salvar_perfil(guild_id, perdedor_id, pp)
+    eventos_derrota = pp.get("resultados_pvp_aplicados", [])
+    if not isinstance(eventos_derrota, list):
+        eventos_derrota = []
+    if not evento_id or evento_id not in eventos_derrota:
+        pp["derrotas"] = int(pp.get("derrotas", 0) or 0) + 1
+        pp["deaths"] = int(pp.get("deaths", 0) or 0) + 1
+        if evento_id:
+            eventos_derrota.append(evento_id)
+            pp["resultados_pvp_aplicados"] = eventos_derrota[-1000:]
+        await _salvar_perfil(guild_id, perdedor_id, pp)
     try:
         await sincronizar_perfil_site(guild_id, perdedor_id)
-    except Exception:
-        pass
+    except Exception as erro:
+        print(f"[PvP] Falha ao sincronizar perdedor {perdedor_id}: {erro}")
 
     return pv, patente_antiga
 
@@ -107,9 +134,19 @@ class Desafios(commands.Cog):
         desafio = await desafios.get(guild.id, revisao["referencia_id"])
         if not desafio:
             return "⚠️ Desafio original não foi encontrado."
+        if desafio.get("status") == "concluido":
+            return "Este resultado PvP já havia sido aplicado; nenhuma recompensa foi duplicada."
+        if desafio.get("status") not in {"aguardando_revisao", "aceito"}:
+            return f"⚠️ O desafio está no estado `{desafio.get('status', 'desconhecido')}` e não pode ser processado."
 
-        xp_extra = desafio["aposta_xp"] * 2 if desafio["aposta_xp"] > 0 else 0
-        pv, patente_antiga = await _atualizar_stats_pvp(guild.id, desafio["vencedor_id"], desafio["perdedor_id"], xp_extra)
+        xp_extra = int(desafio.get("aposta_xp", 0) or 0) * 2
+        pv, patente_antiga = await _atualizar_stats_pvp(
+            guild.id,
+            int(desafio["vencedor_id"]),
+            int(desafio["perdedor_id"]),
+            xp_extra,
+            desafio_id=str(desafio["id"]),
+        )
         await desafios.definir_status(guild.id, desafio["id"], "concluido")
 
         texto = f"🏆 <@{desafio['vencedor_id']}> venceu! +{XP_VITORIA_PVP} XP, +1 vitória. <@{desafio['perdedor_id']}> +1 derrota."
