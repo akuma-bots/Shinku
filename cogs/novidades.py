@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -134,10 +135,16 @@ class Novidades(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        guild_id = getattr(self.bot, "nemesis_guild_id", None)
-        if guild_id is None:
+        guild_id = os.getenv("NEMESIS_GUILD_ID")
+        if not guild_id:
+            logger.error("NEMESIS_GUILD_ID não configurado; novidades automáticas ignoradas.")
             return
-        guild = self.bot.get_guild(int(guild_id))
+        try:
+            guild_id = int(guild_id)
+        except (TypeError, ValueError):
+            logger.error("NEMESIS_GUILD_ID inválido; novidades automáticas ignoradas.")
+            return
+        guild = self.bot.get_guild(guild_id)
         if guild is not None:
             await self._anunciar_release(guild)
 
