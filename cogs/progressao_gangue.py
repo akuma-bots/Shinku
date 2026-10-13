@@ -98,6 +98,50 @@ class ProgressaoGangue(commands.Cog):
             guild.setdefault("membros", {})[str(user_id)] = perfil
             await self._salvar_dados(dados)
 
+    async def _transferir_xp(self, guild_id: int, origem_id: int, destino_id: int, quantidade: int) -> tuple[dict, dict]:
+        """Executa a transferência como uma única operação de leitura/alteração/gravação."""
+        async with self._lock:
+            dados = await self._dados()
+            guild = dados.setdefault(str(guild_id), {})
+            membros = guild.setdefault("membros", {})
+
+            def obter(uid: int) -> dict:
+                perfil = membros.setdefault(str(uid), {
+                    "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
+                    "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+                })
+                perfil.setdefault("xp", 0)
+                perfil.setdefault("mensagens", 0)
+                perfil.setdefault("missoes", 0)
+                perfil.setdefault("guerras", 0)
+                perfil.setdefault("rank_no", 10)
+                perfil.setdefault("ultimo_xp", 0)
+                perfil.setdefault("historico_ranks", [])
+                return perfil
+
+            origem = obter(origem_id)
+            destino = obter(destino_id)
+            saldo_origem = max(0, int(origem.get("xp", 0)))
+            if quantidade <= 0:
+                raise ValueError("A quantidade precisa ser maior que zero.")
+            if saldo_origem < quantidade:
+                raise ValueError(f"Saldo insuficiente. Você possui {saldo_origem:,} XP.".replace(",", "."))
+            origem["xp"] = saldo_origem - quantidade
+            destino["xp"] = max(0, int(destino.get("xp", 0))) + quantidade
+            origem["rank_no"] = rank_por_xp(origem["xp"])["no"]
+            destino["rank_no"] = rank_por_xp(destino["xp"])["no"]
+
+            historico = guild.setdefault("transferencias_xp", [])
+            historico.append({
+                "de": str(origem_id),
+                "para": str(destino_id),
+                "quantidade": quantidade,
+                "timestamp": int(time.time()),
+            })
+            guild["transferencias_xp"] = historico[-500:]
+            await self._salvar_dados(dados)
+            return dict(origem), dict(destino)
+
     async def _config(self, guild_id: int) -> dict:
         dados = await self._dados()
         guild = dados.setdefault(str(guild_id), {})
@@ -340,6 +384,97 @@ class ProgressaoGangue(commands.Cog):
             f"**Total:** {perfil['xp']:,} XP · **Rank:** No.{rank_novo['no']} — {rank_novo['nome']}".replace(",", "."),
             ephemeral=True,
         )
+
+    @app_commands.command(name="gangue-banco", description="Consulta seu saldo de XP transferível da NÊMESIS.")
+    async def gangue_banco(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        perfil = await self._perfil(interaction.guild.id, interaction.user.id)
+        xp = max(0, int(perfil.get("xp", 0)))
+        rank = rank_por_xp(xp)
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  BANCO DE EXPERIÊNCIA",
+            description=(
+                f"**Titular:** {interaction.user.mention}\n"
+                f"**Saldo disponível:** **{xp:,} XP**\n"
+                f"**Rank atual:** ╭・𝐍̷𝐨.{rank['no']} — {rank['nome']}\n\n"
+                "Use `/gangue-doar-xp` para transferir XP a outro membro. "
+                "O valor doado sai do seu saldo e entra no saldo do destinatário."
+            ).replace(",", "."),
+            color=0xB51F32,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="NÊMESIS • BANCO DE XP • Transferências registradas")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="gangue-doar-xp", description="Transfere XP do seu saldo para outro membro da NÊMESIS.")
+    @app_commands.describe(destinatario="Membro que receberá a transferência", quantidade="Quantidade de XP a transferir")
+    async def gangue_doar_xp(
+        self,
+        interaction: discord.Interaction,
+        destinatario: discord.Member,
+        quantidade: app_commands.Range[int, 1, 10000],
+    ):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        if destinatario.bot:
+            await interaction.response.send_message("Não é possível transferir XP para bots.", ephemeral=True)
+            return
+        if destinatario.id == interaction.user.id:
+            await interaction.response.send_message("Você não pode transferir XP para si mesmo.", ephemeral=True)
+            return
+
+        try:
+            perfil_origem, perfil_destino = await self._transferir_xp(
+                interaction.guild.id, interaction.user.id, destinatario.id, int(quantidade)
+            )
+        except ValueError as erro:
+            await interaction.response.send_message(str(erro), ephemeral=True)
+            return
+
+        rank_origem = rank_por_xp(int(perfil_origem["xp"]))
+        rank_destino = rank_por_xp(int(perfil_destino["xp"]))
+        membro_origem = interaction.guild.get_member(interaction.user.id)
+        if membro_origem:
+            await self._aplicar_cargo_rank(interaction.guild, membro_origem, rank_origem)
+        await self._aplicar_cargo_rank(interaction.guild, destinatario, rank_destino)
+
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  TRANSFERÊNCIA CONCLUÍDA",
+            description=(
+                f"**Remetente:** {interaction.user.mention}\n"
+                f"**Destinatário:** {destinatario.mention}\n"
+                f"**Transferido:** **{int(quantidade):,} XP**\n\n"
+                f"**Seu saldo após a transferência:** {int(perfil_origem['xp']):,} XP\n"
+                f"**Saldo do destinatário:** {int(perfil_destino['xp']):,} XP"
+            ).replace(",", "."),
+            color=0xB51F32,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="NÊMESIS • BANCO DE XP • Operação registrada no histórico")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        canal = interaction.guild.get_channel(CANAL_PROGRESSAO_ID)
+        if isinstance(canal, discord.TextChannel):
+            registro = discord.Embed(
+                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  REGISTRO BANCÁRIO",
+                description=(
+                    f"**De:** {interaction.user.mention}\n"
+                    f"**Para:** {destinatario.mention}\n"
+                    f"**Valor:** {int(quantidade):,} XP"
+                ).replace(",", "."),
+                color=0x454545,
+                timestamp=discord.utils.utcnow(),
+            )
+            try:
+                await canal.send(
+                    embed=registro,
+                    allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
 
     @app_commands.command(name="gangue-configurar-cargo", description="Vincula um cargo Discord a um rank de progressão.")
     @app_commands.describe(rank_no="Número do rank de membro (1 a 10)", cargo="Cargo atribuído automaticamente ao alcançar o rank")
