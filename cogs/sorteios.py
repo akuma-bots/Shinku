@@ -1,6 +1,7 @@
 import time
 import uuid
 import random
+import re
 
 import discord
 from discord import app_commands
@@ -714,9 +715,50 @@ class Sorteios(commands.Cog):
         banner: str = "",
         canal: discord.TextChannel = None,
     ):
-        if vencedores <= 0:
+        texto = (texto or "").strip()
+        requisitos = (requisitos or "").strip()
+        premio = (premio or "").strip()
+        banner = (banner or "").strip()
+
+        if not premio or len(premio) > 500:
             await interaction.response.send_message(
-                "A quantidade de vencedores precisa ser maior que 0.",
+                "O prêmio é obrigatório e deve ter até 500 caracteres.",
+                ephemeral=True,
+            )
+            return
+
+        if len(texto) > 1500:
+            await interaction.response.send_message(
+                "O texto do sorteio pode ter até 1.500 caracteres.",
+                ephemeral=True,
+            )
+            return
+
+        if len(requisitos) > 1000:
+            await interaction.response.send_message(
+                "Os requisitos podem ter até 1.000 caracteres.",
+                ephemeral=True,
+            )
+            return
+
+        # Mantém a descrição dentro dos limites dos embeds do Discord.
+        if len(texto) + len(requisitos) + len(premio) > 3000:
+            await interaction.response.send_message(
+                "O conteúdo está muito longo. Reduza o texto, os requisitos ou o prêmio.",
+                ephemeral=True,
+            )
+            return
+
+        if banner and not re.match(r"^https?://\\S+$", banner, re.IGNORECASE):
+            await interaction.response.send_message(
+                "O banner precisa ser uma URL válida iniciada por http:// ou https://.",
+                ephemeral=True,
+            )
+            return
+
+        if vencedores <= 0 or vencedores > 100:
+            await interaction.response.send_message(
+                "A quantidade de vencedores deve ficar entre 1 e 100.",
                 ephemeral=True,
             )
             return
