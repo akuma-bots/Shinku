@@ -134,12 +134,28 @@ async def fechar_canal_ticket(
 async def _montar_select(guild_id: int) -> discord.ui.View:
     tipos = await tickets.get_tipos(guild_id)
 
+    # Emojis decorativos (◈, ✦, ◇ etc.) não são aceitos como emojis
+    # de SelectOption pelo Discord. Usa apenas emojis Unicode válidos.
+    emojis_validos = {
+        "recrutamento": "⚔️",
+        "hierarquia_divisoes": "🎖️",
+        "conflitos_denuncias": "⚖️",
+        "guerras_desafios": "🎯",
+        "suporte_comunidade": "🛟",
+        "aliancas": "🤝",
+        "eventos_atividades": "🎉",
+        "sugestoes_projetos": "💡",
+    }
     options = [
         discord.SelectOption(
             label=t["label"],
             value=t["valor"],
             description=t["descricao"][:100],
-            emoji=t.get("emoji"),
+            emoji=(
+                t.get("emoji")
+                if t.get("emoji") in {"⚔️", "🎖️", "⚖️", "🎯", "🛟", "🤝", "🎉", "💡"}
+                else emojis_validos.get(t["valor"])
+            ),
         )
         for t in tipos
     ]
