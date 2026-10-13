@@ -499,7 +499,15 @@ class Guerras(commands.Cog):
             registro["mensagem_final_id"], registro["canal_id"] = mensagem.id, canal.id
             await self._salvar_dados_guild(interaction.guild.id, dados)
         except (discord.Forbidden, discord.HTTPException):
-            await interaction.followup.send(f"Guerra encerrada e salva como {resultado}, mas não consegui publicar o relatório final.", ephemeral=True)
+            # Se o relatório não puder ser publicado, reabre o registro para permitir nova tentativa.
+            registro["status"] = "ativa"
+            registro["resultado"] = "EM ANDAMENTO"
+            registro["vencedor"] = None
+            registro.pop("encerrado_em", None)
+            registro.pop("encerrado_por_id", None)
+            registro.pop("mensagem_final_id", None)
+            await self._salvar_dados_guild(interaction.guild.id, dados)
+            await interaction.followup.send("Não consegui publicar o relatório final. A guerra foi mantida como ativa para que a staff possa tentar encerrar novamente.", ephemeral=True)
             return
         await interaction.followup.send(f"Guerra {registro['id']} encerrada. Resultado: **{resultado}**.", ephemeral=True)
 
