@@ -1,5 +1,6 @@
 import time
 import asyncio
+import logging
 import unicodedata
 import discord
 from discord import app_commands
@@ -12,6 +13,7 @@ from utils import tickets
 CANAIS_ESCALADOS = set()        # tickets já entregues para atendimento humano
 ULTIMA_ATIVIDADE = {}           # channel_id -> timestamp da última mensagem
 CANAIS_FECHANDO = set()         # evita fechar o mesmo canal duas vezes ao mesmo tempo
+ABERTURA_TICKET_LOCK = asyncio.Lock()  # serializa abertura para o mesmo processo
 
 FRASES_FECHAR = [
     "fechar o ticket",
@@ -321,20 +323,31 @@ class Tickets(commands.Cog):
             color=0xB51F32,
         )
 
-        mensagem = await canal.send(
-            content=user.mention,
-            embed=embed,
-            view=FecharTicketView(),
-        )
+        try:
+            mensagem = await canal.send(
+                content=user.mention,
+                embed=embed,
+                view=FecharTicketView(),
+            )
 
-        # Salva o ticket no armazenamento compartilhado.
-        await tickets.criar_ticket(
-            guild_id=guild.id,
-            usuario_id=user.id,
-            tipo=tipo["valor"],
-            canal_id=canal.id,
-            mensagem_id=mensagem.id,
-        )
+            # Salva o registro depois de publicar a mensagem inicial.
+            await tickets.criar_ticket(
+                guild_id=guild.id,
+                usuario_id=user.id,
+                tipo=tipo["valor"],
+                canal_id=canal.id,
+                mensagem_id=mensagem.id,
+            )
+        except Exception:
+            # Sem registro persistido, não deixamos um canal privado órfão.
+            try:
+                await canal.delete(reason="Falha ao inicializar/persistir ticket NÊMESIS")
+            except (discord.Forbidden, discord.HTTPException):
+                logging.getLogger(__name__).exception(
+                    "Falha ao remover canal órfão de ticket %s.",
+                    canal.id,
+                )
+            raise
 
         ULTIMA_ATIVIDADE[canal.id] = time.time()
 
@@ -623,44 +636,57 @@ class Tickets(commands.Cog):
             )
             return
 
-        # Evita criar outro ticket caso já exista um aberto
-        # para o mesmo usuário.
-        ticket_aberto = await tickets.get_ticket_aberto_usuario(
-            interaction.guild.id,
-            interaction.user.id,
-        )
+        # Responde antes de acessar o armazenamento/criar canal, para não
+        # deixar a interação do Discord expirar enquanto aguarda a operação.
+        await interaction.response.defer(ephemeral=True, thinking=True)
 
-        if ticket_aberto:
-            canal_existente = interaction.guild.get_channel(
-                int(ticket_aberto.get("canal_id", 0))
+        async with ABERTURA_TICKET_LOCK:
+            # A consulta fica dentro do lock: dois cliques simultâneos do
+            # mesmo usuário não criam dois canais.
+            ticket_aberto = await tickets.get_ticket_aberto_usuario(
+                interaction.guild.id,
+                interaction.user.id,
             )
 
-            if canal_existente:
-                await interaction.response.send_message(
-                    f"Você já possui um ticket aberto: "
-                    f"{canal_existente.mention}",
+            if ticket_aberto:
+                try:
+                    canal_existente_id = int(ticket_aberto.get("canal_id", 0) or 0)
+                except (TypeError, ValueError):
+                    canal_existente_id = 0
+                canal_existente = interaction.guild.get_channel(canal_existente_id)
+
+                if canal_existente:
+                    await interaction.followup.send(
+                        f"Você já possui um ticket aberto: {canal_existente.mention}",
+                        ephemeral=True,
+                    )
+                    return
+
+                # Canal apagado manualmente: encerra o registro antigo.
+                await tickets.fechar_ticket(
+                    interaction.guild.id,
+                    ticket_aberto["id"],
+                    fechado_por_id=interaction.user.id,
+                    motivo="Canal do ticket não foi encontrado.",
+                )
+
+            try:
+                canal = await self._criar_canal_ticket(
+                    interaction.guild,
+                    interaction.user,
+                    tipo,
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "Falha ao criar ticket para usuário %s (tipo=%s).",
+                    interaction.user.id,
+                    tipo.get("valor"),
+                )
+                await interaction.followup.send(
+                    "Não consegui criar o ticket. Verifique as permissões do bot e tente novamente.",
                     ephemeral=True,
                 )
                 return
-
-            # Canal foi apagado manualmente. Fecha o registro antigo
-            # antes de permitir um novo.
-            await tickets.fechar_ticket(
-                interaction.guild.id,
-                ticket_aberto["id"],
-                fechado_por_id=interaction.user.id,
-                motivo="Canal do ticket não foi encontrado.",
-            )
-
-        await interaction.response.defer(
-            ephemeral=True
-        )
-
-        canal = await self._criar_canal_ticket(
-            interaction.guild,
-            interaction.user,
-            tipo,
-        )
 
         await interaction.followup.send(
             f"✅ Ticket criado: {canal.mention}",
