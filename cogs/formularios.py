@@ -503,7 +503,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         )
 
     @app_commands.command(name="pagina-remover", description="Remove uma página de um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário", numero_pagina="Número da página (1, 2, 3...) — veja em /formulario-paginas-listar")
+    @app_commands.describe(formulario_id="ID do formulário", numero_pagina="Número da página (1, 2, 3...) — veja em /formularios paginas-listar")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_pagina_remover(self, interaction: discord.Interaction, formulario_id: str, numero_pagina: int):
         ok = await formularios.remover_pagina(interaction.guild.id, formulario_id, numero_pagina - 1)
