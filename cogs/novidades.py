@@ -19,7 +19,7 @@ INTERVALO_ENVIO = 1.0
 
 
 class Novidades(commands.Cog):
-    """Entrega uma vez cada release aos membros que optaram por receber DMs."""
+    """Entrega uma vez cada release a todos os membros humanos do servidor."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -61,11 +61,12 @@ class Novidades(commands.Cog):
                 if release is None:
                     return
 
-                inscricoes = await carregar(ARQUIVO_INSCRITOS, {"guilds": {}})
-                estado_guild = inscricoes.get("guilds", {}).get(str(guild.id), {})
-                inscritos = estado_guild.get("inscritos", [])
-                if not isinstance(inscritos, list) or not inscritos:
-                    logger.info("Release %s sem inscritos em avisos privados.", release["release_id"])
+                # Releases oficiais do bot são obrigatórios: não dependem de opt-in.
+                # Buscar a lista completa evita limitar o envio aos membros em cache.
+                membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+                destinatarios = [str(m.id) for m in membros]
+                if not destinatarios:
+                    logger.info("Nenhum membro humano encontrado para o release %s.", release["release_id"])
                     return
 
                 estados = await carregar(ARQUIVO_ESTADO, {"guilds": {}})
@@ -120,7 +121,7 @@ class Novidades(commands.Cog):
                 )
 
                 houve_falha_storage = False
-                for user_id in inscritos:
+                for user_id in destinatarios:
                     uid = str(user_id)
                     if uid in processados:
                         continue
@@ -151,13 +152,13 @@ class Novidades(commands.Cog):
                         break
                     await asyncio.sleep(INTERVALO_ENVIO)
 
-                if not houve_falha_storage and all(str(uid) in processados for uid in inscritos):
+                if not houve_falha_storage and all(str(uid) in processados for uid in destinatarios):
                     release_estado["concluido"] = True
                     release_estado["concluido_em"] = datetime.now(timezone.utc).isoformat()
                     guild_estado[release["release_id"]] = release_estado
                     estados["guilds"][str(guild.id)] = guild_estado
                     await salvar(ARQUIVO_ESTADO, estados)
-                    logger.info("Entrega do release %s concluída para os inscritos.", release["release_id"])
+                    logger.info("Entrega do release %s processada para todos os membros humanos.", release["release_id"])
             except Exception:
                 logger.exception("Falha ao processar release automático da NÊMESIS.")
             finally:
