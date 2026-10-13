@@ -112,8 +112,12 @@ class BotaoParticipar(discord.ui.View):
             ARQUIVO,
             {},
         )
+        if not isinstance(todos, dict):
+            return None
 
         for sorteio in todos.values():
+            if not isinstance(sorteio, dict):
+                continue
             if (
                 str(sorteio.get("mensagem_id"))
                 == str(mensagem_id)
@@ -331,8 +335,12 @@ class Sorteios(commands.Cog):
             ARQUIVO,
             {},
         )
+        if not isinstance(todos, dict):
+            return None
 
         for sorteio in todos.values():
+            if not isinstance(sorteio, dict):
+                continue
             if (
                 str(sorteio.get("mensagem_id"))
                 == str(mensagem_id)
@@ -1257,11 +1265,14 @@ class Sorteios(commands.Cog):
             {},
         )
 
+        if not isinstance(todos, dict):
+            return
+
         agora = time.time()
 
-        for sorteio in list(
-            todos.values()
-        ):
+        for sorteio in list(todos.values()):
+            if not isinstance(sorteio, dict):
+                continue
 
             if sorteio.get(
                 "encerrado"
