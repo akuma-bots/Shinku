@@ -163,9 +163,13 @@ class Guerras(commands.Cog):
             embed.add_field(name="OBSERVAÇÕES", value=discord.utils.escape_markdown(observacoes[:800]), inline=False)
         if prova_url:
             embed.add_field(name="PROVA DO RESULTADO", value=f"[Abrir evidência]({prova_url.strip()})", inline=False)
+        regras_atuais = dados.get("regras") or REGRAS_PADRAO
+        regras_no_relatorio = "\\n".join(
+            f"{i}. {regra}" for i, regra in enumerate(regras_atuais, 1)
+        )[:1000]
         embed.add_field(
             name="REGRAS APLICÁVEIS",
-            value="As regras oficiais de guerra da NÊMESIS se aplicam a este registro. Use /guerra-regras para consultá-las.",
+            value=regras_no_relatorio or "Consulte /guerra-regras.",
             inline=False,
         )
         embed.set_footer(text=f"Registrado por {interaction.user} • NÊMESIS")
