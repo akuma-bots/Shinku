@@ -274,6 +274,14 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @tasks.loop(seconds=60)
     async def sincronizar_paineis(self):
+        try:
+            await self._sincronizar_paineis_ciclo()
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Falha inesperada ao sincronizar painéis de formulários; será repetida no próximo ciclo."
+            )
+
+    async def _sincronizar_paineis_ciclo(self):
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
         if guild is None:
             return
