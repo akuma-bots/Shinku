@@ -546,8 +546,8 @@ class Missoes(commands.Cog):
 
         if auxiliar_id:
             cabecalho = (
-                f"✅ Recompensa dividida: **{(recompensa + 1) // 2} XP** para o responsável "
-                f"e **{recompensa // 2} XP** para o auxiliar.\n"
+                f"✅ Recompensa dividida: **{((recompensa * 60 + 50) // 100)} XP** para o responsável "
+                f"e **{recompensa - ((recompensa * 60 + 50) // 100)} XP** para o auxiliar.\n"
             )
         else:
             cabecalho = "✅ Recompensa da missão aprovada.\n"
