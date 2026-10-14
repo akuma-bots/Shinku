@@ -82,7 +82,9 @@ async def _registrar_participacao(
             return "nao_encontrado", None
         if mensagem_id is not None and str(sorteio.get("mensagem_id")) != str(mensagem_id):
             return "mensagem_invalida", None
-        if sorteio.get("encerrado"):
+        # Sorteios encerrados com anúncio pendente também precisam de recuperação.
+        # Registros antigos sem esse campo continuam considerados finalizados.
+        if sorteio.get("encerrado") and sorteio.get("anuncio_enviado") is not False:
             return "encerrado", sorteio
         try:
             fim = float(sorteio.get("fim", 0) or 0)
@@ -1158,6 +1160,22 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             f"{sorteio.get('id')}; o encerramento será tentado novamente: {erro}"
         )
 
+    async def _marcar_anuncio_enviado(self, sorteio: dict) -> None:
+        """Persiste a confirmação do anúncio sem sobrescrever dados concorrentes."""
+        async with _SORTEIOS_LOCK:
+            todos = await carregar(ARQUIVO, {})
+            if not isinstance(todos, dict):
+                raise RuntimeError("Armazenamento de sorteios inválido.")
+            atual = todos.get(str(sorteio.get("id")))
+            if not isinstance(atual, dict):
+                raise RuntimeError("Sorteio não encontrado ao confirmar anúncio.")
+            atual["encerrado"] = True
+            atual["anuncio_enviado"] = True
+            atual["atualizado_em"] = time.time()
+            todos[str(atual["id"])] = atual
+            await salvar(ARQUIVO, todos)
+            sorteio.update(atual)
+
     async def _resultado_ja_anunciado(
         self,
         canal: discord.TextChannel,
@@ -1217,7 +1235,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             if not isinstance(atual, dict):
                 print(f"[SORTEIOS] Registro {sorteio.get('id')} não encontrado ao encerrar.")
                 return
-            if atual.get("encerrado"):
+            if atual.get("encerrado") and atual.get("anuncio_enviado") is not False:
                 return
 
             participantes = list(atual.get("participantes", []))
@@ -1235,6 +1253,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             agora = time.time()
 
             atual["encerrado"] = True
+            atual["anuncio_enviado"] = False
             atual["resultado_sorteado"] = True
             atual["vencedores_ids"] = vencedores_ids
             atual["encerrado_em"] = agora
@@ -1267,6 +1286,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             )
             return
         if ja_anunciado:
+            await self._marcar_anuncio_enviado(sorteio)
             logger.info(
                 "Resultado do sorteio %s já estava publicado; anúncio duplicado evitado.",
                 sorteio_id,
@@ -1295,6 +1315,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
 
             try:
                 await canal.send(embed=embed)
+                await self._marcar_anuncio_enviado(sorteio)
             except (discord.Forbidden, discord.HTTPException) as erro:
                 await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
                 return
@@ -1340,6 +1361,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 content=mencoes if vencedores_ids else None,
                 embed=embed,
             )
+            await self._marcar_anuncio_enviado(sorteio)
         except (discord.Forbidden, discord.HTTPException) as erro:
             await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
 
@@ -1362,7 +1384,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
 
         agora = time.time()
         for sorteio in list(todos.values()):
-            if not isinstance(sorteio, dict) or sorteio.get("encerrado"):
+            if not isinstance(sorteio, dict):
+                continue
+            if sorteio.get("encerrado") and sorteio.get("anuncio_enviado") is not False:
                 continue
 
             try:
