@@ -347,57 +347,64 @@ class Missoes(commands.Cog):
         return embeds
 
     async def _garantir_canais_jogos(self, guild: discord.Guild) -> dict:
-        """Garante uma categoria, um canal de missões e um ranking para cada jogo."""
+        """Cria categorias separadas de missões e rankings para cada jogo."""
         registro = await ranking_missoes_jogos.obter_dados(guild.id)
         canais = {}
         for slug, jogo in ranking_missoes_jogos.JOGOS.items():
             dados = registro.get("jogos", {}).get(slug, {})
-            nome_categoria = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}"
-            categoria = guild.get_channel(int(dados.get("categoria_id", 0) or 0))
-            if not isinstance(categoria, discord.CategoryChannel):
-                categoria = discord.utils.get(guild.categories, name=nome_categoria)
+            nome_categoria_missoes = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}・MISSÕES"
+            nome_categoria_ranking = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}・RANKING"
+            categoria_missoes = guild.get_channel(int(dados.get("categoria_missoes_id", dados.get("categoria_id", 0)) or 0))
+            if not isinstance(categoria_missoes, discord.CategoryChannel):
+                categoria_missoes = discord.utils.get(guild.categories, name=nome_categoria_missoes)
+            categoria_ranking = guild.get_channel(int(dados.get("categoria_ranking_id", 0) or 0))
+            if not isinstance(categoria_ranking, discord.CategoryChannel):
+                categoria_ranking = discord.utils.get(guild.categories, name=nome_categoria_ranking)
             try:
-                if categoria is None:
-                    categoria = await guild.create_category(
-                        nome_categoria,
-                        reason="Criar estrutura de missões por jogo da NÊMESIS",
+                if categoria_missoes is None:
+                    categoria_missoes = await guild.create_category(
+                        nome_categoria_missoes,
+                        reason="Criar categoria de missões por jogo da NÊMESIS",
+                    )
+                if categoria_ranking is None:
+                    categoria_ranking = await guild.create_category(
+                        nome_categoria_ranking,
+                        reason="Criar categoria de rankings por jogo da NÊMESIS",
                     )
             except (discord.Forbidden, discord.HTTPException) as erro:
-                log.exception("Não foi possível criar a categoria de %s: %s", jogo["nome"], erro)
+                log.exception("Não foi possível criar as categorias de %s: %s", jogo["nome"], erro)
                 continue
 
-            async def resolver_ou_criar(chave: str, nome: str):
-                canal_id = int(dados.get(chave, 0) or 0)
-                canal = guild.get_channel(canal_id)
-                if not isinstance(canal, discord.TextChannel):
+            async def resolver_ou_criar(categoria, canal_id_salvo: int, nome: str, motivo: str):
+                canal = guild.get_channel(int(canal_id_salvo or 0))
+                if not isinstance(canal, discord.TextChannel) or canal.category_id != categoria.id:
                     canal = discord.utils.get(categoria.text_channels, name=nome)
                 if canal is not None:
                     return canal
-                return await categoria.create_text_channel(
-                    nome,
-                    reason=f"Canal automático de {jogo['nome']} da NÊMESIS",
-                )
+                return await categoria.create_text_channel(nome, reason=motivo)
 
             try:
-                canal_missoes = await resolver_ou_criar("missoes_channel_id", "・missões")
-                canal_ranking = await resolver_ou_criar("ranking_channel_id", "・ranking")
+                canal_missoes = await resolver_ou_criar(
+                    categoria_missoes, dados.get("missoes_channel_id", 0), "・missões",
+                    f"Canal de missões de {jogo['nome']} da NÊMESIS",
+                )
+                canal_ranking = await resolver_ou_criar(
+                    categoria_ranking, dados.get("ranking_channel_id", 0), "・ranking",
+                    f"Canal de ranking de {jogo['nome']} da NÊMESIS",
+                )
                 await ranking_missoes_jogos.salvar_canais(
-                    guild.id,
-                    slug,
-                    categoria.id,
-                    canal_missoes.id,
-                    canal_ranking.id,
-                    dados.get("ranking_message_id"),
+                    guild.id, slug, categoria_missoes.id, categoria_ranking.id,
+                    canal_missoes.id, canal_ranking.id, dados.get("ranking_message_id"),
                 )
                 canais[slug] = {
-                    "categoria_id": categoria.id,
+                    "categoria_missoes_id": categoria_missoes.id,
+                    "categoria_ranking_id": categoria_ranking.id,
                     "missoes_channel_id": canal_missoes.id,
                     "ranking_channel_id": canal_ranking.id,
                 }
             except (discord.Forbidden, discord.HTTPException) as erro:
                 log.exception("Não foi possível preparar os canais de %s: %s", jogo["nome"], erro)
         return canais
-
     async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
         """Atualiza o painel persistente do Top 10 do jogo."""
         dados = (await ranking_missoes_jogos.obter_dados(guild.id)).get("jogos", {}).get(jogo, {})
