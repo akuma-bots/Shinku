@@ -196,5 +196,106 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, discord.Embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C))
 
 
+    @commands.Cog.listener()
+    async def on_bulk_message_delete(self, messages):
+        mensagens = [m for m in messages if m.guild and not m.author.bot]
+        if not mensagens:
+            return
+        agrupadas = {}
+        for mensagem in mensagens:
+            agrupadas.setdefault(mensagem.channel, []).append(mensagem)
+        guild = mensagens[0].guild
+        canal = await self._canal_logs(guild)
+        if not canal:
+            return
+        embed = discord.Embed(
+            title="Exclusão em massa de mensagens",
+            description=f"Foram removidas {len(mensagens)} mensagens em {len(agrupadas)} canal(is).",
+            color=0xED4245,
+        )
+        for origem, itens in list(agrupadas.items())[:8]:
+            linhas = [
+                f"• {discord.utils.escape_markdown(str(m.author))}: {(m.content or '(sem texto)')[:120]}"
+                for m in itens[:5]
+            ]
+            embed.add_field(
+                name=f"Canal: {origem.name} ({len(itens)} mensagens)",
+                value="\n".join(linhas)[:1024] or "Sem conteúdo textual.",
+                inline=False,
+            )
+        await self._enviar_log(canal, embed)
+
+    @commands.Cog.listener()
+    async def on_guild_channel_update(self, antes: discord.abc.GuildChannel, depois: discord.abc.GuildChannel):
+        mudancas = []
+        if antes.name != depois.name:
+            mudancas.append(f"Nome: {antes.name} → {depois.name}")
+        if antes.category_id != depois.category_id:
+            categoria_antes = antes.category.name if antes.category else "Nenhuma"
+            categoria_depois = depois.category.name if depois.category else "Nenhuma"
+            mudancas.append(f"Categoria: {categoria_antes} → {categoria_depois}")
+        if isinstance(antes, discord.TextChannel) and isinstance(depois, discord.TextChannel):
+            if antes.topic != depois.topic:
+                mudancas.append(f"Tópico alterado: {(antes.topic or 'vazio')[:200]} → {(depois.topic or 'vazio')[:200]}")
+            if antes.slowmode_delay != depois.slowmode_delay:
+                mudancas.append(f"Modo lento: {antes.slowmode_delay}s → {depois.slowmode_delay}s")
+            if antes.nsfw != depois.nsfw:
+                mudancas.append(f"NSFW: {antes.nsfw} → {depois.nsfw}")
+        if not mudancas:
+            return
+        canal = await self._canal_logs(depois.guild)
+        if not canal:
+            return
+        embed = discord.Embed(
+            title="Canal atualizado",
+            description=f"Canal: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
+            color=0xFEE75C,
+        )
+        await self._enviar_log(canal, embed)
+
+    @commands.Cog.listener()
+    async def on_guild_role_create(self, role: discord.Role):
+        canal = await self._canal_logs(role.guild)
+        if canal:
+            await self._enviar_log(canal, discord.Embed(
+                title="Cargo criado",
+                description=f"Cargo: {role.name} ({role.id})\nCor: {role.color}",
+                color=0x57F287,
+            ))
+
+    @commands.Cog.listener()
+    async def on_guild_role_delete(self, role: discord.Role):
+        canal = await self._canal_logs(role.guild)
+        if canal:
+            await self._enviar_log(canal, discord.Embed(
+                title="Cargo excluído",
+                description=f"Cargo: {role.name} ({role.id})",
+                color=0xED4245,
+            ))
+
+    @commands.Cog.listener()
+    async def on_guild_role_update(self, antes: discord.Role, depois: discord.Role):
+        mudancas = []
+        if antes.name != depois.name:
+            mudancas.append(f"Nome: {antes.name} → {depois.name}")
+        if antes.color != depois.color:
+            mudancas.append(f"Cor: {antes.color} → {depois.color}")
+        if antes.hoist != depois.hoist:
+            mudancas.append(f"Separado na lista: {antes.hoist} → {depois.hoist}")
+        if antes.mentionable != depois.mentionable:
+            mudancas.append(f"Mencionável: {antes.mentionable} → {depois.mentionable}")
+        if antes.permissions != depois.permissions:
+            mudancas.append("As permissões do cargo foram alteradas.")
+        if not mudancas:
+            return
+        canal = await self._canal_logs(depois.guild)
+        if canal:
+            await self._enviar_log(canal, discord.Embed(
+                title="Cargo atualizado",
+                description=f"Cargo: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
+                color=0xFEE75C,
+            ))
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Logs(bot))
