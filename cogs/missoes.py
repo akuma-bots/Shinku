@@ -78,6 +78,40 @@ class EnviarProvaMissaoView(discord.ui.View):
         await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
 
 
+class NavegacaoMissoesView(discord.ui.View):
+    """Alternador persistente entre as páginas de missões por jogo."""
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior")
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.navegar_painel_missoes(interaction, -1)
+
+    @discord.ui.button(label="Enviar provas", style=discord.ButtonStyle.primary, custom_id="nemesis:missoes:provas")
+    async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
+
+    @discord.ui.button(label="Próxima página", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima")
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.navegar_painel_missoes(interaction, 1)
+
+
+class NavegacaoRankingJogosView(discord.ui.View):
+    """Alternador persistente entre rankings independentes por jogo."""
+    def __init__(self, cog):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    @discord.ui.button(label="Ranking anterior", style=discord.ButtonStyle.secondary, custom_id="nemesis:ranking_jogos:anterior")
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.navegar_painel_ranking(interaction, -1)
+
+    @discord.ui.button(label="Próximo ranking", style=discord.ButtonStyle.primary, custom_id="nemesis:ranking_jogos:proximo")
+    async def proximo(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.navegar_painel_ranking(interaction, 1)
+
+
 TIPOS = {
     "missao": {
         "nome": "Missão",
@@ -124,6 +158,8 @@ class Missoes(commands.Cog):
         self._reward_lock = asyncio.Lock()
         # O custom_id fixo mantém o botão funcional mesmo após reinícios do bot.
         self.bot.add_view(EnviarProvaMissaoView(self))
+        self.bot.add_view(NavegacaoMissoesView(self))
+        self.bot.add_view(NavegacaoRankingJogosView(self))
         if not hasattr(bot, "processadores_revisao"):
             bot.processadores_revisao = {}
         for tipo in ("missao", "contribuicao", "especial"):
@@ -346,111 +382,161 @@ class Missoes(commands.Cog):
 
         return embeds
 
-    async def _garantir_canais_jogos(self, guild: discord.Guild) -> dict:
-        """Cria categorias separadas de missões e rankings para cada jogo."""
-        registro = await ranking_missoes_jogos.obter_dados(guild.id)
-        canais = {}
-        for slug, jogo in ranking_missoes_jogos.JOGOS.items():
-            dados = registro.get("jogos", {}).get(slug, {})
-            nome_categoria_missoes = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}・MISSÕES"
-            nome_categoria_ranking = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}・RANKING"
-            categoria_missoes = guild.get_channel(int(dados.get("categoria_missoes_id", dados.get("categoria_id", 0)) or 0))
-            if not isinstance(categoria_missoes, discord.CategoryChannel):
-                categoria_missoes = discord.utils.get(guild.categories, name=nome_categoria_missoes)
-            categoria_ranking = guild.get_channel(int(dados.get("categoria_ranking_id", 0) or 0))
-            if not isinstance(categoria_ranking, discord.CategoryChannel):
-                categoria_ranking = discord.utils.get(guild.categories, name=nome_categoria_ranking)
-            try:
-                if categoria_missoes is None:
-                    categoria_missoes = await guild.create_category(
-                        nome_categoria_missoes,
-                        reason="Criar categoria de missões por jogo da NÊMESIS",
-                    )
-                if categoria_ranking is None:
-                    categoria_ranking = await guild.create_category(
-                        nome_categoria_ranking,
-                        reason="Criar categoria de rankings por jogo da NÊMESIS",
-                    )
-            except (discord.Forbidden, discord.HTTPException) as erro:
-                log.exception("Não foi possível criar as categorias de %s: %s", jogo["nome"], erro)
-                continue
+    @staticmethod
+    def _slug_da_mensagem(mensagem, prefixo: str, padrao: str = "shigaku") -> str:
+        if not mensagem or not getattr(mensagem, "embeds", None):
+            return padrao
+        rodape = str(mensagem.embeds[0].footer.text or "")
+        marcador = prefixo + ":"
+        for slug in ranking_missoes_jogos.JOGOS:
+            if marcador + slug in rodape:
+                return slug
+        return padrao
 
-            async def resolver_ou_criar(categoria, canal_id_salvo: int, nome: str, motivo: str):
-                canal = guild.get_channel(int(canal_id_salvo or 0))
-                if not isinstance(canal, discord.TextChannel) or canal.category_id != categoria.id:
-                    canal = discord.utils.get(categoria.text_channels, name=nome)
-                if canal is not None:
-                    return canal
-                return await categoria.create_text_channel(nome, reason=motivo)
-
-            try:
-                canal_missoes = await resolver_ou_criar(
-                    categoria_missoes, dados.get("missoes_channel_id", 0), "・missões",
-                    f"Canal de missões de {jogo['nome']} da NÊMESIS",
-                )
-                canal_ranking = await resolver_ou_criar(
-                    categoria_ranking, dados.get("ranking_channel_id", 0), "・ranking",
-                    f"Canal de ranking de {jogo['nome']} da NÊMESIS",
-                )
-                await ranking_missoes_jogos.salvar_canais(
-                    guild.id, slug, categoria_missoes.id, categoria_ranking.id,
-                    canal_missoes.id, canal_ranking.id, dados.get("ranking_message_id"),
-                )
-                canais[slug] = {
-                    "categoria_missoes_id": categoria_missoes.id,
-                    "categoria_ranking_id": categoria_ranking.id,
-                    "missoes_channel_id": canal_missoes.id,
-                    "ranking_channel_id": canal_ranking.id,
-                }
-            except (discord.Forbidden, discord.HTTPException) as erro:
-                log.exception("Não foi possível preparar os canais de %s: %s", jogo["nome"], erro)
-        return canais
-    async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
-        """Atualiza o painel persistente do Top 10 do jogo."""
-        dados = (await ranking_missoes_jogos.obter_dados(guild.id)).get("jogos", {}).get(jogo, {})
-        canal_id = dados.get("ranking_channel_id")
-        if not canal_id:
-            return
-        canal = await self._resolver_canal(guild, int(canal_id))
-        if canal is None:
-            return
-        linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
+    async def _montar_painel_missoes(self, guild: discord.Guild, jogo: str) -> discord.Embed:
+        jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
-        if linhas:
-            descricao = "\n".join(
-                f"**#{indice}** <@{uid}> — **{pontos:,} P.C.**".replace(",", ".")
-                for indice, (uid, _nome, pontos) in enumerate(linhas, start=1)
-            )
-        else:
-            descricao = "Nenhum integrante pontuou neste jogo ainda. As missões aprovadas aparecerão aqui."
+        dados = await missoes._guild(guild.id)
+        atividades = [
+            item for item in dados.get("missoes", [])
+            if str(item.get("jogo") or "").lower() == jogo
+        ]
+        atividades.sort(key=lambda item: (
+            {"missao": 0, "contribuicao": 1, "especial": 2}.get(str(item.get("tipo") or "missao"), 9),
+            str(item.get("id") or ""),
+        ))
         embed = discord.Embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING {nome_jogo.upper()}",
-            description=descricao,
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CENTRAL DE MISSÕES · {nome_jogo.upper()}",
+            description=(
+                f"Seleção atual: **{nome_jogo}**\n"
+                "Use **Próxima página** ou **Página anterior** para alternar entre os jogos.\n"
+                "Envie a prova pelo botão abaixo e informe o ID exato da missão.\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            ),
             color=0x9F2035,
         )
-        embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
-        embed.set_footer(text=f"{nome_jogo} • Pontos obtidos em missões aprovadas • Top 10")
+        if not atividades:
+            embed.add_field(name="Catálogo", value="Não há missões cadastradas para este jogo.", inline=False)
+        for item in atividades[:20]:
+            tipo = TIPOS.get(str(item.get("tipo") or "missao"), TIPOS["missao"])
+            recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
+            estado = "Disponível" if item.get("ativa", True) is not False else "Encerrada"
+            valor = (
+                f"{str(item.get('descricao') or 'Sem descrição cadastrada')[:650]}\n\n"
+                f"**Tipo:** {tipo['nome']}  |  **Recompensa:** {recompensa} P.C.\n"
+                f"**Estado:** {estado}  |  **ID:** `{item.get('id', '—')}`"
+            )
+            embed.add_field(name=str(item.get("titulo") or "Missão")[:256], value=valor[:1024], inline=False)
+        embed.set_author(name="NÊMESIS  /  MISSÕES POR JOGO")
+        embed.set_footer(text=f"PÁGINA: {jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+        return embed
+
+    async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
+        jogos = list(ranking_missoes_jogos.JOGOS)
+        atual = self._slug_da_mensagem(interaction.message, "PÁGINA", "shigaku")
+        indice = jogos.index(atual) if atual in jogos else 0
+        alvo = jogos[(indice + delta) % len(jogos)]
+        embed = await self._montar_painel_missoes(interaction.guild, alvo)
+        await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
+
+    async def _atualizar_painel_missoes(self, guild: discord.Guild) -> None:
+        config = await get_config(guild.id)
+        canal_id = config.get("canal_missoes_missao_id") or CANAIS_PADRAO["canal_missoes_missao_id"]
+        canal = await self._resolver_canal(guild, int(canal_id))
+        if canal is None:
+            log.warning("Canal atual de missões não encontrado; painel não publicado.")
+            return
+        paineis = await ranking_missoes_jogos.obter_paineis(guild.id)
         mensagem = None
-        mensagem_id = dados.get("ranking_message_id")
-        if mensagem_id:
+        if paineis.get("missoes"):
             try:
-                mensagem = await canal.fetch_message(int(mensagem_id))
+                mensagem = await canal.fetch_message(int(paineis["missoes"]))
             except discord.NotFound:
                 mensagem = None
             except (discord.Forbidden, discord.HTTPException) as erro:
-                log.warning("Falha ao buscar ranking de %s: %s", nome_jogo, erro)
+                log.warning("Não foi possível buscar o painel de missões: %s", erro)
                 return
+        jogo = self._slug_da_mensagem(mensagem, "PÁGINA", "shigaku")
+        embed = await self._montar_painel_missoes(guild, jogo)
         try:
-            if mensagem is not None:
-                await mensagem.edit(embed=embed)
+            if mensagem is None:
+                mensagem = await canal.send(embed=embed, view=NavegacaoMissoesView(self))
+                await ranking_missoes_jogos.salvar_painel(guild.id, "missoes", mensagem.id)
+                try:
+                    await mensagem.pin(reason="Painel de navegação de missões NÊMESIS")
+                except discord.HTTPException:
+                    pass
             else:
-                mensagem = await canal.send(embed=embed)
-                await ranking_missoes_jogos.atualizar_mensagem_ranking(
-                    guild.id, jogo, mensagem.id
-                )
+                await mensagem.edit(embed=embed, view=NavegacaoMissoesView(self))
         except (discord.Forbidden, discord.HTTPException):
-            log.exception("Falha ao publicar ranking de %s.", nome_jogo)
+            log.exception("Não foi possível atualizar o painel de missões.")
 
+    async def _montar_painel_ranking(self, guild: discord.Guild, jogo: str) -> discord.Embed:
+        jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
+        nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
+        linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
+        if linhas:
+            linhas_texto = []
+            medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+            for posicao, (uid, nome, pontos) in enumerate(linhas, start=1):
+                selo = medalhas.get(posicao, f"**{posicao:02d}.**")
+                linhas_texto.append(f"{selo} <@{uid}> — **{pontos:,} P.C.**".replace(",", "."))
+            descricao = "\n".join(linhas_texto)
+        else:
+            descricao = "Ainda não há pontos registrados neste jogo. As recompensas entram após a aprovação das provas."
+        embed = discord.Embed(
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING {nome_jogo.upper()}",
+            description=(
+                f"**Jogo selecionado:** {nome_jogo}\n\n{descricao}\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "Use os botões para alternar entre os rankings sem sair deste canal."
+            ),
+            color=0x9F2035,
+        )
+        embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
+        embed.set_footer(text=f"PÁGINA: {jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+        return embed
+
+    async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
+        jogos = list(ranking_missoes_jogos.JOGOS)
+        atual = self._slug_da_mensagem(interaction.message, "PÁGINA", "shigaku")
+        indice = jogos.index(atual) if atual in jogos else 0
+        alvo = jogos[(indice + delta) % len(jogos)]
+        embed = await self._montar_painel_ranking(interaction.guild, alvo)
+        await interaction.response.edit_message(embed=embed, view=NavegacaoRankingJogosView(self))
+
+    async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
+        """Atualiza o painel único de ranking sem criar canais por jogo."""
+        config = await get_config(guild.id)
+        canal_id = config.get("canal_ranking_id") or 1545834182406574241
+        canal = await self._resolver_canal(guild, int(canal_id))
+        if canal is None:
+            log.warning("Canal de ranking atual não encontrado; painel não atualizado.")
+            return
+        paineis = await ranking_missoes_jogos.obter_paineis(guild.id)
+        mensagem = None
+        if paineis.get("ranking"):
+            try:
+                mensagem = await canal.fetch_message(int(paineis["ranking"]))
+            except discord.NotFound:
+                mensagem = None
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                log.warning("Não foi possível buscar o painel de ranking: %s", erro)
+                return
+        pagina = self._slug_da_mensagem(mensagem, "PÁGINA", jogo)
+        embed = await self._montar_painel_ranking(guild, pagina)
+        try:
+            if mensagem is None:
+                mensagem = await canal.send(embed=embed, view=NavegacaoRankingJogosView(self))
+                await ranking_missoes_jogos.salvar_painel(guild.id, "ranking", mensagem.id)
+                try:
+                    await mensagem.pin(reason="Painel de ranking por jogo NÊMESIS")
+                except discord.HTTPException:
+                    pass
+            else:
+                await mensagem.edit(embed=embed, view=NavegacaoRankingJogosView(self))
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Não foi possível atualizar o painel de ranking.")
     @staticmethod
     def _expandir_catalogo_por_jogo(catalogo: list) -> list:
         """Replica as missões padrão para Shigaku, Gakuran e Fistborn com IDs únicos."""
