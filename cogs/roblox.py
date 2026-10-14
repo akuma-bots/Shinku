@@ -370,16 +370,44 @@ class Roblox(commands.Cog):
 
     @tasks.loop(minutes=30)
     async def sincronizacao_automatica(self):
-        vinculos = await carregar(ARQUIVO_VINCULOS, {})
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            vinculos = await carregar(ARQUIVO_VINCULOS, {})
+        except Exception:
+            logger.exception("Falha ao carregar vínculos Roblox; sincronização será repetida no próximo ciclo.")
+            return
+
+        if not isinstance(vinculos, dict):
+            logger.error("Arquivo de vínculos Roblox possui formato inválido.")
+            return
+
         for guild in self.bot.guilds:
-            config = await _config_grupo(guild.id)
-            if not config["grupo_id"] or not config["mapeamentos"]:
-                continue
-            guild_vinculos = vinculos.get(str(guild.id), {})
-            for discord_id, vinculo in guild_vinculos.items():
-                membro = guild.get_member(int(discord_id))
-                if membro:
-                    await sincronizar_cargo_membro(guild, membro, vinculo["roblox_id"])
+            try:
+                config = await _config_grupo(guild.id)
+                if not config["grupo_id"] or not config["mapeamentos"]:
+                    continue
+                guild_vinculos = vinculos.get(str(guild.id), {})
+                if not isinstance(guild_vinculos, dict):
+                    logger.error("Vínculos Roblox inválidos (guild=%s).", guild.id)
+                    continue
+
+                for discord_id, vinculo in guild_vinculos.items():
+                    try:
+                        membro = guild.get_member(int(discord_id))
+                        if not membro or not isinstance(vinculo, dict) or not vinculo.get("roblox_id"):
+                            continue
+                        await sincronizar_cargo_membro(guild, membro, vinculo["roblox_id"])
+                    except Exception:
+                        logger.exception(
+                            "Falha ao sincronizar cargo Roblox (guild=%s, user=%s).",
+                            guild.id, discord_id,
+                        )
+            except Exception:
+                logger.exception(
+                    "Falha na sincronização automática Roblox (guild=%s); continuará no próximo ciclo.",
+                    guild.id,
+                )
 
     @sincronizacao_automatica.before_loop
     async def antes(self):
