@@ -85,16 +85,16 @@ class Logs(commands.Cog):
         if not canal or canal.id == message.channel.id:
             return  # evita loop se o canal de logs for o mesmo onde a mensagem foi apagada
         conteudo = message.content or "*(sem texto)*"
-        anexos = "\\n".join(
+        anexos = "\n".join(
             f"[{anexo.filename}]({anexo.url})" for anexo in message.attachments[:8]
         )
         descricao = (
-            f"**Autor:** {message.author.mention} ({message.author.id})\\n"
-            f"**Canal:** {message.channel.mention}\\n"
-            f"**Mensagem:**\\n{conteudo[:1200]}"
+            f"**Autor:** {message.author.mention} ({message.author.id})\n"
+            f"**Canal:** {message.channel.mention}\n"
+            f"**Mensagem:**\n{conteudo[:1200]}"
         )
         if anexos:
-            descricao += f"\\n**Anexos:**\\n{anexos[:1200]}"
+            descricao += f"\n**Anexos:**\n{anexos[:1200]}"
         embed = discord.Embed(description=descricao[:4000], color=0xED4245)
         await self._enviar_log(canal, embed)
 
