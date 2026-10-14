@@ -204,16 +204,61 @@ class FecharTicketView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ):
+        canal = interaction.channel
+        guild = interaction.guild
+        membro = interaction.user
+
+        if not guild or not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message(
+                "Este botão só pode ser usado dentro de um ticket do servidor.",
+                ephemeral=True,
+            )
+            return
+
+        info_topic = tickets.parse_topic(canal.topic)
+        registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
+        if not info_topic or not registro or registro.get("status") != "aberto":
+            await interaction.response.send_message(
+                "Este canal não é um ticket aberto válido.",
+                ephemeral=True,
+            )
+            return
+
+        config = await get_config(guild.id)
+        suporte_id = config.get("support_role_id")
+        try:
+            suporte_id = int(suporte_id) if suporte_id else None
+        except (TypeError, ValueError):
+            suporte_id = None
+
+        eh_suporte = (
+            isinstance(membro, discord.Member)
+            and suporte_id is not None
+            and membro.get_role(suporte_id) is not None
+        )
+        eh_dono = str(membro.id) == str(info_topic.get("owner_id"))
+        eh_admin = (
+            isinstance(membro, discord.Member)
+            and membro.guild_permissions.manage_channels
+        )
+
+        if not (eh_dono or eh_suporte or eh_admin):
+            await interaction.response.send_message(
+                "Somente o dono deste ticket ou a equipe autorizada pode fechá-lo.",
+                ephemeral=True,
+            )
+            return
+
         await interaction.response.send_message(
             "Fechando o ticket...",
             ephemeral=True,
         )
 
         await fechar_canal_ticket(
-            interaction.channel,
-            f"Fechado por {interaction.user} via botão.",
+            canal,
+            f"Fechamento autorizado pelo usuário {membro.id}.",
             delay=5,
-            fechado_por_id=interaction.user.id,
+            fechado_por_id=membro.id,
         )
 
 
@@ -541,13 +586,20 @@ class Tickets(commands.Cog):
             message.content
         )
 
-        if any(
+        pediu_fechamento = any(
             frase in texto
             for frase in FRASES_FECHAR
-        ):
+        )
+        eh_dono_ticket = str(message.author.id) == str(info_topic.get("owner_id"))
+        eh_admin_ticket = (
+            isinstance(message.author, discord.Member)
+            and message.author.guild_permissions.manage_channels
+        )
+
+        if pediu_fechamento and (eh_dono_ticket or eh_suporte or eh_admin_ticket):
             await fechar_canal_ticket(
                 message.channel,
-                f"{message.author.mention} pediu para fechar o ticket.",
+                f"Fechamento solicitado por usuário autorizado ({message.author.id}).",
                 delay=5,
                 fechado_por_id=message.author.id,
             )
