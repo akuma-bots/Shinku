@@ -60,12 +60,19 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
     @tasks.loop(hours=1)
     async def verificar_temporadas(self):
         for guild in self.bot.guilds:
-            estado = await temporadas.get_estado(guild.id)
-            if estado["inicio_timestamp"] is None:
-                continue
-            if await temporadas.tempo_restante_segundos(guild.id) <= 0:
-                resultado = await temporadas.encerrar_temporada(guild.id)
-                await self._anunciar(guild, resultado)
+            try:
+                estado = await temporadas.get_estado(guild.id)
+                if not estado or estado.get("inicio_timestamp") is None:
+                    continue
+                if await temporadas.tempo_restante_segundos(guild.id) <= 0:
+                    resultado = await temporadas.encerrar_temporada(guild.id)
+                    await self._anunciar(guild, resultado)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Falha ao verificar temporada (guild=%s); será reavaliada no próximo ciclo.",
+                    guild.id,
+                )
 
     @verificar_temporadas.before_loop
     async def antes(self):
