@@ -223,34 +223,34 @@ class Missoes(commands.Cog):
                     value=f"**{recompensa:,} P.C.**\n**{recompensa:,} XP**".replace(",", "."),
                     inline=True,
                 )
-                embed.add_field(
-                    name="◈ COMO PARTICIPAR",
-                    value=(
-                        "1. Leia a descrição e cumpra todos os requisitos.\n"
-                        "2. Realize a atividade no jogo ou na comunidade.\n"
-                        "3. Registre uma evidência clara e legítima.\n"
-                        "4. Envie a prova pelo botão abaixo e aguarde a revisão."
-                    ),
-                    inline=False,
-                )
-                embed.add_field(
-                    name="◈ ENVIO DA PROVA",
-                    value=(
-                        "Informe o código exato da missão e o link direto da imagem hospedada no Discord. "
-                        "O envio será encaminhado ao canal de revisão correspondente."
-                    ),
-                    inline=False,
-                )
-                embed.add_field(
-                    name="◈ REGRAS DE RECOMPENSA",
-                    value=(
-                        f"Sem auxiliar: o responsável recebe **{recompensa} XP e P.C.** após aprovação.\n"
-                        "Com auxiliar opcional: **60%** da recompensa vai para o responsável e **40%** para o auxiliar.\n"
-                        "A recompensa é dividida, não duplicada; a aprovação da staff é obrigatória."
-                    ),
-                    inline=False,
-                )
                 if ativa:
+                    embed.add_field(
+                        name="◈ COMO PARTICIPAR",
+                        value=(
+                            "1. Leia a descrição e cumpra todos os requisitos.\n"
+                            "2. Realize a atividade no jogo ou na comunidade.\n"
+                            "3. Registre uma evidência clara e legítima.\n"
+                            "4. Envie a prova pelo botão abaixo e aguarde a revisão."
+                        ),
+                        inline=False,
+                    )
+                    embed.add_field(
+                        name="◈ ENVIO DA PROVA",
+                        value=(
+                            "Informe o código exato da missão e o link direto da imagem hospedada no Discord. "
+                            "O envio será encaminhado ao canal de revisão correspondente."
+                        ),
+                        inline=False,
+                    )
+                    embed.add_field(
+                        name="◈ REGRAS DE RECOMPENSA",
+                        value=(
+                            f"Sem auxiliar: o responsável recebe **{recompensa} XP e P.C.** após aprovação.\n"
+                            "Com auxiliar opcional: **60%** da recompensa vai para o responsável e **40%** para o auxiliar.\n"
+                            "A recompensa é dividida, não duplicada; a aprovação da staff é obrigatória."
+                        ),
+                        inline=False,
+                    )
                     embed.set_footer(
                         text="NÊMESIS  •  OPERAÇÕES OFICIAIS  •  Provas sujeitas à validação da staff",
                     )
@@ -258,6 +258,11 @@ class Missoes(commands.Cog):
                     embed.add_field(
                         name="◈ SITUAÇÃO",
                         value="Esta operação foi encerrada e permanece publicada apenas para consulta.",
+                        inline=False,
+                    )
+                    embed.add_field(
+                        name="◈ RECOMPENSA REGISTRADA",
+                        value=f"Valor definido para esta operação: **{recompensa} XP e P.C.**",
                         inline=False,
                     )
                     embed.set_footer(text="NÊMESIS  •  ARQUIVO DE OPERAÇÕES")
