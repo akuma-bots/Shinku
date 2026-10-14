@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from urllib.parse import urlparse
 
 import discord
@@ -39,13 +40,24 @@ class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar provas da missão")
         required=True,
         max_length=1000,
     )
+    auxiliar = discord.ui.TextInput(
+        label="Auxiliar (opcional)",
+        placeholder="Mencione o membro ou informe o ID do Discord",
+        required=False,
+        max_length=30,
+    )
 
     def __init__(self, cog):
         super().__init__(timeout=300)
         self.cog = cog
 
     async def on_submit(self, interaction: discord.Interaction):
-        await self.cog.receber_prova_modal(interaction, str(self.missao_id.value), str(self.imagem_url.value))
+        await self.cog.receber_prova_modal(
+            interaction,
+            str(self.missao_id.value),
+            str(self.imagem_url.value),
+            str(self.auxiliar.value or ""),
+        )
 
 
 class EnviarProvaMissaoView(discord.ui.View):
@@ -380,53 +392,119 @@ class Missoes(commands.Cog):
         revisao_id = str(revisao.get("id", "")).strip()
         if not revisao_id:
             return "⚠️ Esta revisão não possui um identificador válido; nenhuma recompensa foi aplicada."
-        atividade_ja_aplicada = revisao_id in atividade.get("recompensas_aplicadas", [])
 
-        autor_id = int(revisao.get("autor_id", 0))
+        autor_id = int(revisao.get("autor_id", 0) or 0)
         if not autor_id:
             return "⚠️ Não foi possível identificar o participante."
+
+        try:
+            auxiliar_id = int(revisao.get("auxiliar_id") or 0)
+        except (TypeError, ValueError):
+            auxiliar_id = 0
+        if auxiliar_id == autor_id:
+            auxiliar_id = 0
 
         try:
             recompensa = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
         except (TypeError, ValueError):
             recompensa = 0
 
-        # O ID da revisão é salvo junto com o XP para que uma repetição após falha
-        # não credite a mesma recompensa novamente.
-        async with self._reward_lock:
-            perfil = await get_perfil(guild.id, autor_id)
-            eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
-            recompensa_aplicada = revisao_id not in eventos_aplicados and not atividade_ja_aplicada
-            marcador_novo = revisao_id not in eventos_aplicados
-            if marcador_novo:
-                eventos_aplicados.append(revisao_id)
-                perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
-            if recompensa_aplicada:
-                perfil["xp"] = int(perfil.get("xp", 0) or 0) + recompensa
-            if recompensa_aplicada or marcador_novo:
-                await _salvar_perfil(guild.id, autor_id, perfil)
+        # Sem auxiliar, mantém compatibilidade com o marcador histórico da revisão.
+        # Com auxiliar, cada participante recebe um evento próprio e recuperável.
+        atividade_ja_aplicada = revisao_id in atividade.get("recompensas_aplicadas", [])
+        if auxiliar_id:
+            distribuicao = [
+                (autor_id, (recompensa + 1) // 2),
+                (auxiliar_id, recompensa // 2),
+            ]
+        else:
+            distribuicao = [(autor_id, recompensa)]
 
-        # Recompensa aprovada também avança a progressão independente da gangue.
+        resultados = []
+        async with self._reward_lock:
+            for usuario_id, quantidade in distribuicao:
+                perfil = await get_perfil(guild.id, usuario_id)
+                eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
+                evento_perfil = (
+                    f"{revisao_id}:{usuario_id}"
+                    if auxiliar_id
+                    else revisao_id
+                )
+                marcador_novo = evento_perfil not in eventos_aplicados
+                recompensa_aplicada = (
+                    marcador_novo
+                    and (auxiliar_id or not atividade_ja_aplicada)
+                )
+
+                if marcador_novo:
+                    eventos_aplicados.append(evento_perfil)
+                    perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
+                if recompensa_aplicada:
+                    perfil["xp"] = int(perfil.get("xp", 0) or 0) + quantidade
+                if recompensa_aplicada or marcador_novo:
+                    await _salvar_perfil(guild.id, usuario_id, perfil)
+
+                resultados.append({
+                    "user_id": usuario_id,
+                    "quantidade": quantidade,
+                    "perfil": perfil,
+                    "aplicada": bool(recompensa_aplicada),
+                    "evento_perfil": evento_perfil,
+                })
+
+        # Registra XP/pontuação na progressão e no site com chave idempotente por membro.
         progressao = self.bot.get_cog("ProgressaoGangue")
-        if progressao is not None and recompensa > 0:
+        tipo_progressao = str(atividade.get("tipo", "missao")).lower()
+        if tipo_progressao not in {"missao", "contribuicao", "especial"}:
+            tipo_progressao = "missao"
+
+        for resultado in resultados:
+            usuario_id = resultado["user_id"]
+            quantidade = resultado["quantidade"]
+            evento_site = (
+                f"missao:{revisao_id}:{usuario_id}"
+                if auxiliar_id
+                else f"missao:{revisao_id}"
+            )
+
+            if progressao is not None and quantidade > 0:
+                try:
+                    await progressao.registrar_recompensa(
+                        guild=guild,
+                        user_id=usuario_id,
+                        quantidade=quantidade,
+                        tipo=tipo_progressao,
+                        evento_id=evento_site,
+                    )
+                except Exception as erro:
+                    log.exception(
+                        "Falha ao registrar recompensa da missão para %s: %s",
+                        usuario_id,
+                        erro,
+                    )
+
+            membro = guild.get_member(usuario_id)
             try:
-                tipo_progressao = str(atividade.get("tipo", "missao")).lower()
-                if tipo_progressao not in {"missao", "contribuicao", "especial"}:
-                    tipo_progressao = "missao"
-                await progressao.registrar_recompensa(
-                    guild=guild,
-                    user_id=autor_id,
-                    quantidade=recompensa,
-                    tipo=tipo_progressao,
-                    evento_id=revisao_id,
+                await _sincronizar_site(
+                    user_id=usuario_id,
+                    perfil=resultado["perfil"],
+                    nome=membro.display_name if membro else "",
+                    delta_pontos=quantidade if resultado["aplicada"] else 0,
+                    evento_id=evento_site,
                 )
             except Exception as erro:
-                log.exception("Falha ao registrar recompensa na progressão da gangue para %s: %s", autor_id, erro)
+                log.exception(
+                    "Falha ao sincronizar pontuação de %s: %s",
+                    usuario_id,
+                    erro,
+                )
 
         dados_guild = await missoes._guild(guild.id)
         alvo = next(
-            (item for item in dados_guild.get("missoes", [])
-             if str(item.get("id")) == str(atividade.get("id"))),
+            (
+                item for item in dados_guild.get("missoes", [])
+                if str(item.get("id")) == str(atividade.get("id"))
+            ),
             None,
         )
         if alvo is not None:
@@ -435,48 +513,105 @@ class Missoes(commands.Cog):
                 aplicadas.append(revisao_id)
             await missoes._salvar_guild(guild.id, dados_guild)
 
-        membro = guild.get_member(autor_id)
-        try:
-            await _sincronizar_site(
-                user_id=autor_id,
-                perfil=perfil,
-                nome=membro.display_name if membro else "",
-                delta_pontos=recompensa,
-                evento_id=f"missao:{revisao_id}",
-            )
-        except Exception as erro:
-            log.exception("Falha ao sincronizar pontuação de %s: %s", autor_id, erro)
+        mensagens = []
+        for resultado in resultados:
+            usuario_id = resultado["user_id"]
+            quantidade = resultado["quantidade"]
+            perfil = resultado["perfil"]
+            membro = guild.get_member(usuario_id)
 
-        texto = (
-            f"✅ <@{autor_id}> recebeu **+{recompensa} XP** e **+{recompensa} de pontuação**."
-            if recompensa_aplicada
-            else f"ℹ️ A recompensa de <@{autor_id}> já estava registrada; nenhuma pontuação duplicada foi adicionada."
-        )
-        nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
-        if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
-            await definir_patente(guild.id, autor_id, nova_patente["nome"])
-            cargo_id = nova_patente.get("cargo_id")
-            cargo = guild.get_role(int(cargo_id)) if cargo_id else None
-            if membro and cargo:
-                try:
-                    await membro.add_roles(cargo, reason="Promoção automática por conclusão de missão")
-                except discord.Forbidden:
-                    pass
-            texto += f" Nova patente: **{nova_patente['nome']}**."
-        return texto
+            if resultado["aplicada"]:
+                mensagens.append(
+                    f"<@{usuario_id}> recebeu **+{quantidade} XP** e **+{quantidade} de pontuação**"
+                )
+            else:
+                mensagens.append(
+                    f"<@{usuario_id}> já tinha a recompensa registrada; nenhum crédito duplicado foi adicionado"
+                )
+
+            nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
+            if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
+                await definir_patente(guild.id, usuario_id, nova_patente["nome"])
+                cargo_id = nova_patente.get("cargo_id")
+                cargo = guild.get_role(int(cargo_id)) if cargo_id else None
+                if membro and cargo:
+                    try:
+                        await membro.add_roles(
+                            cargo,
+                            reason="Promoção automática por conclusão de missão",
+                        )
+                    except discord.Forbidden:
+                        pass
+                mensagens[-1] += f" • Nova patente: **{nova_patente['nome']}**"
+
+        if auxiliar_id:
+            cabecalho = (
+                f"✅ Recompensa dividida: **{(recompensa + 1) // 2} XP** para o responsável "
+                f"e **{recompensa // 2} XP** para o auxiliar.\n"
+            )
+        else:
+            cabecalho = "✅ Recompensa da missão aprovada.\n"
+        return cabecalho + "\n".join(mensagens)
 
     async def receber_prova_modal(
         self,
         interaction: discord.Interaction,
         missao_id: str,
         imagem_url: str,
+        auxiliar_texto: str = "",
     ):
-        """Valida a missão e encaminha a prova para revisão da staff."""
+        """Valida a missão, o auxiliar opcional e encaminha a prova para revisão."""
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
         if guild is None:
             await interaction.followup.send("❌ Use este botão dentro do servidor da NÊMESIS.", ephemeral=True)
             return
+
+        auxiliar_id = None
+        auxiliar_valor = auxiliar_texto.strip()
+        if auxiliar_valor:
+            mencao = re.fullmatch(r"<@!?(\\d+)>", auxiliar_valor)
+            id_direto = re.fullmatch(r"\\d{15,22}", auxiliar_valor)
+            if mencao:
+                auxiliar_id = int(mencao.group(1))
+            elif id_direto:
+                auxiliar_id = int(auxiliar_valor)
+            else:
+                await interaction.followup.send(
+                    "❌ Auxiliar inválido. Informe uma menção como @membro ou o ID numérico do Discord.",
+                    ephemeral=True,
+                )
+                return
+
+            if auxiliar_id == interaction.user.id:
+                await interaction.followup.send(
+                    "❌ Você não pode selecionar a si mesmo como auxiliar.",
+                    ephemeral=True,
+                )
+                return
+
+            try:
+                auxiliar = await guild.fetch_member(auxiliar_id)
+            except discord.NotFound:
+                await interaction.followup.send(
+                    "❌ Esse auxiliar não é membro deste servidor.",
+                    ephemeral=True,
+                )
+                return
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception("Não foi possível validar o auxiliar %s no servidor %s.", auxiliar_id, guild.id)
+                await interaction.followup.send(
+                    "❌ Não consegui validar o auxiliar agora. Tente novamente em instantes.",
+                    ephemeral=True,
+                )
+                return
+
+            if auxiliar.bot:
+                await interaction.followup.send(
+                    "❌ O auxiliar precisa ser uma pessoa, não um bot.",
+                    ephemeral=True,
+                )
+                return
 
         atividade = await missoes.get(guild.id, missao_id.strip())
         if not atividade or not atividade.get("ativa", True):
@@ -537,6 +672,13 @@ class Missoes(commands.Cog):
             0,
             int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0),
         )
+        if auxiliar_id and recompensa < 2:
+            await interaction.followup.send(
+                "❌ Esta missão oferece menos de 2 XP; não é possível dividir a recompensa entre duas pessoas.",
+                ephemeral=True,
+            )
+            return
+
         canal_config = await get_config(guild.id)
         chave_prova = {
             "missao": "canal_provas_missao_id",
@@ -564,8 +706,14 @@ class Missoes(commands.Cog):
                 descricao=(
                     f"Prova enviada por {interaction.user.mention}. "
                     f"ID da missão: `{atividade['id']}`. "
-                    f"Recompensa após aprovação: +{recompensa} de pontuação e +{recompensa} XP."
+                    + (
+                        f"Recompensa total de {recompensa} XP/pontuação dividida igualmente "
+                        f"com <@{auxiliar_id}> após aprovação."
+                        if auxiliar_id
+                        else f"Recompensa após aprovação: +{recompensa} de pontuação e +{recompensa} XP."
+                    )
                 ),
+                auxiliar_id=auxiliar_id,
             )
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Falha ao criar revisão da missão %s.", atividade.get("id"))
