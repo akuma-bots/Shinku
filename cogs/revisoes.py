@@ -147,11 +147,30 @@ class Revisoes(commands.Cog):
     async def abrir_revisao(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
                              titulo: str, descricao: str = None) -> dict:
-        revisao = await revisoes.criar_pendencia(
-            guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao
-        )
+        # Um desafio PvP só pode gerar uma revisão ativa. Se a publicação
+        # falhar depois de persistir a pendência, a nova tentativa reutiliza
+        # o mesmo registro em vez de criar uma segunda prova para a mesma luta.
+        revisao = None
+        if tipo == "pvp":
+            existentes = await revisoes.listar(guild.id, status="pendente")
+            revisao = next(
+                (
+                    item for item in existentes
+                    if isinstance(item, dict)
+                    and item.get("tipo") == "pvp"
+                    and str(item.get("referencia_id")) == str(referencia_id)
+                ),
+                None,
+            )
+            if revisao and revisao.get("mensagem_id"):
+                return revisao
 
-        hash_imagem = await _hash_imagem(print_url)
+        if revisao is None:
+            revisao = await revisoes.criar_pendencia(
+                guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao
+            )
+
+        hash_imagem = await _hash_imagem(revisao.get("print_url") or print_url)
         duplicata = None
         if hash_imagem:
             await revisoes.definir_hash(guild.id, revisao["id"], hash_imagem)
