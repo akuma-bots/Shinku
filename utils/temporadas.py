@@ -409,100 +409,97 @@ async def _sincronizar_perfil_site(
     )
 
 
+_ENCERRAR_TEMPORADA_LOCK = __import__("asyncio").Lock()
+
+
 async def encerrar_temporada(
     guild_id: int,
 ) -> dict:
-    """
-    Encerra a temporada atual, aplica os bônus
-    aos três primeiros colocados, sincroniza os
-    perfis com o Dashboard e inicia a próxima
-    temporada com uma nova baseline.
-    """
+    """Encerra uma temporada com recuperação segura e sem bônus duplicados."""
+    async with _ENCERRAR_TEMPORADA_LOCK:
+        estado = await get_estado(guild_id)
+        pendente = estado.get("encerramento_pendente")
 
-    estado = await get_estado(
-        guild_id
-    )
-
-    top3 = await top_da_temporada(
-        guild_id,
-        limite=3,
-    )
-
-    bonus = [
-        estado["bonus_ouro"],
-        estado["bonus_prata"],
-        estado["bonus_bronze"],
-    ]
-
-    vencedores = []
-
-    for i, (
-        uid,
-        pontos,
-    ) in enumerate(top3):
-
-        user_id = int(uid)
-
-        perfil = await get_perfil(
-            guild_id,
-            user_id,
-        )
-
-        perfil["xp"] += bonus[i]
-
-        await _salvar_perfil(
-            guild_id,
-            user_id,
-            perfil,
-        )
-
-        await _sincronizar_perfil_site(
-            user_id,
-            perfil,
-        )
-
-        vencedores.append(
-            {
-                "user_id": user_id,
-                "pontos": pontos,
-                "bonus_xp": bonus[i],
-                "posicao": i + 1,
+        # Guarda o Top 3 antes de alterar perfis. Se uma gravação ou a
+        # sincronização com o site falhar, a próxima execução retoma a mesma
+        # temporada e os mesmos vencedores, sem recalcular o ranking alterado.
+        if not isinstance(pendente, dict):
+            top3 = await top_da_temporada(guild_id, limite=3)
+            bonus = [
+                int(estado.get("bonus_ouro", 200) or 0),
+                int(estado.get("bonus_prata", 100) or 0),
+                int(estado.get("bonus_bronze", 50) or 0),
+            ]
+            vencedores = [
+                {
+                    "user_id": int(uid),
+                    "pontos": pontos,
+                    "bonus_xp": bonus[i],
+                    "posicao": i + 1,
+                }
+                for i, (uid, pontos) in enumerate(top3)
+            ]
+            pendente = {
+                "numero": int(estado.get("numero_atual", 1) or 1),
+                "vencedores": vencedores,
+                "iniciado_em": time.time(),
             }
-        )
+            estado["encerramento_pendente"] = pendente
+            await _salvar_estado(guild_id, estado)
 
-    estado["historico"].append(
-        {
-            "numero": estado[
-                "numero_atual"
-            ],
+        numero = int(pendente.get("numero", estado.get("numero_atual", 1)) or 1)
+        vencedores = pendente.get("vencedores", [])
+        if not isinstance(vencedores, list):
+            raise ValueError("O registro de encerramento da temporada está inválido.")
+
+        evento_id = f"temporada:{guild_id}:{numero}:bonus_xp"
+        for vencedor in vencedores:
+            if not isinstance(vencedor, dict):
+                continue
+            user_id = int(vencedor["user_id"])
+            bonus_xp = max(0, int(vencedor.get("bonus_xp", 0) or 0))
+            perfil = await get_perfil(guild_id, user_id)
+            eventos = perfil.get("temporadas_bonus_aplicados", [])
+            if not isinstance(eventos, list):
+                eventos = []
+
+            if evento_id not in eventos:
+                perfil["xp"] = int(perfil.get("xp", 0) or 0) + bonus_xp
+                eventos.append(evento_id)
+                perfil["temporadas_bonus_aplicados"] = eventos[-500:]
+                await _salvar_perfil(guild_id, user_id, perfil)
+
+            # Mesmo se o XP já tiver sido persistido antes de uma falha,
+            # tenta novamente a sincronização sem repetir o bônus.
+            await _sincronizar_perfil_site(user_id, perfil)
+
+        historico = estado.get("historico", [])
+        if not isinstance(historico, list):
+            historico = []
+        if not any(
+            isinstance(item, dict) and int(item.get("numero", -1)) == numero
+            for item in historico
+        ):
+            historico.append({
+                "numero": numero,
+                "vencedores": vencedores,
+                "encerrada_em": time.time(),
+            })
+
+        estado["historico"] = historico
+        estado["numero_atual"] = max(
+            int(estado.get("numero_atual", 1) or 1),
+            numero + 1,
+        )
+        estado["inicio_timestamp"] = time.time()
+        estado["baseline"] = await _pontuacoes_atuais(guild_id)
+        estado.pop("encerramento_pendente", None)
+        await _salvar_estado(guild_id, estado)
+
+        return {
+            "numero_encerrada": numero,
             "vencedores": vencedores,
-            "encerrada_em": time.time(),
         }
-    )
-
-    estado["numero_atual"] += 1
-
-    estado["inicio_timestamp"] = (
-        time.time()
-    )
-
-    estado["baseline"] = (
-        await _pontuacoes_atuais(
-            guild_id
-        )
-    )
-
-    await _salvar_estado(
-        guild_id,
-        estado,
-    )
-
-    return {
-        "numero_encerrada": (
-            estado["numero_atual"] - 1
-        ),
-        "vencedores": vencedores,
-    }
 
 
 async def sincronizar_todos_site(
