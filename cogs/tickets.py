@@ -217,7 +217,12 @@ class FecharTicketView(discord.ui.View):
 
         info_topic = tickets.parse_topic(canal.topic)
         registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
-        if not info_topic or not registro or registro.get("status") != "aberto":
+        if (
+            not info_topic
+            or not registro
+            or registro.get("status") != "aberto"
+            or str(registro.get("usuario_id")) != str(info_topic.get("owner_id"))
+        ):
             await interaction.response.send_message(
                 "Este canal não é um ticket aberto válido.",
                 ephemeral=True,
@@ -236,7 +241,7 @@ class FecharTicketView(discord.ui.View):
             and suporte_id is not None
             and membro.get_role(suporte_id) is not None
         )
-        eh_dono = str(membro.id) == str(info_topic.get("owner_id"))
+        eh_dono = str(membro.id) == str(registro.get("usuario_id"))
         eh_admin = (
             isinstance(membro, discord.Member)
             and membro.guild_permissions.manage_channels
