@@ -1,3 +1,4 @@
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -27,6 +28,21 @@ class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(resultado, "enviada")
         self.assertEqual(membro.send.await_count, 2)
+
+    async def test_dm_repete_timeout_de_conexao(self):
+        membro = Mock()
+        membro.id = 789
+        membro.send = AsyncMock(side_effect=[asyncio.TimeoutError(), None])
+
+        with patch("cogs.novidades.asyncio.sleep", new_callable=AsyncMock) as dormir:
+            resultado = await _enviar_dm_com_retry(
+                membro,
+                embed=discord.Embed(title="Teste"),
+            )
+
+        self.assertEqual(resultado, "enviada")
+        self.assertEqual(membro.send.await_count, 2)
+        dormir.assert_awaited_once()
 
     async def test_dm_bloqueada_nao_faz_retry(self):
         membro = Mock()
