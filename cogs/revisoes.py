@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import aiohttp
 import discord
@@ -6,6 +7,7 @@ from discord.ext import commands
 from utils import revisoes, auditoria
 
 CORES = {"pvp": 0xED4245, "pve": 0x57F287, "missao": 0xFEE75C}
+_ABRIR_REVISAO_LOCK = asyncio.Lock()
 
 
 async def _hash_imagem(url: str):
@@ -144,7 +146,22 @@ class Revisoes(commands.Cog):
             ephemeral=True,
         )
 
-    async def abrir_revisao(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
+    async def abrir_revisao(
+        self, guild: discord.Guild, canal: discord.abc.Messageable, *,
+        tipo: str, autor_id: int, referencia_id: str, print_url: str,
+        titulo: str, descricao: str = None
+    ) -> dict:
+        # Serializa o ciclo completo de localizar/criar/publicar a prova.
+        # O lock no storage evita registros duplicados; este lock também evita
+        # duas mensagens Discord para o mesmo registro em chamadas concorrentes.
+        async with _ABRIR_REVISAO_LOCK:
+            return await self._abrir_revisao_sem_lock(
+                guild, canal, tipo=tipo, autor_id=autor_id,
+                referencia_id=referencia_id, print_url=print_url,
+                titulo=titulo, descricao=descricao,
+            )
+
+    async def _abrir_revisao_sem_lock(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
                              titulo: str, descricao: str = None) -> dict:
         # Um desafio PvP só pode gerar uma revisão ativa. Se a publicação
