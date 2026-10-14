@@ -7,7 +7,7 @@ from pathlib import Path
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils.storage import carregar, salvar
 
@@ -344,6 +344,31 @@ class Novidades(commands.Cog):
                 logger.exception("Falha ao processar release automático da NÊMESIS.")
             finally:
                 self._processando = False
+
+    async def cog_load(self):
+        if not self._retry_releases.is_running():
+            self._retry_releases.start()
+
+    async def cog_unload(self):
+        self._retry_releases.cancel()
+
+    @tasks.loop(minutes=15)
+    async def _retry_releases(self):
+        # Mantém pendências vivas mesmo sem reinicialização ou reconexão do bot.
+        if not CAMINHO_RELEASE.exists():
+            return
+        guild_id = os.getenv("NEMESIS_GUILD_ID")
+        try:
+            guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+        except (TypeError, ValueError):
+            logger.error("NEMESIS_GUILD_ID inválido durante a recuperação de releases.")
+            return
+        if guild is not None:
+            await self._anunciar_release(guild)
+
+    @_retry_releases.before_loop
+    async def _before_retry_releases(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener()
     async def on_ready(self):
