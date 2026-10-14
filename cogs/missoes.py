@@ -422,13 +422,13 @@ class Missoes(commands.Cog):
             recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
             estado = "Disponível" if item.get("ativa", True) is not False else "Encerrada"
             valor = (
-                f"{str(item.get('descricao') or 'Sem descrição cadastrada')[:650]}\n\n"
+                f"{str(item.get('descricao') or 'Sem descrição cadastrada')[:450]}\n\n"
                 f"**Tipo:** {tipo['nome']}  |  **Recompensa:** {recompensa} P.C.\n"
                 f"**Estado:** {estado}  |  **ID:** `{item.get('id', '—')}`"
             )
             embed.add_field(name=str(item.get("titulo") or "Missão")[:256], value=valor[:1024], inline=False)
         embed.set_author(name="NÊMESIS  /  MISSÕES POR JOGO")
-        embed.set_footer(text=f"PÁGINA: {jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+        embed.set_footer(text=f"PÁGINA:{jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
@@ -494,7 +494,7 @@ class Missoes(commands.Cog):
             color=0x9F2035,
         )
         embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
-        embed.set_footer(text=f"PÁGINA: {jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+        embed.set_footer(text=f"PÁGINA:{jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
         return embed
 
     async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
