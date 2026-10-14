@@ -21,7 +21,8 @@ async def obter_dados(guild_id: int) -> dict:
 async def salvar_canais(
     guild_id: int,
     jogo: str,
-    categoria_id: int,
+    categoria_missoes_id: int,
+    categoria_ranking_id: int,
     missoes_channel_id: int,
     ranking_channel_id: int,
     ranking_message_id: int | None = None,
@@ -34,7 +35,8 @@ async def salvar_canais(
     atual = jogos.setdefault(jogo, {"pontuacao": {}, "eventos_aplicados": []})
     atual.update({
         "nome": JOGOS[jogo]["nome"],
-        "categoria_id": int(categoria_id),
+        "categoria_missoes_id": int(categoria_missoes_id),
+        "categoria_ranking_id": int(categoria_ranking_id),
         "missoes_channel_id": int(missoes_channel_id),
         "ranking_channel_id": int(ranking_channel_id),
     })
