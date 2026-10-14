@@ -59,6 +59,7 @@ async def criar_pendencia(
     print_url: str,
     titulo: str,
     descricao: str = None,
+    auxiliar_id: int = None,
 ) -> dict:
     async with _REVISOES_LOCK:
 
@@ -89,6 +90,7 @@ async def criar_pendencia(
             "print_url": print_url,
             "titulo": titulo,
             "descricao": descricao,
+            "auxiliar_id": int(auxiliar_id) if auxiliar_id else None,
             "status": "pendente",
             "revisor_id": None,
             "motivo_rejeicao": None,
