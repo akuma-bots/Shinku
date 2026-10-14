@@ -202,7 +202,7 @@ class Novidades(commands.Cog):
             f"• Membros humanos encontrados: **{len(membros)}**\n"
             f"• DMs enviadas: **{enviados}**\n"
             f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\n"
-            f"• Falhas temporárias podem ser tentadas novamente em um novo comunicado.",
+            f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
             ephemeral=True,
         )
 
