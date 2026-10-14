@@ -64,6 +64,22 @@ async def criar_pendencia(
 
         lista = await listar(guild_id)
 
+        # Idempotência para provas PvP: duas chamadas quase simultâneas
+        # não podem criar duas pendências para o mesmo desafio.
+        if str(tipo).lower() == "pvp":
+            existente = next(
+                (
+                    item for item in lista
+                    if isinstance(item, dict)
+                    and str(item.get("tipo", "")).lower() == "pvp"
+                    and str(item.get("referencia_id")) == str(referencia_id)
+                    and item.get("status") == "pendente"
+                ),
+                None,
+            )
+            if existente:
+                return existente
+
         revisao = {
             "id": str(uuid.uuid4())[:8],
             "guild_id": guild_id,
