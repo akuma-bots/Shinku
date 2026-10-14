@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar provas da missão"):
     missao_id = discord.ui.TextInput(
         label="ID da missão",
-        placeholder="Ex.: M-001",
+        placeholder="Ex.: SHI-NM001",
         required=True,
         max_length=50,
     )
