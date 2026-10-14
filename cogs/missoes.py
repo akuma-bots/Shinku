@@ -433,7 +433,7 @@ class Missoes(commands.Cog):
                 marcador_novo = evento_perfil not in eventos_aplicados
                 recompensa_aplicada = (
                     marcador_novo
-                    and (auxiliar_id or not atividade_ja_aplicada)
+                    and (bool(auxiliar_id) or not atividade_ja_aplicada)
                 )
 
                 if marcador_novo:
@@ -489,7 +489,7 @@ class Missoes(commands.Cog):
                     user_id=usuario_id,
                     perfil=resultado["perfil"],
                     nome=membro.display_name if membro else "",
-                    delta_pontos=quantidade if resultado["aplicada"] else 0,
+                    delta_pontos=quantidade,
                     evento_id=evento_site,
                 )
             except Exception as erro:
@@ -570,8 +570,8 @@ class Missoes(commands.Cog):
         auxiliar_id = None
         auxiliar_valor = auxiliar_texto.strip()
         if auxiliar_valor:
-            mencao = re.fullmatch(r"<@!?(\\d+)>", auxiliar_valor)
-            id_direto = re.fullmatch(r"\\d{15,22}", auxiliar_valor)
+            mencao = re.fullmatch(r"<@!?(\d+)>", auxiliar_valor)
+            id_direto = re.fullmatch(r"\d{15,22}", auxiliar_valor)
             if mencao:
                 auxiliar_id = int(mencao.group(1))
             elif id_direto:
