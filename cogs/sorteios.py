@@ -1261,6 +1261,10 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         sorteio_id = str(sorteio.get("id"))
         ja_anunciado = await self._resultado_ja_anunciado(canal, sorteio_id)
         if ja_anunciado is None:
+            await self._reabrir_apos_falha_de_anuncio(
+                sorteio,
+                RuntimeError("Não foi possível verificar o histórico do canal."),
+            )
             return
         if ja_anunciado:
             logger.info(
