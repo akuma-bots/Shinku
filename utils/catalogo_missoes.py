@@ -64,6 +64,14 @@ async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
     }
 
     ids_padrao = {str(item["id"]) for item in catalogo}
+    # As missões antigas sem jogo são arquivadas na migração para os três catálogos.
+    ids_legados = {
+        missao_id
+        for missao_id in existentes
+        if missao_id.startswith("NM")
+        and missao_id[2:].isdigit()
+        and any(item_id.endswith("-" + missao_id) for item_id in ids_padrao)
+    }
     atualizadas = []
 
     for definicao in catalogo:
@@ -81,9 +89,20 @@ async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
         atual["canal_config"] = definicao.get("canal_config", "")
         atualizadas.append(atual)
 
+    # Mantém os registros antigos para histórico, mas desativa a submissão por eles.
+    for missao_id in ids_legados:
+        antiga = existentes[missao_id]
+        arquivada = armazenamento._normalizar_missao({
+            **antiga,
+            "ativa": False,
+            "origem": antiga.get("origem", "migracao"),
+        })
+        atualizadas.append(arquivada)
+
     personalizadas = [
         item for item in guild_data.get("missoes", [])
         if str(item.get("id")) not in ids_padrao
+        and str(item.get("id")) not in ids_legados
     ]
     guild_data["missoes"] = personalizadas + atualizadas
     await armazenamento._salvar_guild(guild_id, guild_data)
