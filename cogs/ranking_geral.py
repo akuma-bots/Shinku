@@ -273,89 +273,48 @@ class RankingGeral(
         self,
         guild: discord.Guild,
     ):
-
-        config = await get_config(
-            guild.id
-        )
-
-        canal_id = config.get(
-            "canal_ranking_id"
-        )
-
-        if not canal_id:
+        """Remove o painel antigo; o ranking por jogo é gerenciado por cogs.missoes."""
+        config = await get_config(guild.id)
+        mensagem_id = config.get("ranking_mensagem_id")
+        if not mensagem_id:
             return
-
         try:
-            canal_id = int(canal_id)
+            mensagem_id = int(mensagem_id)
         except (TypeError, ValueError):
+            await set_config(guild.id, ranking_mensagem_id=0)
             return
 
-        candidatos = [canal_id, 1545834182406574241]
-        canal = None
+        candidatos = [config.get("canal_ranking_id"), 1545834182406574241]
         vistos = set()
+        mensagem_removida = False
         for valor in candidatos:
             try:
-                identificador = int(valor) if valor else None
+                canal_id = int(valor) if valor else None
             except (TypeError, ValueError):
-                identificador = None
-            if not identificador or identificador in vistos:
+                canal_id = None
+            if not canal_id or canal_id in vistos:
                 continue
-            vistos.add(identificador)
-            canal = guild.get_channel(identificador)
+            vistos.add(canal_id)
+            canal = guild.get_channel(canal_id)
             if canal is None:
                 try:
-                    canal = await guild.fetch_channel(identificador)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException) as erro:
-                    print(f"[RankingGeral] Canal {identificador} inacessível: {erro}")
-                    canal = None
-            if canal is not None and callable(getattr(canal, "send", None)):
-                canal_id = identificador
-                break
-            canal = None
-
-        if canal is None:
-            print("[RankingGeral] Nenhum canal de ranking configurado/acessível.")
-            return
-
-        embed = await self._montar_embed(
-            guild
-        )
-
-        mensagem_id = config.get(
-            "ranking_mensagem_id"
-        )
-
-
-        if mensagem_id:
-
+                    canal = await guild.fetch_channel(canal_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    continue
             try:
+                mensagem = await canal.fetch_message(mensagem_id)
+                await mensagem.delete()
+                mensagem_removida = True
+                break
+            except discord.NotFound:
+                mensagem_removida = True
+                break
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                print(f"[RankingGeral] Não foi possível remover o ranking antigo: {erro}")
 
-                msg = await canal.fetch_message(
-                    mensagem_id
-                )
-
-                await msg.edit(
-                    embed=embed
-                )
-
-                return
-
-            except (
-                discord.NotFound,
-                discord.Forbidden,
-            ):
-
-                pass
-
-
-        nova_msg = await canal.send(
-            embed=embed
-        )
-
-        await set_config(
-            guild.id,
-            ranking_mensagem_id=nova_msg.id,
-        )
+        if mensagem_removida:
+            await set_config(guild.id, ranking_mensagem_id=0)
+            print(f"[RankingGeral] Referência do ranking antigo removida em {guild.id}.")
 
 
     @app_commands.command(
@@ -502,24 +461,21 @@ class RankingGeral(
 
     @app_commands.command(
         name="ranking-geral",
-        description=(
-            "Mostra o Top 10 atual de pontuação."
-        ),
+        description="Mostra onde acessar o novo ranking por jogo.",
     )
     async def ranking_geral(
         self,
         interaction: discord.Interaction,
     ):
-
-        embed = await self._montar_embed(
-            interaction.guild
-        )
-
+        config = await get_config(interaction.guild.id)
+        canal_id = config.get("canal_ranking_id") or 1545834182406574241
+        canal = interaction.guild.get_channel(int(canal_id))
+        mention = canal.mention if canal is not None else f"<#{canal_id}>"
         await interaction.response.send_message(
-            embed=embed
+            f"O ranking global antigo foi substituído. Acesse {mention} e use os botões "
+            "**Ranking anterior** e **Próximo ranking** para alternar entre Shigaku, Gakuran e Fistborn.",
+            ephemeral=True,
         )
-
-
     @app_commands.command(
         name="temporada-reiniciar",
         description="Encerra a temporada atual e inicia outra sem apagar estatísticas acumuladas.",
