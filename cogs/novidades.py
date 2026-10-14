@@ -15,7 +15,55 @@ from utils.storage import carregar, salvar
 logger = logging.getLogger(__name__)
 ARQUIVO_ESTADO = "novidades_automaticas.json"
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
-INTERVALO_ENVIO = 1.0
+INTERVALO_ENVIO = 1.2
+TENTATIVAS_DM = 3
+
+
+async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
+    """Retorna enviada, permanente ou temporaria; repete apenas falhas transitórias."""
+    for tentativa in range(1, TENTATIVAS_DM + 1):
+        try:
+            await membro.send(
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return "enviada"
+        except (discord.Forbidden, discord.NotFound):
+            # Bloqueio de DM ou usuário inexistente não se resolve com retry.
+            return "permanente"
+        except discord.HTTPException as erro:
+            # Erros 4xx (exceto rate limit) normalmente não se resolvem repetindo.
+            status = getattr(erro, "status", 0)
+            codigo = getattr(erro, "code", 0)
+            if status and 400 <= status < 500 and status != 429:
+                logger.warning(
+                    "DM rejeitada permanentemente (user=%s, status=%s, code=%s).",
+                    getattr(membro, "id", "desconhecido"), status, codigo,
+                )
+                return "permanente"
+            if tentativa >= TENTATIVAS_DM:
+                logger.warning(
+                    "DM falhou após %s tentativas (user=%s, status=%s).",
+                    tentativa, getattr(membro, "id", "desconhecido"), status,
+                    exc_info=True,
+                )
+                return "temporaria"
+            espera = min(2 ** (tentativa - 1), 8)
+            retry_after = getattr(erro, "retry_after", None)
+            if isinstance(retry_after, (int, float)):
+                espera = max(espera, min(float(retry_after), 30))
+            logger.warning(
+                "Falha transitória na DM (user=%s, tentativa=%s/%s); nova tentativa em %.1fs.",
+                getattr(membro, "id", "desconhecido"), tentativa, TENTATIVAS_DM, espera,
+            )
+            await asyncio.sleep(espera)
+        except Exception:
+            logger.exception(
+                "Erro inesperado ao enviar DM para %s.",
+                getattr(membro, "id", "desconhecido"),
+            )
+            return "temporaria"
+    return "temporaria"
 
 
 class Novidades(commands.Cog):
@@ -128,19 +176,19 @@ class Novidades(commands.Cog):
 
         enviados = 0
         falhas = 0
+        permanentes = 0
         for indice, membro in enumerate(membros):
-            try:
-                await membro.send(
-                    embed=embed,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
+            resultado = await _enviar_dm_com_retry(membro, embed=embed)
+            if resultado == "enviada":
                 enviados += 1
-            except discord.Forbidden:
+            else:
                 falhas += 1
-                logger.info("DM indisponível para membro %s; aviso privado não entregue.", membro.id)
-            except discord.HTTPException:
-                falhas += 1
-                logger.exception("Falha ao enviar comunicado privado ao membro %s.", membro.id)
+                if resultado == "permanente":
+                    permanentes += 1
+                logger.info(
+                    "Comunicado manual não entregue (guild=%s, user=%s, resultado=%s).",
+                    guild.id, membro.id, resultado,
+                )
 
             if indice < len(membros) - 1:
                 await asyncio.sleep(INTERVALO_ENVIO)
@@ -153,7 +201,8 @@ class Novidades(commands.Cog):
             f"**Comunicado finalizado: {titulo}**\n"
             f"• Membros humanos encontrados: **{len(membros)}**\n"
             f"• DMs enviadas: **{enviados}**\n"
-            f"• Falhas (DMs fechadas ou restrições do Discord): **{falhas}**",
+            f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\\n"
+            f"• Falhas temporárias podem ser tentadas novamente em um novo comunicado.",
             ephemeral=True,
         )
 
@@ -235,30 +284,44 @@ class Novidades(commands.Cog):
                     if uid in processados:
                         continue
 
+                    terminal = False
                     try:
                         membro = guild.get_member(int(uid))
                         if membro is None:
                             membro = await guild.fetch_member(int(uid))
-                        await membro.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-                    except discord.Forbidden:
-                        logger.info("DM indisponível para membro %s; marcado como processado.", uid)
+                        resultado = await _enviar_dm_com_retry(membro, embed=embed)
+                        terminal = resultado in {"enviada", "permanente"}
+                        if resultado == "permanente":
+                            logger.info(
+                                "DM do release indisponível para user=%s; não será repetida para este release.",
+                                uid,
+                            )
+                        elif resultado == "temporaria":
+                            logger.warning(
+                                "DM do release permanece pendente para user=%s; será tentada em nova inicialização.",
+                                uid,
+                            )
                     except discord.NotFound:
                         logger.info("Membro %s não está mais no servidor.", uid)
+                        terminal = True
                     except (discord.HTTPException, ValueError, TypeError):
-                        logger.exception("Falha ao entregar novidade ao usuário %s.", uid)
+                        logger.exception("Falha ao localizar/entregar novidade ao usuário %s.", uid)
                     except Exception:
                         logger.exception("Erro inesperado ao entregar novidade ao usuário %s.", uid)
 
-                    processados.add(uid)
-                    release_estado["processados"] = sorted(processados)
-                    guild_estado[release["release_id"]] = release_estado
-                    estados["guilds"][str(guild.id)] = guild_estado
-                    try:
-                        await salvar(ARQUIVO_ESTADO, estados)
-                    except Exception:
-                        houve_falha_storage = True
-                        logger.exception("Falha ao persistir checkpoint do release %s.", release["release_id"])
-                        break
+                    # Só registrar como processado quando entregue ou quando não é
+                    # possível entregar permanentemente. Falhas transitórias ficam pendentes.
+                    if terminal:
+                        processados.add(uid)
+                        release_estado["processados"] = sorted(processados)
+                        guild_estado[release["release_id"]] = release_estado
+                        estados["guilds"][str(guild.id)] = guild_estado
+                        try:
+                            await salvar(ARQUIVO_ESTADO, estados)
+                        except Exception:
+                            houve_falha_storage = True
+                            logger.exception("Falha ao persistir checkpoint do release %s.", release["release_id"])
+                            break
                     await asyncio.sleep(INTERVALO_ENVIO)
 
                 if not houve_falha_storage and all(str(uid) in processados for uid in destinatarios):
