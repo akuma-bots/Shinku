@@ -15,6 +15,7 @@ from utils.catalogo_missoes import (
     obter_mensagem_discord,
 )
 from utils.guild_config import get_config
+from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
     _salvar_perfil,
@@ -259,13 +260,20 @@ class Missoes(commands.Cog):
             embed.set_author(name="NÊMESIS  /  CENTRAL DE OPERAÇÕES")
 
             if indice == 1:
+                jogo_slug = str(atividade.get("jogo") or "").strip().lower()
+                jogo_nome = ranking_missoes_jogos.JOGOS.get(
+                    jogo_slug, {}
+                ).get("nome")
+                identificacao = (
+                    f"**Código**  `{missao_id}`\n"
+                    f"**Categoria**  {tipo['nome']}\n"
+                    f"**Origem**  {origem}"
+                )
+                if jogo_nome:
+                    identificacao += f"\n**Jogo**  {jogo_nome}"
                 embed.add_field(
                     name="◈ IDENTIFICAÇÃO",
-                    value=(
-                        f"**Código**  `{missao_id}`\n"
-                        f"**Categoria**  {tipo['nome']}\n"
-                        f"**Origem**  {origem}"
-                    ),
+                    value=identificacao,
                     inline=True,
                 )
                 embed.add_field(
@@ -338,21 +346,138 @@ class Missoes(commands.Cog):
 
         return embeds
 
+    async def _garantir_canais_jogos(self, guild: discord.Guild) -> dict:
+        """Garante uma categoria, um canal de missões e um ranking para cada jogo."""
+        registro = await ranking_missoes_jogos.obter_dados(guild.id)
+        canais = {}
+        for slug, jogo in ranking_missoes_jogos.JOGOS.items():
+            dados = registro.get("jogos", {}).get(slug, {})
+            nome_categoria = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {jogo['nome']}"
+            categoria = guild.get_channel(int(dados.get("categoria_id", 0) or 0))
+            if not isinstance(categoria, discord.CategoryChannel):
+                categoria = discord.utils.get(guild.categories, name=nome_categoria)
+            try:
+                if categoria is None:
+                    categoria = await guild.create_category(
+                        nome_categoria,
+                        reason="Criar estrutura de missões por jogo da NÊMESIS",
+                    )
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                log.exception("Não foi possível criar a categoria de %s: %s", jogo["nome"], erro)
+                continue
+
+            async def resolver_ou_criar(chave: str, nome: str):
+                canal_id = int(dados.get(chave, 0) or 0)
+                canal = guild.get_channel(canal_id)
+                if not isinstance(canal, discord.TextChannel):
+                    canal = discord.utils.get(categoria.text_channels, name=nome)
+                if canal is not None:
+                    return canal
+                return await categoria.create_text_channel(
+                    nome,
+                    reason=f"Canal automático de {jogo['nome']} da NÊMESIS",
+                )
+
+            try:
+                canal_missoes = await resolver_ou_criar("missoes_channel_id", "・missões")
+                canal_ranking = await resolver_ou_criar("ranking_channel_id", "・ranking")
+                await ranking_missoes_jogos.salvar_canais(
+                    guild.id,
+                    slug,
+                    categoria.id,
+                    canal_missoes.id,
+                    canal_ranking.id,
+                    dados.get("ranking_message_id"),
+                )
+                canais[slug] = {
+                    "categoria_id": categoria.id,
+                    "missoes_channel_id": canal_missoes.id,
+                    "ranking_channel_id": canal_ranking.id,
+                }
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                log.exception("Não foi possível preparar os canais de %s: %s", jogo["nome"], erro)
+        return canais
+
+    async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
+        """Atualiza o painel persistente do Top 10 do jogo."""
+        dados = (await ranking_missoes_jogos.obter_dados(guild.id)).get("jogos", {}).get(jogo, {})
+        canal_id = dados.get("ranking_channel_id")
+        if not canal_id:
+            return
+        canal = await self._resolver_canal(guild, int(canal_id))
+        if canal is None:
+            return
+        linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
+        nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
+        if linhas:
+            descricao = "\n".join(
+                f"**#{indice}** <@{uid}> — **{pontos:,} P.C.**".replace(",", ".")
+                for indice, (uid, _nome, pontos) in enumerate(linhas, start=1)
+            )
+        else:
+            descricao = "Nenhum integrante pontuou neste jogo ainda. As missões aprovadas aparecerão aqui."
+        embed = discord.Embed(
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING {nome_jogo.upper()}",
+            description=descricao,
+            color=0x9F2035,
+        )
+        embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
+        embed.set_footer(text=f"{nome_jogo} • Pontos obtidos em missões aprovadas • Top 10")
+        mensagem = None
+        mensagem_id = dados.get("ranking_message_id")
+        if mensagem_id:
+            try:
+                mensagem = await canal.fetch_message(int(mensagem_id))
+            except discord.NotFound:
+                mensagem = None
+            except (discord.Forbidden, discord.HTTPException) as erro:
+                log.warning("Falha ao buscar ranking de %s: %s", nome_jogo, erro)
+                return
+        try:
+            if mensagem is not None:
+                await mensagem.edit(embed=embed)
+            else:
+                mensagem = await canal.send(embed=embed)
+                await ranking_missoes_jogos.atualizar_mensagem_ranking(
+                    guild.id, jogo, mensagem.id
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Falha ao publicar ranking de %s.", nome_jogo)
+
+    @staticmethod
+    def _expandir_catalogo_por_jogo(catalogo: list) -> list:
+        """Replica as missões padrão para Shigaku, Gakuran e Fistborn com IDs únicos."""
+        resultado = []
+        for slug, jogo in ranking_missoes_jogos.JOGOS.items():
+            for definicao in catalogo:
+                missao = dict(definicao)
+                missao["id"] = f"{jogo['prefixo']}-{definicao['id']}"
+                missao["jogo"] = slug
+                missao["canal_config"] = f"jogo:{slug}"
+                resultado.append(missao)
+        return resultado
+
     async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
         """Publica cada missão padrão uma vez e edita a mesma mensagem nos próximos reinícios."""
         if self._sync_lock.locked():
             return {"atualizadas": 0, "publicadas": 0, "falhas": 0, "ignorada": True}
 
         async with self._sync_lock:
-            catalogo = carregar_catalogo()
+            catalogo_base = carregar_catalogo()
+            catalogo = self._expandir_catalogo_por_jogo(catalogo_base)
+            canais_jogos = await self._garantir_canais_jogos(guild)
             atividades = await sincronizar_catalogo(guild.id, catalogo)
             config = await get_config(guild.id)
             await self._renomear_canais_pontuacao(guild, config)
 
             resultado = {"atualizadas": 0, "publicadas": 0, "falhas": 0}
             for atividade in atividades:
-                chave_canal = atividade.get("canal_config", "")
-                canal_id = config.get(chave_canal) or CANAIS_PADRAO.get(chave_canal)
+                jogo_slug = str(atividade.get("jogo") or "").strip().lower()
+                if jogo_slug:
+                    canal_id = canais_jogos.get(jogo_slug, {}).get("missoes_channel_id")
+                else:
+                    chave_canal = atividade.get("canal_config", "")
+                    canal_id = config.get(chave_canal) or CANAIS_PADRAO.get(chave_canal)
                 if not canal_id:
                     log.error("Missão %s sem canal configurado (%s).", atividade.get("id"), chave_canal)
                     resultado["falhas"] += 1
@@ -445,6 +570,9 @@ class Missoes(commands.Cog):
                     canal.id,
                     mensagens_atualizadas,
                 )
+
+            for slug in ranking_missoes_jogos.JOGOS:
+                await self._atualizar_ranking_jogo(guild, slug)
 
             log.info(
                 "Catálogo de missões sincronizado: %s publicadas, %s atualizadas, %s falhas.",
@@ -558,6 +686,27 @@ class Missoes(commands.Cog):
                 if auxiliar_id
                 else f"missao:{revisao_id}"
             )
+
+            jogo_slug = str(atividade.get("jogo") or "").strip().lower()
+            if jogo_slug and resultado["aplicada"] and quantidade > 0:
+                membro_pontuacao = guild.get_member(usuario_id)
+                try:
+                    await ranking_missoes_jogos.registrar_pontos(
+                        guild_id=guild.id,
+                        jogo=jogo_slug,
+                        user_id=usuario_id,
+                        nome=membro_pontuacao.display_name if membro_pontuacao else "",
+                        pontos=quantidade,
+                        evento_id=f"missao:{revisao_id}:{usuario_id}",
+                    )
+                    await self._atualizar_ranking_jogo(guild, jogo_slug)
+                except Exception as erro:
+                    log.exception(
+                        "Falha ao atualizar ranking de %s para %s: %s",
+                        jogo_slug,
+                        usuario_id,
+                        erro,
+                    )
 
             if progressao is not None and quantidade > 0:
                 try:
