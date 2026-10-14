@@ -106,18 +106,25 @@ class Logs(commands.Cog):
         anexos_depois = [anexo.url for anexo in depois.attachments]
         if antes.content == depois.content and anexos_antes == anexos_depois:
             return
-        canal = await self._canal_logs(antes.guild)
-        if not canal:
-            return
         embed = discord.Embed(
+            title="Mensagem editada",
             description=(
-                f"✏️ {antes.author.mention} editou uma mensagem em {antes.channel.mention}:\n"
-                f"**Antes:** {antes.content[:700] or '*vazio*'}\n"
-                f"**Depois:** {depois.content[:700] or '*vazio*'}"
+                f"**Autor:** {antes.author.mention} ({antes.author.id})\n"
+                f"**Canal:** {antes.channel.mention} ({antes.channel.id})\n"
+                f"**Antes:**\n{antes.content[:1000] or '*vazio*'}\n"
+                f"**Depois:**\n{depois.content[:1000] or '*vazio*'}"
             ),
             color=0xFEE75C,
         )
-        await self._enviar_log(canal, embed)
+        if anexos_antes != anexos_depois:
+            antigos = "\n".join(f"[{a.filename}]({a.url})" for a in antes.attachments[:6]) or "*(nenhum)*"
+            atuais = "\n".join(f"[{a.filename}]({a.url})" for a in depois.attachments[:6]) or "*(nenhum)*"
+            embed.add_field(name="Anexos anteriores", value=antigos[:1024], inline=False)
+            embed.add_field(name="Anexos atuais", value=atuais[:1024], inline=False)
+        embed.add_field(name="ID da mensagem", value=str(antes.id), inline=True)
+        canal = await self._canal_logs(antes.guild)
+        if canal and canal.id != antes.channel.id:
+            await self._enviar_log(canal, embed)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
