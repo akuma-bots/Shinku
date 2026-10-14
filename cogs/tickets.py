@@ -567,12 +567,15 @@ class Tickets(commands.Cog):
             "support_role_id"
         )
 
+        try:
+            cargo_suporte_id = int(cargo_suporte_id) if cargo_suporte_id else None
+        except (TypeError, ValueError):
+            cargo_suporte_id = None
+
         eh_suporte = (
-            cargo_suporte_id
+            cargo_suporte_id is not None
             and isinstance(message.author, discord.Member)
-            and message.author.get_role(
-                int(cargo_suporte_id)
-            ) is not None
+            and message.author.get_role(cargo_suporte_id) is not None
         )
 
         ticket_atual = await tickets.get_ticket_por_canal(
@@ -595,13 +598,22 @@ class Tickets(commands.Cog):
             frase in texto
             for frase in FRASES_FECHAR
         )
-        eh_dono_ticket = str(message.author.id) == str(info_topic.get("owner_id"))
+        eh_dono_ticket = (
+            ticket_atual is not None
+            and ticket_atual.get("status") == "aberto"
+            and str(message.author.id) == str(ticket_atual.get("usuario_id"))
+        )
         eh_admin_ticket = (
             isinstance(message.author, discord.Member)
             and message.author.guild_permissions.manage_channels
         )
 
-        if pediu_fechamento and (eh_dono_ticket or eh_suporte or eh_admin_ticket):
+        if (
+            pediu_fechamento
+            and ticket_atual is not None
+            and ticket_atual.get("status") == "aberto"
+            and (eh_dono_ticket or eh_suporte or eh_admin_ticket)
+        ):
             await fechar_canal_ticket(
                 message.channel,
                 f"Fechamento solicitado por usuário autorizado ({message.author.id}).",
