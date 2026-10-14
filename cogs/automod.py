@@ -1709,9 +1709,21 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         duracao,
     ):
 
-        dados = (
-            await self.carregar_banimentos_temporarios()
-        )
+        try:
+            dados = await self.carregar_banimentos_temporarios()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao carregar banimentos temporários; a verificação será repetida no próximo ciclo."
+            )
+            return
+
+        if not isinstance(dados, dict):
+            import logging
+            logging.getLogger(__name__).error(
+                "Armazenamento de banimentos temporários possui formato inválido."
+            )
+            return
 
         dados[
             f"{guild_id}:{user_id}"
@@ -1809,10 +1821,13 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 )
 
         if alterado:
-
-            await self.salvar_banimentos_temporarios(
-                dados
-            )
+            try:
+                await self.salvar_banimentos_temporarios(dados)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Falha ao persistir banimentos temporários; estado será reavaliado no próximo ciclo."
+                )
 
     @verificar_banimentos.before_loop
     async def antes_verificar_banimentos(
