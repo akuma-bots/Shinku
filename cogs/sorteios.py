@@ -1158,6 +1158,31 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             f"{sorteio.get('id')}; o encerramento será tentado novamente: {erro}"
         )
 
+    async def _resultado_ja_anunciado(
+        self,
+        canal: discord.TextChannel,
+        sorteio_id: str,
+    ) -> bool | None:
+        """Detecta anúncio já aceito pelo Discord após timeout/resposta perdida."""
+        marcador = f"SORTEIO-ID:{sorteio_id}"
+        try:
+            async for mensagem in canal.history(limit=100):
+                if not self.bot.user or mensagem.author.id != self.bot.user.id:
+                    continue
+                if any(
+                    embed.footer
+                    and marcador in (embed.footer.text or "")
+                    for embed in mensagem.embeds
+                ):
+                    return True
+            return False
+        except (discord.Forbidden, discord.HTTPException):
+            logger.exception(
+                "Não foi possível verificar anúncios anteriores do sorteio %s.",
+                sorteio_id,
+            )
+            return None
+
     # =========================================================
     # SORTEAR VENCEDORES
     # =========================================================
@@ -1232,6 +1257,18 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         # O canal foi resolvido antes de marcar o sorteio como encerrado.
         # Assim, falhas temporárias de cache/API permitem nova tentativa no próximo ciclo.
 
+        # Confere se o Discord já aceitou o anúncio numa tentativa anterior.
+        sorteio_id = str(sorteio.get("id"))
+        ja_anunciado = await self._resultado_ja_anunciado(canal, sorteio_id)
+        if ja_anunciado is None:
+            return
+        if ja_anunciado:
+            logger.info(
+                "Resultado do sorteio %s já estava publicado; anúncio duplicado evitado.",
+                sorteio_id,
+            )
+            return
+
         # =====================================================
         # SEM PARTICIPANTES
         # =====================================================
@@ -1249,7 +1286,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             )
 
             embed.set_footer(
-                text="NÊMESIS • Sorteios"
+                text=f"NÊMESIS • Sorteios • SORTEIO-ID:{sorteio_id}"
             )
 
             try:
@@ -1291,7 +1328,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         )
 
         embed.set_footer(
-            text="NÊMESIS • Sorteios"
+            text=f"NÊMESIS • Sorteios • SORTEIO-ID:{sorteio_id}"
         )
 
         try:
