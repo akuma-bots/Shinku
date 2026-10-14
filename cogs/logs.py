@@ -151,23 +151,59 @@ class Logs(commands.Cog):
 
         if antes.nick != depois.nick:
             embed = discord.Embed(
-                description=f"📝 {depois.mention} mudou de apelido: `{antes.nick or antes.name}` → `{depois.nick or depois.name}`",
+                title="Apelido alterado",
+                description=(
+                    f"**Membro:** {depois.mention} ({depois.id})\n"
+                    f"**Antes:** {antes.nick or antes.name}\n"
+                    f"**Depois:** {depois.nick or depois.name}"
+                ),
                 color=0xFEE75C,
             )
             await self._enviar_log(canal, embed)
 
-        cargos_antes = set(antes.roles)
-        cargos_depois = set(depois.roles)
-        ganhos = cargos_depois - cargos_antes
-        perdidos = cargos_antes - cargos_depois
-        for cargo in ganhos:
-            if cargo.is_default():
-                continue
-            await self._enviar_log(canal, discord.Embed(description=f"➕ {depois.mention} recebeu o cargo {cargo.mention}.", color=0x57F287))
-        for cargo in perdidos:
-            if cargo.is_default():
-                continue
-            await self._enviar_log(canal, discord.Embed(description=f"➖ {depois.mention} perdeu o cargo {cargo.mention}.", color=0xED4245))
+        ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
+        ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
+        ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
+        perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
+        if ganhos or perdidos:
+            embed = discord.Embed(
+                title="Cargos do membro alterados",
+                description=f"**Membro:** {depois.mention} ({depois.id})",
+                color=0xB3132B,
+            )
+            if ganhos:
+                embed.add_field(
+                    name=f"Cargos recebidos ({len(ganhos)})",
+                    value=" ".join(cargo.mention for cargo in ganhos)[:1024],
+                    inline=False,
+                )
+            if perdidos:
+                embed.add_field(
+                    name=f"Cargos removidos ({len(perdidos)})",
+                    value=" ".join(cargo.mention for cargo in perdidos)[:1024],
+                    inline=False,
+                )
+            await self._enviar_log(canal, embed)
+
+        if antes.communication_disabled_until != depois.communication_disabled_until:
+            embed = discord.Embed(
+                title="Timeout alterado",
+                description=f"**Membro:** {depois.mention} ({depois.id})",
+                color=0xFEE75C,
+            )
+            embed.add_field(
+                name="Antes",
+                value=discord.utils.format_dt(antes.communication_disabled_until, style="F")
+                if antes.communication_disabled_until else "Sem timeout",
+                inline=True,
+            )
+            embed.add_field(
+                name="Depois",
+                value=discord.utils.format_dt(depois.communication_disabled_until, style="F")
+                if depois.communication_disabled_until else "Sem timeout",
+                inline=True,
+            )
+            await self._enviar_log(canal, embed)
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
