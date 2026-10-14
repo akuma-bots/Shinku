@@ -3,6 +3,7 @@ import time
 import uuid
 import random
 import re
+import logging
 
 import discord
 from discord import app_commands
@@ -16,6 +17,8 @@ ARQUIVO = "sorteios.json"
 COR_SORTEIO = 0x5865F2
 COR_SUCESSO = 0x57F287
 COR_ERRO = 0xED4245
+
+logger = logging.getLogger(__name__)
 
 
 def _selecionar_vencedores(
@@ -1304,55 +1307,41 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
     # =========================================================
 
     @tasks.loop(seconds=30)
-    async def verificar_sorteios(
-        self,
-    ):
-        todos = await carregar(
-            ARQUIVO,
-            {},
-        )
+    async def verificar_sorteios(self):
+        # Erros de storage não devem matar o loop de encerramento automático.
+        try:
+            todos = await carregar(ARQUIVO, {})
+        except Exception:
+            logger.exception("Falha ao carregar sorteios para verificar encerramentos.")
+            return
 
         if not isinstance(todos, dict):
+            logger.error("Estrutura inválida em %s: esperado um objeto.", ARQUIVO)
             return
 
         agora = time.time()
-
         for sorteio in list(todos.values()):
-            if not isinstance(sorteio, dict):
-                continue
-
-            if sorteio.get(
-                "encerrado"
-            ):
+            if not isinstance(sorteio, dict) or sorteio.get("encerrado"):
                 continue
 
             try:
-                fim = float(
-                    sorteio.get(
-                        "fim",
-                        0,
-                    )
+                fim = float(sorteio.get("fim", 0) or 0)
+            except (TypeError, ValueError):
+                logger.error(
+                    "Sorteio com horário de término inválido (id=%s).",
+                    sorteio.get("id", "desconhecido"),
                 )
-            except (
-                TypeError,
-                ValueError,
-            ):
                 continue
 
             if agora < fim:
                 continue
 
             try:
-                await self.sortear_vencedores(
-                    sorteio
-                )
-
-            except Exception as erro:
-                print(
-                    "[SORTEIOS] "
-                    f"Erro ao encerrar "
-                    f"{sorteio.get('id')}: "
-                    f"{erro}"
+                await self.sortear_vencedores(sorteio)
+            except Exception:
+                logger.exception(
+                    "Falha inesperada ao encerrar sorteio id=%s; será reavaliado no próximo ciclo.",
+                    sorteio.get("id", "desconhecido"),
                 )
 
     @verificar_sorteios.before_loop
