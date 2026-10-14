@@ -43,6 +43,13 @@ def carregar_catalogo() -> list:
             )
         resultado.append(item)
 
+    ordem_tipos = {"missao": 0, "contribuicao": 1, "especial": 2}
+    resultado.sort(
+        key=lambda item: (
+            ordem_tipos.get(str(item.get("tipo") or "").strip().lower(), 99),
+            str(item.get("id") or "").casefold(),
+        )
+    )
     return resultado
 
 
