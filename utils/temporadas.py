@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from utils.storage import carregar, salvar
@@ -409,7 +410,7 @@ async def _sincronizar_perfil_site(
     )
 
 
-_ENCERRAR_TEMPORADA_LOCK = __import__("asyncio").Lock()
+_ENCERRAR_TEMPORADA_LOCK = asyncio.Lock()
 
 
 async def encerrar_temporada(
