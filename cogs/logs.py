@@ -84,16 +84,27 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(message.guild)
         if not canal or canal.id == message.channel.id:
             return  # evita loop se o canal de logs for o mesmo onde a mensagem foi apagada
-        conteudo = message.content or "*(sem texto — pode ser um anexo)*"
-        embed = discord.Embed(
-            description=f"🗑️ Mensagem de {message.author.mention} apagada em {message.channel.mention}:\n{conteudo[:500]}",
-            color=0xED4245,
+        conteudo = message.content or "*(sem texto)*"
+        anexos = "\\n".join(
+            f"[{anexo.filename}]({anexo.url})" for anexo in message.attachments[:8]
         )
+        descricao = (
+            f"**Autor:** {message.author.mention} ({message.author.id})\\n"
+            f"**Canal:** {message.channel.mention}\\n"
+            f"**Mensagem:**\\n{conteudo[:1200]}"
+        )
+        if anexos:
+            descricao += f"\\n**Anexos:**\\n{anexos[:1200]}"
+        embed = discord.Embed(description=descricao[:4000], color=0xED4245)
         await self._enviar_log(canal, embed)
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
-        if antes.author.bot or not antes.guild or antes.content == depois.content:
+        if antes.author.bot or not antes.guild:
+            return
+        anexos_antes = [anexo.url for anexo in antes.attachments]
+        anexos_depois = [anexo.url for anexo in depois.attachments]
+        if antes.content == depois.content and anexos_antes == anexos_depois:
             return
         canal = await self._canal_logs(antes.guild)
         if not canal:
@@ -101,8 +112,8 @@ class Logs(commands.Cog):
         embed = discord.Embed(
             description=(
                 f"✏️ {antes.author.mention} editou uma mensagem em {antes.channel.mention}:\n"
-                f"**Antes:** {antes.content[:400] or '*vazio*'}\n"
-                f"**Depois:** {depois.content[:400] or '*vazio*'}"
+                f"**Antes:** {antes.content[:700] or '*vazio*'}\n"
+                f"**Depois:** {depois.content[:700] or '*vazio*'}"
             ),
             color=0xFEE75C,
         )
