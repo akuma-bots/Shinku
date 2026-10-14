@@ -20,7 +20,8 @@ TENTATIVAS_DM = 3
 
 
 async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
-    """Retorna enviada, permanente ou temporaria; repete apenas falhas transitórias."""
+    """Retorna enviada, permanente ou temporaria; repete falhas transitórias."""
+    user_id = getattr(membro, "id", "desconhecido")
     for tentativa in range(1, TENTATIVAS_DM + 1):
         try:
             await membro.send(
@@ -30,22 +31,21 @@ async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed
             return "enviada"
         except (discord.Forbidden, discord.NotFound):
             # Bloqueio de DM ou usuário inexistente não se resolve com retry.
+            logger.info("DM indisponível permanentemente (user=%s).", user_id)
             return "permanente"
         except discord.HTTPException as erro:
-            # Erros 4xx (exceto rate limit) normalmente não se resolvem repetindo.
             status = getattr(erro, "status", 0)
             codigo = getattr(erro, "code", 0)
             if status and 400 <= status < 500 and status != 429:
                 logger.warning(
                     "DM rejeitada permanentemente (user=%s, status=%s, code=%s).",
-                    getattr(membro, "id", "desconhecido"), status, codigo,
+                    user_id, status, codigo,
                 )
                 return "permanente"
             if tentativa >= TENTATIVAS_DM:
                 logger.warning(
-                    "DM falhou após %s tentativas (user=%s, status=%s).",
-                    tentativa, getattr(membro, "id", "desconhecido"), status,
-                    exc_info=True,
+                    "DM falhou após %s tentativas (user=%s, status=%s, code=%s).",
+                    tentativa, user_id, status, codigo, exc_info=True,
                 )
                 return "temporaria"
             espera = min(2 ** (tentativa - 1), 8)
@@ -53,16 +53,25 @@ async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed
             if isinstance(retry_after, (int, float)):
                 espera = max(espera, min(float(retry_after), 30))
             logger.warning(
-                "Falha transitória na DM (user=%s, tentativa=%s/%s); nova tentativa em %.1fs.",
-                getattr(membro, "id", "desconhecido"), tentativa, TENTATIVAS_DM, espera,
+                "Falha HTTP transitória na DM (user=%s, tentativa=%s/%s); retry em %.1fs.",
+                user_id, tentativa, TENTATIVAS_DM, espera,
             )
-            await asyncio.sleep(espera)
+        except (asyncio.TimeoutError, OSError, discord.ConnectionClosed) as erro:
+            if tentativa >= TENTATIVAS_DM:
+                logger.warning(
+                    "Falha de conexão ao enviar DM após %s tentativas (user=%s): %s",
+                    tentativa, user_id, erro, exc_info=True,
+                )
+                return "temporaria"
+            espera = min(2 ** (tentativa - 1), 8)
+            logger.warning(
+                "Conexão instável ao enviar DM (user=%s, tentativa=%s/%s); retry em %.1fs.",
+                user_id, tentativa, TENTATIVAS_DM, espera,
+            )
         except Exception:
-            logger.exception(
-                "Erro inesperado ao enviar DM para %s.",
-                getattr(membro, "id", "desconhecido"),
-            )
+            logger.exception("Erro inesperado ao enviar DM para %s.", user_id)
             return "temporaria"
+        await asyncio.sleep(espera)
     return "temporaria"
 
 
