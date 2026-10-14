@@ -414,8 +414,8 @@ class Missoes(commands.Cog):
         atividade_ja_aplicada = revisao_id in atividade.get("recompensas_aplicadas", [])
         if auxiliar_id:
             distribuicao = [
-                (autor_id, (recompensa + 1) // 2),
-                (auxiliar_id, recompensa // 2),
+                (autor_id, ((recompensa * 60 + 50) // 100)),
+                (auxiliar_id, recompensa - ((recompensa * 60 + 50) // 100)),
             ]
         else:
             distribuicao = [(autor_id, recompensa)]
@@ -707,8 +707,8 @@ class Missoes(commands.Cog):
                     f"Prova enviada por {interaction.user.mention}. "
                     f"ID da missão: `{atividade['id']}`. "
                     + (
-                        f"Recompensa total de {recompensa} XP/pontuação dividida igualmente "
-                        f"com <@{auxiliar_id}> após aprovação."
+                        f"Recompensa total de {recompensa} XP/pontuação: 60% para o responsável e 40% para o auxiliar "
+                        f"<@{auxiliar_id}> após aprovação."
                         if auxiliar_id
                         else f"Recompensa após aprovação: +{recompensa} de pontuação e +{recompensa} XP."
                     )
