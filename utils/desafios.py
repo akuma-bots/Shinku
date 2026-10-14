@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 import uuid
 
@@ -253,7 +254,16 @@ async def definir_resultado(
             lista,
         )
 
-        await _sincronizar_desafio_site(alvo)
+        try:
+            await _sincronizar_desafio_site(alvo)
+        except Exception:
+            # O estado principal já foi salvo. Não interrompe o envio da prova
+            # por uma falha transitória na cópia consumida pelo site; isso
+            # deixaria a luta em aguardando_revisao sem permitir nova tentativa.
+            logging.getLogger(__name__).exception(
+                "Falha ao sincronizar o resultado do desafio %s com o site.",
+                desafio_id,
+            )
 
         return alvo
 
