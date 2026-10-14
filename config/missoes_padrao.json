@@ -8,7 +8,9 @@
       "descricao": "Realize um treinamento PvP com outro membro da NÊMESIS. Envie uma captura de tela que comprove a atividade.",
       "recompensa_xp": 25,
       "canal_config": "canal_missoes_missao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Intermediária",
+      "requisitos": "Realizar treinamento PvP com outro membro da NÊMESIS e apresentar captura de tela que comprove a atividade."
     },
     {
       "id": "NM002",
@@ -17,7 +19,9 @@
       "descricao": "Participe de uma atividade oficial organizada pela NÊMESIS e envie uma captura de tela como prova.",
       "recompensa_xp": 20,
       "canal_config": "canal_missoes_missao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Moderada",
+      "requisitos": "Participar de uma atividade oficial organizada pela NÊMESIS e apresentar captura de tela."
     },
     {
       "id": "NM003",
@@ -26,7 +30,9 @@
       "descricao": "Conquiste uma vitória em combate dentro do jogo e envie uma captura de tela que permita verificar o resultado.",
       "recompensa_xp": 15,
       "canal_config": "canal_missoes_missao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Moderada",
+      "requisitos": "Conquistar uma vitória em combate e apresentar captura de tela que permita verificar o resultado."
     },
     {
       "id": "NM004",
@@ -35,7 +41,9 @@
       "descricao": "Ajude outro integrante com treinamento, orientação ou integração à NÊMESIS. A prova deve mostrar a atividade realizada.",
       "recompensa_xp": 20,
       "canal_config": "canal_missoes_contribuicao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Moderada",
+      "requisitos": "Ajudar outro integrante por meio de treinamento, orientação ou integração e apresentar evidência da atividade."
     },
     {
       "id": "NM005",
@@ -44,7 +52,9 @@
       "descricao": "Divulgue a NÊMESIS em um espaço que permita divulgação e envie uma captura de tela mostrando a publicação.",
       "recompensa_xp": 25,
       "canal_config": "canal_missoes_contribuicao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Intermediária",
+      "requisitos": "Publicar a divulgação em um espaço que permita esse tipo de conteúdo e apresentar captura da publicação."
     },
     {
       "id": "NM006",
@@ -53,7 +63,9 @@
       "descricao": "Traga um novo integrante para o servidor. Envie a prova solicitada pela equipe para validar a participação do recrutado.",
       "recompensa_xp": 30,
       "canal_config": "canal_missoes_contribuicao_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Alta",
+      "requisitos": "Recrutar um novo integrante e apresentar a prova solicitada pela equipe para validação."
     },
     {
       "id": "NM007",
@@ -62,7 +74,9 @@
       "descricao": "Participe de uma operação especial anunciada pela liderança. Envie a captura de tela solicitada no anúncio da operação.",
       "recompensa_xp": 75,
       "canal_config": "canal_missoes_especial_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Alta",
+      "requisitos": "Participar de uma operação especial anunciada pela liderança e apresentar a captura solicitada no anúncio."
     },
     {
       "id": "NM008",
@@ -71,7 +85,9 @@
       "descricao": "Participe de um evento especial oficial da NÊMESIS e envie uma captura de tela que comprove sua presença e participação.",
       "recompensa_xp": 60,
       "canal_config": "canal_missoes_especial_id",
-      "ativa": true
+      "ativa": true,
+      "dificuldade": "Alta",
+      "requisitos": "Participar de um evento especial oficial da NÊMESIS e apresentar captura que comprove presença e participação."
     }
   ]
 }
