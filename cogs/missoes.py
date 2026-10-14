@@ -551,128 +551,20 @@ class Missoes(commands.Cog):
         return resultado
 
     async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
-        """Publica cada missão padrão uma vez e edita a mesma mensagem nos próximos reinícios."""
+        """Sincroniza o catálogo e mantém painéis navegáveis nos canais existentes."""
         if self._sync_lock.locked():
             return {"atualizadas": 0, "publicadas": 0, "falhas": 0, "ignorada": True}
-
         async with self._sync_lock:
-            catalogo_base = carregar_catalogo()
-            catalogo = self._expandir_catalogo_por_jogo(catalogo_base)
-            canais_jogos = await self._garantir_canais_jogos(guild)
+            catalogo = self._expandir_catalogo_por_jogo(carregar_catalogo())
             atividades = await sincronizar_catalogo(guild.id, catalogo)
-            config = await get_config(guild.id)
-            await self._renomear_canais_pontuacao(guild, config)
-
-            resultado = {"atualizadas": 0, "publicadas": 0, "falhas": 0}
-            for atividade in atividades:
-                jogo_slug = str(atividade.get("jogo") or "").strip().lower()
-                if jogo_slug:
-                    canal_id = canais_jogos.get(jogo_slug, {}).get("missoes_channel_id")
-                else:
-                    chave_canal = atividade.get("canal_config", "")
-                    canal_id = config.get(chave_canal) or CANAIS_PADRAO.get(chave_canal)
-                if not canal_id:
-                    log.error("Missão %s sem canal configurado (%s).", atividade.get("id"), chave_canal)
-                    resultado["falhas"] += 1
-                    continue
-
-                canal = await self._resolver_canal(guild, canal_id)
-                if canal is None:
-                    log.error("Canal da missão %s não encontrado: %s", atividade.get("id"), canal_id)
-                    resultado["falhas"] += 1
-                    continue
-
-                mensagem = None
-                registro_mensagem = await obter_mensagem_discord(guild.id, str(atividade["id"]))
-                mensagem_id = registro_mensagem.get("discord_message_id") or atividade.get("discord_message_id")
-                canal_salvo_id = registro_mensagem.get("discord_channel_id") or atividade.get("discord_channel_id")
-                if mensagem_id and str(canal_salvo_id) == str(canal.id):
-                    try:
-                        mensagem = await canal.fetch_message(int(mensagem_id))
-                    except discord.NotFound:
-                        mensagem = None
-                    except (discord.Forbidden, discord.HTTPException) as erro:
-                        log.warning("Falha ao buscar mensagem da missão %s: %s", atividade.get("id"), erro)
-                        resultado["falhas"] += 1
-                        continue
-
-                embeds = self._montar_embeds(atividade)
-                ids_mensagens = registro_mensagem.get("discord_message_ids") or []
-                if not ids_mensagens and mensagem_id:
-                    ids_mensagens = [mensagem_id]
-
-                mensagens_atualizadas = []
-                falhou = False
-                for indice, embed in enumerate(embeds):
-                    mensagem_parte = None
-                    if indice < len(ids_mensagens):
-                        try:
-                            mensagem_parte = await canal.fetch_message(int(ids_mensagens[indice]))
-                        except discord.NotFound:
-                            mensagem_parte = None
-                        except (discord.Forbidden, discord.HTTPException) as erro_busca:
-                            log.warning("Falha ao buscar parte %s da missão %s: %s", indice + 1, atividade.get("id"), erro_busca)
-                            falhou = True
-                            break
-
-                    try:
-                        if mensagem_parte is not None:
-                            await mensagem_parte.edit(
-                                embed=embed,
-                                view=EnviarProvaMissaoView(self)
-                                if indice == 0 and atividade.get("ativa", True)
-                                else None,
-                            )
-                            resultado["atualizadas"] += 1
-                        else:
-                            mensagem_parte = await canal.send(
-                                embed=embed,
-                                view=EnviarProvaMissaoView(self)
-                                if indice == 0 and atividade.get("ativa", True)
-                                else None,
-                            )
-                            resultado["publicadas"] += 1
-
-                        if indice == 0:
-                            try:
-                                if not mensagem_parte.pinned:
-                                    await mensagem_parte.pin(reason="Missão padrão permanente da NÊMESIS")
-                            except discord.HTTPException as erro_fixar:
-                                log.warning("Não foi possível fixar a missão %s; a mensagem continuará no canal: %s", atividade.get("id"), erro_fixar)
-
-                        mensagens_atualizadas.append(int(mensagem_parte.id))
-                    except (discord.Forbidden, discord.HTTPException) as erro:
-                        log.exception("Não foi possível publicar/atualizar a parte %s da missão %s: %s", indice + 1, atividade.get("id"), erro)
-                        falhou = True
-                        break
-
-                if falhou or not mensagens_atualizadas:
-                    resultado["falhas"] += 1
-                    continue
-
-                for id_antigo in ids_mensagens[len(embeds):]:
-                    try:
-                        antiga = await canal.fetch_message(int(id_antigo))
-                        await antiga.delete()
-                    except (TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        pass
-
-                await salvar_mensagem_discord(
-                    guild.id,
-                    str(atividade["id"]),
-                    canal.id,
-                    mensagens_atualizadas,
-                )
-
-            for slug in ranking_missoes_jogos.JOGOS:
-                await self._atualizar_ranking_jogo(guild, slug)
-
+            await self._atualizar_painel_missoes(guild)
+            await self._atualizar_ranking_jogo(guild, "shigaku")
+            resultado = {"atualizadas": len(atividades), "publicadas": 0, "falhas": 0}
             log.info(
-                "Catálogo de missões sincronizado: %s publicadas, %s atualizadas, %s falhas.",
-                resultado["publicadas"], resultado["atualizadas"], resultado["falhas"],
+                "Catálogo por jogo sincronizado: %s registros; painéis atualizados sem criar canais.",
+                len(atividades),
             )
             return resultado
-
     @app_commands.command(
         name="missoes-sincronizar",
         description="Publica ou atualiza as missões padrão nos canais oficiais.",
