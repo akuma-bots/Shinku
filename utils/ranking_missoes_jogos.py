@@ -107,3 +107,19 @@ async def obter_ranking(guild_id: int, jogo: str, limite: int = 10) -> list:
         if pontos > 0:
             linhas.append((str(uid), str(perfil.get("nome") or ""), pontos))
     return sorted(linhas, key=lambda item: (item[2], item[1].casefold()), reverse=True)[:limite]
+async def obter_paineis(guild_id: int) -> dict:
+    todos = await carregar(ARQUIVO, {})
+    registro = todos.get(str(guild_id), {})
+    paineis = registro.get("paineis", {}) if isinstance(registro, dict) else {}
+    return paineis if isinstance(paineis, dict) else {}
+
+async def salvar_painel(guild_id: int, tipo: str, message_id: int) -> None:
+    if tipo not in {"missoes", "ranking"}:
+        raise ValueError("Tipo de painel inválido.")
+    todos = await carregar(ARQUIVO, {})
+    if not isinstance(todos, dict):
+        todos = {}
+    registro = todos.setdefault(str(guild_id), {})
+    paineis = registro.setdefault("paineis", {})
+    paineis[tipo] = int(message_id)
+    await salvar(ARQUIVO, todos)
