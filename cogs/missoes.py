@@ -178,22 +178,26 @@ class Missoes(commands.Cog):
 
     @classmethod
     def _montar_embeds(cls, atividade: dict) -> list[discord.Embed]:
-        """Cria o cartão oficial de missão, preservando descrições longas integralmente."""
+        """Monta um cartão de missão elegante, informativo e compatível com os limites do Discord."""
         tipo = TIPOS.get(str(atividade.get("tipo", "missao")).lower(), TIPOS["missao"])
-        ativa = atividade.get("ativa", True)
+        ativa = atividade.get("ativa", True) is not False
         try:
             recompensa = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
         except (TypeError, ValueError):
             recompensa = 0
 
-        titulo_base = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  {atividade.get('titulo', 'Missão')}"[:256]
+        missao_id = str(atividade.get("id") or "—").strip()
+        titulo_original = str(atividade.get("titulo") or "Operação sem título").strip()
+        titulo_base = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  {titulo_original}"[:256]
         descricao_original = str(atividade.get("descricao") or "").strip()
         if not descricao_original:
-            descricao_original = "Esta missão ainda não possui uma descrição detalhada."
+            descricao_original = "Os detalhes desta operação ainda não foram definidos. Consulte a liderança antes de iniciar."
 
-        partes = cls._dividir_descricao(descricao_original)
+        partes = cls._dividir_descricao(descricao_original, limite=3200)
         embeds = []
-        cor = 0xB51F32 if ativa else 0x454545
+        cor = 0x9F2035 if ativa else 0x484848
+        origem = str(atividade.get("origem") or "oficial").strip().replace("_", " ").title()
+        status = "DISPONÍVEL PARA EXECUÇÃO" if ativa else "OPERAÇÃO ENCERRADA"
 
         for indice, parte in enumerate(partes, start=1):
             sufixo = f"  ━  PARTE {indice}/{len(partes)}" if len(partes) > 1 else ""
@@ -201,9 +205,8 @@ class Missoes(commands.Cog):
             embed = discord.Embed(
                 title=titulo,
                 description=(
-                    "╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
-                    f"   {'MISSÃO DISPONÍVEL' if ativa else 'MISSÃO ENCERRADA'}\n"
-                    "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+                    f"**{status}**  ·  {tipo['nome'].upper()}\n"
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
                     f"{parte}"
                 ),
                 color=cor,
@@ -211,8 +214,8 @@ class Missoes(commands.Cog):
 
             if indice == 1:
                 embed.add_field(
-                    name="◈ CLASSIFICAÇÃO",
-                    value=f"**{tipo['nome']}**\nID: {atividade.get('id', '—')}",
+                    name="◈ IDENTIFICAÇÃO",
+                    value=f"**Código:** `{missao_id}`\n**Categoria:** {tipo['nome']}\n**Origem:** {origem}",
                     inline=True,
                 )
                 embed.add_field(
@@ -220,27 +223,46 @@ class Missoes(commands.Cog):
                     value=f"**{recompensa:,} P.C.**\n**{recompensa:,} XP**".replace(",", "."),
                     inline=True,
                 )
+                embed.add_field(
+                    name="◈ COMO PARTICIPAR",
+                    value=(
+                        "1. Leia a descrição e cumpra todos os requisitos.\n"
+                        "2. Realize a atividade no jogo ou na comunidade.\n"
+                        "3. Registre uma evidência clara e legítima.\n"
+                        "4. Envie a prova pelo botão abaixo e aguarde a revisão."
+                    ),
+                    inline=False,
+                )
+                embed.add_field(
+                    name="◈ ENVIO DA PROVA",
+                    value=(
+                        "Informe o código exato da missão e o link direto da imagem hospedada no Discord. "
+                        "O envio será encaminhado ao canal de revisão correspondente."
+                    ),
+                    inline=False,
+                )
+                embed.add_field(
+                    name="◈ REGRAS DE RECOMPENSA",
+                    value=(
+                        f"Sem auxiliar: o responsável recebe **{recompensa} XP e P.C.** após aprovação.\n"
+                        "Com auxiliar opcional: **60%** da recompensa vai para o responsável e **40%** para o auxiliar.\n"
+                        "A recompensa é dividida, não duplicada; a aprovação da staff é obrigatória."
+                    ),
+                    inline=False,
+                )
                 if ativa:
-                    embed.add_field(
-                        name="◈ PROCEDIMENTO",
-                        value=(
-                            "1. Leia todos os requisitos da missão.\n"
-                            "2. Conclua a atividade no jogo.\n"
-                            "3. Clique em **ENVIAR PROVAS** e informe o ID da missão e o link da evidência.\n"
-                            "4. Aguarde a análise da staff; a recompensa é liberada após aprovação."
-                        ),
-                        inline=False,
+                    embed.set_footer(
+                        text="NÊMESIS  •  OPERAÇÕES OFICIAIS  •  Provas sujeitas à validação da staff",
                     )
-                    embed.set_footer(text="NÊMESIS  •  OPERAÇÕES OFICIAIS  •  Envio sujeito à validação da staff")
                 else:
                     embed.add_field(
                         name="◈ SITUAÇÃO",
-                        value="Esta operação foi encerrada. A publicação permanece disponível apenas para consulta.",
+                        value="Esta operação foi encerrada e permanece publicada apenas para consulta.",
                         inline=False,
                     )
                     embed.set_footer(text="NÊMESIS  •  ARQUIVO DE OPERAÇÕES")
             else:
-                embed.set_footer(text=f"NÊMESIS  •  CONTINUAÇÃO DA MISSÃO  •  {indice}/{len(partes)}")
+                embed.set_footer(text=f"NÊMESIS  •  CONTINUAÇÃO DA OPERAÇÃO  •  {indice}/{len(partes)}")
 
             embeds.append(embed)
 
