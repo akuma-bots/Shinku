@@ -279,19 +279,15 @@ async def on_ready():
     )
 
     if servidor is None:
-
         print(
             "ERRO: o servidor da NÊMESIS "
             f"({NEMESIS_GUILD_ID}) não foi encontrado."
         )
-
-        return
-
-
-    print(
-        f"Servidor autorizado: "
-        f"{servidor.name} ({servidor.id})"
-    )
+    else:
+        print(
+            f"Servidor autorizado: "
+            f"{servidor.name} ({servidor.id})"
+        )
 
 
     # ========================================================
@@ -323,6 +319,11 @@ async def on_ready():
                 f"'{guild.name}': {erro}"
             )
 
+
+    # Se o servidor autorizado não estiver acessível, já removemos as
+    # associações não autorizadas acima e não tentamos sincronizar comandos.
+    if servidor is None:
+        return
 
     # ========================================================
     # SINCRONIZAÇÃO
