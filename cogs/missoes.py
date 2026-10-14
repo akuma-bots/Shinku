@@ -78,10 +78,28 @@ class EnviarProvaMissaoView(discord.ui.View):
 
 
 TIPOS = {
-    "missao": {"nome": "Missão", "emoji": "🎯"},
+    "missao": {
+        "nome": "Missão",
+        "plural": "MISSÕES",
+        "emoji": "🎯",
+        "cor": 0x9F2035,
+        "assinatura": "AÇÃO • DESEMPENHO • COMPETITIVIDADE",
+    },
     # O valor interno antigo é mantido para compatibilidade com os dados existentes.
-    "contribuicao": {"nome": "Contribuição", "emoji": "✦"},
-    "especial": {"nome": "Missão especial", "emoji": "⭐"},
+    "contribuicao": {
+        "nome": "Contribuição",
+        "plural": "CONTRIBUIÇÕES",
+        "emoji": "✦",
+        "cor": 0x9A7836,
+        "assinatura": "APOIO • EVOLUÇÃO • COMPROMISSO",
+    },
+    "especial": {
+        "nome": "Missão especial",
+        "plural": "OPERAÇÕES ESPECIAIS",
+        "emoji": "✧",
+        "cor": 0x754A9E,
+        "assinatura": "ACESSO ESPECIAL • OBJETIVOS DE DESTAQUE",
+    },
 }
 
 CANAIS_PADRAO = {
@@ -178,8 +196,9 @@ class Missoes(commands.Cog):
 
     @classmethod
     def _montar_embeds(cls, atividade: dict) -> list[discord.Embed]:
-        """Monta um cartão de missão elegante, informativo e compatível com os limites do Discord."""
-        tipo = TIPOS.get(str(atividade.get("tipo", "missao")).lower(), TIPOS["missao"])
+        """Monta cartões de missão com identidade visual por categoria e leitura objetiva."""
+        tipo_chave = str(atividade.get("tipo", "missao")).lower()
+        tipo = TIPOS.get(tipo_chave, TIPOS["missao"])
         ativa = atividade.get("ativa", True) is not False
         try:
             recompensa = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
@@ -188,87 +207,101 @@ class Missoes(commands.Cog):
 
         missao_id = str(atividade.get("id") or "—").strip()
         titulo_original = str(atividade.get("titulo") or "Operação sem título").strip()
+        titulo_categoria = tipo["plural"]
         titulo_base = f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  {titulo_original}"[:256]
         descricao_original = str(atividade.get("descricao") or "").strip()
         if not descricao_original:
             descricao_original = "Os detalhes desta operação ainda não foram definidos. Consulte a liderança antes de iniciar."
 
-        partes = cls._dividir_descricao(descricao_original, limite=3200)
+        partes = cls._dividir_descricao(descricao_original, limite=2800)
         embeds = []
-        cor = 0x9F2035 if ativa else 0x484848
+        cor = tipo["cor"] if ativa else 0x484848
         origem = str(atividade.get("origem") or "oficial").strip().replace("_", " ").title()
-        status = "DISPONÍVEL PARA EXECUÇÃO" if ativa else "OPERAÇÃO ENCERRADA"
+        status = "OPERAÇÃO DISPONÍVEL" if ativa else "OPERAÇÃO ENCERRADA"
+        recompensa_formatada = f"{recompensa:,}".replace(",", ".")
 
         for indice, parte in enumerate(partes, start=1):
             sufixo = f"  ━  PARTE {indice}/{len(partes)}" if len(partes) > 1 else ""
             titulo = f"{titulo_base[:256 - len(sufixo)]}{sufixo}"
+            descricao_cartao = (
+                f"**{status}**  ·  `{titulo_categoria}`\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"{tipo['assinatura']}\n\n"
+                f"{parte}"
+            )
             embed = discord.Embed(
                 title=titulo,
-                description=(
-                    f"**{status}**  ·  {tipo['nome'].upper()}\n"
-                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"{parte}"
-                ),
+                description=descricao_cartao[:4096],
                 color=cor,
             )
+            embed.set_author(name=f"NÊMESIS  /  {titulo_categoria}")
+            embed.add_field(
+                name="◈ IDENTIFICAÇÃO",
+                value=f"**Código**\n`{missao_id}`\n\n**Origem**\n{origem}",
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ CATEGORIA",
+                value=f"{tipo['emoji']} **{tipo['nome']}**\n\n**Estado**\n{'Disponível' if ativa else 'Arquivada'}",
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ RECOMPENSA",
+                value=f"**{recompensa_formatada} P.C.**\n{recompensa_formatada} XP",
+                inline=True,
+            )
 
-            if indice == 1:
+            if ativa:
                 embed.add_field(
-                    name="◈ IDENTIFICAÇÃO",
-                    value=f"**Código:** `{missao_id}`\n**Categoria:** {tipo['nome']}\n**Origem:** {origem}",
-                    inline=True,
+                    name="◈ DIRETRIZES DE EXECUÇÃO",
+                    value=(
+                        "Leia o objetivo e cumpra os requisitos descritos.\n"
+                        "Realize a atividade e registre uma evidência legítima.\n"
+                        "Envie a prova pelo botão abaixo e aguarde a análise."
+                    ),
+                    inline=False,
                 )
                 embed.add_field(
-                    name="◈ RECOMPENSA",
-                    value=f"**{recompensa:,} P.C.**\n**{recompensa:,} XP**".replace(",", "."),
-                    inline=True,
+                    name="◈ PADRÃO DE VALIDAÇÃO",
+                    value=(
+                        "A evidência deve ser clara e corresponder a esta missão. "
+                        "A recompensa só é concedida após aprovação da staff. "
+                        "Envios duplicados ou provas inválidas podem ser recusados."
+                    ),
+                    inline=False,
                 )
-                if ativa:
-                    embed.add_field(
-                        name="◈ COMO PARTICIPAR",
-                        value=(
-                            "1. Leia a descrição e cumpra todos os requisitos.\n"
-                            "2. Realize a atividade no jogo ou na comunidade.\n"
-                            "3. Registre uma evidência clara e legítima.\n"
-                            "4. Envie a prova pelo botão abaixo e aguarde a revisão."
-                        ),
-                        inline=False,
-                    )
-                    embed.add_field(
-                        name="◈ ENVIO DA PROVA",
-                        value=(
-                            "Informe o código exato da missão e o link direto da imagem hospedada no Discord. "
-                            "O envio será encaminhado ao canal de revisão correspondente."
-                        ),
-                        inline=False,
-                    )
-                    embed.add_field(
-                        name="◈ REGRAS DE RECOMPENSA",
-                        value=(
-                            f"Sem auxiliar: o responsável recebe **{recompensa} XP e P.C.** após aprovação.\n"
-                            "Com auxiliar opcional: **60%** da recompensa vai para o responsável e **40%** para o auxiliar.\n"
-                            "A recompensa é dividida, não duplicada; a aprovação da staff é obrigatória."
-                        ),
-                        inline=False,
-                    )
-                    embed.set_footer(
-                        text="NÊMESIS  •  OPERAÇÕES OFICIAIS  •  Provas sujeitas à validação da staff",
-                    )
-                else:
-                    embed.add_field(
-                        name="◈ SITUAÇÃO",
-                        value="Esta operação foi encerrada e permanece publicada apenas para consulta.",
-                        inline=False,
-                    )
-                    embed.add_field(
-                        name="◈ RECOMPENSA REGISTRADA",
-                        value=f"Valor definido para esta operação: **{recompensa} XP e P.C.**",
-                        inline=False,
-                    )
-                    embed.set_footer(text="NÊMESIS  •  ARQUIVO DE OPERAÇÕES")
+                embed.add_field(
+                    name="◈ DISTRIBUIÇÃO DA RECOMPENSA",
+                    value=(
+                        f"Sem auxiliar: **{recompensa_formatada} XP e P.C.** para o responsável.\n"
+                        "Com auxiliar opcional: **60%** para o responsável e **40%** para o auxiliar.\n"
+                        "A divisão não duplica o valor total da recompensa."
+                    ),
+                    inline=False,
+                )
+                embed.set_footer(
+                    text=f"NÊMESIS  •  {titulo_categoria}  •  Provas sujeitas à validação da staff",
+                )
             else:
-                embed.set_footer(text=f"NÊMESIS  •  CONTINUAÇÃO DA OPERAÇÃO  •  {indice}/{len(partes)}")
+                embed.add_field(
+                    name="◈ REGISTRO DA OPERAÇÃO",
+                    value=(
+                        "Esta publicação foi arquivada para consulta. "
+                        "Novos envios por esta missão não estão disponíveis."
+                    ),
+                    inline=False,
+                )
+                embed.add_field(
+                    name="◈ RECOMPENSA DEFINIDA",
+                    value=f"Valor previsto no catálogo: **{recompensa_formatada} XP e P.C.**",
+                    inline=False,
+                )
+                embed.set_footer(text=f"NÊMESIS  •  ARQUIVO  •  {titulo_categoria}")
 
+            if len(partes) > 1:
+                embed.set_footer(
+                    text=f"NÊMESIS  •  {titulo_categoria}  •  Parte {indice}/{len(partes)}"
+                )
             embeds.append(embed)
 
         return embeds
