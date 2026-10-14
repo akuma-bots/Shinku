@@ -31,6 +31,9 @@ def _embed_revisao(revisao: dict) -> discord.Embed:
         color=CORES.get(revisao["tipo"], 0x5865F2),
     )
     embed.add_field(name="Enviado por", value=f"<@{revisao['autor_id']}>", inline=True)
+    auxiliar_id = revisao.get("auxiliar_id")
+    if auxiliar_id:
+        embed.add_field(name="Auxiliar", value=f"<@{int(auxiliar_id)}>", inline=True)
     embed.add_field(name="Tipo", value=revisao["tipo"].upper(), inline=True)
     embed.set_image(url=revisao["print_url"])
     embed.set_footer(text=f"ID: {revisao['id']}")
@@ -149,7 +152,7 @@ class Revisoes(commands.Cog):
     async def abrir_revisao(
         self, guild: discord.Guild, canal: discord.abc.Messageable, *,
         tipo: str, autor_id: int, referencia_id: str, print_url: str,
-        titulo: str, descricao: str = None
+        titulo: str, descricao: str = None, auxiliar_id: int = None
     ) -> dict:
         # Serializa o ciclo completo de localizar/criar/publicar a prova.
         # O lock no storage evita registros duplicados; este lock também evita
@@ -158,12 +161,13 @@ class Revisoes(commands.Cog):
             return await self._abrir_revisao_sem_lock(
                 guild, canal, tipo=tipo, autor_id=autor_id,
                 referencia_id=referencia_id, print_url=print_url,
-                titulo=titulo, descricao=descricao,
+                titulo=titulo, descricao=descricao, auxiliar_id=auxiliar_id,
             )
 
     async def _abrir_revisao_sem_lock(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
-                             titulo: str, descricao: str = None) -> dict:
+                             titulo: str, descricao: str = None,
+                             auxiliar_id: int = None) -> dict:
         # Um desafio PvP só pode gerar uma revisão ativa. Se a publicação
         # falhar depois de persistir a pendência, a nova tentativa reutiliza
         # o mesmo registro em vez de criar uma segunda prova para a mesma luta.
@@ -184,7 +188,8 @@ class Revisoes(commands.Cog):
 
         if revisao is None:
             revisao = await revisoes.criar_pendencia(
-                guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao
+                guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao,
+                auxiliar_id=auxiliar_id,
             )
 
         hash_imagem = await _hash_imagem(revisao.get("print_url") or print_url)
