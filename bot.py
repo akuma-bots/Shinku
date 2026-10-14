@@ -460,20 +460,12 @@ async def iniciar_servidor_web():
             else "degraded" if falhas
             else "online"
         )
-        return web.json_response({
-            "status": status,
-            "commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
-            "guild_id": str(NEMESIS_GUILD_ID),
-            "storage": "upstash" if USANDO_UPSTASH else "local",
-            "loaded_cogs": sorted(bot.cogs.keys()),
-            "loaded_cog_count": len(bot.cogs),
-            "command_count": len(
-                bot.tree.get_commands(guild=bot.get_guild(NEMESIS_GUILD_ID))
-                if bot.get_guild(NEMESIS_GUILD_ID) is not None
-                else bot.tree.get_commands()
-            ),
-            "failed_cogs": falhas,
-        }, status=200 if status == "online" else 503 if status == "degraded" else 202)
+        # Endpoint público sem autenticação: expõe somente o estado operacional.
+        # IDs internos e detalhes de falhas permanecem disponíveis apenas nos logs.
+        return web.json_response(
+            {"status": status},
+            status=200 if status == "online" else 503 if status == "degraded" else 202,
+        )
 
     app.router.add_get("/", handle)
     app.router.add_get("/health", health)
