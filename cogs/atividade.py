@@ -294,13 +294,22 @@ class SistemaAtividade(commands.Cog):
 
     @app_commands.command(
         name="atividade-ranking",
-        description="Mostra o ranking de participações nos Activity Checks.",
+        description="Mostra o ranking geral, semanal ou mensal de atividade.",
     )
-    @app_commands.describe(limite="Quantidade de membros no ranking (1 a 20)")
+    @app_commands.describe(
+        limite="Quantidade de membros no ranking (1 a 20)",
+        periodo="Período usado para calcular as participações",
+    )
+    @app_commands.choices(periodo=[
+        app_commands.Choice(name="Geral", value="geral"),
+        app_commands.Choice(name="Últimos 7 dias", value="semanal"),
+        app_commands.Choice(name="Últimos 30 dias", value="mensal"),
+    ])
     async def atividade_ranking(
         self,
         interaction: discord.Interaction,
         limite: app_commands.Range[int, 1, 20] = 10,
+        periodo: app_commands.Choice[str] = None,
     ):
         if interaction.guild is None or interaction.guild.id != GUILD_ID:
             await interaction.response.send_message(
@@ -309,36 +318,50 @@ class SistemaAtividade(commands.Cog):
             )
             return
 
+        periodo_valor = periodo.value if periodo else "geral"
+        agora = time.time()
+        janela = {"semanal": 7 * 86400, "mensal": 30 * 86400}.get(periodo_valor)
         dados = await self._carregar()
-        ordenados = sorted(
-            (
-                (uid, perfil) for uid, perfil in dados["membros"].items()
-                if isinstance(perfil, dict) and int(perfil.get("registros", 0) or 0) > 0
-            ),
+        ordenados = []
+        for uid, perfil in dados["membros"].items():
+            if not isinstance(perfil, dict):
+                continue
+            if janela is None:
+                total = int(perfil.get("registros", 0) or 0)
+            else:
+                total = sum(
+                    1 for registro in perfil.get("historico", [])
+                    if isinstance(registro, dict)
+                    and agora - janela < float(registro.get("registrado_em", 0) or 0) <= agora
+                )
+            if total:
+                ordenados.append((uid, perfil, total))
+
+        ordenados.sort(
             key=lambda item: (
-                int(item[1].get("registros", 0) or 0),
+                item[2],
                 float(item[1].get("ultima_participacao", 0) or 0),
             ),
             reverse=True,
-        )[:int(limite)]
+        )
+        ordenados = ordenados[:int(limite)]
 
+        rotulos = {"geral": "GERAL", "semanal": "SEMANAL · 7 DIAS", "mensal": "MENSAL · 30 DIAS"}
         embed = discord.Embed(
-            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING DE ATIVIDADE",
-            description="Participações registradas nos Activity Checks oficiais.",
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING {rotulos[periodo_valor]}",
+            description="Participações confirmadas nos Activity Checks oficiais.",
             color=0xB51F32,
         )
         if not ordenados:
-            embed.description = "Ainda não há participações registradas."
+            embed.description = "Nenhuma participação encontrada para este período."
         else:
             linhas = []
-            for posicao, (uid, perfil) in enumerate(ordenados, start=1):
+            for posicao, (uid, perfil, total) in enumerate(ordenados, start=1):
                 membro = interaction.guild.get_member(int(uid))
                 nome = membro.mention if membro else f"<@{uid}>"
-                linhas.append(
-                    f"**{posicao}.** {nome} — **{int(perfil.get('registros', 0) or 0)}** participação(ões)"
-                )
+                linhas.append(f"**{posicao}.** {nome} — **{total}** participação(ões)")
             embed.add_field(name="◈ CLASSIFICAÇÃO", value="\n".join(linhas)[:1024], inline=False)
-        embed.set_footer(text="Os registros são persistidos no armazenamento compartilhado do bot.")
+        embed.set_footer(text="NÊMESIS • Ranking calculado a partir dos registros persistidos.")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
@@ -373,6 +396,92 @@ class SistemaAtividade(commands.Cog):
             value=f"<t:{int(ultima)}:R>" if ultima else "Nenhum registro",
             inline=True,
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(
+        name="atividade-encerrar",
+        description="Encerra imediatamente a chamada de atividade em andamento.",
+    )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def atividade_encerrar(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != GUILD_ID:
+            await interaction.response.send_message(
+                "Este comando só pode ser usado no servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        async with self._lock:
+            dados = await self._carregar()
+            agora = time.time()
+            aberta = next(
+                (
+                    (message_id, sessao)
+                    for message_id, sessao in dados["sessoes"].items()
+                    if isinstance(sessao, dict)
+                    and sessao.get("status") == "aberta"
+                    and float(sessao.get("expira_em", 0) or 0) > agora
+                ),
+                None,
+            )
+        if aberta is None:
+            await interaction.followup.send("Não há nenhuma chamada de atividade em andamento.", ephemeral=True)
+            return
+
+        fechada = await self._fechar_sessao(aberta[0], motivo=f"encerrada_por:{interaction.user.id}")
+        if fechada:
+            await interaction.followup.send("A chamada de atividade foi encerrada e o botão de registro foi desativado.", ephemeral=True)
+        else:
+            await interaction.followup.send("A chamada já havia sido encerrada.", ephemeral=True)
+
+    @app_commands.command(
+        name="atividade-relatorio",
+        description="Mostra um resumo administrativo do sistema de atividade.",
+    )
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def atividade_relatorio(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != GUILD_ID:
+            await interaction.response.send_message(
+                "Este comando só pode ser usado no servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        dados = await self._carregar()
+        sessoes = [s for s in dados["sessoes"].values() if isinstance(s, dict)]
+        agora = time.time()
+        abertas = sum(
+            1 for s in sessoes
+            if s.get("status") == "aberta" and float(s.get("expira_em", 0) or 0) > agora
+        )
+        encerradas = sum(1 for s in sessoes if s.get("status") == "encerrada")
+        total_presencas = sum(
+            len(set(s.get("participantes", [])))
+            for s in sessoes
+            if isinstance(s.get("participantes", []), list)
+        )
+        ativos_7_dias = sum(
+            1 for perfil in dados["membros"].values()
+            if isinstance(perfil, dict)
+            and any(
+                isinstance(registro, dict)
+                and agora - 7 * 86400 < float(registro.get("registrado_em", 0) or 0) <= agora
+                for registro in perfil.get("historico", [])
+            )
+        )
+        embed = discord.Embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RELATÓRIO DE ATIVIDADE",
+            description="Resumo do funcionamento e das participações registradas.",
+            color=0xB51F32,
+        )
+        embed.add_field(name="◈ CHAMADAS REGISTRADAS", value=str(len(sessoes)), inline=True)
+        embed.add_field(name="◈ EM ANDAMENTO", value=str(abertas), inline=True)
+        embed.add_field(name="◈ ENCERRADAS", value=str(encerradas), inline=True)
+        embed.add_field(name="◈ PRESENÇAS REGISTRADAS", value=str(total_presencas), inline=True)
+        embed.add_field(name="◈ MEMBROS ATIVOS · 7 DIAS", value=str(ativos_7_dias), inline=True)
+        embed.add_field(name="◈ MEMBROS NO HISTÓRICO", value=str(len(dados["membros"])), inline=True)
+        embed.set_footer(text="Relatório administrativo • acesso restrito à Staff")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @tasks.loop(seconds=30)
