@@ -422,7 +422,7 @@ async def monitorar_integracao():
                     "bot_id": str(bot.user.id) if bot.user else None,
                     "bot_name": str(bot.user) if bot.user else "NÊMESIS",
                     "guild_name": servidor.name if servidor else None,
-                    "online": bool(servidor and bot.is_ready()),
+                    "online": bool(servidor and bot.is_ready() and not getattr(bot, "cogs_falhos", [])),
                     "storage_backend": "upstash" if USANDO_UPSTASH else "local",
                     "ready": bot.is_ready(),
                     "updated_at": datetime.now(timezone.utc).isoformat(),
