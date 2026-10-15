@@ -449,13 +449,24 @@ class RankingGeral(
         }
         await salvar(ARQUIVO_COMPETITIVO, competitivo)
 
+        # O ranking por jogo usa um armazenamento próprio; reseta-o junto dos perfis globais.
+        from utils import ranking_missoes_jogos
+        quantidade_rankings_jogo = await ranking_missoes_jogos.resetar_pontuacoes_jogos(
+            interaction.guild.id
+        )
+        cog_missoes = interaction.client.get_cog("Missoes")
+        if cog_missoes is not None:
+            for slug in ranking_missoes_jogos.JOGOS:
+                await cog_missoes._atualizar_ranking_jogo(interaction.guild, slug)
+
         await interaction.followup.send(
             "RESET COMPLETO EXECUTADO.\n"
             f"Perfis locais zerados: **{quantidade_local}**.\n"
             f"Perfis do Top Global/site zerados: **{quantidade_global}**.\n"
             "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
-            "tempo no Top 10 foram zerados. O histórico sazonal foi limpo e "
-            "uma nova temporada de 30 dias foi iniciada. O catálogo foi preservado.",
+            "tempo no Top 10 foram zerados. Os rankings de Shigaku, Gakuran e Fistborn "
+            f"também foram limpos ({quantidade_rankings_jogo} rankings). O histórico sazonal "
+            "foi limpo e uma nova temporada de 30 dias foi iniciada. O catálogo de missões foi preservado.",
             ephemeral=True,
         )
 
