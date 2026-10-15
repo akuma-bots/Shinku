@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,23 @@ class BoasVindasDM(commands.Cog):
     """Envia boas-vindas por DM quando uma pessoa entra no servidor da NÊMESIS."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    @app_commands.command(name="codigos", description="Consultar códigos de Shigaku, Gakuran e Fistborn.")
+    @app_commands.guild_only()
+    async def consultar_codigos(self, interaction: discord.Interaction):
+        """Abre a central interativa de códigos para consulta a qualquer momento."""
+        if interaction.guild_id != GUILD_NEMESIS_ID:
+            await interaction.response.send_message(
+                "Este sistema está disponível apenas no servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            embed=_embed_codigos("shigaku"),
+            view=BoasVindasView(interaction.user.id, "shigaku"),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @commands.Cog.listener()
     async def on_member_join(self, membro: discord.Member):
