@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS
+from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM
 
 
 def test_welcome_codes_catalog_has_all_games_and_requirements():
@@ -39,3 +39,7 @@ def test_weekly_catalog_period_is_monday_through_sunday():
     assert fim == date(2026, 10, 18)
     assert fim.weekday() == 6
     assert (fim - inicio).days == 6
+
+
+def test_interactive_codes_slash_command_is_registered():
+    assert BoasVindasDM.consultar_codigos.name == "codigos"
