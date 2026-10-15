@@ -180,6 +180,38 @@ async def definir_mensagem(
     return alvo
 
 
+async def transicionar_status(
+    guild_id: int,
+    desafio_id: str,
+    status_esperado: str,
+    status_novo: str,
+):
+    """Altera o estado somente se ele ainda corresponder ao esperado.
+
+    A verificação e a gravação compartilham o mesmo lock para impedir que
+    dois cliques concorrentes aceitem/recusem o mesmo desafio.
+    """
+    async with _DESAFIOS_TRANSICAO_LOCK:
+        lista = (await _tudo()).get(str(guild_id), [])
+        alvo = next(
+            (d for d in lista if d.get("id") == desafio_id),
+            None,
+        )
+        if not alvo or alvo.get("status") != status_esperado:
+            return None
+
+        alvo["status"] = status_novo
+        await _salvar_guild(guild_id, lista)
+        try:
+            await _sincronizar_desafio_site(alvo)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Falha ao sincronizar a transição do desafio %s com o site.",
+                desafio_id,
+            )
+        return alvo
+
+
 async def definir_status(
     guild_id: int,
     desafio_id: str,
