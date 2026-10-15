@@ -15,7 +15,7 @@ from utils.storage import carregar, salvar
 logger = logging.getLogger(__name__)
 ARQUIVO_ESTADO = "novidades_automaticas.json"
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
-INTERVALO_ENVIO = 1.2
+CONCORRENCIA_ENVIO = 5
 TENTATIVAS_DM = 3
 
 
@@ -186,8 +186,19 @@ class Novidades(commands.Cog):
         enviados = 0
         falhas = 0
         permanentes = 0
-        for indice, membro in enumerate(membros):
-            resultado = await _enviar_dm_com_retry(membro, embed=embed)
+        semaforo = asyncio.Semaphore(CONCORRENCIA_ENVIO)
+
+        async def enviar_para_membro(membro: discord.Member) -> tuple[int, str]:
+            # Concorrência limitada: reduz o tempo total e deixa o discord.py
+            # gerenciar os rate limits HTTP sem criar uma rajada ilimitada.
+            async with semaforo:
+                resultado = await _enviar_dm_com_retry(membro, embed=embed)
+                return membro.id, resultado
+
+        tarefas = [asyncio.create_task(enviar_para_membro(membro)) for membro in membros]
+        total = len(tarefas)
+        for concluido, tarefa in enumerate(asyncio.as_completed(tarefas), start=1):
+            user_id, resultado = await tarefa
             if resultado == "enviada":
                 enviados += 1
             else:
@@ -196,11 +207,21 @@ class Novidades(commands.Cog):
                     permanentes += 1
                 logger.info(
                     "Comunicado manual não entregue (guild=%s, user=%s, resultado=%s).",
-                    guild.id, membro.id, resultado,
+                    guild.id, user_id, resultado,
                 )
 
-            if indice < len(membros) - 1:
-                await asyncio.sleep(INTERVALO_ENVIO)
+            # Dá visibilidade ao andamento sem editar a resposta a cada destinatário.
+            if concluido % 25 == 0 and concluido < total:
+                try:
+                    await interaction.edit_original_response(
+                        content=(
+                            f"**Enviando comunicado: {titulo}**\\n"
+                            f"Progresso: **{concluido}/{total}** membros processados.\\n"
+                            f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
+                        )
+                    )
+                except discord.HTTPException:
+                    logger.debug("Não foi possível atualizar a mensagem de progresso do aviso.")
 
         logger.info(
             "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
