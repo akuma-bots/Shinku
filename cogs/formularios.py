@@ -417,7 +417,13 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 try:
                     mensagem = await canal.fetch_message(int(mensagem_id))
                     await mensagem.delete()
-                except (TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+                except (
+                    TypeError,
+                    ValueError,
+                    discord.NotFound,
+                    discord.Forbidden,
+                    discord.HTTPException,
+                ):
                     continue
 
             registros.pop(formulario_id, None)
