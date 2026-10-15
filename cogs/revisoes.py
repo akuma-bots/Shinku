@@ -237,7 +237,18 @@ class Revisoes(commands.Cog):
 
         # A consulta ao storage pode demorar; confirme a interação antes do I/O.
         await interaction.response.defer(ephemeral=True, thinking=True)
-        revisao = await revisoes.get(interaction.guild.id, revisao_id)
+        try:
+            revisao = await revisoes.get(interaction.guild.id, revisao_id)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao consultar a revisão %s antes da decisão.", revisao_id
+            )
+            await interaction.followup.send(
+                "Não consegui consultar esta revisão no armazenamento. Nenhuma decisão foi aplicada; tente novamente.",
+                ephemeral=True,
+            )
+            return
         if not revisao:
             await interaction.followup.send("Essa revisão não existe mais.", ephemeral=True)
             return
