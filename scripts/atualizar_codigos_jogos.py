@@ -10,7 +10,8 @@ from __future__ import annotations
 import json
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from html import unescape
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -97,11 +98,17 @@ def extract_codes(section: str, existing: dict) -> list[dict]:
     return result
 
 
+def calcular_semana(data: date) -> tuple[date, date]:
+    """Retorna a segunda-feira e o domingo da semana que contém a data."""
+    inicio = data - timedelta(days=data.weekday())
+    return inicio, inicio + timedelta(days=6)
+
+
 def main() -> int:
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    week_end = week_start + timedelta(days=6)
+    # Use o fuso do servidor da NÊMESIS, não o UTC do runner do GitHub.
+    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    week_start, week_end = calcular_semana(today)
     changed = False
     failures = []
 
@@ -125,7 +132,7 @@ def main() -> int:
     catalog["semana_referente"] = {
         "inicio": week_start.isoformat(),
         "fim": week_end.isoformat(),
-        "fuso": "UTC do runner do GitHub Actions",
+        "fuso": "America/Sao_Paulo",
     }
     CATALOG_PATH.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Catálogo atualizado para a semana {week_start.isoformat()} a {week_end.isoformat()}.")
