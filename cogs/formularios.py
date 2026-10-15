@@ -361,9 +361,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                         mensagens = []
                         break
 
-                if mensagens == [] and indice > 0:
-                    break
-
                 try:
                     if mensagem is None:
                         mensagem = await canal.send(
