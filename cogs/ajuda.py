@@ -9,7 +9,6 @@ SISTEMAS = {
     "Desafios": ("⚔️", "PvP / Desafios"),
     "Guerras": ("🏰", "Guerras"),
     "Perfil": ("🎖️", "Perfil & Patentes"),
-    "PerfilCard": ("🖼️", "Perfil Visual"),
     "Roblox": ("🎮", "Conta Roblox"),
     "Tutorial": ("📚", "Tutoriais por sistema"),
     "RankingGeral": ("🌍", "Ranking Geral"),
