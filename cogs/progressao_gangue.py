@@ -13,6 +13,7 @@ log = logging.getLogger(__name__)
 
 GUILD_ID = 1543381737961160910
 CANAL_PROGRESSAO_ID = 1545832891681087628
+CANAL_REGISTRO_ATIVIDADE_ID = 1545833111860936804
 ARQUIVO = "progressao_gangue.json"
 COOLDOWN_MENSAGENS = 60
 XP_POR_MENSAGEM = 5
@@ -533,11 +534,50 @@ class ProgressaoGangue(commands.Cog):
         await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
         if rank_novo["no"] != rank_antigo["no"]:
             await self._anunciar_rank(interaction.guild, membro, rank_novo, perfil["xp"])
+        total_xp = int(perfil["xp"])
+        motivo_seguro = discord.utils.escape_markdown(motivo)
+        canal_registro = interaction.guild.get_channel(CANAL_REGISTRO_ATIVIDADE_ID)
+        if not isinstance(canal_registro, discord.TextChannel):
+            try:
+                canal_registro = await self.bot.fetch_channel(CANAL_REGISTRO_ATIVIDADE_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                canal_registro = None
+
+        if isinstance(canal_registro, discord.TextChannel):
+            registro = discord.Embed(
+                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ATIVIDADE REGISTRADA",
+                description=(
+                    f"**Membro:** {membro.mention}\\n"
+                    f"**Registrado por:** {interaction.user.mention}\\n"
+                    f"**Tipo:** {atividade.name}\\n"
+                    f"**Recompensa:** +{quantidade} XP\\n"
+                    f"**Motivo:** {motivo_seguro}\\n"
+                    f"**Experiência total:** {total_xp:,} XP\\n"
+                    f"**Rank atual:** ╭・𝐍̷𝐨.{rank_novo['no']} — {rank_novo['nome']}"
+                ).replace(",", "."),
+                color=0xB51F32,
+                timestamp=discord.utils.utcnow(),
+            )
+            registro.set_thumbnail(url=membro.display_avatar.url)
+            registro.set_footer(text="NÊMESIS • REGISTRO OFICIAL DE ATIVIDADES")
+            try:
+                await canal_registro.send(
+                    embed=registro,
+                    allowed_mentions=discord.AllowedMentions(users=False, roles=False, everyone=False),
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                log.exception(
+                    "Atividade de gangue registrada, mas não foi possível publicar no canal %s.",
+                    CANAL_REGISTRO_ATIVIDADE_ID,
+                )
+        else:
+            log.error("Canal de registro de atividade %s não encontrado/acessível.", CANAL_REGISTRO_ATIVIDADE_ID)
+
         await interaction.response.send_message(
-            f"Atividade registrada para {membro.mention}.\n"
-            f"**Tipo:** {atividade.name}\n**Recompensa:** +{quantidade} XP\n"
-            f"**Motivo:** {discord.utils.escape_markdown(motivo)}\n"
-            f"**Total:** {perfil['xp']:,} XP · **Rank:** No.{rank_novo['no']} — {rank_novo['nome']}".replace(",", "."),
+            f"Atividade registrada para {membro.mention}.\\n"
+            f"**Tipo:** {atividade.name}\\n**Recompensa:** +{quantidade} XP\\n"
+            f"**Motivo:** {motivo_seguro}\\n"
+            f"**Total:** {total_xp:,} XP · **Rank:** No.{rank_novo['no']} — {rank_novo['nome']}".replace(",", "."),
             ephemeral=True,
         )
 
