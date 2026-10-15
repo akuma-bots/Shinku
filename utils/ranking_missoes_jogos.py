@@ -123,3 +123,58 @@ async def salvar_painel(guild_id: int, tipo: str, message_id: int) -> None:
     paineis = registro.setdefault("paineis", {})
     paineis[tipo] = int(message_id)
     await salvar(ARQUIVO, todos)
+
+
+async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str]) -> dict:
+    """Busca estatísticas globais/localizadas para enriquecer o ranking por jogo."""
+    from utils.perfis import ARQUIVO_PERFIS
+    from utils.competitivo_sync import ARQUIVO_COMPETITIVO
+
+    locais = await carregar(ARQUIVO_PERFIS, {})
+    locais_guild = locais.get(str(guild_id), {}) if isinstance(locais, dict) else {}
+    competitivo = await carregar(ARQUIVO_COMPETITIVO, {"perfis": {}})
+    globais = competitivo.get("perfis", {}) if isinstance(competitivo, dict) else {}
+    resultado = {}
+
+    for uid in user_ids:
+        local = locais_guild.get(str(uid), {}) if isinstance(locais_guild, dict) else {}
+        global_ = globais.get(str(uid), {}) if isinstance(globais, dict) else {}
+        if not isinstance(local, dict):
+            local = {}
+        if not isinstance(global_, dict):
+            global_ = {}
+        kills = int(local.get("kills", global_.get("kills", 0)) or 0)
+        deaths = int(local.get("deaths", global_.get("deaths", 0)) or 0)
+        resultado[str(uid)] = {
+            "xp": int(local.get("xp", global_.get("xp", 0)) or 0),
+            "vitorias": int(local.get("vitorias", global_.get("vitorias", 0)) or 0),
+            "derrotas": int(local.get("derrotas", global_.get("derrotas", 0)) or 0),
+            "empates": int(local.get("empates", global_.get("empates", 0)) or 0),
+            "kills": kills,
+            "deaths": deaths,
+            "mvps": int(local.get("mvps", global_.get("mvps", 0)) or 0),
+            "sequencia": int(local.get("sequencia_atual", global_.get("sequencia_atual", 0)) or 0),
+            "maior_sequencia": int(local.get("maior_sequencia", global_.get("maior_sequencia", 0)) or 0),
+            "tempo_top": int(global_.get("tempo_top_global_segundos", 0) or 0),
+            "patente": str(local.get("patente", global_.get("patente", "")) or "—"),
+            "kdr": round(kills / deaths, 2) if deaths > 0 else float(kills),
+        }
+    return resultado
+
+
+async def resetar_pontuacoes_jogos(guild_id: int) -> int:
+    """Zera os rankings por jogo junto do reset global, preservando os painéis."""
+    todos = await carregar(ARQUIVO, {})
+    if not isinstance(todos, dict):
+        todos = {}
+    registro = todos.setdefault(str(guild_id), {})
+    jogos = registro.setdefault("jogos", {})
+    alterados = 0
+    for slug in JOGOS:
+        atual = jogos.setdefault(slug, {"pontuacao": {}, "eventos_aplicados": []})
+        atual["pontuacao"] = {}
+        atual["eventos_aplicados"] = []
+        atual["ranking_message_id"] = registro.get("paineis", {}).get("ranking")
+        alterados += 1
+    await salvar(ARQUIVO, todos)
+    return alterados
