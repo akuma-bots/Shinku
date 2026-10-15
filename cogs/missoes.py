@@ -477,7 +477,7 @@ class Missoes(commands.Cog):
         linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
         if linhas:
             estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
-                guild.id, [uid for uid, _, _ in linhas]
+                guild.id, [uid for uid, _, _ in linhas], jogo=jogo
             )
             linhas_texto = []
             medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
@@ -495,7 +495,7 @@ class Missoes(commands.Cog):
                     + f"  ·  **XP:** {stats.get('xp', 0):,}".replace(",", ".")
                     + f"  ·  **K/D:** {stats.get('kills', 0)}/{stats.get('deaths', 0)} ({stats.get('kdr', 0):.2f})"
                     + f"\n┊ **MVPs:** {stats.get('mvps', 0)}  ·  **Sequência:** {stats.get('sequencia', 0)} (máx. {stats.get('maior_sequencia', 0)})"
-                    + f"\n┊ **Patente:** {stats.get('patente', '—')}  ·  **Tempo no Top 10 global:** {tempo}"
+                    + f"\n┊ **Patente:** {stats.get('patente', '—')}  ·  **Tempo no Top 10 do jogo:** {tempo}"
                 )
             descricao = "\n\n".join(linhas_texto)
         else:
