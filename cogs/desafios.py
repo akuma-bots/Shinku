@@ -322,16 +322,25 @@ class Desafios(commands.Cog):
         if not custom_id.startswith("desafio:"):
             return
 
-        _, acao, desafio_id = custom_id.split(":", 2)
-        desafio = await desafios.get(interaction.guild.id, desafio_id)
-        if not desafio or desafio["status"] != "pendente":
-            await interaction.response.send_message("Esse desafio não está mais disponível.", ephemeral=True)
+        partes = custom_id.split(":", 2)
+        if len(partes) != 3 or partes[1] not in {"aceitar", "recusar"} or not partes[2]:
+            await interaction.followup.send("Ação de desafio inválida.", ephemeral=True)
             return
-        if interaction.user.id != desafio["desafiado_id"]:
-            await interaction.response.send_message("Esse desafio não é seu.", ephemeral=True)
+        _, acao, desafio_id = partes
+        if interaction.guild is None:
+            await interaction.followup.send("Use este botão dentro do servidor.", ephemeral=True)
             return
 
-        await interaction.response.defer()
+        # Carregar/atualizar o desafio pode demorar quando o storage está lento.
+        # Deferimos antes do I/O para evitar a expiração da interação.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        desafio = await desafios.get(interaction.guild.id, desafio_id)
+        if not desafio or desafio["status"] != "pendente":
+            await interaction.followup.send("Esse desafio não está mais disponível.", ephemeral=True)
+            return
+        if interaction.user.id != desafio["desafiado_id"]:
+            await interaction.followup.send("Esse desafio não é seu.", ephemeral=True)
+            return
 
         if acao == "aceitar":
             if desafio["aposta_xp"] > 0:
