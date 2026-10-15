@@ -234,15 +234,16 @@ class Revisoes(commands.Cog):
             await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
             return
         _, acao, revisao_id = partes
+
+        # A consulta ao storage pode demorar; confirme a interação antes do I/O.
+        await interaction.response.defer(ephemeral=True, thinking=True)
         revisao = await revisoes.get(interaction.guild.id, revisao_id)
         if not revisao:
-            await interaction.response.send_message("Essa revisão não existe mais.", ephemeral=True)
+            await interaction.followup.send("Essa revisão não existe mais.", ephemeral=True)
             return
         if revisao["status"] != "pendente":
-            await interaction.response.send_message(f"Essa revisão já foi **{revisao['status']}**.", ephemeral=True)
+            await interaction.followup.send(f"Essa revisão já foi **{revisao['status']}**.", ephemeral=True)
             return
-
-        await interaction.response.defer()
 
         if acao == "aprovar":
             revisao = await revisoes.aprovar(interaction.guild.id, revisao_id, interaction.user.id)
