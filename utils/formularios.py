@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 
@@ -6,6 +7,8 @@ from utils.storage import carregar, salvar
 
 ARQUIVO_FORMULARIOS = "formularios.json"
 ARQUIVO_RESPOSTAS = "formularios_respostas.json"
+
+_STATUS_RESPOSTA_LOCK = asyncio.Lock()
 
 
 async def _tudo_formularios():
@@ -418,51 +421,39 @@ async def get_resposta(
         (
             resposta
             for resposta in lista
-            if resposta.get("id") == resposta_id
-        ),
-        None,
-    )
-
-
-async def definir_status_resposta(
+            if resposta.getasync def definir_status_resposta(
     guild_id: int,
     resposta_id: str,
     status: str,
     revisor_id: int,
 ):
-
-    dados = await _tudo_respostas()
-
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
-
-    alvo = next(
-        (
-            resposta
-            for resposta in lista
-            if resposta.get("id") == resposta_id
-        ),
-        None,
-    )
-
-    if not alvo:
-        return None
-
     if status not in {"aprovada", "recusada"}:
         raise ValueError("Status de candidatura inválido.")
 
-    # Impede que um clique repetido sobrescreva uma decisão já persistida.
-    if alvo.get("status") != "pendente":
-        return None
+    # Serializa decisões no processo: dois revisores não podem aprovar/recusar
+    # a mesma candidatura simultaneamente usando snapshots do mesmo estado.
+    async with _STATUS_RESPOSTA_LOCK:
+        dados = await _tudo_respostas()
+        lista = dados.get(str(guild_id), [])
 
-    alvo["status"] = status
-    alvo["revisor_id"] = revisor_id
-    alvo["atualizado_em"] = time.time()
+        alvo = next(
+            (
+                resposta
+                for resposta in lista
+                if resposta.get("id") == resposta_id
+            ),
+            None,
+        )
 
-    await _salvar_respostas_guild(
-        guild_id,
+        if not alvo or alvo.get("status") != "pendente":
+            return None
+
+        alvo["status"] = status
+        alvo["revisor_id"] = revisor_id
+        alvo["atualizado_em"] = time.time()
+
+        await _salvar_respostas_guild(guild_id, lista)
+        return alvo       guild_id,
         lista,
     )
 
