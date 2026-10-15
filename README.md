@@ -14,6 +14,7 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Progressão da gangue:** XP de participação, ranks, cargos configuráveis e recompensas.
 - **Perfil e competitivo:** XP, patentes, vitórias, derrotas, KDR, P.C., temporadas e rankings; o perfil também exibe a conta Roblox verificada.
 - **Roblox:** vínculo por código de verificação, consulta de perfil, identificação de membros pelo nome Roblox e sincronização opcional de cargos por rank.
+- **Boas-vindas por DM:** mensagem automática de entrada com a tag `NΞM`, convite do servidor, orientação para `/tutorial` e menu interativo de códigos de Shigaku, Gakuran e Fistborn.
 - **Tutoriais:** central interativa `/tutorial` com guias para missões, PvP, guerras, moderação, provas, sorteios, tickets, eventos, formulários, Roblox e outros sistemas.
 - **Novidades por DM:** releases oficiais enviados automaticamente a todos os membros humanos do servidor, sem inscrição prévia, com registro persistente para evitar repetição em reinicializações.
 - **Sorteios:** embeds, botões de participação, requisitos informativos, prêmios, término automático e seleção de vencedores.
