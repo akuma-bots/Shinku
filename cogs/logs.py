@@ -185,7 +185,11 @@ class Logs(commands.Cog):
                 )
             await self._enviar_log(canal, embed)
 
-        if antes.communication_disabled_until != depois.communication_disabled_until:
+        # Compatível com versões de discord.py em que o atributo não está
+        # disponível no objeto Member. A comparação não pode derrubar o listener.
+        timeout_antes = getattr(antes, "communication_disabled_until", None)
+        timeout_depois = getattr(depois, "communication_disabled_until", None)
+        if timeout_antes != timeout_depois:
             embed = discord.Embed(
                 title="Timeout alterado",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
@@ -193,14 +197,14 @@ class Logs(commands.Cog):
             )
             embed.add_field(
                 name="Antes",
-                value=discord.utils.format_dt(antes.communication_disabled_until, style="F")
-                if antes.communication_disabled_until else "Sem timeout",
+                value=discord.utils.format_dt(timeout_antes, style="F")
+                if timeout_antes else "Sem timeout",
                 inline=True,
             )
             embed.add_field(
                 name="Depois",
-                value=discord.utils.format_dt(depois.communication_disabled_until, style="F")
-                if depois.communication_disabled_until else "Sem timeout",
+                value=discord.utils.format_dt(timeout_depois, style="F")
+                if timeout_depois else "Sem timeout",
                 inline=True,
             )
             await self._enviar_log(canal, embed)
