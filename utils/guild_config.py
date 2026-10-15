@@ -1,7 +1,11 @@
+import asyncio
 from utils.storage import carregar, salvar
 
 
 ARQUIVO = "guild_configs.json"
+
+# Evita que atualizações simultâneas sobrescrevam campos umas das outras.
+_CONFIG_LOCK = asyncio.Lock()
 
 
 # ============================================================
@@ -226,26 +230,28 @@ async def set_config(
 
     for chave, valor in campos.items():
 
-        if valor is not None:
+    async with _CONFIG_LOCK:
 
-            if chave in CAMPOS_ID:
-                valor = _normalizar_id(valor)
+            if valor is not None:
 
-            atual[chave] = valor
+                if chave in CAMPOS_ID:
+                    valor = _normalizar_id(valor)
 
-    dados[str(guild_id)] = atual
+                atual[chave] = valor
 
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
+        dados[str(guild_id)] = atual
 
-    return atual
+        await salvar(
+            ARQUIVO,
+            dados,
+        )
+
+        return atual
 
 
-# ============================================================
-# CARGOS AUTOMÁTICOS
-# ============================================================
+    # ============================================================
+    # CARGOS AUTOMÁTICOS
+    # ============================================================
 
 async def definir_canal_cargo_automatico(
     guild_id: int,
@@ -253,69 +259,72 @@ async def definir_canal_cargo_automatico(
     cargo_id: int,
 ):
 
-    dados = await _tudo()
+    async with _CONFIG_LOCK:
 
-    atual = _normalizar_config(
-        dados.get(
-            str(guild_id),
+        dados = await _tudo()
+
+        atual = _normalizar_config(
+            dados.get(
+                str(guild_id),
+                {},
+            )
+        )
+
+        mapa = atual.setdefault(
+            "canais_cargo_automatico",
             {},
         )
-    )
 
-    mapa = atual.setdefault(
-        "canais_cargo_automatico",
-        {},
-    )
+        mapa[str(canal_id)] = int(cargo_id)
 
-    mapa[str(canal_id)] = int(cargo_id)
+        dados[str(guild_id)] = atual
 
-    dados[str(guild_id)] = atual
+        await salvar(
+            ARQUIVO,
+            dados,
+        )
 
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
-
-    return mapa
-
+        return mapa
 
 async def remover_canal_cargo_automatico(
     guild_id: int,
     canal_id: int,
 ):
 
-    dados = await _tudo()
+    async with _CONFIG_LOCK:
 
-    atual = _normalizar_config(
-        dados.get(
-            str(guild_id),
+        dados = await _tudo()
+
+        atual = _normalizar_config(
+            dados.get(
+                str(guild_id),
+                {},
+            )
+        )
+
+        mapa = atual.setdefault(
+            "canais_cargo_automatico",
             {},
         )
-    )
 
-    mapa = atual.setdefault(
-        "canais_cargo_automatico",
-        {},
-    )
+        mapa.pop(
+            str(canal_id),
+            None,
+        )
 
-    mapa.pop(
-        str(canal_id),
-        None,
-    )
+        dados[str(guild_id)] = atual
 
-    dados[str(guild_id)] = atual
+        await salvar(
+            ARQUIVO,
+            dados,
+        )
 
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
-
-    return mapa
+        return mapa
 
 
-# ============================================================
-# CONTADORES
-# ============================================================
+    # ============================================================
+    # CONTADORES
+    # ============================================================
 
 async def adicionar_contador(
     guild_id: int,
@@ -324,78 +333,81 @@ async def adicionar_contador(
     cargo_id: int = None,
 ):
 
-    dados = await _tudo()
+    async with _CONFIG_LOCK:
 
-    atual = _normalizar_config(
-        dados.get(
-            str(guild_id),
-            {},
+        dados = await _tudo()
+
+        atual = _normalizar_config(
+            dados.get(
+                str(guild_id),
+                {},
+            )
         )
-    )
 
-    lista = atual.setdefault(
-        "contadores",
-        [],
-    )
+        lista = atual.setdefault(
+            "contadores",
+            [],
+        )
 
-    lista[:] = [
-        contador
-        for contador in lista
-        if contador["canal_id"] != canal_id
-    ]
+        lista[:] = [
+            contador
+            for contador in lista
+            if contador["canal_id"] != canal_id
+        ]
 
-    lista.append(
-        {
-            "tipo": tipo,
-            "canal_id": int(canal_id),
-            "cargo_id": (
-                int(cargo_id)
-                if cargo_id is not None
-                else None
-            ),
-        }
-    )
+        lista.append(
+            {
+                "tipo": tipo,
+                "canal_id": int(canal_id),
+                "cargo_id": (
+                    int(cargo_id)
+                    if cargo_id is not None
+                    else None
+                ),
+            }
+        )
 
-    dados[str(guild_id)] = atual
+        dados[str(guild_id)] = atual
 
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
+        await salvar(
+            ARQUIVO,
+            dados,
+        )
 
-    return lista
-
+        return lista
 
 async def remover_contador(
     guild_id: int,
     canal_id: int,
 ):
 
-    dados = await _tudo()
+    async with _CONFIG_LOCK:
 
-    atual = _normalizar_config(
-        dados.get(
-            str(guild_id),
-            {},
+        dados = await _tudo()
+
+        atual = _normalizar_config(
+            dados.get(
+                str(guild_id),
+                {},
+            )
         )
-    )
 
-    lista = atual.setdefault(
-        "contadores",
-        [],
-    )
+        lista = atual.setdefault(
+            "contadores",
+            [],
+        )
 
-    lista[:] = [
-        contador
-        for contador in lista
-        if contador["canal_id"] != canal_id
-    ]
+        lista[:] = [
+            contador
+            for contador in lista
+            if contador["canal_id"] != canal_id
+        ]
 
-    dados[str(guild_id)] = atual
+        dados[str(guild_id)] = atual
 
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
+        await salvar(
+            ARQUIVO,
+            dados,
+        )
 
-    return lista
+        return lista
