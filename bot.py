@@ -449,30 +449,24 @@ async def iniciar_servidor_web():
     app = web.Application()
 
 
-    async def handle(request):
-        return web.Response(
-            text=(
-                f"{bot.user or 'Bot NÊMESIS'} "
-                "está online."
-            )
-        )
-
     async def health(request):
-        falhas = [
-            item.get("cog")
-            for item in getattr(bot, "cogs_falhos", [])
-        ]
+        falhas = getattr(bot, "cogs_falhos", [])
+        servidor = bot.get_guild(NEMESIS_GUILD_ID)
         status = (
             "starting" if not bot.is_ready()
-            else "degraded" if falhas
+            else "degraded" if falhas or servidor is None
             else "online"
         )
-        # Endpoint público sem autenticação: expõe somente o estado operacional.
-        # IDs internos e detalhes de falhas permanecem disponíveis apenas nos logs.
+        codigo_http = 200 if status == "online" else 503 if status == "degraded" else 202
+        # Não expõe IDs internos nem detalhes das exceções.
         return web.json_response(
-            {"status": status},
-            status=200 if status == "online" else 503 if status == "degraded" else 202,
+            {"status": status, "failed_cogs": len(falhas)},
+            status=codigo_http,
         )
+
+    async def handle(request):
+        # A raiz reflete o estado real, inclusive falhas de inicialização.
+        return await health(request)
 
     app.router.add_get("/", handle)
     app.router.add_get("/health", health)
