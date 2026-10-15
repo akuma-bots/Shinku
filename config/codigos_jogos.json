@@ -165,6 +165,6 @@
   "semana_referente": {
     "inicio": "2026-10-12",
     "fim": "2026-10-18",
-    "fuso": "UTC do runner do GitHub Actions"
+    "fuso": "America/Sao_Paulo"
   }
 }
