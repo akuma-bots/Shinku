@@ -75,6 +75,23 @@ class Perfil(commands.Cog):
 
         embed = discord.Embed(title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PERFIL DE {alvo.display_name.upper()}"[:256], color=0xB51F32)
         embed.set_thumbnail(url=alvo.display_avatar.url)
+        embed.add_field(name="◈ NOME", value=discord.utils.escape_markdown(alvo.display_name)[:256], inline=True)
+        embed.add_field(name="◈ USUÁRIO", value=f"`{discord.utils.escape_markdown(alvo.name)}`", inline=True)
+        embed.add_field(name="◈ ID DO DISCORD", value=f"`{alvo.id}`", inline=True)
+        cargos = [cargo.mention for cargo in reversed(alvo.roles) if cargo.name != "@everyone"]
+        if cargos:
+            cargos_texto = " · ".join(cargos[:10])
+            if len(cargos) > 10:
+                cargos_texto += f" · e mais {len(cargos) - 10} cargo(s)"
+        else:
+            cargos_texto = "Nenhum cargo atribuído"
+        embed.add_field(name=f"◈ CARGOS ({len(cargos)})", value=cargos_texto[:1024], inline=False)
+        embed.add_field(name="◈ CONTA CRIADA", value=f"<t:{int(alvo.created_at.timestamp())}:D>", inline=True)
+        embed.add_field(
+            name="◈ ENTROU NO SERVIDOR",
+            value=f"<t:{int(alvo.joined_at.timestamp())}:D>" if alvo.joined_at else "Data indisponível",
+            inline=True,
+        )
         embed.add_field(name="◈ PATENTE", value=p["patente"] or "Sem patente", inline=True)
         embed.add_field(name="◈ XP", value=str(p["xp"]) + progresso, inline=True)
         embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
