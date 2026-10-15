@@ -324,11 +324,11 @@ class Desafios(commands.Cog):
 
         partes = custom_id.split(":", 2)
         if len(partes) != 3 or partes[1] not in {"aceitar", "recusar"} or not partes[2]:
-            await interaction.followup.send("Ação de desafio inválida.", ephemeral=True)
+            await interaction.response.send_message("Ação de desafio inválida.", ephemeral=True)
             return
         _, acao, desafio_id = partes
         if interaction.guild is None:
-            await interaction.followup.send("Use este botão dentro do servidor.", ephemeral=True)
+            await interaction.response.send_message("Use este botão dentro do servidor.", ephemeral=True)
             return
 
         # Carregar/atualizar o desafio pode demorar quando o storage está lento.
