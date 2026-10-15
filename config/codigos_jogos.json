@@ -161,5 +161,10 @@
       "requisitos": "Alguns códigos exigem pelo menos 200 TP (Training Power). Treine no jogo caso o resgate seja recusado por requisito insuficiente. Respeite maiúsculas e minúsculas; códigos podem expirar e alguns registros comunitários precisam de confirmação.",
       "fonte": "https://rocodes.gg/codes/fistborn"
     }
+  },
+  "semana_referente": {
+    "inicio": "2026-10-12",
+    "fim": "2026-10-18",
+    "fuso": "UTC do runner do GitHub Actions"
   }
 }
