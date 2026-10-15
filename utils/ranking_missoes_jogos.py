@@ -125,7 +125,7 @@ async def salvar_painel(guild_id: int, tipo: str, message_id: int) -> None:
     await salvar(ARQUIVO, todos)
 
 
-async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str]) -> dict:
+async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str], jogo: str | None = None) -> dict:
     """Busca estatísticas globais/localizadas para enriquecer o ranking por jogo."""
     from utils.perfis import ARQUIVO_PERFIS
     from utils.competitivo_sync import ARQUIVO_COMPETITIVO
@@ -134,6 +134,8 @@ async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str]) -> di
     locais_guild = locais.get(str(guild_id), {}) if isinstance(locais, dict) else {}
     competitivo = await carregar(ARQUIVO_COMPETITIVO, {"perfis": {}})
     globais = competitivo.get("perfis", {}) if isinstance(competitivo, dict) else {}
+    dados_jogos = await obter_dados(guild_id)
+    perfis_jogo = dados_jogos.get("jogos", {}).get(jogo, {}).get("pontuacao", {}) if jogo else {}
     resultado = {}
 
     for uid in user_ids:
@@ -145,6 +147,9 @@ async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str]) -> di
             global_ = {}
         kills = int(local.get("kills", global_.get("kills", 0)) or 0)
         deaths = int(local.get("deaths", global_.get("deaths", 0)) or 0)
+        perfil_jogo = perfis_jogo.get(str(uid), {}) if isinstance(perfis_jogo, dict) else {}
+        if not isinstance(perfil_jogo, dict):
+            perfil_jogo = {}
         resultado[str(uid)] = {
             "xp": int(local.get("xp", global_.get("xp", 0)) or 0),
             "vitorias": int(local.get("vitorias", global_.get("vitorias", 0)) or 0),
@@ -155,7 +160,7 @@ async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str]) -> di
             "mvps": int(local.get("mvps", global_.get("mvps", 0)) or 0),
             "sequencia": int(local.get("sequencia_atual", global_.get("sequencia_atual", 0)) or 0),
             "maior_sequencia": int(local.get("maior_sequencia", global_.get("maior_sequencia", 0)) or 0),
-            "tempo_top": int(global_.get("tempo_top_global_segundos", 0) or 0),
+            "tempo_top": int(perfil_jogo.get("tempo_top_segundos", 0) or 0),
             "patente": str(local.get("patente", global_.get("patente", "")) or "—"),
             "kdr": round(kills / deaths, 2) if deaths > 0 else float(kills),
         }
@@ -178,3 +183,37 @@ async def resetar_pontuacoes_jogos(guild_id: int) -> int:
         alterados += 1
     await salvar(ARQUIVO, todos)
     return alterados
+
+
+async def atualizar_tempo_top_jogos(guild_id: int, agora: float | None = None) -> None:
+    """Acumula tempo no Top 10 de cada jogo, com intervalos limitados a 2 minutos."""
+    import time
+
+    agora = float(agora or time.time())
+    todos = await carregar(ARQUIVO, {})
+    if not isinstance(todos, dict):
+        todos = {}
+    registro = todos.setdefault(str(guild_id), {})
+    jogos = registro.setdefault("jogos", {})
+    mudou = False
+    for slug in JOGOS:
+        dados_jogo = jogos.setdefault(slug, {"pontuacao": {}, "eventos_aplicados": []})
+        pontuacao = dados_jogo.setdefault("pontuacao", {})
+        ordenados = sorted(
+            ((str(uid), perfil) for uid, perfil in pontuacao.items() if isinstance(perfil, dict)),
+            key=lambda item: (int(item[1].get("pontos", 0) or 0), str(item[1].get("nome", "")).casefold()),
+            reverse=True,
+        )
+        ids_top = {uid for uid, perfil in ordenados[:10] if int(perfil.get("pontos", 0) or 0) > 0}
+        for uid, perfil in pontuacao.items():
+            if not isinstance(perfil, dict):
+                continue
+            ultima = float(perfil.get("ultima_verificacao_top10", agora) or agora)
+            decorrido = max(0, min(120, agora - ultima))
+            if perfil.get("em_top10"):
+                perfil["tempo_top_segundos"] = int(perfil.get("tempo_top_segundos", 0) or 0) + int(decorrido)
+            perfil["em_top10"] = str(uid) in ids_top
+            perfil["ultima_verificacao_top10"] = agora
+            mudou = True
+    if mudou:
+        await salvar(ARQUIVO, todos)
