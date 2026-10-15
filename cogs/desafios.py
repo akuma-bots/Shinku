@@ -384,7 +384,7 @@ class Desafios(commands.Cog):
             embed.add_field(name="✅ Aceito!", value="A luta pode acontecer agora.", inline=False)
             await interaction.message.edit(embed=embed, view=None)
             await interaction.followup.send(
-                "Você recusou o desafio. A aposta do desafiante foi devolvida, se havia uma.",
+                "Desafio aceito. A luta pode acontecer agora.",
                 ephemeral=True,
             )
 
@@ -418,6 +418,10 @@ class Desafios(commands.Cog):
             embed.color = 0x99AAB5
             embed.add_field(name="🚫 Recusado", value="O desafio foi recusado.", inline=False)
             await interaction.message.edit(embed=embed, view=None)
+            await interaction.followup.send(
+                "Desafio recusado. A aposta do desafiante foi devolvida, se havia uma.",
+                ephemeral=True,
+            )
 
     @app_commands.command(name="luta-completar", description="Envia o resultado de uma luta aceita para revisão.")
     @app_commands.describe(desafio_id="ID do desafio (aparece na mensagem de aceite)",
