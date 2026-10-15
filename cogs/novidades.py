@@ -191,8 +191,6 @@ class Novidades(commands.Cog):
             semaforo = asyncio.Semaphore(CONCORRENCIA_ENVIO)
 
             async def enviar_para_membro(membro: discord.Member) -> tuple[int, str]:
-                # Concorrência limitada: reduz o tempo total e deixa o discord.py
-            # gerenciar os rate limits HTTP sem criar uma rajada ilimitada.
                 async with semaforo:
                     resultado = await _enviar_dm_com_retry(membro, embed=embed)
                     return membro.id, resultado
@@ -212,7 +210,6 @@ class Novidades(commands.Cog):
                         guild.id, user_id, resultado,
                     )
 
-                # Dá visibilidade ao andamento sem editar a resposta a cada destinatário.
                 if concluido % 25 == 0 and concluido < total:
                     try:
                         await interaction.edit_original_response(
@@ -221,32 +218,20 @@ class Novidades(commands.Cog):
                                 f"Progresso: **{concluido}/{total}** membros processados.\n"
                                 f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
                             )
-                    )
+                        )
                     except discord.HTTPException:
                         logger.debug("Não foi possível atualizar a mensagem de progresso do aviso.")
 
-        logger.info(
-            "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
-            guild.id, titulo, len(membros), enviados, falhas,
-        )
-        await interaction.followup.send(
-            f"**Comunicado finalizado: {titulo}**\n"
-            f"• Membros humanos encontrados: **{len(membros)}**\n"
-            f"• DMs enviadas: **{enviados}**\n"
-            f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\n"
-            f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
-            ephemeral=True,
-        )
             logger.info(
                 "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
                 guild.id, titulo, len(membros), enviados, falhas,
             )
             try:
                 await interaction.followup.send(
-                    f"**Comunicado finalizado: {titulo}**\\n"
-                    f"• Membros humanos encontrados: **{len(membros)}**\\n"
-                    f"• DMs enviadas: **{enviados}**\\n"
-                    f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\\n"
+                    f"**Comunicado finalizado: {titulo}**\n"
+                    f"• Membros humanos encontrados: **{len(membros)}**\n"
+                    f"• DMs enviadas: **{enviados}**\n"
+                    f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\n"
                     f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
                     ephemeral=True,
                 )
@@ -255,8 +240,8 @@ class Novidades(commands.Cog):
 
         asyncio.create_task(processar_envio_em_segundo_plano())
         await interaction.followup.send(
-            f"**Disparo iniciado: {titulo}**\\n"
-            f"Destinatários: **{len(membros)}** membros humanos.\\n"
+            f"**Disparo iniciado: {titulo}**\n"
+            f"Destinatários: **{len(membros)}** membros humanos.\n"
             "O envio continuará em segundo plano; o Discord ainda pode aplicar limites de entrega.",
             ephemeral=True,
         )
