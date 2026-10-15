@@ -252,6 +252,13 @@ class RankingGeral(
                     guild
                 )
 
+                # Atualiza o tempo no Top 10 dos rankings por jogo sem criar novos canais.
+                from utils import ranking_missoes_jogos
+                await ranking_missoes_jogos.atualizar_tempo_top_jogos(guild.id)
+                cog_missoes = self.bot.get_cog("Missoes")
+                if cog_missoes is not None:
+                    await cog_missoes._atualizar_ranking_jogo(guild, "shigaku")
+
             except Exception as erro:
 
                 print(
