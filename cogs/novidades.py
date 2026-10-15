@@ -216,8 +216,8 @@ class Novidades(commands.Cog):
                 try:
                     await interaction.edit_original_response(
                         content=(
-                            f"**Enviando comunicado: {titulo}**\\n"
-                            f"Progresso: **{concluido}/{total}** membros processados.\\n"
+                            f"**Enviando comunicado: {titulo}**\n"
+                            f"Progresso: **{concluido}/{total}** membros processados.\n"
                             f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
                         )
                     )
