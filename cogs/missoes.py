@@ -476,12 +476,28 @@ class Missoes(commands.Cog):
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
         linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
         if linhas:
+            estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
+                guild.id, [uid for uid, _, _ in linhas]
+            )
             linhas_texto = []
             medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
             for posicao, (uid, nome, pontos) in enumerate(linhas, start=1):
                 selo = medalhas.get(posicao, f"**{posicao:02d}.**")
-                linhas_texto.append(f"{selo} <@{uid}> — **{pontos:,} P.C.**".replace(",", "."))
-            descricao = "\n".join(linhas_texto)
+                stats = estatisticas.get(str(uid), {})
+                minutos = max(0, int(stats.get("tempo_top", 0))) // 60
+                dias, resto = divmod(minutos, 1440)
+                horas, minutos = divmod(resto, 60)
+                tempo = f"{dias}d {horas}h" if dias else f"{horas}h {minutos}min"
+                nome_exibicao = f"<@{uid}>"
+                linhas_texto.append(
+                    f"{selo} {nome_exibicao} — **{pontos:,} P.C.**".replace(",", ".")
+                    + f"\n┊ **V/E/D:** {stats.get('vitorias', 0)}/{stats.get('empates', 0)}/{stats.get('derrotas', 0)}"
+                    + f"  ·  **XP:** {stats.get('xp', 0):,}".replace(",", ".")
+                    + f"  ·  **K/D:** {stats.get('kills', 0)}/{stats.get('deaths', 0)} ({stats.get('kdr', 0):.2f})"
+                    + f"\n┊ **MVPs:** {stats.get('mvps', 0)}  ·  **Sequência:** {stats.get('sequencia', 0)} (máx. {stats.get('maior_sequencia', 0)})"
+                    + f"\n┊ **Patente:** {stats.get('patente', '—')}  ·  **Tempo no Top 10 global:** {tempo}"
+                )
+            descricao = "\n\n".join(linhas_texto)
         else:
             descricao = "Ainda não há pontos registrados neste jogo. As recompensas entram após a aprovação das provas."
         embed = discord.Embed(
