@@ -182,8 +182,11 @@ class Ajuda(commands.Cog):
         agrupado = {}
 
 
+        # Os comandos da NÊMESIS são registrados no escopo do servidor,
+        # não no escopo global. Consultar get_commands() sem guild retornava
+        # uma árvore vazia e fazia o /help afirmar que não havia comandos.
         for comando in sorted(
-            self.bot.tree.get_commands(),
+            self.bot.tree.get_commands(guild=membro.guild),
             key=lambda comando: comando.name,
         ):
 
