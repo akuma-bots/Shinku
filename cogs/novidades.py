@@ -15,7 +15,7 @@ from utils.storage import carregar, salvar
 logger = logging.getLogger(__name__)
 ARQUIVO_ESTADO = "novidades_automaticas.json"
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
-CONCORRENCIA_ENVIO = 5
+CONCORRENCIA_ENVIO = 40
 INTERVALO_ENVIO = 1.2  # Mantido apenas para a fila de releases automáticos.
 TENTATIVAS_DM = 3
 
