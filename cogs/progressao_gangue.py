@@ -547,12 +547,12 @@ class ProgressaoGangue(commands.Cog):
             registro = discord.Embed(
                 title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ATIVIDADE REGISTRADA",
                 description=(
-                    f"**Membro:** {membro.mention}\\n"
-                    f"**Registrado por:** {interaction.user.mention}\\n"
-                    f"**Tipo:** {atividade.name}\\n"
-                    f"**Recompensa:** +{quantidade} XP\\n"
-                    f"**Motivo:** {motivo_seguro}\\n"
-                    f"**Experiência total:** {total_xp:,} XP\\n"
+                    f"**Membro:** {membro.mention}\n"
+                    f"**Registrado por:** {interaction.user.mention}\n"
+                    f"**Tipo:** {atividade.name}\n"
+                    f"**Recompensa:** +{quantidade} XP\n"
+                    f"**Motivo:** {motivo_seguro}\n"
+                    f"**Experiência total:** {total_xp:,} XP\n"
                     f"**Rank atual:** ╭・𝐍̷𝐨.{rank_novo['no']} — {rank_novo['nome']}"
                 ).replace(",", "."),
                 color=0xB51F32,
@@ -574,9 +574,9 @@ class ProgressaoGangue(commands.Cog):
             log.error("Canal de registro de atividade %s não encontrado/acessível.", CANAL_REGISTRO_ATIVIDADE_ID)
 
         await interaction.response.send_message(
-            f"Atividade registrada para {membro.mention}.\\n"
-            f"**Tipo:** {atividade.name}\\n**Recompensa:** +{quantidade} XP\\n"
-            f"**Motivo:** {motivo_seguro}\\n"
+            f"Atividade registrada para {membro.mention}.\n"
+            f"**Tipo:** {atividade.name}\n**Recompensa:** +{quantidade} XP\n"
+            f"**Motivo:** {motivo_seguro}\n"
             f"**Total:** {total_xp:,} XP · **Rank:** No.{rank_novo['no']} — {rank_novo['nome']}".replace(",", "."),
             ephemeral=True,
         )
