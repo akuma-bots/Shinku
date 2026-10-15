@@ -184,45 +184,46 @@ class Novidades(commands.Cog):
         embed.add_field(name="◈ ENVIADO POR", value=interaction.user.mention, inline=True)
         embed.set_footer(text="NÊMESIS • Comunicados oficiais")
 
-        enviados = 0
-        falhas = 0
-        permanentes = 0
-        semaforo = asyncio.Semaphore(CONCORRENCIA_ENVIO)
+        async def processar_envio_em_segundo_plano():
+            enviados = 0
+            falhas = 0
+            permanentes = 0
+            semaforo = asyncio.Semaphore(CONCORRENCIA_ENVIO)
 
-        async def enviar_para_membro(membro: discord.Member) -> tuple[int, str]:
-            # Concorrência limitada: reduz o tempo total e deixa o discord.py
+            async def enviar_para_membro(membro: discord.Member) -> tuple[int, str]:
+                # Concorrência limitada: reduz o tempo total e deixa o discord.py
             # gerenciar os rate limits HTTP sem criar uma rajada ilimitada.
-            async with semaforo:
-                resultado = await _enviar_dm_com_retry(membro, embed=embed)
-                return membro.id, resultado
+                async with semaforo:
+                    resultado = await _enviar_dm_com_retry(membro, embed=embed)
+                    return membro.id, resultado
 
-        tarefas = [asyncio.create_task(enviar_para_membro(membro)) for membro in membros]
-        total = len(tarefas)
-        for concluido, tarefa in enumerate(asyncio.as_completed(tarefas), start=1):
-            user_id, resultado = await tarefa
-            if resultado == "enviada":
-                enviados += 1
-            else:
-                falhas += 1
-                if resultado == "permanente":
-                    permanentes += 1
-                logger.info(
-                    "Comunicado manual não entregue (guild=%s, user=%s, resultado=%s).",
-                    guild.id, user_id, resultado,
-                )
-
-            # Dá visibilidade ao andamento sem editar a resposta a cada destinatário.
-            if concluido % 25 == 0 and concluido < total:
-                try:
-                    await interaction.edit_original_response(
-                        content=(
-                            f"**Enviando comunicado: {titulo}**\n"
-                            f"Progresso: **{concluido}/{total}** membros processados.\n"
-                            f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
-                        )
+            tarefas = [asyncio.create_task(enviar_para_membro(membro)) for membro in membros]
+            total = len(tarefas)
+            for concluido, tarefa in enumerate(asyncio.as_completed(tarefas), start=1):
+                user_id, resultado = await tarefa
+                if resultado == "enviada":
+                    enviados += 1
+                else:
+                    falhas += 1
+                    if resultado == "permanente":
+                        permanentes += 1
+                    logger.info(
+                        "Comunicado manual não entregue (guild=%s, user=%s, resultado=%s).",
+                        guild.id, user_id, resultado,
                     )
-                except discord.HTTPException:
-                    logger.debug("Não foi possível atualizar a mensagem de progresso do aviso.")
+
+                # Dá visibilidade ao andamento sem editar a resposta a cada destinatário.
+                if concluido % 25 == 0 and concluido < total:
+                    try:
+                        await interaction.edit_original_response(
+                            content=(
+                                f"**Enviando comunicado: {titulo}**\n"
+                                f"Progresso: **{concluido}/{total}** membros processados.\n"
+                                f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
+                            )
+                    )
+                    except discord.HTTPException:
+                        logger.debug("Não foi possível atualizar a mensagem de progresso do aviso.")
 
         logger.info(
             "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
@@ -234,6 +235,29 @@ class Novidades(commands.Cog):
             f"• DMs enviadas: **{enviados}**\n"
             f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\n"
             f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
+            ephemeral=True,
+        )
+            logger.info(
+                "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
+                guild.id, titulo, len(membros), enviados, falhas,
+            )
+            try:
+                await interaction.followup.send(
+                    f"**Comunicado finalizado: {titulo}**\\n"
+                    f"• Membros humanos encontrados: **{len(membros)}**\\n"
+                    f"• DMs enviadas: **{enviados}**\\n"
+                    f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\\n"
+                    f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
+                    ephemeral=True,
+                )
+            except discord.HTTPException:
+                logger.exception("Não foi possível publicar o resumo do comunicado.")
+
+        asyncio.create_task(processar_envio_em_segundo_plano())
+        await interaction.followup.send(
+            f"**Disparo iniciado: {titulo}**\\n"
+            f"Destinatários: **{len(membros)}** membros humanos.\\n"
+            "O envio continuará em segundo plano; o Discord ainda pode aplicar limites de entrega.",
             ephemeral=True,
         )
 
