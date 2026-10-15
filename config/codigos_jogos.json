@@ -1,0 +1,165 @@
+{
+  "atualizado_em": "2026-10-15",
+  "jogos": {
+    "shigaku": {
+      "nome": "Shigaku",
+      "descricao": "Códigos para rerolls e recompensas.",
+      "codigos": [
+        {
+          "codigo": "SHIGAKUSBACK",
+          "recompensa": "Recompensa divulgada pela comunidade; quantidade não confirmada"
+        },
+        {
+          "codigo": "25kMEMBERS",
+          "recompensa": "100 rerolls"
+        },
+        {
+          "codigo": "MOREMOREMORE",
+          "recompensa": "25 rerolls"
+        },
+        {
+          "codigo": "WEREBACK",
+          "recompensa": "150 rerolls"
+        },
+        {
+          "codigo": "40KFAVS",
+          "recompensa": "100 rerolls"
+        },
+        {
+          "codigo": "35KLIKES",
+          "recompensa": "100 rerolls"
+        },
+        {
+          "codigo": "LOCKERSFIXED",
+          "recompensa": "1 reroll"
+        },
+        {
+          "codigo": "MASTERMANIPULATOR",
+          "recompensa": "9 rerolls"
+        },
+        {
+          "codigo": "lapeace",
+          "recompensa": "10 rerolls"
+        },
+        {
+          "codigo": "JUSTTHESTART",
+          "recompensa": "10 rerolls"
+        },
+        {
+          "codigo": "bugfixes",
+          "recompensa": "3 rerolls"
+        },
+        {
+          "codigo": "MYBADFIXESOTW",
+          "recompensa": "25 rerolls"
+        },
+        {
+          "codigo": "1KLIKESANDDELAYSORRY",
+          "recompensa": "25 rerolls"
+        },
+        {
+          "codigo": "RELEASETHANKYOU",
+          "recompensa": "25 rerolls"
+        }
+      ],
+      "requisitos": "Entre na comunidade/grupo oficial do Shigaku no Roblox. No jogo, abra Settings (Configurações), selecione Codes e resgate cada código. Códigos podem expirar ou ser usados apenas uma vez por conta.",
+      "fonte": "https://urgametips.com/shigaku-codes/"
+    },
+    "gakuran": {
+      "nome": "Gakuran",
+      "descricao": "Códigos de rerolls e recompensas.",
+      "codigos": [
+        {
+          "codigo": "QOL4",
+          "recompensa": "Rerolls e/ou Yen; quantidade varia conforme a lista consultada"
+        },
+        {
+          "codigo": "pityfixed",
+          "recompensa": "20 rerolls"
+        },
+        {
+          "codigo": "PITY",
+          "recompensa": "20 rerolls"
+        },
+        {
+          "codigo": "GAKURANCOMEBACK",
+          "recompensa": "40 rerolls"
+        },
+        {
+          "codigo": "QOL3",
+          "recompensa": "67 rerolls"
+        },
+        {
+          "codigo": "FRESHLOOK",
+          "recompensa": "40 rerolls"
+        },
+        {
+          "codigo": "QOL2",
+          "recompensa": "40 rerolls"
+        },
+        {
+          "codigo": "9999rerolls",
+          "recompensa": "1 reroll"
+        },
+        {
+          "codigo": "doublerestart",
+          "recompensa": "21 rerolls"
+        },
+        {
+          "codigo": "CLUBAKUMASOBACK",
+          "recompensa": "30 rerolls"
+        },
+        {
+          "codigo": "discordfixed",
+          "recompensa": "33 rerolls"
+        },
+        {
+          "codigo": "laterestart",
+          "recompensa": "30 rerolls"
+        },
+        {
+          "codigo": "BUGFIXDAY",
+          "recompensa": "Recompensa não confirmada"
+        }
+      ],
+      "requisitos": "Entre no grupo oficial de Gakuran. Algumas contas podem precisar de verificação de idade, amigos adicionados e/ou tempo mínimo de jogo; confira os requisitos atuais se um código falhar. Abra o menu do jogo, selecione Codes, cole o código exatamente como está escrito e resgate.",
+      "fonte": "https://rocodes.gg/codes/gakuran"
+    },
+    "fistborn": {
+      "nome": "Fistborn",
+      "descricao": "Códigos de Tokens e outras recompensas.",
+      "codigos": [
+        {
+          "codigo": "E8XMQX",
+          "recompensa": "Recompensa não especificada na lista consultada"
+        },
+        {
+          "codigo": "WeLoveYall",
+          "recompensa": "50.000 Tokens"
+        },
+        {
+          "codigo": "CookieWarriors",
+          "recompensa": "Tokens; quantidade não confirmada"
+        },
+        {
+          "codigo": "AppleWarriors",
+          "recompensa": "Tokens; quantidade não confirmada"
+        },
+        {
+          "codigo": "fistborn",
+          "recompensa": "2.500 Tokens"
+        },
+        {
+          "codigo": "GlutsCookies",
+          "recompensa": "20.000 Tokens (status pode variar)"
+        },
+        {
+          "codigo": "ADVANCE",
+          "recompensa": "1.500 Tokens (status pode variar)"
+        }
+      ],
+      "requisitos": "Alguns códigos exigem pelo menos 200 TP (Training Power). Treine no jogo caso o resgate seja recusado por requisito insuficiente. Respeite maiúsculas e minúsculas; códigos podem expirar e alguns registros comunitários precisam de confirmação.",
+      "fonte": "https://rocodes.gg/codes/fistborn"
+    }
+  }
+}
