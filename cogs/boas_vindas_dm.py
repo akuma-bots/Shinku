@@ -66,9 +66,13 @@ def _embed_codigos(chave: str) -> discord.Embed:
         if codigo:
             linhas.append(f"`{codigo}` — {recompensa}")
     descricao_codigos = "\n".join(linhas) or "Nenhum código listado no momento."
+    semana = catalogo.get("semana_referente", {})
+    periodo = ""
+    if semana.get("inicio") and semana.get("fim"):
+        periodo = f"\n**Semana dos códigos:** {semana['inicio']} até {semana['fim']}"
     embed = discord.Embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CÓDIGOS / {jogo['nome'].upper()}",
-        description=(f"{jogo.get('descricao', '')}\n\n**Lista catalogada em:** {catalogo.get('atualizado_em', 'indisponível')}\n\n{descricao_codigos}")[:4096],
+        description=(f"{jogo.get('descricao', '')}\n\n**Verificado em:** {catalogo.get('atualizado_em', 'indisponível')}{periodo}\n\n{descricao_codigos}")[:4096],
         color=0xB51F32,
         url=jogo.get("fonte"),
     )
