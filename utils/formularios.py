@@ -430,8 +430,7 @@ async def get_resposta(
     if status not in {"aprovada", "recusada"}:
         raise ValueError("Status de candidatura inválido.")
 
-    # Serializa decisões no processo: dois revisores não podem aprovar/recusar
-    # a mesma candidatura simultaneamente usando snapshots do mesmo estado.
+    # Serializa decisões no processo para impedir decisões concorrentes.
     async with _STATUS_RESPOSTA_LOCK:
         dados = await _tudo_respostas()
         lista = dados.get(str(guild_id), [])
@@ -453,12 +452,7 @@ async def get_resposta(
         alvo["atualizado_em"] = time.time()
 
         await _salvar_respostas_guild(guild_id, lista)
-        return alvo       guild_id,
-        lista,
-    )
-
-    return alvo
-
+        return alvo
 
 async def listar_respostas(
     guild_id: int,
