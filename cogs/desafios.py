@@ -352,6 +352,10 @@ class Desafios(commands.Cog):
                     embed.color = 0x99AAB5
                     embed.add_field(name="🚫 Cancelado", value=f"{interaction.user.mention} não tem XP suficiente pra cobrir a aposta.", inline=False)
                     await interaction.message.edit(embed=embed, view=None)
+                    await interaction.followup.send(
+                        "A aposta foi cancelada porque você não tem XP suficiente. O XP reservado ao desafiante foi devolvido.",
+                        ephemeral=True,
+                    )
                     return
 
             await desafios.definir_status(interaction.guild.id, desafio_id, "aceito")
@@ -359,6 +363,10 @@ class Desafios(commands.Cog):
             embed.color = 0x57F287
             embed.add_field(name="✅ Aceito!", value="A luta pode acontecer agora.", inline=False)
             await interaction.message.edit(embed=embed, view=None)
+            await interaction.followup.send(
+                "Você recusou o desafio. A aposta do desafiante foi devolvida, se havia uma.",
+                ephemeral=True,
+            )
 
             config = await get_config(interaction.guild.id)
             canal_id = config.get("canal_lutas_id")
@@ -373,6 +381,10 @@ class Desafios(commands.Cog):
             )
             aviso.set_footer(text=f"Ao terminar, use /luta-completar desafio_id:{desafio_id}")
             await canal.send(embed=aviso)
+            await interaction.followup.send(
+                f"Desafio aceito. O confronto foi publicado em {canal.mention}.",
+                ephemeral=True,
+            )
         else:
             await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
             if desafio["aposta_xp"] > 0:
