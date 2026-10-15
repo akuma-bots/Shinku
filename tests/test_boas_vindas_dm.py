@@ -28,3 +28,14 @@ def test_codes_catalog_is_valid_json():
         semana = data["semana_referente"]
         assert semana["inicio"] <= semana["fim"]
         assert semana["fuso"]
+
+
+def test_weekly_catalog_period_is_monday_through_sunday():
+    from datetime import date
+    from scripts.atualizar_codigos_jogos import calcular_semana
+
+    inicio, fim = calcular_semana(date(2026, 10, 15))
+    assert inicio == date(2026, 10, 12)
+    assert fim == date(2026, 10, 18)
+    assert fim.weekday() == 6
+    assert (fim - inicio).days == 6
