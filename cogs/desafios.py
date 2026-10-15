@@ -343,10 +343,23 @@ class Desafios(commands.Cog):
             return
 
         if acao == "aceitar":
+            reservado = await desafios.transicionar_status(
+                interaction.guild.id, desafio_id, "pendente", "processando_aceite"
+            )
+            if not reservado:
+                await interaction.followup.send("Esse desafio já está sendo processado por outra ação.", ephemeral=True)
+                return
+
             if desafio["aposta_xp"] > 0:
-                ok = await _remover_xp(interaction.guild.id, interaction.user.id, desafio["aposta_xp"])
+                try:
+                    ok = await _remover_xp(interaction.guild.id, interaction.user.id, desafio["aposta_xp"])
+                except Exception:
+                    await desafios.transicionar_status(
+                        interaction.guild.id, desafio_id, "processando_aceite", "pendente"
+                    )
+                    raise
                 if not ok:
-                    await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
+                    await desafios.transicionar_status(interaction.guild.id, desafio_id, "processando_aceite", "recusado")
                     await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
                     embed = interaction.message.embeds[0]
                     embed.color = 0x99AAB5
@@ -358,7 +371,14 @@ class Desafios(commands.Cog):
                     )
                     return
 
-            await desafios.definir_status(interaction.guild.id, desafio_id, "aceito")
+            aceito = await desafios.transicionar_status(
+                interaction.guild.id, desafio_id, "processando_aceite", "aceito"
+            )
+            if not aceito:
+                if desafio["aposta_xp"] > 0:
+                    await _devolver_xp(interaction.guild.id, interaction.user.id, desafio["aposta_xp"])
+                await interaction.followup.send("Não foi possível confirmar o aceite; a aposta foi devolvida se havia sido debitada.", ephemeral=True)
+                return
             embed = interaction.message.embeds[0]
             embed.color = 0x57F287
             embed.add_field(name="✅ Aceito!", value="A luta pode acontecer agora.", inline=False)
@@ -386,7 +406,12 @@ class Desafios(commands.Cog):
                 ephemeral=True,
             )
         else:
-            await desafios.definir_status(interaction.guild.id, desafio_id, "recusado")
+            recusado = await desafios.transicionar_status(
+                interaction.guild.id, desafio_id, "pendente", "recusado"
+            )
+            if not recusado:
+                await interaction.followup.send("Esse desafio já foi processado por outra ação.", ephemeral=True)
+                return
             if desafio["aposta_xp"] > 0:
                 await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
             embed = interaction.message.embeds[0]
