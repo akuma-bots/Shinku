@@ -2,7 +2,7 @@ name: Daily game codes refresh
 
 on:
   schedule:
-    - cron: "17 9 * * *"
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions:
