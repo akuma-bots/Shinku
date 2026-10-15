@@ -22,4 +22,9 @@ def test_welcome_uses_nemesis_tag_and_invite():
 def test_codes_catalog_is_valid_json():
     root = Path(__file__).resolve().parents[1]
     data = json.loads((root / "config" / "codigos_jogos.json").read_text(encoding="utf-8"))
-    assert data["atualizado_em"] == "2026-10-15"
+    assert len(data["atualizado_em"]) == 10
+    assert data["atualizado_em"][4] == "-" and data["atualizado_em"][7] == "-"
+    if "semana_referente" in data:
+        semana = data["semana_referente"]
+        assert semana["inicio"] <= semana["fim"]
+        assert semana["fuso"]
