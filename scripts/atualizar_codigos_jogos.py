@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh the game-code catalog from the configured public code-list pages.
+"""Refresh the game-code catalog daily from the configured public code-list pages.
 
 The updater is deliberately conservative: if a source cannot be parsed with
 confidence, it fails rather than replacing the catalog with an empty/incorrect
@@ -18,7 +18,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "config" / "codigos_jogos.json"
-HEADERS = {"User-Agent": "NemesisCodesUpdater/1.0 (weekly public code catalog)"}
+HEADERS = {"User-Agent": "NemesisCodesUpdater/1.0 (daily public code catalog)"}
 SOURCES = {
     "shigaku": "https://urgametips.com/shigaku-codes/",
     "gakuran": "https://rocodes.gg/codes/gakuran",
@@ -109,7 +109,6 @@ def main() -> int:
     # Use o fuso do servidor da NÊMESIS, não o UTC do runner do GitHub.
     today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     week_start, week_end = calcular_semana(today)
-    changed = False
     failures = []
 
     for key, url in SOURCES.items():
@@ -125,7 +124,7 @@ def main() -> int:
             print(f"ERRO {key}: {exc}", file=sys.stderr)
 
     if failures:
-        print("Atualização semanal incompleta; o catálogo não será gravado.", file=sys.stderr)
+        print("Atualização diária incompleta; o catálogo não será gravado.", file=sys.stderr)
         return 1
 
     catalog["atualizado_em"] = today.isoformat()
@@ -135,7 +134,7 @@ def main() -> int:
         "fuso": "America/Sao_Paulo",
     }
     CATALOG_PATH.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Catálogo atualizado para a semana {week_start.isoformat()} a {week_end.isoformat()}.")
+    print(f"Catálogo atualizado em {today.isoformat()}; semana de referência {week_start.isoformat()} a {week_end.isoformat()}.")
     return 0
 
 
