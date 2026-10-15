@@ -355,7 +355,14 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                     except discord.NotFound:
                         mensagem = None
                     except (discord.Forbidden, discord.HTTPException):
-                        continue
+                        # Não avance para a próxima mensagem quando não foi
+                        # possível verificar esta: isso desalinharia os IDs e
+                        # poderia publicar painéis duplicados no próximo ciclo.
+                        mensagens = []
+                        break
+
+                if mensagens == [] and indice > 0:
+                    break
 
                 try:
                     if mensagem is None:
