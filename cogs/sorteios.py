@@ -589,12 +589,16 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         except ValueError:
             return
 
+        # A consulta ao armazenamento pode levar tempo; confirme a interação
+        # antes de buscar o sorteio ou iniciar o encerramento automático.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
         sorteio = await self.obter_sorteio(
             sorteio_id
         )
 
         if not sorteio:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Não foi possível encontrar este sorteio.",
                 ephemeral=True,
             )
@@ -610,7 +614,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 interaction.message.id
             )
         ):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Este botão não pertence a este sorteio.",
                 ephemeral=True,
             )
@@ -630,7 +634,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             sorteio["participantes"] = participantes
 
             if not participantes:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Ainda não há participantes neste sorteio.",
                     ephemeral=True,
                 )
@@ -675,7 +679,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 )
             )
 
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 embed=embed,
                 ephemeral=True,
             )
@@ -701,10 +705,10 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         }
         if status == "expirado":
             await self.sortear_vencedores(sorteio)
-            await interaction.response.send_message(mensagens[status], ephemeral=True)
+            await interaction.followup.send(mensagens[status], ephemeral=True)
             return
         if status != "ok":
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 mensagens.get(status, "Não foi possível registrar sua participação."),
                 ephemeral=True,
             )
@@ -719,7 +723,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         except discord.HTTPException:
             pass
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "✓ Você entrou no sorteio. Boa sorte!",
             ephemeral=True,
         )
