@@ -421,7 +421,13 @@ async def get_resposta(
         (
             resposta
             for resposta in lista
-            if resposta.getasync def definir_status_resposta(
+            if resposta.get("id") == resposta_id
+        ),
+        None,
+    )
+
+
+async def definir_status_resposta(
     guild_id: int,
     resposta_id: str,
     status: str,
