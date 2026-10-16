@@ -5,9 +5,9 @@ import time
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
-from utils.apresentacao import criar_embed, tasks
+from utils.apresentacao import criar_embed
 
 from utils import formularios
 from utils.storage import carregar, salvar
