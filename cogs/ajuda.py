@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import criar_embed
+
 
 SISTEMAS = {
     "Missoes": ("🎯", "Missões"),
@@ -320,17 +322,10 @@ class Ajuda(commands.Cog):
             start=1,
         ):
 
-            embed = discord.Embed(
-                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE COMANDOS",
-                description=texto,
-                color=0xB51F32,
-            )
-
-            embed.set_footer(
-                text=(
-                    f"NÊMESIS • Página "
-                    f"{numero}/{total}"
-                )
+            embed = criar_embed(
+                "N̷ÊMESIS ━ CENTRAL DE COMANDOS",
+                texto,
+                rodape=f"NÊMESIS • Página {numero}/{total}",
             )
 
             embeds.append(
