@@ -4,6 +4,7 @@ import logging
 import unicodedata
 import discord
 from discord.ext import commands, tasks
+from utils.apresentacao import criar_embed
 from utils.storage import carregar_config
 from utils.guild_config import get_config, set_config
 from utils import tickets
@@ -176,10 +177,10 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
 async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     config = await get_config(guild_id)
 
-    embed = discord.Embed(
-        title=config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        description=config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
-        color=0xB51F32,
+    embed = criar_embed(
+        config.get("ticket_painel_titulo") or TITULO_PADRAO,
+        config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
+        rodape="NÊMESIS • Central de atendimento",
     )
 
     banner_url = config.get("ticket_painel_banner_url")
@@ -363,13 +364,13 @@ class Tickets(commands.Cog):
             reason=f"Ticket ({tipo['label']}) aberto por {user}",
         )
 
-        embed = discord.Embed(
-            title=f"{tipo.get('emoji', '🎫')} {tipo['label']}",
-            description=(
-                "Olá, bem-vindo(a)! Descreva com detalhes o que você "
-                "precisa — nossa equipe vai te atender em breve."
+        embed = criar_embed(
+            f"{tipo.get('emoji', '🎫')} {tipo['label']}",
+            (
+                "Seu atendimento foi aberto. Descreva o que precisa, "
+                "inclua o contexto necessário e aguarde a equipe."
             ),
-            color=0xB51F32,
+            rodape="NÊMESIS • Atendimento privado",
         )
 
         try:
@@ -669,17 +670,10 @@ class Tickets(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
-            description=resultado["resposta"],
-            color=0xB51F32,
-        )
-
-        embed.set_footer(
-            text=(
-                "Resposta automática • "
-                "Se não resolveu, digite "
-                "'falar com atendente'."
-            )
+        embed = criar_embed(
+            "N̷ÊMESIS ━ RESPOSTA AUTOMÁTICA",
+            resultado["resposta"],
+            rodape="NÊMESIS • Se precisar, solicite atendimento humano",
         )
 
         await message.reply(
