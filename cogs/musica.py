@@ -91,7 +91,6 @@ class Musica(commands.Cog):
                     break
                 item = fila.pop(0)
                 voz = guild.voice_client
-                self.agora[gid] = item
                 # Atualiza a URL de mídia perto do momento da reprodução, pois
                 # URLs de streaming podem expirar enquanto aguardam na fila.
                 try:
@@ -105,6 +104,7 @@ class Musica(commands.Cog):
                             f"Não consegui abrir **{discord.utils.escape_markdown(item['title'])}**. Pulando para a próxima música."
                         )
                     continue
+                self.agora[gid] = item
                 loop = asyncio.get_running_loop()
                 terminou = asyncio.Event()
 
