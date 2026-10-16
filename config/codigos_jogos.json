@@ -1,33 +1,17 @@
 {
-  "atualizado_em": "2026-10-15",
+  "atualizado_em": "2026-10-16",
   "jogos": {
     "shigaku": {
       "nome": "Shigaku",
       "descricao": "Códigos para rerolls e recompensas.",
       "codigos": [
         {
-          "codigo": "SHIGAKUSBACK",
-          "recompensa": "Recompensa divulgada pela comunidade; quantidade não confirmada"
+          "codigo": "Checked",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "25kMEMBERS",
-          "recompensa": "100 rerolls"
-        },
-        {
-          "codigo": "MOREMOREMORE",
-          "recompensa": "25 rerolls"
-        },
-        {
-          "codigo": "WEREBACK",
-          "recompensa": "150 rerolls"
-        },
-        {
-          "codigo": "40KFAVS",
-          "recompensa": "100 rerolls"
-        },
-        {
-          "codigo": "35KLIKES",
-          "recompensa": "100 rerolls"
+          "codigo": "October",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
           "codigo": "LOCKERSFIXED",
@@ -50,16 +34,20 @@
           "recompensa": "3 rerolls"
         },
         {
-          "codigo": "MYBADFIXESOTW",
+          "codigo": "MOREMOREMORE",
           "recompensa": "25 rerolls"
         },
         {
-          "codigo": "1KLIKESANDDELAYSORRY",
+          "codigo": "MYBADFIXESOTW",
           "recompensa": "25 rerolls"
         },
         {
           "codigo": "RELEASETHANKYOU",
           "recompensa": "25 rerolls"
+        },
+        {
+          "codigo": "WEREBACK",
+          "recompensa": "150 rerolls"
         }
       ],
       "requisitos": "Entre na comunidade/grupo oficial do Shigaku no Roblox. No jogo, abra Settings (Configurações), selecione Codes e resgate cada código. Códigos podem expirar ou ser usados apenas uma vez por conta.",
@@ -69,6 +57,62 @@
       "nome": "Gakuran",
       "descricao": "Códigos de rerolls e recompensas.",
       "codigos": [
+        {
+          "codigo": "Staff",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Review",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Update",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "October",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "There",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Official",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Game",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Developer",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Links",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Discord",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Submit",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Added",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Success",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Rate",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
         {
           "codigo": "QOL4",
           "recompensa": "67 rerolls e 5.000 Yen (lista comunitária; confirme se ainda funciona)"
@@ -98,10 +142,6 @@
           "recompensa": "40 rerolls"
         },
         {
-          "codigo": "9999rerolls",
-          "recompensa": "1 reroll"
-        },
-        {
           "codigo": "doublerestart",
           "recompensa": "21 rerolls"
         },
@@ -118,8 +158,88 @@
           "recompensa": "30 rerolls"
         },
         {
-          "codigo": "BUGFIXDAY",
-          "recompensa": "Recompensa não confirmada"
+          "codigo": "NOMORESILENCE",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "SINGALONG",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Rerolls",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "EATUP",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "SKATERBOY",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Days",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "WINGCHAN",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "QUICKSHUTDOWN",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "QUICKPATCH",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MUSICFIXESNOPTIMIZATION",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "CHESS",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "LARPSIMULATOR",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MAPUPDATE",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "XAYSEYES",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "SECRET",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Frequently",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Asked",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Questions",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "About",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "What",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "This",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         }
       ],
       "requisitos": "Entre no grupo oficial de Gakuran. Algumas contas podem precisar de verificação de idade, amigos adicionados e/ou tempo mínimo de jogo; confira os requisitos atuais se um código falhar. Abra o menu do jogo, selecione Codes, cole o código exatamente como está escrito e resgate.",
@@ -130,12 +250,60 @@
       "descricao": "Códigos de Tokens e outras recompensas.",
       "codigos": [
         {
-          "codigo": "E8XMQX",
-          "recompensa": "Recompensa não especificada na lista consultada"
+          "codigo": "Update",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "WeLoveYall",
-          "recompensa": "50.000 Tokens"
+          "codigo": "October",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Kengan",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "February",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Official",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Game",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Developer",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Links",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Discord",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Submit",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Added",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Success",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Rate",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "E8XMQX",
+          "recompensa": "Recompensa não especificada na lista consultada"
         },
         {
           "codigo": "CookieWarriors",
@@ -146,16 +314,588 @@
           "recompensa": "Tokens; quantidade não confirmada"
         },
         {
-          "codigo": "fistborn",
-          "recompensa": "2.500 Tokens"
+          "codigo": "MikuIsSpanishNow",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Tokens",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
           "codigo": "GlutsCookies",
           "recompensa": "20.000 Tokens (status pode variar)"
         },
         {
+          "codigo": "HalfWayShigure",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "RoadmenGotReleased",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "NewUI",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "NewEmotes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "NewBundle",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MuscleChuds",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "KoeiQuantumQuest",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutIsNotTheFather",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutDelay2",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutDelay1",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutAteTheUpdate",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "OpwipMakesKhinkali",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "NYCBlowsUp",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "HelpSaveGlut",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutAteTray",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "EndOftheMonth",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "CappSetFree",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "SukiHasAkumaHostage",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "SukiRemovedTheWindow",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutIsHungry",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutSlimedMythra",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutIsOverWorked",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MikaModeIsReal",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "IReplacementTookAWrongTurn",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "AIReplacementTookAWrongTurn",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GluttonyIsFatAf",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "HappyMothersDay",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "WeHateGluttony",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "HttpAsyncMyGroup",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Coins",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "GlutIsFat",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "JoseMustyPinkMohawk",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Expires",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "April",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "JoseMohawk",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Phase1Woo",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "extendedtime2",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "TheFallen",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Shozukilovesyou",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "HappyEaster",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "BigUpdateSoon",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "branchespatches1",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Requires",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "PartyUp",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "disclaimersmall2",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "gift3",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "gift2",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "gift1",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "bugfixes2",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "bugfixes1",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "christmaspart1",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty5mvisits",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty8klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty40kmembers",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty7klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty35kmembers",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty6klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty30kmembers",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty5klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Days",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty5kccu",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty4klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "tyfor20kmembers",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "wow3klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "thanksfor1mil",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "thanksfor4k",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty2klikes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
           "codigo": "ADVANCE",
           "recompensa": "1.500 Tokens (status pode variar)"
+        },
+        {
+          "codigo": "sorry4delay",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "ty1500likes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "thanksfor2k",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "thanksfor1k",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MODESOON",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "TALENTS",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "WEBACK",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "thanksfor750",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "FreeMacro",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "sorry4shutdown",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Staff",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Score",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Community",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Rating",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Based",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Request",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Stats",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Player",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Time",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Players",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Data",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Insights",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Within",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "What",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Games",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Dueling",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Grounds",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Samurai",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Duels",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Boxing",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Beta",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "MUGEN",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Recommended",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "RoCodes",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Soccer",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Stadium",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Tycoon",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Stepford",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "County",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Railway",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Unbox",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Your",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Tank",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Crazy",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Cards",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Skibidi",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Tower",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Defense",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Outrun",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Speedster",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Rider",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Defenders",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Ascension",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Incremental",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "More",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Cookie",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Kingdom",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "World",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Goblin",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Mine",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Aimbot",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Plants",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Brainrots",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Twilight",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Zone",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Dinosaur",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Racing",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Steal",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Generator",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Cool",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Baddie",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "About",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "RoCodes.gg",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Code-Checking",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Process",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         }
       ],
       "requisitos": "Alguns códigos exigem pelo menos 200 TP (Training Power). Treine no jogo caso o resgate seja recusado por requisito insuficiente. Respeite maiúsculas e minúsculas; códigos podem expirar e alguns registros comunitários precisam de confirmação.",
