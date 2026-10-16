@@ -5,6 +5,7 @@ Aceita links e buscas; a reprodução depende da disponibilidade do provedor de 
 """
 import asyncio
 import logging
+import shlex
 import shutil
 from typing import Any
 from urllib.parse import urlparse
@@ -159,7 +160,7 @@ class Musica(commands.Cog):
                             and "\\n" not in str(valor)
                         ]
                         if linhas:
-                            argumentos_headers = "-headers " + repr("\\r\\n".join(linhas) + "\\r\\n")
+                            argumentos_headers = "-headers " + shlex.quote("\r\n".join(linhas) + "\r\n")
                     antes = FFMPEG_OPCOES["before_options"]
                     if argumentos_headers:
                         antes = f"{antes} {argumentos_headers}"
