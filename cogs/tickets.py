@@ -548,8 +548,13 @@ class Tickets(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        # O listener também recebe eventos de canais de voz; somente canais
+        # de texto e tópicos possuem metadados de ticket e atributo topic.
+        if not isinstance(message.channel, (discord.TextChannel, discord.Thread)):
+            return
+
         info_topic = tickets.parse_topic(
-            message.channel.topic
+            message.channel.topic if isinstance(message.channel, discord.TextChannel) else None
         )
 
         if not info_topic:
