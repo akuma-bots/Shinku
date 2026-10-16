@@ -5,6 +5,7 @@ Aceita links e buscas; a reprodução depende da disponibilidade do provedor de 
 """
 import asyncio
 import logging
+import shutil
 from typing import Any
 from urllib.parse import urlparse
 
@@ -31,8 +32,8 @@ YDL_OPCOES = {
     "extractor_args": {"youtube": {"player_client": ["android", "web_safari"]}},
 }
 FFMPEG_OPCOES = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-    "options": "-vn",
+    "before_options": "-nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn -sn -dn -loglevel warning",
 }
 
 
@@ -46,7 +47,10 @@ class Musica(commands.Cog):
         self.volumes: dict[int, float] = {}
         self.agora: dict[int, dict[str, Any]] = {}
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
-        self.ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
+        # empacotado pelo imageio-ffmpeg fica como fallback.
+        self.ffmpeg = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
+        LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
 
     async def _extrair(self, consulta: str) -> dict[str, Any]:
         # Impede que URLs arbitrárias sejam usadas para acessar serviços internos.
@@ -76,7 +80,13 @@ class Musica(commands.Cog):
             duracao = int(dados.get("duration") or 0)
             if not url:
                 raise ValueError("O provedor não retornou um fluxo de áudio.")
-            return {"url": url, "title": titulo, "webpage_url": webpage, "duration": duracao}
+            return {
+                "url": url,
+                "title": titulo,
+                "webpage_url": webpage,
+                "duration": duracao,
+                "http_headers": dados.get("http_headers") or {},
+            }
         return await asyncio.to_thread(extrair)
 
     @staticmethod
@@ -106,6 +116,7 @@ class Musica(commands.Cog):
                 try:
                     atualizado = await self._extrair(item["webpage_url"])
                     item["url"] = atualizado["url"]
+                    item["http_headers"] = atualizado.get("http_headers") or {}
                 except Exception:
                     LOG.exception("Não foi possível atualizar o fluxo de áudio.")
                     canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
@@ -120,14 +131,42 @@ class Musica(commands.Cog):
 
                 def ao_terminar(erro):
                     if erro:
-                        LOG.warning("Erro de reprodução no servidor %s: %s", gid, erro)
+                        LOG.error("Erro de reprodução no servidor %s: %s", gid, erro)
+                        canal_id = item.get("text_channel_id", 0)
+                        canal = self.bot.get_channel(canal_id)
+                        if canal:
+                            asyncio.run_coroutine_threadsafe(
+                                canal.send(
+                                    "⚠️ A fonte de áudio encerrou inesperadamente. "
+                                    "Tente outra música ou outro link."
+                                ),
+                                loop,
+                            )
                     loop.call_soon_threadsafe(terminou.set)
 
                 try:
+                    # Alguns provedores exigem os mesmos cabeçalhos HTTP usados
+                    # pelo yt-dlp para entregar o fluxo de áudio.
+                    cabecalhos = item.get("http_headers") or {}
+                    argumentos_headers = ""
+                    if cabecalhos:
+                        linhas = [
+                            f"{chave}: {valor}"
+                            for chave, valor in cabecalhos.items()
+                            if "\\r" not in str(chave)
+                            and "\\n" not in str(chave)
+                            and "\\r" not in str(valor)
+                            and "\\n" not in str(valor)
+                        ]
+                        if linhas:
+                            argumentos_headers = "-headers " + repr("\\r\\n".join(linhas) + "\\r\\n")
+                    antes = FFMPEG_OPCOES["before_options"]
+                    if argumentos_headers:
+                        antes = f"{antes} {argumentos_headers}"
                     fonte = discord.FFmpegPCMAudio(
                         item["url"],
                         executable=self.ffmpeg,
-                        before_options=FFMPEG_OPCOES["before_options"],
+                        before_options=antes,
                         options=FFMPEG_OPCOES["options"],
                     )
                     volume = self.volumes.get(gid, VOLUME_PADRAO)
