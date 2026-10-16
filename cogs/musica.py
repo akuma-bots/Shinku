@@ -27,6 +27,8 @@ YDL_OPCOES = {
     "source_address": "0.0.0.0",
     "extractor_retries": 2,
     "socket_timeout": 15,
+    # Tenta clientes públicos alternativos quando o cliente web padrão é bloqueado.
+    "extractor_args": {"youtube": {"player_client": ["android", "web_safari"]}},
 }
 FFMPEG_OPCOES = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -55,7 +57,15 @@ class Musica(commands.Cog):
                 raise ValueError("Provedor de música não permitido.")
 
         def extrair():
-            dados = self.ytdl.extract_info(consulta, download=False)
+            try:
+                dados = self.ytdl.extract_info(consulta, download=False)
+            except Exception:
+                # Para pesquisas por texto, tenta SoundCloud como alternativa
+                # quando o YouTube bloqueia a extração. Links não são reescritos.
+                if consulta.startswith(("http://", "https://")):
+                    raise
+                LOG.info("Pesquisa no provedor principal falhou; tentando SoundCloud.")
+                dados = self.ytdl.extract_info(f"scsearch1:{consulta}", download=False)
             if "entries" in dados:
                 dados = next((item for item in dados["entries"] if item), None)
             if not dados:
