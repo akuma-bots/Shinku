@@ -409,6 +409,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         fim: float,
         criado_por: discord.Member,
         banner: str = "",
+        recompensa_automatica: str = "",
     ) -> discord.Embed:
 
         descricao = ""
@@ -426,7 +427,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
 
         descricao += (
             "🎁 **Prêmio:**\n"
-            f"{premio.strip()}\n\n"
+            f"{premio.strip()}\n"
+            + (f"\n**Recompensa automática por vencedor:** {recompensa_automatica}\n" if recompensa_automatica else "\n")
+            + "\n"
             "🏆 **Vencedores:**\n"
             f"**{vencedores}**\n\n"
             "⏰ **Sorteio termina:**\n"
@@ -744,7 +747,17 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         duracao_minutos="Tempo até o encerramento do sorteio.",
         banner="URL da imagem/banner do sorteio.",
         canal="Canal onde o sorteio será publicado.",
+        tipo_recompensa="Recompensa automática entregue a cada vencedor.",
+        xp_recompensa="Quantidade de XP concedida a cada vencedor.",
+        cargo_recompensa="Cargo concedido a cada vencedor.",
     )
+    @app_commands.choices(tipo_recompensa=[
+        app_commands.Choice(name="Nenhuma recompensa automática", value="nenhuma"),
+        app_commands.Choice(name="XP do perfil", value="xp_perfil"),
+        app_commands.Choice(name="XP da gangue", value="xp_gangue"),
+        app_commands.Choice(name="Cargo Discord", value="cargo"),
+        app_commands.Choice(name="Manual (descrito no prêmio)", value="manual"),
+    ])
     @app_commands.checks.has_permissions(
         manage_guild=True
     )
@@ -758,6 +771,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         duracao_minutos: int,
         banner: str = "",
         canal: discord.TextChannel = None,
+        tipo_recompensa: app_commands.Choice[str] = None,
+        xp_recompensa: app_commands.Range[int, 1, 100000] = None,
+        cargo_recompensa: discord.Role = None,
     ):
         texto = (texto or "").strip()
         requisitos = (requisitos or "").strip()
@@ -821,6 +837,31 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             )
             return
 
+        tipo_recompensa = tipo_recompensa.value if tipo_recompensa else "nenhuma"
+        xp_recompensa = int(xp_recompensa or 0)
+        if tipo_recompensa in {"xp_perfil", "xp_gangue"} and xp_recompensa <= 0:
+            await interaction.response.send_message(
+                "Informe uma quantidade de XP maior que zero para a recompensa escolhida.",
+                ephemeral=True,
+            )
+            return
+        if tipo_recompensa == "cargo":
+            if cargo_recompensa is None:
+                await interaction.response.send_message(
+                    "Selecione o cargo que será entregue aos vencedores.",
+                    ephemeral=True,
+                )
+                return
+            bot_member = interaction.guild.me if interaction.guild else None
+            if cargo_recompensa.is_default() or cargo_recompensa.managed or (
+                bot_member and cargo_recompensa >= bot_member.top_role
+            ):
+                await interaction.response.send_message(
+                    "O cargo precisa estar abaixo do cargo mais alto do bot e não pode ser gerenciado.",
+                    ephemeral=True,
+                )
+                return
+
         canal_destino = (
             canal
             or interaction.channel
@@ -856,6 +897,15 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             fim=fim,
             criado_por=interaction.user,
             banner=banner,
+            recompensa_automatica=(
+                f"+{xp_recompensa:,} XP de perfil".replace(",", ".")
+                if tipo_recompensa == "xp_perfil"
+                else f"+{xp_recompensa:,} XP de gangue".replace(",", ".")
+                if tipo_recompensa == "xp_gangue"
+                else f"Cargo: {cargo_recompensa.name}"
+                if tipo_recompensa == "cargo" and cargo_recompensa
+                else ""
+            ),
         )
 
         view = self.criar_view(
@@ -895,6 +945,10 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             "requisitos": requisitos,
             "premio": premio,
             "banner": banner.strip() or None,
+            "tipo_recompensa": tipo_recompensa,
+            "xp_recompensa": xp_recompensa if tipo_recompensa in {"xp_perfil", "xp_gangue"} else 0,
+            "cargo_recompensa_id": cargo_recompensa.id if tipo_recompensa == "cargo" and cargo_recompensa else None,
+            "recompensas_processadas": {},
 
             "fim": fim,
             "vencedores": vencedores,
@@ -1205,6 +1259,112 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             )
             return None
 
+    async def _marcar_recompensa_concedida(self, sorteio: dict, usuario_id: int) -> None:
+        async with _SORTEIOS_LOCK:
+            todos = await carregar(ARQUIVO, {})
+            if not isinstance(todos, dict):
+                raise RuntimeError("Armazenamento de sorteios inválido ao registrar recompensa.")
+            atual = todos.get(str(sorteio.get("id")))
+            if not isinstance(atual, dict):
+                raise RuntimeError("Sorteio não encontrado ao registrar recompensa.")
+            processadas = atual.setdefault("recompensas_processadas", {})
+            processadas[str(usuario_id)] = {"status": "concedida", "em": time.time()}
+            atual["atualizado_em"] = time.time()
+            todos[str(atual["id"])] = atual
+            await salvar(ARQUIVO, todos)
+            sorteio.update(atual)
+
+    async def _conceder_recompensas(self, sorteio: dict) -> bool:
+        """Concede recompensas automáticas com deduplicação e permite retomar falhas."""
+        tipo = str(sorteio.get("tipo_recompensa", "nenhuma"))
+        if tipo not in {"xp_perfil", "xp_gangue", "cargo"}:
+            return True
+
+        guild_id = int(sorteio.get("guild_id") or 0)
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            try:
+                guild = await self.bot.fetch_guild(guild_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.error("Não foi possível localizar a guild do sorteio %s para entregar prêmios.", sorteio.get("id"))
+                return False
+
+        vencedores = sorteio.get("vencedores_ids", [])
+        if not isinstance(vencedores, list):
+            return False
+
+        for raw_id in vencedores:
+            try:
+                usuario_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+
+            processadas = sorteio.get("recompensas_processadas", {})
+            if isinstance(processadas, dict):
+                registro = processadas.get(str(usuario_id))
+                if isinstance(registro, dict) and registro.get("status") == "concedida":
+                    continue
+
+            membro = guild.get_member(usuario_id)
+            if membro is None:
+                try:
+                    membro = await guild.fetch_member(usuario_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.warning("Vencedor %s não acessível para recompensa do sorteio %s.", usuario_id, sorteio.get("id"))
+                    return False
+
+            try:
+                if tipo == "cargo":
+                    cargo_id = int(sorteio.get("cargo_recompensa_id") or 0)
+                    cargo = guild.get_role(cargo_id)
+                    if cargo is None:
+                        logger.error("Cargo de recompensa %s não existe mais (sorteio %s).", cargo_id, sorteio.get("id"))
+                        return False
+                    if cargo not in membro.roles:
+                        await membro.add_roles(cargo, reason=f"Prêmio do sorteio NÊMESIS {sorteio.get('id')}")
+                elif tipo == "xp_perfil":
+                    from utils.perfis import get_perfil, _salvar_perfil, _sincronizar_site
+
+                    perfil = await get_perfil(guild.id, membro.id)
+                    eventos = perfil.setdefault("sorteios_recompensados", [])
+                    evento_id = str(sorteio.get("id"))
+                    if evento_id not in eventos:
+                        perfil["xp"] = max(0, int(perfil.get("xp", 0) or 0)) + max(1, int(sorteio.get("xp_recompensa", 0) or 0))
+                        eventos.append(evento_id)
+                        perfil["sorteios_recompensados"] = eventos[-500:]
+                        await _salvar_perfil(guild.id, membro.id, perfil)
+                    # Também repara a sincronização com o site se o processo caiu após salvar o perfil.
+                    await _sincronizar_site(user_id=membro.id, perfil=perfil, nome=membro.display_name, delta_pontos=0)
+                elif tipo == "xp_gangue":
+                    cog = self.bot.get_cog("ProgressaoGangue")
+                    if cog is None:
+                        logger.error("Cog ProgressaoGangue indisponível para recompensa do sorteio %s.", sorteio.get("id"))
+                        return False
+                    perfil, rank_antigo, rank_novo, aplicada = await cog._registrar_xp_atomico(
+                        guild.id,
+                        membro.id,
+                        max(1, int(sorteio.get("xp_recompensa", 0) or 0)),
+                        evento_id=f"sorteio:{sorteio.get('id')}:{membro.id}",
+                        tipo="sorteio",
+                    )
+                    await cog._aplicar_cargo_rank(guild, membro, rank_novo)
+                    if rank_novo["no"] != rank_antigo["no"]:
+                        await cog._anunciar_rank(guild, membro, rank_novo, int(perfil.get("xp", 0)))
+            except (discord.Forbidden, discord.HTTPException, ValueError, TypeError, RuntimeError):
+                logger.exception("Falha ao conceder recompensa do sorteio %s ao vencedor %s.", sorteio.get("id"), usuario_id)
+                return False
+            except Exception:
+                logger.exception("Erro inesperado ao conceder recompensa do sorteio %s ao vencedor %s.", sorteio.get("id"), usuario_id)
+                return False
+
+            try:
+                await self._marcar_recompensa_concedida(sorteio, usuario_id)
+            except Exception:
+                logger.exception("Recompensa possivelmente concedida, mas não foi possível persistir o estado do sorteio %s.", sorteio.get("id"))
+                return False
+
+        return True
+
     # =========================================================
     # SORTEAR VENCEDORES
     # =========================================================
@@ -1268,6 +1428,15 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             # Propaga o estado mais recente ao restante do fluxo de anúncio.
             sorteio.clear()
             sorteio.update(atual)
+
+        # Entrega as recompensas antes do anúncio. Se houver falha, o ciclo seguinte
+        # retoma o processamento sem sortear outros vencedores nem duplicar XP/cargos.
+        if not await self._conceder_recompensas(sorteio):
+            await self._reabrir_apos_falha_de_anuncio(
+                sorteio,
+                RuntimeError("Uma ou mais recompensas ainda não puderam ser entregues."),
+            )
+            return
 
         # Atualiza os botões da mensagem original. Se a edição falhar depois
         # de persistir o encerramento, reabre o sorteio para o próximo ciclo.
