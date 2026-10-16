@@ -42,6 +42,7 @@ class Musica(commands.Cog):
         self.filas: dict[int, list[dict[str, Any]]] = {}
         self.tarefas: dict[int, asyncio.Task] = {}
         self.volumes: dict[int, float] = {}
+        self.agora: dict[int, dict[str, Any]] = {}
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
         self.ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -90,6 +91,7 @@ class Musica(commands.Cog):
                     break
                 item = fila.pop(0)
                 voz = guild.voice_client
+                self.agora[gid] = item
                 # Atualiza a URL de mídia perto do momento da reprodução, pois
                 # URLs de streaming podem expirar enquanto aguardam na fila.
                 try:
@@ -130,9 +132,20 @@ class Musica(commands.Cog):
                     await terminou.wait()
                 except (discord.HTTPException, discord.ClientException, OSError):
                     LOG.exception("Falha ao reproduzir áudio no servidor %s.", gid)
-                    continue
+                finally:
+                    if self.agora.get(gid) is item:
+                        self.agora.pop(gid, None)
         finally:
-            self.tarefas.pop(gid, None)
+            # Só a tarefa atual pode remover sua própria referência.
+            if self.tarefas.get(gid) is asyncio.current_task():
+                self.tarefas.pop(gid, None)
+            # Evita perder uma música adicionada no instante em que a fila esvaziou.
+            if (
+                self.filas.get(gid)
+                and guild.voice_client
+                and guild.voice_client.is_connected()
+            ):
+                await self._garantir_reprodutor(guild)
 
     async def _garantir_reprodutor(self, guild: discord.Guild):
         tarefa = self.tarefas.get(guild.id)
@@ -151,7 +164,11 @@ class Musica(commands.Cog):
         try:
             if voz and voz.is_connected():
                 if voz.channel != estado.channel:
-                    await voz.move_to(estado.channel)
+                    await interaction.followup.send(
+                        f"Já estou tocando em {voz.channel.mention}. Entre nesse canal para controlar a reprodução.",
+                        ephemeral=True,
+                    )
+                    return None
             else:
                 voz = await estado.channel.connect(timeout=15, reconnect=True)
         except (discord.Forbidden, discord.HTTPException, asyncio.TimeoutError):
@@ -162,6 +179,24 @@ class Musica(commands.Cog):
             )
             return None
         return voz
+
+    async def _exigir_mesmo_canal(self, interaction: discord.Interaction) -> bool:
+        """Evita que membros de outro canal controlem a sessão de música."""
+        guild = interaction.guild
+        voz = guild.voice_client if guild else None
+        membro = interaction.user
+        estado = membro.voice if isinstance(membro, discord.Member) else None
+        if not voz or not voz.is_connected():
+            await interaction.response.send_message(
+                "Não há uma sessão de música conectada.", ephemeral=True
+            )
+            return False
+        if not estado or estado.channel != voz.channel:
+            await interaction.response.send_message(
+                f"Entre em {voz.channel.mention} para controlar a música.", ephemeral=True
+            )
+            return False
+        return True
 
     @app_commands.command(name="play", description="Toca uma música por link ou pesquisa.")
     @app_commands.describe(consulta="Nome da música ou URL do áudio/vídeo")
@@ -206,6 +241,8 @@ class Musica(commands.Cog):
 
     @app_commands.command(name="skip", description="Pula a música atual.")
     async def skip(self, interaction: discord.Interaction):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
         voz = interaction.guild.voice_client if interaction.guild else None
         if not voz or not (voz.is_playing() or voz.is_paused()):
             await interaction.response.send_message("Não há música tocando agora.", ephemeral=True)
@@ -215,6 +252,8 @@ class Musica(commands.Cog):
 
     @app_commands.command(name="pause", description="Pausa a música atual.")
     async def pause(self, interaction: discord.Interaction):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
         voz = interaction.guild.voice_client if interaction.guild else None
         if not voz or not voz.is_playing():
             await interaction.response.send_message("Não há música tocando para pausar.", ephemeral=True)
@@ -224,6 +263,8 @@ class Musica(commands.Cog):
 
     @app_commands.command(name="resume", description="Retoma a música pausada.")
     async def resume(self, interaction: discord.Interaction):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
         voz = interaction.guild.voice_client if interaction.guild else None
         if not voz or not voz.is_paused():
             await interaction.response.send_message("Não há música pausada.", ephemeral=True)
@@ -259,8 +300,13 @@ class Musica(commands.Cog):
             await interaction.response.send_message("Não há música tocando agora.", ephemeral=True)
             return
         estado = "Pausada" if voz.is_paused() else "Tocando"
+        atual = self.agora.get(interaction.guild.id, {})
+        titulo = discord.utils.escape_markdown(atual.get("title", "Música atual"))
+        duracao = self._tempo(atual.get("duration", 0))
         await interaction.response.send_message(embed=self._embed_musica(
-            "♫ Estado da reprodução", f"Estado: **{estado}**\nFila restante: **{len(self.filas.get(interaction.guild.id, []))}**"
+            "♫ Estado da reprodução",
+            f"**{titulo}**\nEstado: **{estado}** • Duração: **{duracao}**\n"
+            f"Fila restante: **{len(self.filas.get(interaction.guild.id, []))}**"
         ))
 
     @app_commands.command(name="volume", description="Ajusta o volume da música (1–100%).")
@@ -268,6 +314,8 @@ class Musica(commands.Cog):
     async def volume(self, interaction: discord.Interaction, percentual: app_commands.Range[int, 1, 100]):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        if not await self._exigir_mesmo_canal(interaction):
             return
         gid = interaction.guild.id
         self.volumes[gid] = percentual / 100
@@ -280,6 +328,8 @@ class Musica(commands.Cog):
     async def stop(self, interaction: discord.Interaction):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
+            return
+        if not await self._exigir_mesmo_canal(interaction):
             return
         gid = interaction.guild.id
         self.filas[gid] = []
