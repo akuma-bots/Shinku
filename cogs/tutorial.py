@@ -4,6 +4,20 @@ from discord.ext import commands
 
 
 TUTORIAIS = {
+    "musica": {
+        "titulo": "Sistema de música",
+        "descricao": "Como colocar o bot em call e controlar a reprodução.",
+        "passos": [
+            "Entre primeiro no canal de voz em que quer ouvir música.",
+            "No Discord, use /play e informe o nome da música ou um link compatível do YouTube ou SoundCloud.",
+            "O bot entra automaticamente no seu canal de voz e começa a tocar; você precisa estar conectado a um canal de voz.",
+            "Use /queue para ver a fila e /nowplaying para conferir a música atual.",
+            "Use /pause para pausar, /resume para continuar, /skip para pular e /volume para ajustar o volume entre 1 e 100.",
+            "Use /stop para encerrar a reprodução, limpar a fila e desconectar o bot da call.",
+            "Se o bot não entrar, confirme que ele tem as permissões Conectar, Falar e Ver canal; a hospedagem também precisa ter as dependências de voz instaladas.",
+        ],
+        "comandos": "/play · /queue · /nowplaying · /pause · /resume · /skip · /volume · /stop",
+    },
     "inicio": {
         "titulo": "Começando na NÊMESIS",
         "descricao": "Guia inicial para novos membros.",
@@ -303,7 +317,7 @@ class TutorialView(discord.ui.View):
         self.add_item(SeletorTutorial(autor_id, selecionado))
 
 
-class Tutorial(commands.GroupCog, group_name="tutorial", group_description="Tutoriais dos sistemas da NÊMESIS."):
+class Tutorial(commands.Cog):
     """Central interativa de orientação dos sistemas da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
