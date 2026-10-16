@@ -18,7 +18,8 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Central de códigos:** comando `/codigos` para abrir a lista interativa de Shigaku, Gakuran e Fistborn a qualquer momento, com recompensas, requisitos, período de referência e fontes.
 - **Tutoriais:** central interativa `/tutorial` com guias para missões, PvP, guerras, moderação, provas, sorteios, tickets, eventos, formulários, Roblox e outros sistemas.
 - **Novidades por DM:** releases oficiais enviados automaticamente a todos os membros humanos do servidor, sem inscrição prévia, com registro persistente para evitar repetição em reinicializações.
-- **Sorteios:** embeds, botões de participação, requisitos informativos, prêmios, término automático e seleção de vencedores.
+- **Sorteios:** embeds, botões de participação, requisitos informativos, prêmios, término automático e seleção de vencedores, com entrega de recompensas configuráveis.
+- **Música por voz:** pesquisa por nome ou link, fila, reprodução atual, pausa, retomada, pular, volume e encerramento; controles limitados ao canal de voz da sessão.
 - **Recordes, eventos e parcerias:** registros e anúncios nos canais configurados.
 - **Dashboard:** compartilhamento de dados com o site da NÊMESIS por meio do Upstash.
 
