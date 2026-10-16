@@ -245,24 +245,31 @@ class Ajuda(commands.Cog):
 
         blocos = []
 
-
         for chave in chaves_ordenadas:
-
             grupo = agrupado[chave]
+            cabecalho = f"**{grupo['emoji']} {grupo['titulo']}**"
+            bloco_atual = cabecalho
 
-            linhas = "\n".join(
-                f"**/{comando.name}**"
-                f"{' 〔acesso controlado〕' if _comando_tem_acesso_controlado(comando) else ''} — "
-                f"{comando.description}"
-                for comando in grupo["comandos"]
-            )
+            for comando in grupo["comandos"]:
+                acesso = (
+                    " 〔acesso controlado〕"
+                    if _comando_tem_acesso_controlado(comando)
+                    else ""
+                )
+                linha = (
+                    f"**/{comando.name}**{acesso} — "
+                    f"{comando.description}"
+                )
+                candidato = f"{bloco_atual}\n{linha}"
 
+                if len(candidato) > LIMITE_DESCRICAO and bloco_atual != cabecalho:
+                    blocos.append(bloco_atual)
+                    bloco_atual = f"{cabecalho}\n{linha}"
+                else:
+                    bloco_atual = candidato
 
-            blocos.append(
-                f"**{grupo['emoji']} "
-                f"{grupo['titulo']}**\n"
-                f"{linhas}"
-            )
+            if bloco_atual:
+                blocos.append(bloco_atual)
 
 
         paginas_texto = []
