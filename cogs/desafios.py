@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
+
 from utils import desafios
 from utils.guild_config import get_config, set_config
 from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil, sincronizar_perfil_site
@@ -275,10 +277,11 @@ class Desafios(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
-            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  DESAFIO PvP",
-            description=f"{interaction.user.mention} desafiou {membro.mention} para uma luta!",
-            color=0xED4245,
+        embed = criar_embed(
+            "N̷ÊMESIS ━ DESAFIO PvP",
+            f"{interaction.user.mention} desafiou {membro.mention} para uma luta!",
+            cor=COR_ERRO,
+            rodape="NÊMESIS • Desafios competitivos",
         )
         if aposta_xp > 0:
             embed.add_field(name="◈ APOSTA", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
@@ -394,10 +397,11 @@ class Desafios(commands.Cog):
             if canal is None or not hasattr(canal, "send"):
                 await interaction.followup.send("⚠️ Canal de lutas não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
                 return
-            aviso = discord.Embed(
-                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CONFRONTO EM ANDAMENTO",
-                description=f"<@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
-                color=0xED4245,
+            aviso = criar_embed(
+                "N̷ÊMESIS ━ CONFRONTO EM ANDAMENTO",
+                f"<@{desafio['desafiante_id']}> vs <@{desafio['desafiado_id']}>",
+                cor=COR_ERRO,
+                rodape=None,
             )
             aviso.set_footer(text=f"Ao terminar, use /luta-completar desafio_id:{desafio_id}")
             await canal.send(embed=aviso)
@@ -592,10 +596,11 @@ class Desafios(commands.Cog):
                 nota = "configurado" if origem == "configurado" else "usando padrão"
                 linhas.append(f"✅ **{nome}** — {resolvido.mention} ({nota}).")
 
-        embed = discord.Embed(
-            title="Diagnóstico de canais — NÊMESIS",
-            description="\n".join(linhas),
-            color=0x57F287 if all("❌" not in linha and "⚠️" not in linha for linha in linhas) else 0xFEE75C,
+        embed = criar_embed(
+            "N̷ÊMESIS ━ DIAGNÓSTICO DE CANAIS",
+            "\n".join(linhas),
+            cor=COR_SUCESSO if all("❌" not in linha and "⚠️" not in linha for linha in linhas) else COR_AVISO,
+            rodape="NÊMESIS • Diagnóstico administrativo",
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
