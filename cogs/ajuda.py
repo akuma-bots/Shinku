@@ -251,7 +251,8 @@ class Ajuda(commands.Cog):
             grupo = agrupado[chave]
 
             linhas = "\n".join(
-                f"**/{comando.name}** — "
+                f"**/{comando.name}**"
+                f"{' 〔acesso controlado〕' if _comando_tem_acesso_controlado(comando) else ''} — "
                 f"{comando.description}"
                 for comando in grupo["comandos"]
             )
