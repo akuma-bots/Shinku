@@ -7,6 +7,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import criar_embed
+
 from utils import missoes
 from utils.catalogo_missoes import (
     carregar_catalogo,
@@ -288,10 +290,11 @@ class Missoes(commands.Cog):
                 f"**{status_icone} {status}**  ·  **{tipo['nome'].upper()}**\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             )
-            embed = discord.Embed(
-                title=titulo,
-                description=f"{cabecalho}\n\n{parte}",
-                color=cor,
+            embed = criar_embed(
+                titulo,
+                f"{cabecalho}\n\n{parte}",
+                cor=cor,
+                rodape=None,
             )
             embed.set_author(name="NÊMESIS  /  CENTRAL DE OPERAÇÕES")
 
@@ -405,15 +408,16 @@ class Missoes(commands.Cog):
             {"missao": 0, "contribuicao": 1, "especial": 2}.get(str(item.get("tipo") or "missao"), 9),
             str(item.get("id") or ""),
         ))
-        embed = discord.Embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CENTRAL DE MISSÕES · {nome_jogo.upper()}",
-            description=(
+        embed = criar_embed(
+            f"N̷ÊMESIS ━ CENTRAL DE MISSÕES · {nome_jogo.upper()}",
+            (
                 f"Seleção atual: **{nome_jogo}**\n"
                 "Use **Próxima página** ou **Página anterior** para alternar entre os jogos.\n"
                 "Envie a prova pelo botão abaixo e informe o ID exato da missão.\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ),
-            color=0x9F2035,
+            cor=0x9F2035,
+            rodape=None,
         )
         if not atividades:
             embed.add_field(name="Catálogo", value="Não há missões cadastradas para este jogo.", inline=False)
@@ -500,14 +504,15 @@ class Missoes(commands.Cog):
             descricao = "\n\n".join(linhas_texto)
         else:
             descricao = "Ainda não há pontos registrados neste jogo. As recompensas entram após a aprovação das provas."
-        embed = discord.Embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RANKING {nome_jogo.upper()}",
-            description=(
+        embed = criar_embed(
+            f"N̷ÊMESIS ━ RANKING {nome_jogo.upper()}",
+            (
                 f"**Jogo selecionado:** {nome_jogo}\n\n{descricao}\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                 "Use os botões para alternar entre os rankings sem sair deste canal."
             ),
-            color=0x9F2035,
+            cor=0x9F2035,
+            rodape=None,
         )
         embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
         embed.set_footer(text=f"PÁGINA:{jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
