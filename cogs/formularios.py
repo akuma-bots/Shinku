@@ -5,7 +5,9 @@ import time
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+
+from utils.apresentacao import criar_embed, tasks
 
 from utils import formularios
 from utils.storage import carregar, salvar
@@ -118,10 +120,9 @@ def _embeds_painel(formulario: dict) -> list[discord.Embed]:
     embeds = []
     for indice, parte in enumerate(partes, start=1):
         titulo_parte = titulo if indice == 1 else f"{titulo[:230]} (continuação {indice}/{len(partes)})"
-        embed = discord.Embed(title=titulo_parte, description=parte, color=0xB51F32)
+        embed = criar_embed(titulo_parte, parte, rodape=f"NÊMESIS • CENTRAL DE FORMULÁRIOS • {indice}/{len(partes)}")
         if indice == 1 and formulario.get("banner_url"):
             embed.set_image(url=str(formulario["banner_url"]))
-        embed.set_footer(text=f"NÊMESIS • CENTRAL DE FORMULÁRIOS • {indice}/{len(partes)}")
         embeds.append(embed)
     return embeds
 
@@ -237,7 +238,7 @@ def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> 
     embeds = []
     for indice, bloco in enumerate(blocos, start=1):
         titulo = titulo_base if len(blocos) == 1 else f"{titulo_base[:220]} ({indice}/{len(blocos)})"
-        embed = discord.Embed(title=titulo[:256], color=0xB51F32)
+        embed = criar_embed(titulo[:256], rodape=f"NÊMESIS • ID {resposta['id']} • {guild.name}")
         embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
         for pergunta, resp in bloco:
             embed.add_field(
@@ -245,7 +246,6 @@ def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> 
                 value=str(resp if resp is not None else "—")[:1024] or "—",
                 inline=False,
             )
-        embed.set_footer(text=f"ID: {resposta['id']} • {guild.name}")
         embeds.append(embed)
     return embeds
 
@@ -550,7 +550,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             )
             titulo_pagina = pagina.get("titulo") if isinstance(pagina, dict) else f"Página {i}"
             blocos.append(f"**{titulo_pagina or f'Página {i}'}**\n{perguntas_texto}")
-        embed = discord.Embed(title=f"📋 Páginas — {formulario['nome']}", description="\n\n".join(blocos), color=0xB51F32)
+        embed = criar_embed(f"📋 Páginas — {formulario['nome']}", "\n\n".join(blocos), rodape="NÊMESIS • Configuração de formulários")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="listar", description="Lista os formulários configurados.")
@@ -566,7 +566,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             f"{len(f['cargos_notificar'])} cargo(s) notificado(s)"
             for f in lista
         ]
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE FORMULÁRIOS", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed("N̷ÊMESIS ━ CENTRAL DE FORMULÁRIOS", "\n".join(linhas), rodape="NÊMESIS • Administração de formulários")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="remover", description="Remove um formulário.")
