@@ -299,27 +299,68 @@ class Moderacao(commands.Cog):
         description="Apaga uma quantidade de mensagens do canal."
     )
     @app_commands.describe(
-        quantidade="Quantidade de mensagens a apagar (1-100)"
+        quantidade="Quantidade de mensagens a apagar (1-1000)"
     )
     @app_commands.checks.has_permissions(
         manage_messages=True
     )
+    @app_commands.checks.bot_has_permissions(
+        manage_messages=True,
+        read_message_history=True
+    )
     async def clear(
         self,
         interaction: discord.Interaction,
-        quantidade: app_commands.Range[int, 1, 100]
+        quantidade: app_commands.Range[int, 1, 1000]
     ):
-        await interaction.response.defer(
-            ephemeral=True
-        )
+        """Apaga até 1.000 mensagens usando a rotina otimizada do discord.py."""
+        canal = interaction.channel
+        if not isinstance(canal, (discord.TextChannel, discord.Thread)):
+            await interaction.response.send_message(
+                "Este comando só pode ser usado em canais de texto ou tópicos.",
+                ephemeral=True
+            )
+            return
 
-        apagadas = await interaction.channel.purge(
-            limit=quantidade
-        )
+        # Reconhece a interação antes da operação de rede, evitando timeout.
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        try:
+            # purge agrupa mensagens em lotes e trata mensagens antigas
+            # (com mais de 14 dias) individualmente, conforme a API do Discord.
+            apagadas = await canal.purge(
+                limit=quantidade,
+                bulk=True,
+                oldest_first=False,
+                reason=f"/clear executado por {interaction.user} ({interaction.user.id})"
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "Não consegui apagar as mensagens. Verifique as permissões do bot "
+                "para gerenciar mensagens e ler o histórico deste canal.",
+                ephemeral=True
+            )
+            return
+        except discord.HTTPException:
+            logging.exception("Falha da API do Discord durante /clear.")
+            await interaction.followup.send(
+                "O Discord não concluiu a limpeza. Algumas mensagens podem ter sido "
+                "apagadas antes do erro; tente novamente com uma quantidade menor.",
+                ephemeral=True
+            )
+            return
 
         await interaction.followup.send(
-            f"🧹 {len(apagadas)} mensagens apagadas.",
+            f"🧹 Limpeza concluída: **{len(apagadas)}** de até **{quantidade}** "
+            f"mensagens apagadas em {canal.mention}.",
             ephemeral=True
+        )
+
+        await self._log(
+            interaction,
+            f"🧹 **/clear** — {interaction.user.mention} apagou "
+            f"**{len(apagadas)}** mensagens em {canal.mention} "
+            f"(limite solicitado: {quantidade})."
         )
 
     @app_commands.command(
