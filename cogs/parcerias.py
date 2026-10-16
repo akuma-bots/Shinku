@@ -5,6 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import criar_embed
+
 from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 
@@ -489,10 +491,10 @@ class Parcerias(commands.Cog):
             "status": "ativa",
         }
 
-        embed = discord.Embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  NOVA PARCERIA: {nome}",
-            description=descricao,
-            color=0xB51F32,
+        embed = criar_embed(
+            f"N̷ÊMESIS ━ NOVA PARCERIA: {nome}",
+            descricao,
+            rodape=None,
         )
 
         embed.add_field(
@@ -727,14 +729,10 @@ class Parcerias(commands.Cog):
             start=1,
         ):
 
-            embed = discord.Embed(
-                title=(
-                    f"🤝 {parceria['nome']}"
-                ),
-                description=parceria[
-                    "descricao"
-                ],
-                color=0xB51F32,
+            embed = criar_embed(
+                f"🤝 {parceria['nome']}",
+                parceria["descricao"],
+                rodape=None,
             )
 
             embed.add_field(
