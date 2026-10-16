@@ -6,6 +6,7 @@ Aceita links e buscas; a reprodução depende da disponibilidade do provedor de 
 import asyncio
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 import discord
 from discord import app_commands
@@ -45,6 +46,13 @@ class Musica(commands.Cog):
         self.ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
 
     async def _extrair(self, consulta: str) -> dict[str, Any]:
+        # Impede que URLs arbitrárias sejam usadas para acessar serviços internos.
+        if consulta.startswith(("http://", "https://")):
+            host = (urlparse(consulta).hostname or "").lower()
+            permitidos = ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com")
+            if not any(host == dominio or host.endswith("." + dominio) for dominio in permitidos):
+                raise ValueError("Provedor de música não permitido.")
+
         def extrair():
             dados = self.ytdl.extract_info(consulta, download=False)
             if "entries" in dados:
@@ -82,6 +90,19 @@ class Musica(commands.Cog):
                     break
                 item = fila.pop(0)
                 voz = guild.voice_client
+                # Atualiza a URL de mídia perto do momento da reprodução, pois
+                # URLs de streaming podem expirar enquanto aguardam na fila.
+                try:
+                    atualizado = await self._extrair(item["webpage_url"])
+                    item["url"] = atualizado["url"]
+                except Exception:
+                    LOG.exception("Não foi possível atualizar o fluxo de áudio.")
+                    canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
+                    if canal_texto:
+                        await canal_texto.send(
+                            f"Não consegui abrir **{discord.utils.escape_markdown(item['title'])}**. Pulando para a próxima música."
+                        )
+                    continue
                 loop = asyncio.get_running_loop()
                 terminou = asyncio.Event()
 
