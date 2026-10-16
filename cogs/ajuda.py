@@ -59,17 +59,11 @@ def _sistema_do_comando(
     )
 
 
-def _pode_ver(
-    comando: app_commands.Command,
-    membro: discord.Member,
-) -> bool:
-
-    if not comando.checks:
-        return True
-
-    return (
-        membro.guild_permissions.administrator
-        or membro.guild_permissions.manage_guild
+def _comando_tem_acesso_controlado(comando: app_commands.Command) -> bool:
+    """Indica que o comando aplica verificações adicionais de acesso."""
+    return bool(
+        comando.checks
+        or getattr(comando, "default_permissions", None)
     )
 
 
@@ -198,12 +192,6 @@ class Ajuda(commands.Cog):
             ):
                 continue
 
-
-            if not _pode_ver(
-                comando,
-                membro,
-            ):
-                continue
 
 
             nome_cog, emoji, titulo = (
