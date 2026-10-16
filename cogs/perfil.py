@@ -1,6 +1,8 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+
+from utils.apresentacao import criar_embed
 from utils.storage import carregar
 from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_patente, kdr, ARQUIVO_PERFIS
 from utils.competitivo_sync import ARQUIVO_COMPETITIVO
@@ -73,7 +75,7 @@ class Perfil(commands.Cog):
         proxima = next((pt for pt in patentes if pt["xp_minimo"] > p["xp"]), None)
         progresso = f"\nPróxima patente: **{proxima['nome']}** em {proxima['xp_minimo'] - p['xp']} XP" if proxima else ""
 
-        embed = discord.Embed(title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PERFIL DE {alvo.display_name.upper()}"[:256], color=0xB51F32)
+        embed = criar_embed(f"N̷ÊMESIS ━ PERFIL DE {alvo.display_name.upper()}"[:256], rodape="NÊMESIS • Perfil do membro")
         embed.set_thumbnail(url=alvo.display_avatar.url)
         embed.add_field(name="◈ NOME", value=discord.utils.escape_markdown(alvo.display_name)[:256], inline=True)
         embed.add_field(name="◈ USUÁRIO", value=f"`{discord.utils.escape_markdown(alvo.name)}`", inline=True)
@@ -152,7 +154,7 @@ class Perfil(commands.Cog):
             await interaction.response.send_message("Nenhuma patente configurada ainda.", ephemeral=True)
             return
         linhas = [f"**{p['nome']}** — a partir de {p['xp_minimo']} XP" + (f" (cargo: <@&{p['cargo_id']}>)" if p.get("cargo_id") else "") for p in patentes]
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  HIERARQUIA DE PATENTES", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed("N̷ÊMESIS ━ HIERARQUIA DE PATENTES", "\n".join(linhas), rodape="NÊMESIS • Progressão e patentes")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
@@ -196,7 +198,7 @@ class Perfil(commands.Cog):
         nomes_metrica = {"vitorias": "vitórias", "mvps": "MVPs", "maior_sequencia": "maior sequência", "xp": "XP"}
         linhas = [f"**#{i+1}** <@{uid}> — {perfil.get(metrica, 0)} {nomes_metrica[metrica]}" for i, (uid, perfil) in enumerate(top)]
 
-        embed = discord.Embed(title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING / {nomes_metrica[metrica].upper()}", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed(f"N̷ÊMESIS ━ RANKING / {nomes_metrica[metrica].upper()}", "\n".join(linhas), rodape="NÊMESIS • Classificação dos membros")
         await interaction.response.send_message(embed=embed)
 
 
