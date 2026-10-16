@@ -5,6 +5,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import COR_ERRO, COR_SUCESSO, criar_embed
 from utils.storage import USANDO_UPSTASH, verificar_conexao_compartilhada
 
 
@@ -24,9 +25,11 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
 
         falhas = getattr(self.bot, "cogs_falhos", [])
         comando_count = len(self.bot.tree.get_commands(guild=guild))
-        embed = discord.Embed(
-            title="NÊMESIS • Status do sistema",
-            color=0x57F287 if self.bot.is_ready() and not falhas else 0xED4245,
+        embed = criar_embed(
+            "N̷ÊMESIS ━ STATUS DO SISTEMA",
+            cor=COR_SUCESSO if self.bot.is_ready() and not falhas else COR_ERRO,
+            rodape="NÊMESIS • Diagnóstico administrativo",
+            timestamp=True,
         )
         embed.add_field(name="Discord", value="Online" if self.bot.is_ready() else "Inicializando", inline=True)
         embed.add_field(name="Servidor", value="Conectado" if self.bot.get_guild(guild.id) else "Não encontrado", inline=True)
@@ -40,7 +43,6 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
                 value="\n".join(f"• {item.get('cog', 'desconhecido')}" for item in falhas[:10])[:1024],
                 inline=False,
             )
-        embed.set_footer(text="NÊMESIS • Diagnóstico administrativo")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="diagnostico", description="Testa a conexão com o armazenamento compartilhado.")
