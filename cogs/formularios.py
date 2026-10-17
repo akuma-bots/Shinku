@@ -1,16 +1,13 @@
-import hashlib
-import json
 import logging
 import time
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 from utils.apresentacao import criar_embed
 
 from utils import formularios
-from utils.storage import carregar, salvar
 
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
@@ -43,7 +40,6 @@ def _limpar_sessoes_formularios(agora: float | None = None) -> None:
         excesso = len(SESSOES_FORMULARIOS) - LIMITE_SESSOES_FORMULARIO
         for chave, _ in ordenadas[:excesso]:
             SESSOES_FORMULARIOS.pop(chave, None)
-ARQUIVO_PAINEIS_DISCORD = "formularios_discord.json"
 GUILD_NEMESIS_ID = 1543381737961160910
 
 
@@ -267,174 +263,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.sincronizar_paineis.start()
-
-    def cog_unload(self):
-        self.sincronizar_paineis.cancel()
-
-    @tasks.loop(seconds=60)
-    async def sincronizar_paineis(self):
-        try:
-            await self._sincronizar_paineis_ciclo()
-        except Exception:
-            logging.getLogger(__name__).exception(
-                "Falha inesperada ao sincronizar painéis de formulários; será repetida no próximo ciclo."
-            )
-
-    async def _sincronizar_paineis_ciclo(self):
-        guild = self.bot.get_guild(GUILD_NEMESIS_ID)
-        if guild is None:
-            return
-        canal = guild.get_channel(CANAL_PAINEIS_FORMULARIOS)
-        if canal is None:
-            try:
-                canal = await guild.fetch_channel(CANAL_PAINEIS_FORMULARIOS)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                return
-
-        lista = await formularios.listar_formularios(guild.id)
-        lista = [item for item in lista if isinstance(item, dict) and item.get("id")]
-        dados_paineis = await carregar(ARQUIVO_PAINEIS_DISCORD, {})
-        if not isinstance(dados_paineis, dict):
-            dados_paineis = {}
-        registros = dados_paineis.setdefault(str(guild.id), {})
-        ids_atuais = {str(item["id"]) for item in lista}
-
-        for item in lista:
-            formulario_id = str(item["id"])
-            registro = registros.get(formulario_id, {})
-            embeds = _embeds_painel(item)
-            view = _view_painel(item)
-
-            # Assinatura do conteúdo publicado. O site é consultado a cada ciclo,
-            # mas o Discord só recebe PATCH quando o painel realmente mudou.
-            assinatura_painel = hashlib.sha256(
-                json.dumps(
-                    {
-                        "embeds": [embed.to_dict() for embed in embeds],
-                        "ativo": item.get("ativo") is not False,
-                        "tem_perguntas": bool(_perguntas_flat(item)),
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
-            ).hexdigest()
-
-            # Compatibilidade com o formato antigo (um único message_id).
-            ids_mensagens = []
-            if isinstance(registro, dict):
-                ids_mensagens = registro.get("message_ids") or []
-                if not ids_mensagens and registro.get("message_id"):
-                    ids_mensagens = [registro["message_id"]]
-
-            # Se o painel não mudou e foi verificado recentemente, evita
-            # consultas repetidas à API do Discord em todos os ciclos de 60 s.
-            # A verificação completa ocorre a cada 5 minutos para reparar mensagens apagadas.
-            verificado_em = 0
-            if isinstance(registro, dict):
-                try:
-                    verificado_em = float(registro.get("verificado_em", 0))
-                except (TypeError, ValueError):
-                    verificado_em = 0
-
-            if (
-                isinstance(registro, dict)
-                and registro.get("assinatura") == assinatura_painel
-                and len(ids_mensagens) == len(embeds)
-                and time.time() - verificado_em < 300
-            ):
-                continue
-
-            mensagens = []
-            for indice, embed in enumerate(embeds):
-                mensagem = None
-                if indice < len(ids_mensagens):
-                    try:
-                        mensagem = await canal.fetch_message(int(ids_mensagens[indice]))
-                    except discord.NotFound:
-                        mensagem = None
-                    except (discord.Forbidden, discord.HTTPException):
-                        # Não avance para a próxima mensagem quando não foi
-                        # possível verificar esta: isso desalinharia os IDs e
-                        # poderia publicar painéis duplicados no próximo ciclo.
-                        mensagens = []
-                        break
-
-                try:
-                    if mensagem is None:
-                        mensagem = await canal.send(
-                            embed=embed,
-                            view=view if indice == 0 else None,
-                        )
-                    else:
-                        # Evita PATCH repetido a cada 60 segundos: a mensagem só
-                        # é editada quando o conteúdo do formulário foi alterado.
-                        if not isinstance(registro, dict) or registro.get("assinatura") != assinatura_painel:
-                            await mensagem.edit(
-                                embed=embed,
-                                view=view if indice == 0 else None,
-                            )
-                    mensagens.append(int(mensagem.id))
-                except (discord.Forbidden, discord.HTTPException):
-                    # Não apaga registros antigos se o Discord recusar a operação.
-                    mensagens = []
-                    break
-
-            if not mensagens:
-                continue
-
-            # Remove mensagens excedentes se a descrição ficou menor após uma edição.
-            for id_antigo in ids_mensagens[len(embeds):]:
-                try:
-                    antiga = await canal.fetch_message(int(id_antigo))
-                    await antiga.delete()
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    pass
-
-            registros[formulario_id] = {
-                "channel_id": int(canal.id),
-                "message_id": mensagens[0],
-                "message_ids": mensagens,
-                "assinatura": assinatura_painel,
-                "verificado_em": time.time(),
-            }
-
-        for formulario_id in list(registros):
-            if formulario_id in ids_atuais:
-                continue
-
-            registro = registros.get(formulario_id, {})
-            ids_antigos = []
-            if isinstance(registro, dict):
-                ids_antigos = registro.get("message_ids") or []
-                if not ids_antigos and registro.get("message_id"):
-                    ids_antigos = [registro["message_id"]]
-
-            # Apaga também as mensagens de continuação quando o formulário
-            # é removido do site, mantendo compatibilidade com registros antigos.
-            for mensagem_id in ids_antigos:
-                try:
-                    mensagem = await canal.fetch_message(int(mensagem_id))
-                    await mensagem.delete()
-                except (
-                    TypeError,
-                    ValueError,
-                    discord.NotFound,
-                    discord.Forbidden,
-                    discord.HTTPException,
-                ):
-                    continue
-
-            registros.pop(formulario_id, None)
-
-        await salvar(ARQUIVO_PAINEIS_DISCORD, dados_paineis)
-
-    @sincronizar_paineis.before_loop
-    async def antes_de_sincronizar_paineis(self):
-        await self.bot.wait_until_ready()
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
+
         embeds = _embeds_resposta(formulario, resposta, guild)
         view = _view_resposta(resposta["id"])
 
