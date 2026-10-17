@@ -36,6 +36,26 @@ class TestStorageLocal(unittest.TestCase):
 
 
 class TestStorageConfiguracao(unittest.IsolatedAsyncioTestCase):
+    async def test_chave_do_upstash_isolada_do_site(self):
+        self.assertEqual(storage._chave_bot("perfis.json"), "nemesis_bot:perfis.json")
+
+    async def test_importa_dado_antigo_uma_vez_para_namespace_privado(self):
+        chamadas = []
+
+        async def redis_mock(*args):
+            chamadas.append(args)
+            if args == ("GET", "nemesis_bot:perfis.json"):
+                return None
+            if args == ("GET", "perfis.json"):
+                return '{"123": {"xp": 7}}'
+            return "OK"
+
+        with patch.multiple(storage, USANDO_UPSTASH=True, UPSTASH_CONFIG_INCOMPLETA=False), patch.object(storage, "_comando_redis", side_effect=redis_mock):
+            resultado = await storage.carregar("perfis.json", {})
+
+        self.assertEqual(resultado, {"123": {"xp": 7}})
+        self.assertIn(("SET", "nemesis_bot:perfis.json", '{"123": {"xp": 7}}'), chamadas)
+
     async def test_upstash_parcial_nao_cai_silenciosamente_no_disco(self):
         with patch.object(storage, "UPSTASH_CONFIG_INCOMPLETA", True), patch.object(storage, "USANDO_UPSTASH", False):
             with self.assertRaises(storage.ErroStorage):
