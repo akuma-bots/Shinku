@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, criar_embed
-from utils.storage import USANDO_UPSTASH, verificar_conexao_compartilhada
+from utils.storage import USANDO_UPSTASH, verificar_conexao_storage
 
 
 class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
@@ -45,33 +45,33 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
             )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="diagnostico", description="Testa a conexão com o armazenamento compartilhado.")
+    @app_commands.command(name="diagnostico", description="Testa a conexão com o armazenamento privado do bot.")
     @app_commands.checks.has_permissions(administrator=True)
     async def diagnostico(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         if not USANDO_UPSTASH:
             await interaction.followup.send(
-                "⚠️ O bot está usando armazenamento local. A sincronização compartilhada com o site não está ativa.",
+                "⚠️ O bot está usando armazenamento local privado. Nenhuma sincronização com o site é realizada.",
                 ephemeral=True,
             )
             return
 
         try:
-            await asyncio.wait_for(verificar_conexao_compartilhada(), timeout=8)
+            await asyncio.wait_for(verificar_conexao_storage(), timeout=8)
         except asyncio.TimeoutError:
-            logging.warning("Diagnóstico manual: timeout ao verificar o armazenamento compartilhado.")
-            await interaction.followup.send("❌ O armazenamento compartilhado demorou mais de 8 segundos para responder.", ephemeral=True)
+            logging.warning("Diagnóstico manual: timeout ao verificar o armazenamento privado.")
+            await interaction.followup.send("❌ O armazenamento privado demorou mais de 8 segundos para responder.", ephemeral=True)
             return
         except Exception as erro:
-            logging.exception("Diagnóstico manual: falha no armazenamento compartilhado.")
+            logging.exception("Diagnóstico manual: falha no armazenamento privado.")
             await interaction.followup.send(
-                f"❌ Falha no armazenamento compartilhado: `{type(erro).__name__}`. Confira os logs do Render.",
+                f"❌ Falha no armazenamento privado: `{type(erro).__name__}`. Confira os logs do Render.",
                 ephemeral=True,
             )
             return
 
         await interaction.followup.send(
-            "✅ O armazenamento compartilhado respondeu. Isso confirma a conectividade do Redis, mas não substitui a verificação de cada fluxo do site.",
+            "✅ O armazenamento privado do bot respondeu. Os dados do bot estão isolados do site.",
             ephemeral=True,
         )
 
