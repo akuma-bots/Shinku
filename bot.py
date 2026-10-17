@@ -5,7 +5,6 @@ import asyncio
 import logging
 import pkgutil
 from pathlib import Path
-from datetime import datetime, timezone
 
 import discord
 from discord import app_commands
@@ -28,11 +27,7 @@ logging.basicConfig(
 CAMINHO_ENV = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=CAMINHO_ENV)
 
-from utils.storage import (
-    USANDO_UPSTASH,
-    salvar,
-    verificar_conexao_compartilhada,
-)
+from utils.storage import USANDO_UPSTASH, verificar_conexao_storage
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 NEMESIS_GUILD_ID = os.getenv("NEMESIS_GUILD_ID")
@@ -401,46 +396,6 @@ async def on_ready():
 
 
 # ============================================================
-# PONTE DE SINCRONIZAÇÃO — DASHBOARD ↔ BOT
-# ============================================================
-
-async def monitorar_integracao():
-    """
-    Publica um heartbeat no Redis compartilhado.
-    O Dashboard usa este registro para confirmar que está lendo
-    o mesmo banco acessado pelo bot.
-    """
-    await bot.wait_until_ready()
-
-    while not bot.is_closed():
-        try:
-            servidor = bot.get_guild(NEMESIS_GUILD_ID)
-            await salvar(
-                "integracao_bot_status.json",
-                {
-                    "guild_id": str(NEMESIS_GUILD_ID),
-                    "bot_id": str(bot.user.id) if bot.user else None,
-                    "bot_name": str(bot.user) if bot.user else "NÊMESIS",
-                    "guild_name": servidor.name if servidor else None,
-                    "online": bool(servidor and bot.is_ready() and not getattr(bot, "cogs_falhos", [])),
-                    "storage_backend": "upstash" if USANDO_UPSTASH else "local",
-                    "ready": bot.is_ready(),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                },
-            )
-            logging.info(
-                "Heartbeat Dashboard: online=%s guild_id=%s guild_encontrada=%s storage=%s",
-                bool(servidor and bot.is_ready()),
-                NEMESIS_GUILD_ID,
-                bool(servidor),
-                "upstash" if USANDO_UPSTASH else "local",
-            )
-        except Exception:
-            logging.exception("Falha ao atualizar heartbeat de integração.")
-        await asyncio.sleep(60)
-
-
-# ============================================================
 # HEALTH CHECK — RENDER
 # ============================================================
 
@@ -507,22 +462,14 @@ async def iniciar_servidor_web():
 
 async def main():
 
-    # Em produção, o bot precisa usar o mesmo Upstash do Dashboard.
-    # Sem isso, os dados ficariam apenas no disco local e não sincronizariam.
-    if os.getenv("RENDER") and not USANDO_UPSTASH:
-        raise RuntimeError(
-            "Sincronização NÊMESIS indisponível: configure "
-            "UPSTASH_REDIS_REST_URL e UPSTASH_REDIS_REST_TOKEN "
-            "no ambiente do Render, usando o mesmo banco do Netlify."
-        )
-
+    # O armazenamento do bot é privado; não há heartbeat nem sincronização com site.
     if USANDO_UPSTASH:
-        await verificar_conexao_compartilhada()
-        logging.info("Conexão com o Redis compartilhado confirmada.")
+        await verificar_conexao_storage()
+        logging.info("Conexão com o armazenamento privado confirmada.")
     else:
         logging.warning(
             "Upstash não configurado; usando armazenamento local. "
-            "A sincronização com o Dashboard não estará ativa."
+            "Em hospedagem efêmera, os dados locais podem não persistir após reinícios."
         )
 
     async with bot:
@@ -552,7 +499,6 @@ async def main():
         await asyncio.gather(
             bot.start(TOKEN),
             iniciar_servidor_web(),
-            monitorar_integracao(),
         )
 
 
