@@ -5,6 +5,7 @@ Aceita links e buscas; a reprodução depende da disponibilidade do provedor de 
 """
 import asyncio
 import logging
+import random
 import shlex
 import shutil
 from typing import Any
@@ -38,6 +39,90 @@ FFMPEG_OPCOES = {
 }
 
 
+class MusicControlView(discord.ui.View):
+    """Painel interativo de reprodução, inspirado em bots de música populares."""
+
+    def __init__(self, cog: "Musica", guild_id: int):
+        super().__init__(timeout=1800)
+        self.cog = cog
+        self.guild_id = guild_id
+
+    async def _validar(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message(
+                "Este painel pertence a outro servidor.", ephemeral=True
+            )
+            return False
+        return await self.cog._exigir_mesmo_canal(interaction)
+
+    @discord.ui.button(label="Pausar / Retomar", emoji="⏯️", style=discord.ButtonStyle.secondary)
+    async def pausar_retomar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        voz = interaction.guild.voice_client
+        if voz.is_playing():
+            voz.pause()
+            await interaction.response.send_message("⏸ Reprodução pausada.", ephemeral=True)
+        elif voz.is_paused():
+            voz.resume()
+            await interaction.response.send_message("▶ Reprodução retomada.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Não há música tocando agora.", ephemeral=True)
+
+    @discord.ui.button(label="Pular", emoji="⏭️", style=discord.ButtonStyle.primary)
+    async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        voz = interaction.guild.voice_client
+        if not voz or not (voz.is_playing() or voz.is_paused()):
+            await interaction.response.send_message("Não há música para pular.", ephemeral=True)
+            return
+        self.cog.skip_requested.add(self.guild_id)
+        voz.stop()
+        await interaction.response.send_message("⏭ Música pulada.", ephemeral=True)
+
+    @discord.ui.button(label="Encerrar", emoji="⏹️", style=discord.ButtonStyle.danger)
+    async def encerrar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        voz = interaction.guild.voice_client
+        self.cog.filas[self.guild_id] = []
+        self.cog.loop_modes[self.guild_id] = "off"
+        self.cog.skip_requested.add(self.guild_id)
+        if voz:
+            if voz.is_playing() or voz.is_paused():
+                voz.stop()
+            await voz.disconnect(force=True)
+        tarefa = self.cog.tarefas.get(self.guild_id)
+        if tarefa and not tarefa.done():
+            tarefa.cancel()
+        self.cog.tarefas.pop(self.guild_id, None)
+        await interaction.response.send_message("⏹ Reprodução encerrada e fila limpa.", ephemeral=True)
+
+    @discord.ui.button(label="Embaralhar", emoji="🔀", style=discord.ButtonStyle.secondary)
+    async def embaralhar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        fila = self.cog.filas.get(self.guild_id, [])
+        if len(fila) < 2:
+            await interaction.response.send_message("Adicione pelo menos duas músicas à fila para embaralhar.", ephemeral=True)
+            return
+        random.shuffle(fila)
+        await interaction.response.send_message(f"🔀 Fila embaralhada ({len(fila)} músicas).", ephemeral=True)
+
+    @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary)
+    async def repeticao(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        modos = ("off", "track", "queue")
+        atual = self.cog.loop_modes.get(self.guild_id, "off")
+        novo = modos[(modos.index(atual) + 1) % len(modos)]
+        self.cog.loop_modes[self.guild_id] = novo
+        rotulos = {"off": "desligada", "track": "música atual", "queue": "fila"}
+        button.label = f"Repetição: {rotulos[novo]}"
+        await interaction.response.send_message(f"🔁 Repetição definida para **{rotulos[novo]}**.", ephemeral=True)
+
+
 class Musica(commands.Cog):
     """Reprodução de música em canais de voz."""
 
@@ -47,6 +132,8 @@ class Musica(commands.Cog):
         self.tarefas: dict[int, asyncio.Task] = {}
         self.volumes: dict[int, float] = {}
         self.agora: dict[int, dict[str, Any]] = {}
+        self.loop_modes: dict[int, str] = {}
+        self.skip_requested: set[int] = set()
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
         # empacotado pelo imageio-ffmpeg fica como fallback.
@@ -177,9 +264,20 @@ class Musica(commands.Cog):
                         await canal_texto.send(embed=self._embed_musica(
                             "▶ Tocando agora",
                             f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
-                            f"Duração: {self._tempo(item['duration'])}",
-                        ))
+                            f"Duração: {self._tempo(item['duration'])}\n"
+                            f"Repetição: { {'off': 'desligada', 'track': 'música atual', 'queue': 'fila'}.get(self.loop_modes.get(gid, 'off'), 'desligada') }",
+                        ), view=MusicControlView(self, gid))
                     await terminou.wait()
+                    # O modo de repetição só é aplicado quando a faixa termina
+                    # naturalmente; /skip e o botão Pular não repetem a faixa.
+                    if gid in self.skip_requested:
+                        self.skip_requested.discard(gid)
+                    else:
+                        modo_repeticao = self.loop_modes.get(gid, "off")
+                        if modo_repeticao == "track":
+                            self.filas.setdefault(gid, []).insert(0, item)
+                        elif modo_repeticao == "queue":
+                            self.filas.setdefault(gid, []).append(item)
                 except (discord.HTTPException, discord.ClientException, OSError):
                     LOG.exception("Falha ao reproduzir áudio no servidor %s.", gid)
                 finally:
@@ -373,6 +471,53 @@ class Musica(commands.Cog):
         if voz and isinstance(voz.source, discord.PCMVolumeTransformer):
             voz.source.volume = percentual / 100
         await interaction.response.send_message(f"🔊 Volume definido para **{percentual}%**.")
+
+    @app_commands.command(name="shuffle", description="Embaralha as músicas que aguardam na fila.")
+    async def shuffle(self, interaction: discord.Interaction):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
+        fila = self.filas.get(interaction.guild.id, [])
+        if len(fila) < 2:
+            await interaction.response.send_message("Adicione pelo menos duas músicas à fila.", ephemeral=True)
+            return
+        random.shuffle(fila)
+        await interaction.response.send_message(f"🔀 Fila embaralhada: **{len(fila)}** músicas.")
+
+    @app_commands.command(name="loop", description="Define repetição desligada, da música atual ou da fila.")
+    @app_commands.describe(modo="O que deve ser repetido")
+    @app_commands.choices(modo=[
+        app_commands.Choice(name="Desligado", value="off"),
+        app_commands.Choice(name="Música atual", value="track"),
+        app_commands.Choice(name="Fila inteira", value="queue"),
+    ])
+    async def loop(self, interaction: discord.Interaction, modo: app_commands.Choice[str]):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
+        self.loop_modes[interaction.guild.id] = modo.value
+        rotulos = {"off": "desligada", "track": "música atual", "queue": "fila inteira"}
+        await interaction.response.send_message(f"🔁 Repetição definida para **{rotulos[modo.value]}**.")
+
+    @app_commands.command(name="remove", description="Remove uma música da fila pela posição.")
+    @app_commands.describe(posicao="Posição da música na fila, começando em 1")
+    async def remove(self, interaction: discord.Interaction, posicao: app_commands.Range[int, 1, 100]):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
+        fila = self.filas.get(interaction.guild.id, [])
+        if posicao > len(fila):
+            await interaction.response.send_message(f"A fila tem apenas **{len(fila)}** música(s).", ephemeral=True)
+            return
+        item = fila.pop(posicao - 1)
+        titulo = discord.utils.escape_markdown(item.get("title", "Música sem título"))
+        await interaction.response.send_message(f"🗑️ Removida da fila: **{titulo}**.")
+
+    @app_commands.command(name="clearqueue", description="Limpa a fila sem interromper a música atual.")
+    async def clearqueue(self, interaction: discord.Interaction):
+        if not await self._exigir_mesmo_canal(interaction):
+            return
+        fila = self.filas.setdefault(interaction.guild.id, [])
+        total = len(fila)
+        fila.clear()
+        await interaction.response.send_message(f"🧹 Fila limpa. A música atual continua tocando; **{total}** item(ns) removido(s).")
 
     @app_commands.command(name="stop", description="Para a música, limpa a fila e sai do canal de voz.")
     async def stop(self, interaction: discord.Interaction):
