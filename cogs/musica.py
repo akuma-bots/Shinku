@@ -395,6 +395,7 @@ class Musica(commands.Cog):
         if not voz or not (voz.is_playing() or voz.is_paused()):
             await interaction.response.send_message("Não há música tocando agora.", ephemeral=True)
             return
+        self.skip_requested.add(interaction.guild.id)
         voz.stop()
         await interaction.response.send_message("⏭ Música pulada.")
 
