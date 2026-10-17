@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -6,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import criar_embed
+from utils.storage import carregar, salvar
 
 from utils import formularios
 
@@ -41,6 +43,81 @@ def _limpar_sessoes_formularios(agora: float | None = None) -> None:
         for chave, _ in ordenadas[:excesso]:
             SESSOES_FORMULARIOS.pop(chave, None)
 GUILD_NEMESIS_ID = 1543381737961160910
+_LOCK_PAINÉIS_AUTOMÁTICOS = asyncio.Lock()
+ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
+
+FORMULARIOS_AUTOMATICOS = [
+    {
+        "chave": "staff",
+        "nome": "Inscrição para Staff",
+        "titulo": "NÊMESIS — RECRUTAMENTO STAFF",
+        "descricao": (
+            "CENTRAL DE RECRUTAMENTO • EQUIPE NÊMESIS\n\n"
+            "Use este formulário para se candidatar à equipe. Responda com clareza e sinceridade; "
+            "candidaturas incompletas ou com informações falsas poderão ser recusadas.\n\n"
+            "REQUISITOS\n"
+            "— Conhecer e respeitar as regras da NÊMESIS.\n"
+            "— Ter postura respeitosa, responsabilidade e maturidade.\n"
+            "— Conseguir agir com imparcialidade em conflitos.\n"
+            "— Ter disponibilidade para auxiliar a comunidade.\n\n"
+            "O envio não garante aprovação. A equipe analisará sua candidatura."
+        ),
+        "canal_id": 1545835428530360401,
+        "paginas": [[
+            "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
+            "Por que deseja fazer parte da Staff da NÊMESIS?",
+            "Qual é sua disponibilidade semanal para ajudar no servidor?",
+            "Você já teve experiência com moderação ou organização? Explique.",
+            "Como agiria se dois membros começassem uma discussão séria?"
+        ]],
+    },
+    {
+        "chave": "entrada",
+        "nome": "Entrada na NÊMESIS",
+        "titulo": "NÊMESIS — FORMULÁRIO DE RECRUTAMENTO",
+        "descricao": (
+            "CENTRAL DE RECRUTAMENTO • INGRESSO NA NÊMESIS\n\n"
+            "Preencha este formulário para solicitar sua entrada na NÊMESIS. Informe seus dados "
+            "corretamente e responda às perguntas de forma objetiva.\n\n"
+            "ANTES DE ENVIAR\n"
+            "— Leia e aceite as regras do servidor.\n"
+            "— Mantenha respeito pelos membros e pela liderança.\n"
+            "— Esteja ciente de que a participação exige atividade e cooperação.\n\n"
+            "A candidatura será analisada pela equipe responsável; o envio não garante entrada."
+        ),
+        "canal_id": 1545835428530360401,
+        "paginas": [[
+            "Qual é seu nome/apelido e seu usuário do Roblox, se tiver?",
+            "Quais jogos você joga com mais frequência?",
+            "Por que quer entrar na NÊMESIS?",
+            "Com que frequência pretende participar das atividades?",
+            "Você leu as regras e concorda em respeitá-las?"
+        ]],
+    },
+    {
+        "chave": "alianca",
+        "nome": "Proposta de Aliança",
+        "titulo": "NÊMESIS — PROPOSTA DE ALIANÇA",
+        "descricao": (
+            "RELAÇÕES INSTITUCIONAIS • ALIANÇAS ENTRE GANGUES\n\n"
+            "Este canal recebe propostas oficiais de aliança. A liderança da organização solicitante "
+            "deve preencher o formulário com informações verificáveis e uma proposta objetiva.\n\n"
+            "INFORMAÇÕES NECESSÁRIAS\n"
+            "— Identificação e contato da liderança.\n"
+            "— Tamanho e atividade atual da organização.\n"
+            "— Objetivo da aliança e formas de cooperação.\n\n"
+            "A proposta será avaliada pela liderança da NÊMESIS. O envio não representa aprovação automática."
+        ),
+        "canal_id": 1547774529965662228,
+        "paginas": [[
+            "Qual é o nome oficial da gangue/comunidade e sua tag?",
+            "Quem é o líder responsável e qual é seu usuário do Discord?",
+            "Quantos membros ativos sua organização possui?",
+            "Qual é o foco da organização e em quais jogos atua?",
+            "Qual é a proposta de aliança e como as duas organizações cooperariam?"
+        ]],
+    },
+]
 
 
 def _paginas_modal(formulario: dict) -> list:
@@ -263,6 +340,84 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Publica os três painéis oficiais uma vez e recupera painéis apagados."""
+        async with _LOCK_PAINÉIS_AUTOMÁTICOS:
+            guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+            if guild is None:
+                logging.warning("Painéis automáticos: servidor NÊMESIS não está disponível.")
+                return
+
+            try:
+                estado = await carregar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, {})
+            except Exception:
+                logging.exception("Não foi possível carregar o estado dos painéis automáticos.")
+                return
+
+            for definicao in FORMULARIOS_AUTOMATICOS:
+                chave = definicao["chave"]
+                try:
+                    lista = await formularios.listar_formularios(guild.id)
+                    formulario = next(
+                        (item for item in lista if item.get("nome") == definicao["nome"]),
+                        None,
+                    )
+                    if formulario is None:
+                        formulario = await formularios.criar_formulario(
+                            guild.id,
+                            definicao["nome"],
+                            definicao["titulo"],
+                            definicao["descricao"],
+                            None,
+                            self.bot.user.id if self.bot.user else 0,
+                        )
+
+                    if not formularios.perguntas_flat(formulario):
+                        for perguntas in definicao["paginas"]:
+                            formulario = await formularios.adicionar_pagina(
+                                guild.id, formulario["id"], perguntas
+                            )
+                            if formulario is None:
+                                raise RuntimeError(
+                                    f"Não foi possível configurar perguntas para {definicao['nome']}."
+                                )
+
+                    canal = guild.get_channel(definicao["canal_id"])
+                    if canal is None:
+                        canal = await guild.fetch_channel(definicao["canal_id"])
+                    if not callable(getattr(canal, "send", None)):
+                        raise TypeError(f"O canal {definicao['canal_id']} não aceita mensagens.")
+
+                    registro = estado.get(chave, {})
+                    mensagem_existente = None
+                    if registro.get("canal_id") == definicao["canal_id"] and registro.get("mensagem_id"):
+                        try:
+                            mensagem_existente = await canal.fetch_message(int(registro["mensagem_id"]))
+                        except discord.NotFound:
+                            mensagem_existente = None
+
+                    if mensagem_existente is not None:
+                        continue
+
+                    embeds = _embeds_painel(formulario)
+                    view = _view_painel(formulario)
+                    mensagem = await canal.send(embeds=embeds, view=view)
+                    estado[chave] = {
+                        "canal_id": definicao["canal_id"],
+                        "mensagem_id": mensagem.id,
+                        "formulario_id": formulario["id"],
+                    }
+                    await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
+                    logging.info(
+                        "Painel automático publicado: %s (canal=%s, mensagem=%s).",
+                        definicao["nome"], definicao["canal_id"], mensagem.id,
+                    )
+                except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+                    logging.exception("Falha ao publicar o painel automático %s.", definicao["nome"])
+                except Exception:
+                    logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
 
