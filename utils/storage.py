@@ -41,6 +41,15 @@ USANDO_UPSTASH = bool(
 )
 UPSTASH_CONFIG_INCOMPLETA = bool(UPSTASH_URL) != bool(UPSTASH_TOKEN)
 
+# Namespace exclusivo do bot; os dados deixam de compartilhar chaves com o site.
+PREFIXO_CHAVES = "nemesis_bot:"
+
+
+def _chave_bot(nome_arquivo: str) -> str:
+    if not isinstance(nome_arquivo, str) or not nome_arquivo.strip():
+        raise ErroStorage("O nome do arquivo de armazenamento é inválido.")
+    return f"{PREFIXO_CHAVES}{nome_arquivo.strip()}"
+
 
 # =========================================================
 # ERROS
@@ -242,8 +251,8 @@ async def carregar(
     """
     Carrega dados.
 
-    Com Upstash:
-        GET nome_arquivo
+    Com Upstash, usa chaves privadas do bot; dados antigos são importados
+    uma única vez para o namespace isolado.
 
     Sem Upstash:
         data/nome_arquivo
@@ -257,18 +266,19 @@ async def carregar(
 
     if USANDO_UPSTASH:
 
-        valor = await _comando_redis(
-            "GET",
-            nome_arquivo,
-        )
+        chave = _chave_bot(nome_arquivo)
+        valor = await _comando_redis("GET", chave)
+
+        # Importação única dos dados antigos, sem continuar lendo as
+        # alterações futuras do site na chave original.
+        if valor is None:
+            legado = await _comando_redis("GET", nome_arquivo)
+            if legado is not None:
+                await _comando_redis("SET", chave, legado)
+                valor = legado
 
         if valor is None:
-
-            await salvar(
-                nome_arquivo,
-                padrao,
-            )
-
+            await salvar(nome_arquivo, padrao)
             return padrao
 
         try:
@@ -326,7 +336,7 @@ async def salvar(
 
         await _comando_redis(
             "SET",
-            nome_arquivo,
+            _chave_bot(nome_arquivo),
             conteudo,
         )
 
@@ -339,21 +349,14 @@ async def salvar(
 
 
 # =========================================================
-# VERIFICAÇÃO DA CONEXÃO COMPARTILHADA
+# VERIFICAÇÃO DO ARMAZENAMENTO PRIVADO
 # =========================================================
 
-async def verificar_conexao_compartilhada() -> bool:
-    """
-    Confirma que o bot consegue acessar o Redis compartilhado
-    com o Dashboard. Não retorna nem registra credenciais.
-    """
+async def verificar_conexao_storage() -> bool:
+    """Confirma acesso ao Redis usado como armazenamento privado do bot."""
     resultado = await _comando_redis("PING")
-
     if str(resultado).upper() != "PONG":
-        raise ErroStorage(
-            "O Upstash não confirmou a conexão compartilhada."
-        )
-
+        raise ErroStorage("O Upstash não confirmou a conexão de armazenamento.")
     return True
 
 
