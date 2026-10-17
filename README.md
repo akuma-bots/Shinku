@@ -1,6 +1,6 @@
 # NÊMESIS — Bot oficial
 
-Bot oficial da NÊMESIS, desenvolvido em Python com `discord.py`. O projeto reúne operações da gangue, atendimento, moderação, missões, revisão de provas, confrontos PvP, guerras, progressão, sorteios e integração com o dashboard.
+Bot oficial da NÊMESIS, desenvolvido em Python com `discord.py`. O projeto reúne operações da gangue, atendimento, moderação, missões, revisão de provas, confrontos PvP, guerras, progressão, sorteios com armazenamento próprio, sem integração com o dashboard.
 
 O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um modelo multi-servidor.
 
@@ -21,7 +21,12 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Sorteios:** embeds, botões de participação, requisitos informativos, prêmios, término automático e seleção de vencedores, com entrega de recompensas configuráveis.
 - **Música por voz:** pesquisa por nome ou link, fila, reprodução atual, pausa, retomada, pular, volume e encerramento; controles limitados ao canal de voz da sessão.
 - **Recordes, eventos e parcerias:** registros e anúncios nos canais configurados.
-- **Dashboard:** compartilhamento de dados com o site da NÊMESIS por meio do Upstash.
+
+## Armazenamento
+
+- O bot usa chaves privadas com prefixo `nemesis_bot:` no Upstash; os dados novos deixam de ser compartilhados com o site/dashboard.
+- Registros antigos sem prefixo são importados uma única vez para preservar os dados existentes. Depois da importação, atualizações do site não são lidas pelo bot.
+- Se o Upstash não estiver configurado, o bot usa arquivos JSON locais; em hospedagem com disco efêmero, esses arquivos podem não sobreviver a reinícios/deploys.
 
 ## Requisitos
 
