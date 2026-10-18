@@ -413,7 +413,7 @@ class Missoes(commands.Cog):
             (
                 f"Seleção atual: **{nome_jogo}**\n"
                 "Use **Próxima página** ou **Página anterior** para alternar entre os jogos.\n"
-                "Envie a prova pelo botão abaixo e informe o ID exato da missão.\n\n"
+                "Use `/missao-enviar-prova` para anexar a imagem diretamente, escolher a missão pela lista e selecionar o auxiliar sem copiar links ou IDs.\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ),
             cor=0x9F2035,
