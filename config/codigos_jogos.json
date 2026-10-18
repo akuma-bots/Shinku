@@ -1,5 +1,5 @@
 {
-  "atualizado_em": "2026-10-16",
+  "atualizado_em": "2026-10-18",
   "jogos": {
     "shigaku": {
       "nome": "Shigaku",
@@ -494,7 +494,7 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "Requires",
+          "codigo": "requires",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
@@ -666,15 +666,15 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
+          "codigo": "players",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
           "codigo": "Player",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "Time",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
-          "codigo": "Players",
+          "codigo": "time",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
@@ -706,14 +706,6 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "Samurai",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
-          "codigo": "Duels",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
           "codigo": "Boxing",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
@@ -722,7 +714,15 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "MUGEN",
+          "codigo": "Samurai",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Duels",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Ryujin",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
