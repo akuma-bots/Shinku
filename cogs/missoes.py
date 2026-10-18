@@ -800,6 +800,91 @@ class Missoes(commands.Cog):
             cabecalho = "✅ Recompensa da missão aprovada.\n"
         return cabecalho + "\n".join(mensagens)
 
+    @app_commands.command(
+        name="missao-enviar-prova",
+        description="Envie a prova de uma missão com anexo, sem copiar links ou IDs."
+    )
+    @app_commands.describe(
+        missao_id="Escolha a missão pelo nome ou código",
+        prova="Anexe a imagem da prova diretamente aqui",
+        auxiliar="Selecione o auxiliar (opcional)"
+    )
+    async def missao_enviar_prova(
+        self,
+        interaction: discord.Interaction,
+        missao_id: str,
+        prova: discord.Attachment,
+        auxiliar: discord.Member = None,
+    ):
+        """Recebe a imagem como anexo e seleciona missão/auxiliar pelo Discord."""
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Use este comando dentro do servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        if not (prova.content_type or "").lower().startswith("image/"):
+            await interaction.response.send_message(
+                "O arquivo precisa ser uma imagem. Anexe PNG, JPG, JPEG, WEBP ou outro formato de imagem.",
+                ephemeral=True,
+            )
+            return
+
+        if prova.size > 10 * 1024 * 1024:
+            await interaction.response.send_message(
+                "A imagem ultrapassa o limite de 10 MB. Envie uma versão menor.",
+                ephemeral=True,
+            )
+            return
+
+        # O seletor de usuário nativo elimina a necessidade de copiar IDs.
+        auxiliar_texto = str(auxiliar.id) if auxiliar else ""
+        await self.receber_prova_modal(
+            interaction,
+            str(missao_id),
+            str(prova.url),
+            auxiliar_texto,
+        )
+
+    @missao_enviar_prova.autocomplete("missao_id")
+    async def autocomplete_missao_id(
+        self,
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        """Sugere missões ativas por título e código para evitar digitação de IDs."""
+        if interaction.guild is None:
+            return []
+        try:
+            dados = await missoes._guild(interaction.guild.id)
+            atividades = [
+                item for item in dados.get("missoes", [])
+                if isinstance(item, dict) and item.get("ativa", True) is not False
+            ]
+            termo = current.casefold().strip()
+            atividades = [
+                item for item in atividades
+                if termo in str(item.get("id", "")).casefold()
+                or termo in str(item.get("titulo", "")).casefold()
+            ]
+            atividades.sort(key=lambda item: (
+                str(item.get("jogo", "")).casefold(),
+                str(item.get("titulo", "")).casefold(),
+            ))
+            escolhas = []
+            for item in atividades[:25]:
+                codigo = str(item.get("id", "")).strip()
+                titulo = str(item.get("titulo", "Missão")).strip()
+                if not codigo:
+                    continue
+                label = f"{titulo} — {codigo}"[:100]
+                escolhas.append(app_commands.Choice(name=label, value=codigo[:100]))
+            return escolhas
+        except Exception:
+            log.exception("Falha ao carregar sugestões de missões para autocomplete.")
+            return []
+
     async def receber_prova_modal(
         self,
         interaction: discord.Interaction,
