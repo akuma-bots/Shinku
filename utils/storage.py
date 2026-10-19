@@ -269,8 +269,8 @@ async def carregar(
         chave = _chave_bot(nome_arquivo)
         valor = await _comando_redis("GET", chave)
 
-        # Importação única dos dados antigos, sem continuar lendo as
-        # alterações futuras do site na chave original.
+        # Importação única de dados da chave legada, sem continuar lendo
+        # alterações futuras na chave original.
         if valor is None:
             legado = await _comando_redis("GET", nome_arquivo)
             if legado is not None:
