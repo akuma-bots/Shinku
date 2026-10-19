@@ -196,10 +196,18 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
 
 async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     config = await get_config(guild_id)
+    descricao = config.get("ticket_painel_descricao") or DESCRICAO_PADRAO
+
+    # Migra o texto padrão antigo sem sobrescrever descrições personalizadas.
+    if (
+        descricao.startswith("A Central de Atendimento é o canal oficial para tratar de assuntos da")
+        and "◈ ORIENTAÇÕES ◈" in descricao
+    ):
+        descricao = DESCRICAO_PADRAO
 
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
+        descricao,
         rodape="NÊMESIS • Suporte oficial",
     )
     embed.add_field(
