@@ -69,6 +69,27 @@ def _normalizar_perfil(perfil) -> dict:
         for medalha in medalhas
         if str(medalha).strip()
     ))
+
+    # Esses registros impedem crédito duplicado após retries/reinicializações.
+    # Uma string não pode ser convertida diretamente em lista, pois viraria caracteres.
+    for campo in (
+        "recompensas_missoes_aplicadas",
+        "resultados_pvp_aplicados",
+        "sorteios_recompensados",
+        "temporadas_bonus_aplicados",
+        "eventos_recompensa",
+    ):
+        eventos = normalizado.get(campo, [])
+        if isinstance(eventos, str):
+            eventos = [eventos] if eventos.strip() else []
+        elif not isinstance(eventos, (list, tuple, set)):
+            eventos = []
+        normalizado[campo] = list(dict.fromkeys(
+            str(evento).strip()
+            for evento in eventos
+            if str(evento).strip()
+        ))[-5000:]
+
     normalizado["maior_sequencia"] = max(
         normalizado["maior_sequencia"],
         normalizado["sequencia_atual"],
