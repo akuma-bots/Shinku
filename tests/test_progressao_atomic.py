@@ -48,5 +48,45 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(1 for resultado in resultados if resultado[3]), 30)
 
 
+    async def test_leitura_de_perfil_existente_nao_persiste_sem_mudancas(self):
+        self.dados = {
+            "123": {
+                "membros": {
+                    "456": {
+                        "xp": 250,
+                        "mensagens": 4,
+                        "missoes": 1,
+                        "guerras": 0,
+                        "rank_no": 8,
+                        "ultimo_xp": 10,
+                        "historico_ranks": [],
+                    }
+                }
+            }
+        }
+        chamadas = 0
+        salvar_original = self.cog._salvar_dados
+
+        async def contar_salvamento(dados):
+            nonlocal chamadas
+            chamadas += 1
+            await salvar_original(dados)
+
+        self.cog._salvar_dados = contar_salvamento
+        perfil = await self.cog._perfil(123, 456)
+
+        self.assertEqual(perfil["xp"], 250)
+        self.assertEqual(chamadas, 0)
+
+    async def test_perfil_legado_invalido_e_reparado(self):
+        self.dados = {"123": {"membros": {"456": "dado-inválido"}}}
+
+        perfil = await self.cog._perfil(123, 456)
+
+        self.assertEqual(perfil["xp"], 0)
+        self.assertEqual(perfil["historico_ranks"], [])
+        self.assertIsInstance(self.dados["123"]["membros"]["456"], dict)
+
+
 if __name__ == "__main__":
     unittest.main()
