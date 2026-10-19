@@ -49,18 +49,23 @@ async def criar(
     async with _DESAFIOS_TRANSICAO_LOCK:
         lista = await _lista_guild(guild_id)
         par = {int(desafiante_id), int(desafiado_id)}
-        ativo = next(
-            (
-                desafio for desafio in lista
-                if {int(desafio.get("desafiante_id", 0) or 0), int(desafio.get("desafiado_id", 0) or 0)} == par
-                and desafio.get("status") in {
-                    "pendente", "processando_aceite", "aceito",
-                    "aguardando_revisao", "concluido",
+        ativo = None
+        for registro in lista:
+            try:
+                par_registro = {
+                    int(registro.get("desafiante_id")),
+                    int(registro.get("desafiado_id")),
                 }
-                and desafio.get("status") != "concluido"
-            ),
-            None,
-        )
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if (
+                par_registro == par
+                and registro.get("status") in {
+                    "pendente", "processando_aceite", "aceito", "aguardando_revisao",
+                }
+            ):
+                ativo = registro
+                break
         if ativo:
             raise ValueError("Já existe um desafio ativo entre esses membros.")
 
