@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 import time
@@ -635,6 +636,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         self.punicoes_em_andamento = set()
         self.decisoes_em_andamento = set()
+        self._banimentos_lock = asyncio.Lock()
 
         self.verificar_banimentos.start()
 
@@ -1839,93 +1841,53 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
     # BANIMENTOS TEMPORÁRIOS
     # ========================================================
 
-    async def carregar_banimentos_temporarios(
-        self,
-    ):
-
+    async def carregar_banimentos_temporarios(self):
+        """Retorna None em falha de storage para não confundir erro com arquivo vazio."""
         try:
-
-            dados = await carregar(
-                ARQUIVO_BANIMENTOS_TEMPORARIOS,
-                {},
-            )
-
-            return (
-                dados
-                if isinstance(
-                    dados,
-                    dict,
-                )
-                else {}
-            )
-
-        except Exception as erro:
-
-            print(
-                "[AUTOMOD][ERRO] "
-                "Falha ao carregar banimentos "
-                f"temporários: {erro}"
-            )
-
-            return {}
-
-    async def salvar_banimentos_temporarios(
-        self,
-        dados,
-    ):
-
-        try:
-
-            await salvar(
-                ARQUIVO_BANIMENTOS_TEMPORARIOS,
-                dados,
-            )
-
-        except Exception as erro:
-
-            print(
-                "[AUTOMOD][ERRO] "
-                "Falha ao salvar banimentos "
-                f"temporários: {erro}"
-            )
-
-    async def registrar_banimento_temporario(
-        self,
-        guild_id,
-        user_id,
-        duracao,
-    ):
-
-        try:
-            dados = await self.carregar_banimentos_temporarios()
+            dados = await carregar(ARQUIVO_BANIMENTOS_TEMPORARIOS, {})
         except Exception:
             import logging
             logging.getLogger(__name__).exception(
-                "Falha ao carregar banimentos temporários; a verificação será repetida no próximo ciclo."
+                "Falha ao carregar banimentos temporários; nenhuma expiração será descartada."
             )
-            return
-
+            return None
         if not isinstance(dados, dict):
             import logging
             logging.getLogger(__name__).error(
                 "Armazenamento de banimentos temporários possui formato inválido."
             )
-            return
+            return None
+        return dados
 
-        dados[
-            f"{guild_id}:{user_id}"
-        ] = {
-            "guild_id": guild_id,
-            "user_id": user_id,
-            "expira_em": (
-                time.time()
-                + duracao
-            ),
-        }
+    async def salvar_banimentos_temporarios(self, dados) -> bool:
+        if not isinstance(dados, dict):
+            return False
+        try:
+            await salvar(ARQUIVO_BANIMENTOS_TEMPORARIOS, dados)
+            return True
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao salvar banimentos temporários; a operação não será considerada persistida."
+            )
+            return False
 
-        await self.salvar_banimentos_temporarios(
-            dados
-        )
+    async def registrar_banimento_temporario(self, guild_id, user_id, duracao) -> bool:
+        async with self._banimentos_lock:
+            dados = await self.carregar_banimentos_temporarios()
+            if not isinstance(dados, dict):
+                return False
+            try:
+                duracao = max(1, int(duracao))
+            except (TypeError, ValueError, OverflowError):
+                return False
+
+            dados[f"{int(guild_id)}:{int(user_id)}"] = {
+                "guild_id": int(guild_id),
+                "user_id": int(user_id),
+                "expira_em": time.time() + duracao,
+            }
+            return await self.salvar_banimentos_temporarios(dados)
 
     @tasks.loop(
         seconds=30
