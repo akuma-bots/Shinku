@@ -404,34 +404,82 @@ class Missoes(commands.Cog):
             if str(item.get("jogo") or "").lower() == jogo
         ]
         atividades.sort(key=lambda item: (
-            {"missao": 0, "contribuicao": 1, "especial": 2}.get(str(item.get("tipo") or "missao"), 9),
+            {"missao": 0, "contribuicao": 1, "especial": 2}.get(
+                str(item.get("tipo") or "missao").lower(), 9
+            ),
             str(item.get("id") or ""),
         ))
+
+        abertas = sum(1 for item in atividades if item.get("ativa", True) is not False)
+        encerradas = len(atividades) - abertas
         embed = criar_embed(
-            f"N̷ÊMESIS ━ CENTRAL DE MISSÕES · {nome_jogo.upper()}",
+            f"✦・ N̷ÊMESIS — CENTRAL DE MISSÕES ・✦",
             (
-                f"Seleção atual: **{nome_jogo}**\n"
-                "Use **Próxima página** ou **Página anterior** para alternar entre os jogos.\n"
-                "Use `/missao-enviar-prova` para anexar a imagem diretamente, escolher a missão pela lista e selecionar o auxiliar sem copiar links ou IDs.\n\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                f"**◈ JOGO SELECIONADO**  ·  {nome_jogo}\n"
+                "**CATÁLOGO DE OPERAÇÕES**\n"
+                "Escolha uma missão e envie a prova pelo comando "
+                "`/missao-enviar-prova`. A equipe validará a participação antes "
+                "da liberação das recompensas."
             ),
             cor=0x9F2035,
             rodape=None,
         )
+        embed.set_author(name="NÊMESIS  /  CENTRAL DE OPERAÇÕES")
+        embed.add_field(name="◉ DISPONÍVEIS", value=f"`{abertas}`", inline=True)
+        embed.add_field(name="■ ENCERRADAS", value=f"`{encerradas}`", inline=True)
+        embed.add_field(name="◈ TOTAL", value=f"`{len(atividades)}`", inline=True)
+
         if not atividades:
-            embed.add_field(name="Catálogo", value="Não há missões cadastradas para este jogo.", inline=False)
-        for item in atividades[:20]:
-            tipo = TIPOS.get(str(item.get("tipo") or "missao"), TIPOS["missao"])
-            recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
-            estado = "Disponível" if item.get("ativa", True) is not False else "Encerrada"
-            valor = (
-                f"{str(item.get('descricao') or 'Sem descrição cadastrada')[:450]}\n\n"
-                f"**Tipo:** {tipo['nome']}  |  **Recompensa:** {recompensa} P.C.\n"
-                f"**Estado:** {estado}  |  **ID:** `{item.get('id', '—')}`"
+            embed.add_field(
+                name="╭── ◈ CATÁLOGO VAZIO",
+                value="Ainda não há operações cadastradas para este jogo.",
+                inline=False,
             )
-            embed.add_field(name=str(item.get("titulo") or "Missão")[:256], value=valor[:1024], inline=False)
-        embed.set_author(name="NÊMESIS  /  MISSÕES POR JOGO")
-        embed.set_footer(text=f"PÁGINA:{jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+
+        for indice, item in enumerate(atividades[:20], start=1):
+            tipo_chave = str(item.get("tipo") or "missao").lower()
+            tipo = TIPOS.get(tipo_chave, TIPOS["missao"])
+            try:
+                recompensa = max(
+                    0,
+                    int(item.get("recompensa_xp", item.get("pontos", 0)) or 0),
+                )
+            except (TypeError, ValueError):
+                recompensa = 0
+            estado = "Disponível" if item.get("ativa", True) is not False else "Encerrada"
+            icone = tipo.get("emoji", "🎯")
+            titulo = str(item.get("titulo") or "Operação sem título").strip()
+            descricao = str(item.get("descricao") or "Sem descrição cadastrada").strip()
+            if not descricao:
+                descricao = "Sem descrição cadastrada"
+            identificador = str(item.get("id") or "—")
+            embed.add_field(
+                name=f"{icone} {indice:02d} · {titulo[:75]} — {recompensa:,} P.C.".replace(",", ".")[:150],
+                value=(
+                    f"{descricao[:110]}\n"
+                    f"┊ **Tipo:** {tipo['nome']}  ·  **Estado:** {estado}\n"
+                    f"┊ **ID:** `{identificador[:24]}`"
+                )[:1024],
+                inline=False,
+            )
+
+        if len(atividades) > 20:
+            embed.add_field(
+                name="◈ CATÁLOGO COMPLEMENTAR",
+                value=(
+                    f"Exibindo 20 de {len(atividades)} operações. "
+                    "Consulte os canais oficiais de missões para acessar as demais."
+                ),
+                inline=False,
+            )
+
+        embed.set_footer(
+            text=(
+                f"PÁGINA:{jogo} • JOGO "
+                f"{list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/"
+                f"{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
+            )
+        )
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
