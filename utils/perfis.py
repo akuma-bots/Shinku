@@ -27,48 +27,82 @@ XP_DERROTA = 10
 XP_BONUS_MVP = 20
 
 
+def _inteiro_nao_negativo(valor, padrao: int = 0) -> int:
+    """Converte estatísticas antigas para inteiros válidos sem deixar o perfil quebrar."""
+    try:
+        return max(0, int(valor if valor is not None else padrao))
+    except (TypeError, ValueError, OverflowError):
+        return max(0, int(padrao))
+
+
+def _normalizar_perfil(perfil) -> dict:
+    """Completa campos ausentes e saneia dados legados sem descartar campos extras."""
+    if not isinstance(perfil, dict):
+        perfil = {}
+
+    normalizado = {**PADRAO_PERFIL, **perfil}
+    for campo in (
+        "xp",
+        "vitorias",
+        "derrotas",
+        "empates",
+        "kills",
+        "deaths",
+        "mvps",
+        "sequencia_atual",
+        "maior_sequencia",
+    ):
+        normalizado[campo] = _inteiro_nao_negativo(
+            normalizado.get(campo),
+            PADRAO_PERFIL[campo],
+        )
+
+    medalhas = normalizado.get("medalhas", [])
+    if isinstance(medalhas, str):
+        medalhas = [medalhas] if medalhas.strip() else []
+    elif not isinstance(medalhas, (list, tuple, set)):
+        medalhas = []
+
+    # Preserva a ordem original e remove entradas vazias/duplicadas.
+    normalizado["medalhas"] = list(dict.fromkeys(
+        str(medalha).strip()
+        for medalha in medalhas
+        if str(medalha).strip()
+    ))
+    normalizado["maior_sequencia"] = max(
+        normalizado["maior_sequencia"],
+        normalizado["sequencia_atual"],
+    )
+    return normalizado
+
+
 async def get_perfil(
     guild_id: int,
     user_id: int,
 ) -> dict:
-
-    todos = await carregar(
-        ARQUIVO_PERFIS,
-        {},
-    )
-
-    perfil = todos.get(
-        str(guild_id),
-        {},
-    ).get(
-        str(user_id),
-        {},
-    )
+    todos = await carregar(ARQUIVO_PERFIS, {})
+    guilds = todos if isinstance(todos, dict) else {}
+    perfis_guild = guilds.get(str(guild_id), {})
+    if not isinstance(perfis_guild, dict):
+        perfis_guild = {}
+    perfil = perfis_guild.get(str(user_id), {})
 
     # Recupera estatísticas antigas do ranking interno se o perfil local ainda não existir.
-    if not perfil:
+    if not isinstance(perfil, dict) or not perfil:
         competitivo = await carregar(
             ARQUIVO_COMPETITIVO,
             {"catalogo": [], "perfis": {}},
         )
-        perfil_competitivo = competitivo.get("perfis", {}).get(str(user_id), {})
-        if isinstance(perfil_competitivo, dict):
+        competitivos = competitivo.get("perfis", {}) if isinstance(competitivo, dict) else {}
+        perfil_competitivo = competitivos.get(str(user_id), {}) if isinstance(competitivos, dict) else {}
+        if isinstance(perfil_competitivo, dict) and perfil_competitivo:
             perfil = {
                 chave: perfil_competitivo[chave]
                 for chave in PADRAO_PERFIL
                 if chave in perfil_competitivo
             }
 
-    return {
-        **PADRAO_PERFIL,
-        **perfil,
-        "medalhas": list(
-            perfil.get(
-                "medalhas",
-                [],
-            )
-        ),
-    }
+    return _normalizar_perfil(perfil)
 
 
 async def _salvar_perfil(
