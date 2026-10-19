@@ -24,15 +24,15 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 
 ## Armazenamento
 
-- O bot usa chaves privadas com prefixo `nemesis_bot:` no Upstash; os dados novos deixam de ser compartilhados com o site/dashboard.
-- Registros antigos sem prefixo são importados uma única vez para preservar os dados existentes. Depois da importação, atualizações do site não são lidas pelo bot.
+- O bot usa chaves privadas com prefixo `nemesis_bot:` no Upstash para isolar os dados operacionais da NÊMESIS.
+- Registros antigos sem prefixo podem ser importados uma única vez para preservar dados existentes. Depois da migração, o bot opera com seu próprio namespace.
 - Se o Upstash não estiver configurado, o bot usa arquivos JSON locais; em hospedagem com disco efêmero, esses arquivos podem não sobreviver a reinícios/deploys.
 
 ## Requisitos
 
 - Python 3.12 recomendado.
 - Aplicação de bot criada no [Discord Developer Portal](https://discord.com/developers/applications).
-- Redis REST do Upstash para manter bot e dashboard usando o mesmo armazenamento.
+- Redis REST do Upstash para persistência dos dados em produção.
 - Permissões Discord compatíveis com os recursos ativados, incluindo visualizar/enviar mensagens, embeds, gerenciar mensagens e canais, moderar membros e gerenciar cargos quando necessário.
 
 Ative no portal os intents **Message Content** e **Server Members** quando os recursos instalados exigirem esses dados.
@@ -59,7 +59,7 @@ Configure as seguintes variáveis de ambiente. Não coloque credenciais no códi
 | `UPSTASH_REDIS_REST_TOKEN` | Sim em produção | Token privado do banco compartilhado. |
 | `PORT` | Não | Porta HTTP de health check; usa 8080 como padrão fora de plataformas que definem a porta. |
 
-Em produção no Render, o bot recusa iniciar se o Upstash não estiver configurado. Isso evita operar silenciosamente com dados locais que não sincronizam com o dashboard.
+Em produção no Render, configure o Upstash para manter os dados persistentes entre reinicializações. Sem ele, o bot pode recorrer ao armazenamento local, que não é confiável em disco efêmero.
 
 Inicie localmente:
 
@@ -88,8 +88,8 @@ O workflow é uma primeira barreira de qualidade; não substitui testes funciona
 
 ## Armazenamento e segurança
 
-- O bot e o dashboard devem usar o mesmo banco Upstash e os mesmos nomes de chaves esperados pela integração.
-- Os arquivos locais em `data/` servem para execução local; não são um substituto para o armazenamento compartilhado em produção.
+- O armazenamento é exclusivo do bot; não existe dependência operacional de um dashboard.
+- Os arquivos locais em `data/` servem para execução local; em produção, prefira o Upstash para persistência.
 - Nunca faça commit de `.env`, tokens, chaves REST ou outros segredos.
 - Alterações em comandos só ficam disponíveis no Discord depois que o processo atualizado inicia e sincroniza a árvore de comandos.
 - Confirme logs e o endpoint `/health` após cada deploy.
