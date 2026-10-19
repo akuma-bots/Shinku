@@ -22,6 +22,14 @@ INTERVALO_ATUALIZACAO_MINUTOS = 10
 _LOG = logging.getLogger(__name__)
 
 
+def _contador_registrado(config: dict, canal_id: int) -> bool:
+    contadores = config.get("contadores", []) if isinstance(config, dict) else []
+    return any(
+        isinstance(item, dict) and item.get("canal_id") == canal_id
+        for item in contadores
+    )
+
+
 class Contadores(commands.Cog):
     """
     Canais de voz atualizados automaticamente com dados internos do bot.
@@ -210,11 +218,7 @@ class Contadores(commands.Cog):
     ):
 
         config = await get_config(interaction.guild.id)
-        registrados = config.get("contadores", [])
-        if not any(
-            isinstance(item, dict) and item.get("canal_id") == canal.id
-            for item in registrados
-        ):
+        if not _contador_registrado(config, canal.id):
             await interaction.response.send_message(
                 "Esse canal não está registrado como contador. Nenhum canal foi apagado.",
                 ephemeral=True,
