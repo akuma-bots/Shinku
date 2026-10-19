@@ -135,16 +135,25 @@ class Musica(commands.Cog):
         self.loop_modes: dict[int, str] = {}
         self.skip_requested: set[int] = set()
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
+        self._extrair_lock = asyncio.Lock()
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
         # empacotado pelo imageio-ffmpeg fica como fallback.
         self.ffmpeg = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
         LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
 
     async def _extrair(self, consulta: str) -> dict[str, Any]:
-        # Impede que URLs arbitrárias sejam usadas para acessar serviços internos.
+        consulta = str(consulta or "").strip()
+        if not consulta:
+            raise ValueError("Informe o nome de uma música ou um link válido.")
+        if len(consulta) > 300:
+            raise ValueError("A pesquisa musical deve ter no máximo 300 caracteres.")
+
+        permitidos = (
+            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+            "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com",
+        )
         if consulta.startswith(("http://", "https://")):
             host = (urlparse(consulta).hostname or "").lower()
-            permitidos = ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com")
             if not any(host == dominio or host.endswith("." + dominio) for dominio in permitidos):
                 raise ValueError("Provedor de música não permitido.")
 
@@ -152,30 +161,42 @@ class Musica(commands.Cog):
             try:
                 dados = self.ytdl.extract_info(consulta, download=False)
             except Exception:
-                # Para pesquisas por texto, tenta SoundCloud como alternativa
-                # quando o YouTube bloqueia a extração. Links não são reescritos.
                 if consulta.startswith(("http://", "https://")):
                     raise
                 LOG.info("Pesquisa no provedor principal falhou; tentando SoundCloud.")
                 dados = self.ytdl.extract_info(f"scsearch1:{consulta}", download=False)
+
+            if not isinstance(dados, dict):
+                raise ValueError("O provedor retornou uma resposta inválida.")
             if "entries" in dados:
-                dados = next((item for item in dados["entries"] if item), None)
-            if not dados:
+                entradas = dados.get("entries")
+                dados = next((item for item in entradas if isinstance(item, dict)), None) if isinstance(entradas, (list, tuple)) else None
+            if not isinstance(dados, dict):
                 raise ValueError("Nenhum resultado de áudio foi encontrado.")
-            url = dados.get("url")
-            titulo = dados.get("title") or "Áudio sem título"
-            webpage = dados.get("webpage_url") or consulta
-            duracao = int(dados.get("duration") or 0)
-            if not url:
-                raise ValueError("O provedor não retornou um fluxo de áudio.")
+
+            url = str(dados.get("url") or "").strip()
+            if urlparse(url).scheme.lower() not in {"http", "https"}:
+                raise ValueError("O provedor não retornou um fluxo HTTP/HTTPS válido.")
+
+            titulo = str(dados.get("title") or "Áudio sem título").strip()[:256]
+            webpage = str(dados.get("webpage_url") or consulta).strip()[:2048]
+            try:
+                duracao = max(0, int(dados.get("duration") or 0))
+            except (TypeError, ValueError, OverflowError):
+                duracao = 0
+            headers = dados.get("http_headers")
             return {
                 "url": url,
-                "title": titulo,
+                "title": titulo or "Áudio sem título",
                 "webpage_url": webpage,
                 "duration": duracao,
-                "http_headers": dados.get("http_headers") or {},
+                "http_headers": headers if isinstance(headers, dict) else {},
             }
-        return await asyncio.to_thread(extrair)
+
+        # YoutubeDL não é thread-safe; uma extração por vez evita disputas entre
+        # comandos simultâneos e reduz carga desnecessária nos provedores.
+        async with self._extrair_lock:
+            return await asyncio.to_thread(extrair)
 
     @staticmethod
     def _tempo(segundos: int) -> str:
@@ -353,6 +374,12 @@ class Musica(commands.Cog):
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
             return
         await interaction.response.defer(thinking=True)
+        if len(self.filas.get(interaction.guild.id, [])) >= MAX_QUEUE:
+            await interaction.followup.send(
+                f"A fila atingiu o limite de {MAX_QUEUE} músicas.",
+                ephemeral=True,
+            )
+            return
         voz = await self._conectar(interaction)
         if voz is None:
             return
