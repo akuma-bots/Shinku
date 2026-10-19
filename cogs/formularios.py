@@ -43,6 +43,8 @@ def _limpar_sessoes_formularios(agora: float | None = None) -> None:
         for chave, _ in ordenadas[:excesso]:
             SESSOES_FORMULARIOS.pop(chave, None)
 GUILD_NEMESIS_ID = 1543381737961160910
+CARGOS_AUTORIZADOS_FORMULARIO_STAFF = {1547306211458940968, 1547306457526181939}
+NOME_FORMULARIO_STAFF = "Inscrição para Staff"
 _LOCK_PAINÉIS_AUTOMÁTICOS = asyncio.Lock()
 ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
 
@@ -681,6 +683,34 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             if not resposta:
                 await interaction.response.send_message("Essa candidatura não existe mais.", ephemeral=True)
                 return
+
+            formulario_resposta = await formularios.get_formulario(
+                guild_encontrada.id,
+                resposta.get("formulario_id", ""),
+            )
+            if formulario_resposta and formulario_resposta.get("nome") == NOME_FORMULARIO_STAFF:
+                # A candidatura de Staff só pode ser aprovada/recusada pelos cargos autorizados.
+                membro_revisor = guild_encontrada.get_member(interaction.user.id)
+                if membro_revisor is None:
+                    try:
+                        membro_revisor = await guild_encontrada.fetch_member(interaction.user.id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        membro_revisor = None
+
+                autorizado = bool(
+                    membro_revisor
+                    and any(
+                        cargo.id in CARGOS_AUTORIZADOS_FORMULARIO_STAFF
+                        for cargo in membro_revisor.roles
+                    )
+                )
+                if not autorizado:
+                    await interaction.response.send_message(
+                        "Você não tem autorização para revisar o formulário Staff da NÊMESIS.",
+                        ephemeral=True,
+                    )
+                    return
+
             if resposta["status"] != "pendente":
                 await interaction.response.send_message(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
                 return
