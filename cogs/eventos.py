@@ -1,4 +1,6 @@
+import asyncio
 import datetime
+import logging
 import time
 
 import discord
@@ -10,6 +12,8 @@ from utils.storage import carregar, salvar
 
 
 ARQUIVO = "eventos.json"
+_EVENTOS_LOCK = asyncio.Lock()
+_LOG = logging.getLogger(__name__)
 
 FUSO_BRASIL = datetime.timezone(
     datetime.timedelta(hours=-3)
@@ -17,17 +21,12 @@ FUSO_BRASIL = datetime.timezone(
 
 
 async def _todos_eventos():
-    return await carregar(
-        ARQUIVO,
-        {},
-    )
+    dados = await carregar(ARQUIVO, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def _salvar_eventos(dados):
-    await salvar(
-        ARQUIVO,
-        dados,
-    )
+    await salvar(ARQUIVO, dados if isinstance(dados, dict) else {})
 
 
 def _evento_para_dados(
