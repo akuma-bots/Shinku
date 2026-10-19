@@ -36,7 +36,7 @@ class Moderacao(commands.Cog):
                 logging.warning("Canal de logs %s não aceita mensagens.", log_id)
                 return
 
-            await canal.send(texto)
+            await canal.send(texto, allowed_mentions=discord.AllowedMentions.none())
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
             logging.exception("Não foi possível registrar a ação de moderação no canal de logs.")
         except Exception:
@@ -104,6 +104,63 @@ class Moderacao(commands.Cog):
 
         return "\n\n".join(mensagens)
 
+    async def _validar_alvo(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+    ) -> bool:
+        """Impede punições inválidas por autoalvo ou hierarquia do Discord."""
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "Este comando só pode ser usado dentro do servidor.",
+                ephemeral=True,
+            )
+            return False
+
+        if membro.id == interaction.user.id:
+            await interaction.response.send_message(
+                "Você não pode aplicar uma punição em si mesmo.",
+                ephemeral=True,
+            )
+            return False
+
+        if membro.id == self.bot.user.id:
+            await interaction.response.send_message(
+                "Não é possível aplicar uma punição no próprio bot.",
+                ephemeral=True,
+            )
+            return False
+
+        if membro.id == guild.owner_id:
+            await interaction.response.send_message(
+                "O proprietário do servidor não pode ser punido por este comando.",
+                ephemeral=True,
+            )
+            return False
+
+        autor = interaction.user
+        if (
+            isinstance(autor, discord.Member)
+            and autor.id != guild.owner_id
+            and membro.top_role >= autor.top_role
+        ):
+            await interaction.response.send_message(
+                "Você não pode punir alguém com cargo igual ou superior ao seu.",
+                ephemeral=True,
+            )
+            return False
+
+        bot_membro = guild.me
+        if bot_membro is None or membro.top_role >= bot_membro.top_role:
+            await interaction.response.send_message(
+                "Não consigo punir este membro: meu cargo precisa estar acima do cargo mais alto dele.",
+                ephemeral=True,
+            )
+            return False
+
+        return True
+
     @app_commands.command(
         name="ban",
         description="Bane um membro do servidor."
@@ -115,12 +172,16 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         ban_members=True
     )
+    @app_commands.checks.bot_has_permissions(ban_members=True)
     async def ban(
         self,
         interaction: discord.Interaction,
         membro: discord.Member,
         motivo: str = "Não especificado"
     ):
+        if not await self._validar_alvo(interaction, membro):
+            return
+
         await membro.ban(
             reason=motivo,
             delete_message_days=0
@@ -156,12 +217,16 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         kick_members=True
     )
+    @app_commands.checks.bot_has_permissions(kick_members=True)
     async def kick(
         self,
         interaction: discord.Interaction,
         membro: discord.Member,
         motivo: str = "Não especificado"
     ):
+        if not await self._validar_alvo(interaction, membro):
+            return
+
         await membro.kick(reason=motivo)
 
         await registrar_punicao(
@@ -195,6 +260,7 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         moderate_members=True
     )
+    @app_commands.checks.bot_has_permissions(moderate_members=True)
     async def mute(
         self,
         interaction: discord.Interaction,
@@ -202,6 +268,9 @@ class Moderacao(commands.Cog):
         minutos: app_commands.Range[int, 1, 40320],
         motivo: str = "Não especificado"
     ):
+        if not await self._validar_alvo(interaction, membro):
+            return
+
         ate = (
             discord.utils.utcnow()
             + datetime.timedelta(minutes=minutos)
@@ -239,15 +308,25 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         moderate_members=True
     )
+    @app_commands.checks.bot_has_permissions(moderate_members=True)
     async def unmute(
         self,
         interaction: discord.Interaction,
         membro: discord.Member
     ):
+        if not await self._validar_alvo(interaction, membro):
+            return
+
         await membro.timeout(None)
 
         await interaction.response.send_message(
-            f"🔊 {membro.mention} não está mais silenciado."
+            f"🔊 {membro.mention} não está mais silenciado.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        await self._log(
+            interaction,
+            f"🔊 **/unmute** — {membro.mention} teve o silenciamento removido por "
+            f"{interaction.user.mention}.",
         )
 
     @app_commands.command(
@@ -267,6 +346,9 @@ class Moderacao(commands.Cog):
         membro: discord.Member,
         motivo: str
     ):
+        if not await self._validar_alvo(interaction, membro):
+            return
+
         try:
             await membro.send(
                 f"⚠️ Você recebeu um aviso em "
@@ -565,27 +647,21 @@ class Moderacao(commands.Cog):
         interaction: discord.Interaction,
         error: app_commands.AppCommandError
     ):
-        if isinstance(
-            error,
-            app_commands.MissingPermissions
-        ):
+        if isinstance(error, app_commands.MissingPermissions):
+            mensagem = "Você não tem permissão para usar esse comando."
+        elif isinstance(error, app_commands.BotMissingPermissions):
+            permissoes = ", ".join(error.missing_permissions)
             mensagem = (
-                "Você não tem permissão "
-                "para usar esse comando."
+                "Não consigo executar esta ação porque faltam permissões no bot: "
+                f"**{permissoes}**. Peça à administração para revisar as permissões."
             )
-
-            if interaction.response.is_done():
-                await interaction.followup.send(
-                    mensagem,
-                    ephemeral=True
-                )
-            else:
-                await interaction.response.send_message(
-                    mensagem,
-                    ephemeral=True
-                )
         else:
             raise error
+
+        if interaction.response.is_done():
+            await interaction.followup.send(mensagem, ephemeral=True)
+        else:
+            await interaction.response.send_message(mensagem, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
