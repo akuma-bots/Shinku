@@ -478,12 +478,12 @@ class Missoes(commands.Cog):
         jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
         linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
+        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
         if linhas:
             estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
                 guild.id, [uid for uid, _, _ in linhas], jogo=jogo
             )
             linhas_texto = []
-            medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
             for posicao, (uid, nome, pontos) in enumerate(linhas, start=1):
                 selo = medalhas.get(posicao, f"**{posicao:02d}.**")
                 stats = estatisticas.get(str(uid), {})
@@ -491,30 +491,40 @@ class Missoes(commands.Cog):
                 dias, resto = divmod(minutos, 1440)
                 horas, minutos = divmod(resto, 60)
                 tempo = f"{dias}d {horas}h" if dias else f"{horas}h {minutos}min"
-                nome_exibicao = f"<@{uid}>"
                 linhas_texto.append(
-                    f"{selo} {nome_exibicao} — **{pontos:,} P.C.**".replace(",", ".")
-                    + f"\n┊ **V/E/D:** {stats.get('vitorias', 0)}/{stats.get('empates', 0)}/{stats.get('derrotas', 0)}"
-                    + f"  ·  **XP:** {stats.get('xp', 0):,}".replace(",", ".")
-                    + f"  ·  **K/D:** {stats.get('kills', 0)}/{stats.get('deaths', 0)} ({stats.get('kdr', 0):.2f})"
-                    + f"\n┊ **MVPs:** {stats.get('mvps', 0)}  ·  **Sequência:** {stats.get('sequencia', 0)} (máx. {stats.get('maior_sequencia', 0)})"
-                    + f"\n┊ **Patente:** {stats.get('patente', '—')}  ·  **Tempo no Top 10 do jogo:** {tempo}"
+                    f"{selo} <@{uid}>  ━  **{pontos:,} P.C.**".replace(",", ".")
+                    + f"\n┊ V/E/D **{stats.get('vitorias', 0)}/{stats.get('empates', 0)}/{stats.get('derrotas', 0)}**"
+                    + f"  ·  XP **{stats.get('xp', 0):,}**".replace(",", ".")
+                    + f"  ·  K/D **{stats.get('kills', 0)}/{stats.get('deaths', 0)}** ({stats.get('kdr', 0):.2f})"
+                    + f"\n┊ MVP **{stats.get('mvps', 0)}**  ·  Sequência **{stats.get('sequencia', 0)}/{stats.get('maior_sequencia', 0)}**"
+                    + f"  ·  Patente **{stats.get('patente', '—')}**"
+                    + f"\n┊ ⏱ Top 10 **{tempo}**"
                 )
             descricao = "\n\n".join(linhas_texto)
         else:
-            descricao = "Ainda não há pontos registrados neste jogo. As recompensas entram após a aprovação das provas."
+            descricao = (
+                "╭────────────── ◈ ──────────────╮\n"
+                "  Ainda não há jogadores classificados.\n"
+                "  As pontuações são registradas após a aprovação das provas.\n"
+                "╰────────────── ◈ ──────────────╯"
+            )
         embed = criar_embed(
-            f"N̷ÊMESIS ━ RANKING {nome_jogo.upper()}",
+            f"✦・ N̷ÊMESIS — RANKING {nome_jogo.upper()} ・✦",
             (
-                f"**Jogo selecionado:** {nome_jogo}\n\n{descricao}\n\n"
+                f"**◈ JOGO SELECIONADO**  ·  {nome_jogo}\n"
+                "**CLASSIFICAÇÃO POR PONTOS DE COMBATE**\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"{descricao}\n\n"
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "Use os botões para alternar entre os rankings sem sair deste canal."
+                "◂ Use os botões abaixo para alternar entre os jogos."
             ),
             cor=0x9F2035,
             rodape=None,
         )
-        embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO POR JOGO")
-        embed.set_footer(text=f"PÁGINA:{jogo} • {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}")
+        embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
+        embed.set_footer(
+            text=f"PÁGINA:{jogo} • RANKING {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
+        )
         return embed
 
     async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
