@@ -345,11 +345,16 @@ class Tickets(commands.Cog):
         )
 
         if cargo_suporte:
-            overwrites[cargo_suporte] = discord.PermissionOverwrite(
-                view_channel=True,
-                send_messages=True,
-                read_message_history=True,
-            )
+            # O cargo de suporte e todos os cargos acima dele podem atender
+            # tickets. Administradores já ignoram overwrites pelo Discord.
+            for cargo in guild.roles:
+                if cargo.is_default() or cargo.position < cargo_suporte.position:
+                    continue
+                overwrites[cargo] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                )
 
         nome_canal = f"ticket-{tipo['valor']}-{user.name}"[:95]
 
@@ -578,10 +583,24 @@ class Tickets(commands.Cog):
         except (TypeError, ValueError):
             cargo_suporte_id = None
 
-        eh_suporte = (
-            cargo_suporte_id is not None
-            and isinstance(message.author, discord.Member)
-            and message.author.get_role(cargo_suporte_id) is not None
+        cargo_suporte = (
+            message.guild.get_role(cargo_suporte_id)
+            if cargo_suporte_id
+            else None
+        )
+        eh_suporte = bool(
+            isinstance(message.author, discord.Member)
+            and (
+                message.author.guild_permissions.administrator
+                or (
+                    cargo_suporte is not None
+                    and any(
+                        cargo.id != message.guild.default_role.id
+                        and cargo.position >= cargo_suporte.position
+                        for cargo in message.author.roles
+                    )
+                )
+            )
         )
 
         ticket_atual = await tickets.get_ticket_por_canal(
