@@ -21,7 +21,6 @@ from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
     _salvar_perfil,
-    _sincronizar_site,
     calcular_patente_atual,
     definir_patente,
 )
@@ -678,7 +677,7 @@ class Missoes(commands.Cog):
                     "evento_perfil": evento_perfil,
                 })
 
-        # Registra XP/pontuação na progressão e no site com chave idempotente por membro.
+        # Registra XP e pontuação na progressão interna com chave idempotente por membro.
         progressao = self.bot.get_cog("ProgressaoGangue")
         tipo_progressao = str(atividade.get("tipo", "missao")).lower()
         if tipo_progressao not in {"missao", "contribuicao", "especial"}:
@@ -687,7 +686,7 @@ class Missoes(commands.Cog):
         for resultado in resultados:
             usuario_id = resultado["user_id"]
             quantidade = resultado["quantidade"]
-            evento_site = (
+            evento_id = (
                 f"missao:{revisao_id}:{usuario_id}"
                 if auxiliar_id
                 else f"missao:{revisao_id}"
@@ -730,21 +729,6 @@ class Missoes(commands.Cog):
                         erro,
                     )
 
-            membro = guild.get_member(usuario_id)
-            try:
-                await _sincronizar_site(
-                    user_id=usuario_id,
-                    perfil=resultado["perfil"],
-                    nome=membro.display_name if membro else "",
-                    delta_pontos=quantidade,
-                    evento_id=evento_site,
-                )
-            except Exception as erro:
-                log.exception(
-                    "Falha ao sincronizar pontuação de %s: %s",
-                    usuario_id,
-                    erro,
-                )
 
         dados_guild = await missoes._guild(guild.id)
         alvo = next(
