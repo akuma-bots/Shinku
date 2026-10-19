@@ -102,12 +102,27 @@ async def fechar_canal_ticket(
                 motivo=motivo,
             )
 
-        await canal.send(
-            f"🔒 Fechando este ticket em {delay}s. Motivo: {motivo}"
-        )
+        if ticket:
+            dono = canal.guild.get_member(int(ticket.get("usuario_id") or 0))
+            if dono:
+                try:
+                    embed = criar_embed(
+                        "✦・ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO ・✦",
+                        f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\\n\\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
+                        rodape="NÊMESIS • Central de atendimento",
+                    )
+                    await dono.send(embed=embed, view=AvaliacaoTicketView(
+                        canal.guild.id, str(ticket["id"]), int(ticket.get("usuario_id") or 0),
+                        int(ticket.get("atendido_por_id") or 0),
+                    ))
+                    await tickets.atualizar_ticket(canal.guild.id, ticket["id"], avaliacao_solicitada=True)
+                except discord.Forbidden:
+                    logging.info("Não foi possível enviar a avaliação por DM; usuário %s.", ticket.get("usuario_id"))
+                except discord.HTTPException:
+                    logging.exception("Falha ao enviar prompt de avaliação do ticket.")
 
+        await canal.send(f"🔒 Fechando este ticket em {delay}s. Motivo: {motivo}")
         await asyncio.sleep(delay)
-
         await canal.delete(reason=motivo)
 
     except discord.NotFound:
@@ -189,6 +204,55 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
         embed.set_image(url=banner_url)
 
     return embed
+
+
+CANAL_AVALIACOES_TICKET_ID = 1545835885063438487
+
+class AvaliacaoTicketView(discord.ui.View):
+    def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
+        super().__init__(timeout=None)
+        self.guild_id, self.ticket_id, self.owner_id, self.atendente_id = guild_id, ticket_id, owner_id, atendente_id
+        for nota in range(1, 6):
+            button = discord.ui.Button(label=f"{nota}/5", emoji="⭐", style=discord.ButtonStyle.primary, custom_id=f"ticket:avaliar:{ticket_id}:{nota}")
+            button.callback = self._callback(nota)
+            self.add_item(button)
+
+    def _callback(self, nota: int):
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.owner_id:
+                await interaction.response.send_message("Somente quem abriu o ticket pode avaliá-lo.", ephemeral=True)
+                return
+            ticket = await tickets.get_ticket(self.guild_id, self.ticket_id)
+            if not ticket or ticket.get("status") != "fechado":
+                await interaction.response.send_message("Este ticket não foi encontrado ou ainda não foi encerrado.", ephemeral=True)
+                return
+            if ticket.get("avaliacao") is not None:
+                await interaction.response.send_message("Você já avaliou este atendimento.", ephemeral=True)
+                return
+            await tickets.atualizar_ticket(self.guild_id, self.ticket_id, avaliacao=nota, avaliado_em=time.time())
+            guild = interaction.client.get_guild(self.guild_id)
+            canal = guild.get_channel(CANAL_AVALIACOES_TICKET_ID) if guild else None
+            if canal is None and guild:
+                try:
+                    canal = await guild.fetch_channel(CANAL_AVALIACOES_TICKET_ID)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    canal = None
+            if canal is None or not callable(getattr(canal, "send", None)):
+                await interaction.response.send_message("Avaliação registrada, mas não consegui publicar no canal de avaliações. Avise a staff.", ephemeral=True)
+                return
+            rotulo = {5: "Excelente", 4: "Muito bom", 3: "Bom", 2: "Regular", 1: "Ruim"}[nota]
+            embed = criar_embed("Nova Avaliação de Atendimento", f"NÊMESIS • Ticket #{self.ticket_id} • avaliação verificada", rodape="Obrigado por avaliar! • NÊMESIS")
+            embed.add_field(name=f"{nota}/5 · {rotulo}", value="⭐" * nota, inline=False)
+            embed.add_field(name="Feedback", value="O cliente não deixou comentário.", inline=False)
+            embed.add_field(name="Cliente", value=f"<@{self.owner_id}> · ID {self.owner_id}", inline=False)
+            embed.add_field(name="Responsável", value=(f"<@{self.atendente_id}> · ID {self.atendente_id}" if self.atendente_id else "Não identificado"), inline=False)
+            embed.add_field(name="Atendimento", value=f"#{self.ticket_id}", inline=False)
+            embed.add_field(name="Avaliado", value=discord.utils.format_dt(discord.utils.utcnow(), style="F"), inline=False)
+            await canal.send(embed=embed)
+            for item in self.children:
+                item.disabled = True
+            await interaction.response.edit_message(content=f"Avaliação enviada: {nota}/5 — {rotulo}. Obrigado pelo feedback!", view=self)
+        return callback
 
 
 class FecharTicketView(discord.ui.View):
