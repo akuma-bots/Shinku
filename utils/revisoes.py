@@ -10,10 +10,8 @@ _REVISOES_LOCK = asyncio.Lock()
 
 
 async def _tudo():
-    return await carregar(
-        ARQUIVO_REVISOES,
-        {},
-    )
+    dados = await carregar(ARQUIVO_REVISOES, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def _salvar_guild(
@@ -36,18 +34,15 @@ async def listar(
 
     dados = await _tudo()
 
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
+    lista = dados.get(str(guild_id), [])
+    if not isinstance(lista, list):
+        return []
 
+    # Ignora entradas legadas inválidas para que uma única linha corrompida
+    # não impeça a staff de revisar as demais provas.
+    lista = [revisao for revisao in lista if isinstance(revisao, dict)]
     if status:
-        lista = [
-            revisao
-            for revisao in lista
-            if revisao.get("status") == status
-        ]
-
+        lista = [revisao for revisao in lista if revisao.get("status") == status]
     return lista
 
 
