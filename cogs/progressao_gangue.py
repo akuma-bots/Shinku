@@ -74,22 +74,49 @@ class ProgressaoGangue(commands.Cog):
         await salvar(ARQUIVO, dados)
 
     async def _perfil(self, guild_id: int, user_id: int) -> dict:
+        """Lê um perfil e persiste apenas quando cria ou corrige dados legados."""
         async with self._lock:
             dados = await self._dados()
-            guild = dados.setdefault(str(guild_id), {})
-            membros = guild.setdefault("membros", {})
-            perfil = membros.setdefault(str(user_id), {
-                "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
-                "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
-            })
-            perfil.setdefault("xp", 0)
-            perfil.setdefault("mensagens", 0)
-            perfil.setdefault("missoes", 0)
-            perfil.setdefault("guerras", 0)
-            perfil.setdefault("rank_no", 10)
-            perfil.setdefault("ultimo_xp", 0)
-            perfil.setdefault("historico_ranks", [])
-            await self._salvar_dados(dados)
+            chave_guild = str(guild_id)
+            guild = dados.get(chave_guild)
+            mudou = False
+            if not isinstance(guild, dict):
+                guild = {}
+                dados[chave_guild] = guild
+                mudou = True
+
+            membros = guild.get("membros")
+            if not isinstance(membros, dict):
+                membros = {}
+                guild["membros"] = membros
+                mudou = True
+
+            chave_usuario = str(user_id)
+            perfil = membros.get(chave_usuario)
+            if not isinstance(perfil, dict):
+                perfil = {
+                    "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
+                    "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+                }
+                membros[chave_usuario] = perfil
+                mudou = True
+
+            padroes = {
+                "xp": 0,
+                "mensagens": 0,
+                "missoes": 0,
+                "guerras": 0,
+                "rank_no": 10,
+                "ultimo_xp": 0,
+                "historico_ranks": [],
+            }
+            for campo, padrao in padroes.items():
+                if campo not in perfil:
+                    perfil[campo] = list(padrao) if isinstance(padrao, list) else padrao
+                    mudou = True
+
+            if mudou:
+                await self._salvar_dados(dados)
             return dict(perfil)
 
     async def _atualizar_perfil(self, guild_id: int, user_id: int, perfil: dict):
