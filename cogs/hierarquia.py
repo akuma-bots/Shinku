@@ -27,6 +27,21 @@ PATENTES_PADRAO = [
     ("Capitão Geral", 68000),
 ]
 
+CARGOS_PATENTE_ID = {
+    "Lutador": 1561705759992057877,
+    "Subtenente": 1559561987296469024,
+    "Tenente": 1558909073758625973,
+    "Executor": 1561715055077097603,
+    "Especialista": 1561715502508933150,
+    "Elite": 1561703280227262474,
+    "Veterano": 1561703510406602872,
+    "Treinador": 1561706517819039845,
+    "Comandante": 1561715380672798730,
+    "Vice Capitão": 1560370097577791569,
+    "Capitão": 1558909311315607723,
+    "Capitão Geral": 1561706215195541605,
+}
+
 # Permissões cumulativas apenas para funções operacionais delimitadas.
 # Não concedemos Administrator, Manage Guild, Manage Roles, Manage Channels,
 # Kick Members ou Ban Members por esta configuração.
@@ -79,24 +94,27 @@ class Hierarquia(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        por_nome = {cargo.name.casefold(): cargo for cargo in guild.roles}
-        ausentes = [nome for nome, _ in PATENTES_PADRAO if nome.casefold() not in por_nome]
+        por_id = {cargo.id: cargo for cargo in guild.roles}
+        ausentes = [
+            nome for nome, _ in PATENTES_PADRAO
+            if CARGOS_PATENTE_ID[nome] not in por_id
+        ]
         if ausentes:
             await interaction.followup.send(
-                "Não alterei a configuração porque estes cargos não foram encontrados com o nome exato:\n"
-                + "\n".join(f"• {nome}" for nome in ausentes)
-                + "\n\nCrie/renomeie os cargos ou confirme os nomes e execute novamente.",
+                "Não alterei a configuração porque estes IDs de cargos não foram encontrados no servidor:\n"
+                + "\n".join(
+                    f"• {nome}: {CARGOS_PATENTE_ID[nome]}" for nome in ausentes
+                ),
                 ephemeral=True,
             )
             return
 
         patentes = []
         for nome, xp_minimo in PATENTES_PADRAO:
-            cargo = por_nome[nome.casefold()]
             patentes.append({
                 "nome": nome,
                 "xp_minimo": xp_minimo,
-                "cargo_id": cargo.id,
+                "cargo_id": CARGOS_PATENTE_ID[nome],
             })
         await salvar_patentes(guild.id, patentes)
         await interaction.followup.send(
