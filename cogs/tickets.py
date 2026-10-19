@@ -458,10 +458,20 @@ class FecharTicketView(discord.ui.View):
         eh_dono = str(membro.id) == str(registro.get("usuario_id"))
         eh_admin = (
             isinstance(membro, discord.Member)
-            and membro.guild_permissions.manage_channels
+            and (
+                membro.guild_permissions.administrator
+                or membro.guild_permissions.manage_channels
+            )
+        )
+        responsavel_id = registro.get("atendido_por_id")
+        bloqueado_por_responsavel = (
+            responsavel_id
+            and str(membro.id) != str(responsavel_id)
+            and not eh_admin
+            and not eh_dono
         )
 
-        if not (eh_dono or eh_suporte or eh_admin):
+        if bloqueado_por_responsavel or not (eh_dono or eh_suporte or eh_admin):
             await interaction.response.send_message(
                 "Somente o dono deste ticket ou a equipe autorizada pode fechá-lo.",
                 ephemeral=True,
@@ -856,14 +866,29 @@ class Tickets(commands.Cog):
         )
         eh_admin_ticket = (
             isinstance(message.author, discord.Member)
-            and message.author.guild_permissions.manage_channels
+            and (
+                message.author.guild_permissions.administrator
+                or message.author.guild_permissions.manage_channels
+            )
+        )
+        responsavel_id = ticket_atual.get("atendido_por_id") if ticket_atual else None
+        permitido_fechar = (
+            eh_dono_ticket
+            or eh_admin_ticket
+            or (
+                eh_suporte
+                and (
+                    not responsavel_id
+                    or str(message.author.id) == str(responsavel_id)
+                )
+            )
         )
 
         if (
             pediu_fechamento
             and ticket_atual is not None
             and ticket_atual.get("status") == "aberto"
-            and (eh_dono_ticket or eh_suporte or eh_admin_ticket)
+            and permitido_fechar
         ):
             await fechar_canal_ticket(
                 message.channel,
