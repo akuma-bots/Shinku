@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 
@@ -12,10 +13,12 @@ from utils.guild_config import get_config, set_config
 
 
 ARQUIVO = "parcerias.json"
+_PARCERIAS_LOCK = asyncio.Lock()
 
 
 async def _todas():
-    return await carregar(ARQUIVO, {})
+    dados = await carregar(ARQUIVO, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def _da_guild(guild_id: int):
@@ -26,7 +29,7 @@ async def _da_guild(guild_id: int):
     if not isinstance(lista, list):
         lista = []
 
-    return lista
+    return [parceria for parceria in lista if isinstance(parceria, dict)]
 
 
 async def _salvar_da_guild(guild_id: int, lista):
@@ -43,7 +46,7 @@ async def _salvar_da_guild(guild_id: int, lista):
 def _normalizar_parceria(parceria: dict, guild_id: int) -> dict:
     """
     Garante que parcerias antigas continuem funcionando e tenham
-    os campos necessários para o Dashboard.
+    os campos necessários para o histórico interno de parcerias.
     """
 
     resultado = dict(parceria)
@@ -339,8 +342,8 @@ class Parcerias(commands.Cog):
     """
     Sistema de parcerias da NÊMESIS.
 
-    O arquivo parcerias.json é compartilhado pelo Upstash,
-    permitindo que Bot e Dashboard trabalhem sobre a mesma fonte.
+    O arquivo parcerias.json é armazenamento interno do bot,
+    persistido pelo adaptador de armazenamento configurado.
     """
 
     def __init__(
@@ -546,8 +549,7 @@ class Parcerias(commands.Cog):
 
         except discord.Forbidden:
 
-            # Se o anúncio falhar, não apagamos o registro.
-            # O Dashboard continuará enxergando a parceria.
+            # Se o anúncio falhar, mantemos o registro para correção posterior.
             parceria["mensagem_id"] = None
             parceria["canal_id"] = canal.id
 
@@ -556,18 +558,10 @@ class Parcerias(commands.Cog):
             parceria["mensagem_id"] = None
             parceria["canal_id"] = canal.id
 
-        lista = await _normalizar_todas_guild(
-            interaction.guild.id
-        )
-
-        lista.append(
-            parceria
-        )
-
-        await _salvar_da_guild(
-            interaction.guild.id,
-            lista,
-        )
+        async with _PARCERIAS_LOCK:
+            lista = await _normalizar_todas_guild(interaction.guild.id)
+            lista.append(parceria)
+            await _salvar_da_guild(interaction.guild.id, lista)
 
         if cargo and not aviso_cargo:
 
@@ -616,70 +610,71 @@ class Parcerias(commands.Cog):
         nome: str,
     ):
 
-        lista = await _normalizar_todas_guild(
-            interaction.guild.id
-        )
-
-        indice = next(
-            (
-                i
-                for i, parceria in enumerate(lista)
-                if parceria["nome"].lower()
-                == nome.lower()
-            ),
-            None,
-        )
-
-        if indice is None:
-            await interaction.response.send_message(
-                "Não achei nenhuma parceria com esse nome.",
-                ephemeral=True,
+        async with _PARCERIAS_LOCK:
+            lista = await _normalizar_todas_guild(
+                interaction.guild.id
             )
-            return
-
-        alvo = lista[indice]
-
-        cargo_id = alvo.get(
-            "cargo_id"
-        )
-
-        if cargo_id:
-
-            cargo = interaction.guild.get_role(
-                cargo_id
+    
+            indice = next(
+                (
+                    i
+                    for i, parceria in enumerate(lista)
+                    if parceria["nome"].lower()
+                    == nome.lower()
+                ),
+                None,
             )
-
-            if cargo:
-
-                try:
-                    await cargo.delete(
-                        reason=(
-                            f"Parceria com {nome} removida"
+    
+            if indice is None:
+                await interaction.response.send_message(
+                    "Não achei nenhuma parceria com esse nome.",
+                    ephemeral=True,
+                )
+                return
+    
+            alvo = lista[indice]
+    
+            cargo_id = alvo.get(
+                "cargo_id"
+            )
+    
+            if cargo_id:
+    
+                cargo = interaction.guild.get_role(
+                    cargo_id
+                )
+    
+                if cargo:
+    
+                    try:
+                        await cargo.delete(
+                            reason=(
+                                f"Parceria com {nome} removida"
+                            )
                         )
-                    )
-
-                except (
-                    discord.Forbidden,
-                    discord.HTTPException,
-                ):
-                    pass
-
-        alvo["status"] = "removida"
-        alvo["atualizado_em"] = time.time()
-        alvo["removido_por_id"] = (
-            interaction.user.id
-        )
-        alvo["removido_em"] = time.time()
-
-        # Mantém o registro histórico para o Dashboard,
-        # mas deixa a parceria inativa.
-        lista[indice] = alvo
-
-        await _salvar_da_guild(
-            interaction.guild.id,
-            lista,
-        )
-
+    
+                    except (
+                        discord.Forbidden,
+                        discord.HTTPException,
+                    ):
+                        pass
+    
+            alvo["status"] = "removida"
+            alvo["atualizado_em"] = time.time()
+            alvo["removido_por_id"] = (
+                interaction.user.id
+            )
+            alvo["removido_em"] = time.time()
+    
+            # Mantém o registro histórico e marca a parceria como inativa.
+            lista[indice] = alvo
+    
+            await _salvar_da_guild(
+                interaction.guild.id,
+                lista,
+            )
+    
+    
         await interaction.response.send_message(
             f"✓ Parceria com **{nome}** removida "
             "e marcada como inativa.",
