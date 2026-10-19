@@ -1,3 +1,4 @@
+import asyncio
 import re
 import time
 import uuid
@@ -9,6 +10,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 
 ARQUIVO_GUERRAS = "guerras.json"
+_GUERRAS_LOCK = asyncio.Lock()
 COR_NEMESIS = 0xB51F32
 REGRAS_PADRAO = [
     "Respeitar todos os participantes e a staff.",
@@ -18,6 +20,13 @@ REGRAS_PADRAO = [
     "É proibido falsificar placares ou provas.",
     "A staff pode anular resultados com evidências de irregularidades.",
 ]
+
+
+def _inteiro_seguro(valor, padrao=0):
+    try:
+        return int(valor)
+    except (TypeError, ValueError, OverflowError):
+        return padrao
 
 
 def _resultado(placar_nemesis: int, placar_inimiga: int) -> str:
@@ -36,21 +45,34 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     async def _dados_guild(self, guild_id: int) -> dict:
         todos = await carregar(ARQUIVO_GUERRAS, {})
+        if not isinstance(todos, dict):
+            todos = {}
         dados = todos.get(str(guild_id), {})
-        dados.setdefault("guild_id", guild_id)
-        dados.setdefault("temporada_atual", 1)
-        dados.setdefault("guerras", [])
-        dados.setdefault("agendamentos", [])
-        dados.setdefault("regras", REGRAS_PADRAO.copy())
+        if not isinstance(dados, dict):
+            dados = {}
+        guerras = dados.get("guerras", [])
+        agendamentos = dados.get("agendamentos", [])
+        regras = dados.get("regras", REGRAS_PADRAO.copy())
+        dados["guild_id"] = guild_id
+        dados["temporada_atual"] = max(1, _inteiro_seguro(dados.get("temporada_atual", 1), 1))
+        dados["guerras"] = [item for item in guerras if isinstance(item, dict)] if isinstance(guerras, list) else []
+        dados["agendamentos"] = [item for item in agendamentos if isinstance(item, dict)] if isinstance(agendamentos, list) else []
+        dados["regras"] = [str(item) for item in regras if str(item).strip()] if isinstance(regras, list) else REGRAS_PADRAO.copy()
         return dados
 
     async def _salvar_dados_guild(self, guild_id: int, dados: dict):
         todos = await carregar(ARQUIVO_GUERRAS, {})
+        if not isinstance(todos, dict):
+            todos = {}
+        if not isinstance(dados, dict):
+            dados = {}
         dados["guild_id"] = guild_id
-        dados.setdefault("temporada_atual", 1)
-        dados.setdefault("guerras", [])
-        dados.setdefault("agendamentos", [])
-        dados.setdefault("regras", REGRAS_PADRAO.copy())
+        dados["temporada_atual"] = max(1, _inteiro_seguro(dados.get("temporada_atual", 1), 1))
+        for campo in ("guerras", "agendamentos"):
+            valor = dados.get(campo, [])
+            dados[campo] = [item for item in valor if isinstance(item, dict)] if isinstance(valor, list) else []
+        regras = dados.get("regras", REGRAS_PADRAO.copy())
+        dados["regras"] = [str(item) for item in regras if str(item).strip()] if isinstance(regras, list) else REGRAS_PADRAO.copy()
         todos[str(guild_id)] = dados
         await salvar(ARQUIVO_GUERRAS, todos)
 
