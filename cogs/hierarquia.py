@@ -38,20 +38,26 @@ PERMISSOES_POR_PATENTE = {
     "Especialista": set(),
     "Elite": set(),
     "Veterano": set(),
-    "Treinador": {"manage_messages"},
-    "Comandante": {"manage_messages", "moderate_members"},
-    "Vice Capitão": {"manage_messages", "moderate_members", "manage_nicknames"},
-    "Capitão": {"manage_messages", "moderate_members", "manage_nicknames", "manage_events"},
+    # A progressão oferece recursos de participação, não moderação/administração.
+    "Treinador": {"create_public_threads"},
+    "Comandante": {"create_public_threads", "create_private_threads"},
+    "Vice Capitão": {"create_public_threads", "create_private_threads", "use_external_emojis"},
+    "Capitão": {"create_public_threads", "create_private_threads", "use_external_emojis", "use_external_stickers"},
     "Capitão Geral": {
-        "manage_messages", "moderate_members", "manage_nicknames",
-        "manage_events", "manage_threads",
+        "create_public_threads", "create_private_threads",
+        "use_external_emojis", "use_external_stickers",
+        "send_messages_in_threads",
     },
 }
 
+# Estas permissões não são concedidas pela hierarquia competitiva. As permissões
+# administrativas/moderativas permanecem reservadas ao OCTÓGONO/liderança.
 PERMISSOES_RESTRITAS = {
     "administrator", "manage_guild", "manage_roles", "manage_channels",
-    "kick_members", "ban_members", "mention_everyone", "manage_webhooks",
-    "manage_permissions",
+    "kick_members", "ban_members", "moderate_members", "manage_messages",
+    "manage_nicknames", "manage_events", "manage_threads", "manage_webhooks",
+    "manage_permissions", "mention_everyone", "manage_expressions",
+    "manage_guild_expressions", "manage_emojis", "manage_emojis_and_stickers",
 }
 
 
