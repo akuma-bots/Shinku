@@ -1920,18 +1920,8 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         membro = message.author
 
-        if isinstance(
-            membro,
-            discord.Member,
-        ):
-
-            if (
-                membro.guild_permissions.administrator
-                or membro.guild_permissions.manage_guild
-                or membro.guild_permissions.manage_messages
-            ):
-
-                return
+        # As regras também se aplicam à Staff e à Administração.
+        # Apenas bots e o canal oficial de regras são ignorados acima.
 
         chave = (
             message.guild.id,
