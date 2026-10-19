@@ -454,11 +454,11 @@ class Missoes(commands.Cog):
                 descricao = "Sem descrição cadastrada"
             identificador = str(item.get("id") or "—")
             embed.add_field(
-                name=f"{icone} {indice:02d} · {titulo} — {recompensa:,} P.C.".replace(",", ".")[:256],
+                name=f"{icone} {indice:02d} · {titulo[:75]} — {recompensa:,} P.C.".replace(",", ".")[:150],
                 value=(
                     f"{descricao[:110]}\n"
                     f"┊ **Tipo:** {tipo['nome']}  ·  **Estado:** {estado}\n"
-                    f"┊ **ID:** `{identificador[:80]}`"
+                    f"┊ **ID:** `{identificador[:24]}`"
                 )[:1024],
                 inline=False,
             )
