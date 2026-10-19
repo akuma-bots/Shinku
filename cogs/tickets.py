@@ -725,19 +725,29 @@ class Tickets(commands.Cog):
         )
 
         embed = criar_embed(
-            f"{tipo.get('emoji', '🎫')} {tipo['label']}",
+            f"✦・ NÊMESIS — {tipo['label'].upper()} ・✦",
             (
-                "Seu atendimento foi aberto. Descreva o que precisa, "
-                "inclua o contexto necessário e aguarde a equipe."
+                f"Olá, {user.mention}. Seu atendimento foi iniciado com sucesso.\n\n"
+                "╭──────────── ◈ ATENDIMENTO ◈ ────────────╮\n"
+                "➜ Explique sua solicitação com detalhes.\n"
+                "➜ Envie provas, imagens ou contexto quando necessário.\n"
+                "➜ Aguarde a equipe responsável responder.\n"
+                "➜ Use **Fechar Ticket** quando o atendimento terminar.\n"
+                "╰─────────────────────────────────────────╯"
             ),
-            rodape="NÊMESIS • Atendimento privado",
+            rodape="NÊMESIS • Central de atendimento privada",
+            timestamp=True,
         )
+        embed.add_field(name="Categoria", value=tipo["label"][:1024], inline=True)
+        embed.add_field(name="Solicitante", value=f"{user.mention}\n`{user.id}`", inline=True)
+        embed.add_field(name="Status", value="🟢 Aguardando atendimento", inline=True)
+        embed.set_thumbnail(url=user.display_avatar.url)
 
         try:
             mensagem = await canal.send(
-                content=user.mention,
                 embed=embed,
                 view=FecharTicketView(),
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
 
             # Salva o registro depois de publicar a mensagem inicial.
