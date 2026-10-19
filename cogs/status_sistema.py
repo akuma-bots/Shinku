@@ -51,7 +51,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         await interaction.response.defer(ephemeral=True, thinking=True)
         if not USANDO_UPSTASH:
             await interaction.followup.send(
-                "⚠️ O bot está usando armazenamento local privado. Nenhuma sincronização com o site é realizada.",
+                "⚠️ O bot está usando armazenamento local privado. Os dados podem não persistir após reinicializações.",
                 ephemeral=True,
             )
             return
@@ -71,7 +71,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
             return
 
         await interaction.followup.send(
-            "✅ O armazenamento privado do bot respondeu. Os dados do bot estão isolados do site.",
+            "✅ O armazenamento privado do bot respondeu corretamente.",
             ephemeral=True,
         )
 
