@@ -610,69 +610,71 @@ class Parcerias(commands.Cog):
         nome: str,
     ):
 
-        lista = await _normalizar_todas_guild(
-            interaction.guild.id
-        )
-
-        indice = next(
-            (
-                i
-                for i, parceria in enumerate(lista)
-                if parceria["nome"].lower()
-                == nome.lower()
-            ),
-            None,
-        )
-
-        if indice is None:
-            await interaction.response.send_message(
-                "Não achei nenhuma parceria com esse nome.",
-                ephemeral=True,
+        async with _PARCERIAS_LOCK:
+            lista = await _normalizar_todas_guild(
+                interaction.guild.id
             )
-            return
-
-        alvo = lista[indice]
-
-        cargo_id = alvo.get(
-            "cargo_id"
-        )
-
-        if cargo_id:
-
-            cargo = interaction.guild.get_role(
-                cargo_id
+    
+            indice = next(
+                (
+                    i
+                    for i, parceria in enumerate(lista)
+                    if parceria["nome"].lower()
+                    == nome.lower()
+                ),
+                None,
             )
-
-            if cargo:
-
-                try:
-                    await cargo.delete(
-                        reason=(
-                            f"Parceria com {nome} removida"
+    
+            if indice is None:
+                await interaction.response.send_message(
+                    "Não achei nenhuma parceria com esse nome.",
+                    ephemeral=True,
+                )
+                return
+    
+            alvo = lista[indice]
+    
+            cargo_id = alvo.get(
+                "cargo_id"
+            )
+    
+            if cargo_id:
+    
+                cargo = interaction.guild.get_role(
+                    cargo_id
+                )
+    
+                if cargo:
+    
+                    try:
+                        await cargo.delete(
+                            reason=(
+                                f"Parceria com {nome} removida"
+                            )
                         )
-                    )
-
-                except (
-                    discord.Forbidden,
-                    discord.HTTPException,
-                ):
-                    pass
-
-        alvo["status"] = "removida"
-        alvo["atualizado_em"] = time.time()
-        alvo["removido_por_id"] = (
-            interaction.user.id
-        )
-        alvo["removido_em"] = time.time()
-
-        # Mantém o registro histórico e marca a parceria como inativa.
-        lista[indice] = alvo
-
-        await _salvar_da_guild(
-            interaction.guild.id,
-            lista,
-        )
-
+    
+                    except (
+                        discord.Forbidden,
+                        discord.HTTPException,
+                    ):
+                        pass
+    
+            alvo["status"] = "removida"
+            alvo["atualizado_em"] = time.time()
+            alvo["removido_por_id"] = (
+                interaction.user.id
+            )
+            alvo["removido_em"] = time.time()
+    
+            # Mantém o registro histórico e marca a parceria como inativa.
+            lista[indice] = alvo
+    
+            await _salvar_da_guild(
+                interaction.guild.id,
+                lista,
+            )
+    
+    
         await interaction.response.send_message(
             f"✓ Parceria com **{nome}** removida "
             "e marcada como inativa.",
