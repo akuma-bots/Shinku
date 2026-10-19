@@ -50,6 +50,23 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
             await cog._extrair("x" * 301)
         cog.ytdl.extract_info.assert_not_called()
 
+    async def test_aceita_resultados_lazy_do_ytdlp(self):
+        cog = self.criar_cog({
+            "entries": iter([
+                None,
+                {
+                    "url": "https://audio.example/stream",
+                    "title": "Busca",
+                    "webpage_url": "https://www.youtube.com/watch?v=abc",
+                    "duration": 30,
+                },
+            ])
+        })
+        resultado = await cog._extrair("nome da música")
+
+        self.assertEqual(resultado["title"], "Busca")
+        self.assertEqual(resultado["duration"], 30)
+
 
 if __name__ == "__main__":
     unittest.main()
