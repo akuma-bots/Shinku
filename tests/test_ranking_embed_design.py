@@ -45,6 +45,7 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("385 P.C.", embed.description)
         self.assertIn("K/D **2/1**", embed.description)
         self.assertIn("Patente **Tenente**", embed.description)
+        self.assertIn("PÁGINA:shigaku", embed.footer.text)
         self.assertEqual(embed.color.value, 0x9F2035)
 
     async def test_ranking_vazio_mostra_mensagem_curta(self):
