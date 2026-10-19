@@ -14,6 +14,19 @@ _LOG = logging.getLogger(__name__)
 _AUTO_ROLE_LOCK = asyncio.Lock()
 
 
+def _cargo_atribuivel(guild, cargo) -> bool:
+    bot_member = getattr(guild, "me", None)
+    if bot_member is None:
+        return False
+    permissoes = getattr(bot_member, "guild_permissions", None)
+    if permissoes is None or not getattr(permissoes, "manage_roles", False):
+        return False
+    try:
+        return not cargo.is_default() and not cargo.managed and cargo < bot_member.top_role
+    except (AttributeError, TypeError):
+        return False
+
+
 class CargoAutomatico(commands.Cog):
     """Canais 'administrados' pelo bot: qualquer mensagem postada ali
     (texto, print, comprovante etc) dá automaticamente um cargo escolhido
@@ -30,14 +43,7 @@ class CargoAutomatico(commands.Cog):
     @app_commands.describe(canal="Canal que vai dar o cargo", cargo="Cargo que a pessoa recebe ao postar ali")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def definir_canal_cargo(self, interaction: discord.Interaction, canal: discord.TextChannel, cargo: discord.Role):
-        bot_member = interaction.guild.me
-        if (
-            bot_member is None
-            or not bot_member.guild_permissions.manage_roles
-            or cargo >= bot_member.top_role
-            or cargo.is_default()
-            or cargo.managed
-        ):
+        if not _cargo_atribuivel(interaction.guild, cargo):
             await interaction.response.send_message(
                 "⚠️ Não consigo atribuir esse cargo. Confira se tenho a permissão **Gerenciar cargos** "
                 "e se o cargo escolhido é atribuível e está abaixo do meu cargo mais alto.",
@@ -106,13 +112,7 @@ class CargoAutomatico(commands.Cog):
             membro = message.guild.get_member(message.author.id) or membro
             if cargo in membro.roles:
                 return
-            bot_member = message.guild.me
-            if (
-                bot_member is None
-                or not bot_member.guild_permissions.manage_roles
-                or cargo >= bot_member.top_role
-                or cargo.managed
-            ):
+            if not _cargo_atribuivel(message.guild, cargo):
                 _LOG.warning(
                     "Cargo automático não atribuível (guild=%s, channel=%s, role=%s).",
                     message.guild.id, message.channel.id, cargo.id,
