@@ -11,6 +11,15 @@ from utils.guild_config import get_config, set_config
 from utils import tickets
 
 
+log = logging.getLogger(__name__)
+
+
+async def _preparar_resposta_interacao(interaction: discord.Interaction) -> None:
+    """Adia a resposta do componente sem tentar reconhecer a interação duas vezes."""
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+
 CANAIS_ESCALADOS = set()        # tickets já entregues para atendimento humano
 ULTIMA_ATIVIDADE = {}           # channel_id -> timestamp da última mensagem
 CANAIS_FECHANDO = set()         # evita fechar o mesmo canal duas vezes ao mesmo tempo
@@ -396,8 +405,11 @@ class FecharTicketView(discord.ui.View):
         guild = interaction.guild
         membro = interaction.user
 
+        # Responde imediatamente para evitar expiração da interação durante I/O.
+        await _preparar_resposta_interacao(interaction)
+
         if not guild or not isinstance(canal, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Este botão só pode ser usado dentro de um ticket.",
                 ephemeral=True,
             )
@@ -406,7 +418,7 @@ class FecharTicketView(discord.ui.View):
         info_topic = tickets.parse_topic(canal.topic)
         registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
         if not info_topic or not registro or registro.get("status") != "aberto":
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Este canal não é um ticket aberto válido.",
                 ephemeral=True,
             )
@@ -437,7 +449,7 @@ class FecharTicketView(discord.ui.View):
             )
         )
         if not (eh_admin or eh_suporte):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Somente a equipe de suporte ou a administração pode assumir este atendimento.",
                 ephemeral=True,
             )
@@ -446,12 +458,12 @@ class FecharTicketView(discord.ui.View):
         responsavel_atual = registro.get("atendido_por_id")
         if responsavel_atual:
             if str(responsavel_atual) == str(membro.id):
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Você já é o responsável por este ticket.",
                     ephemeral=True,
                 )
             else:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f"Este ticket já está sob responsabilidade de <@{responsavel_atual}>. "
                     "Somente a administração pode intervir.",
                     ephemeral=True,
@@ -465,7 +477,7 @@ class FecharTicketView(discord.ui.View):
             membro.id,
         )
         if not atualizado:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Não consegui registrar a responsabilidade. Tente novamente.",
                 ephemeral=True,
             )
@@ -511,7 +523,7 @@ class FecharTicketView(discord.ui.View):
                 guild.id,
                 registro["id"],
             )
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Não consegui aplicar as permissões de responsável. Verifique as permissões do bot.",
                 ephemeral=True,
             )
@@ -519,7 +531,10 @@ class FecharTicketView(discord.ui.View):
 
         button.label = f"Responsável: {membro.display_name}"[:80]
         button.disabled = True
-        await interaction.response.edit_message(view=self)
+        try:
+            await interaction.message.edit(view=self)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            log.warning("Não foi possível atualizar os botões do ticket %s após atribuir atendimento.", canal.id)
         await interaction.followup.send(
             f"✅ Você agora é responsável por {canal.mention}. "
             "A equipe comum não pode intervir; a administração continua com acesso.",
@@ -540,8 +555,12 @@ class FecharTicketView(discord.ui.View):
         guild = interaction.guild
         membro = interaction.user
 
+        # O fechamento executa operações de armazenamento e exclusão de canal.
+        # Adia a resposta para não deixar a interação expirar após 3 segundos.
+        await _preparar_resposta_interacao(interaction)
+
         if not guild or not isinstance(canal, discord.TextChannel):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Este botão só pode ser usado dentro de um ticket do servidor.",
                 ephemeral=True,
             )
@@ -555,7 +574,7 @@ class FecharTicketView(discord.ui.View):
             or registro.get("status") != "aberto"
             or str(registro.get("usuario_id")) != str(info_topic.get("owner_id"))
         ):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Este canal não é um ticket aberto válido.",
                 ephemeral=True,
             )
@@ -595,13 +614,13 @@ class FecharTicketView(discord.ui.View):
         )
 
         if bloqueado_por_responsavel or not (eh_dono or eh_suporte or eh_admin):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Somente o dono deste ticket ou a equipe autorizada pode fechá-lo.",
                 ephemeral=True,
             )
             return
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "Fechando o ticket...",
             ephemeral=True,
         )
