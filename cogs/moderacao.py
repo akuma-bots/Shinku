@@ -36,7 +36,7 @@ class Moderacao(commands.Cog):
                 logging.warning("Canal de logs %s não aceita mensagens.", log_id)
                 return
 
-            await canal.send(texto)
+            await canal.send(texto, allowed_mentions=discord.AllowedMentions.none())
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
             logging.exception("Não foi possível registrar a ação de moderação no canal de logs.")
         except Exception:
@@ -172,6 +172,7 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         ban_members=True
     )
+    @app_commands.checks.bot_has_permissions(ban_members=True)
     async def ban(
         self,
         interaction: discord.Interaction,
@@ -216,6 +217,7 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         kick_members=True
     )
+    @app_commands.checks.bot_has_permissions(kick_members=True)
     async def kick(
         self,
         interaction: discord.Interaction,
@@ -258,6 +260,7 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         moderate_members=True
     )
+    @app_commands.checks.bot_has_permissions(moderate_members=True)
     async def mute(
         self,
         interaction: discord.Interaction,
@@ -305,6 +308,7 @@ class Moderacao(commands.Cog):
     @app_commands.checks.has_permissions(
         moderate_members=True
     )
+    @app_commands.checks.bot_has_permissions(moderate_members=True)
     async def unmute(
         self,
         interaction: discord.Interaction,
