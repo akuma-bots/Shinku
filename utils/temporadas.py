@@ -35,10 +35,8 @@ ESTADO_PADRAO = {
 
 
 async def _tudo():
-    return await carregar(
-        ARQUIVO_TEMPORADAS,
-        {},
-    )
+    dados = await carregar(ARQUIVO_TEMPORADAS, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def get_estado(
@@ -47,15 +45,28 @@ async def get_estado(
 
     dados = await _tudo()
 
-    estado = dados.get(
-        str(guild_id),
-        {},
-    )
+    estado = dados.get(str(guild_id), {})
+    if not isinstance(estado, dict):
+        estado = {}
 
-    return {
-        **ESTADO_PADRAO,
-        **estado,
-    }
+    normalizado = {**ESTADO_PADRAO, **estado}
+    try:
+        normalizado["numero_atual"] = max(1, int(normalizado.get("numero_atual", 1) or 1))
+        normalizado["duracao_dias"] = max(1, int(normalizado.get("duracao_dias", 30)))
+        for campo, padrao in (("bonus_ouro", 200), ("bonus_prata", 100), ("bonus_bronze", 50)):
+            normalizado[campo] = max(0, int(normalizado.get(campo, padrao) or 0))
+    except (TypeError, ValueError, OverflowError):
+        normalizado["numero_atual"] = max(1, int(ESTADO_PADRAO["numero_atual"]))
+        normalizado["duracao_dias"] = max(1, int(ESTADO_PADRAO["duracao_dias"]))
+        normalizado["bonus_ouro"] = ESTADO_PADRAO["bonus_ouro"]
+        normalizado["bonus_prata"] = ESTADO_PADRAO["bonus_prata"]
+        normalizado["bonus_bronze"] = ESTADO_PADRAO["bonus_bronze"]
+
+    if not isinstance(normalizado.get("baseline"), dict):
+        normalizado["baseline"] = {}
+    if not isinstance(normalizado.get("historico"), list):
+        normalizado["historico"] = []
+    return normalizado
 
 
 async def _salvar_estado(
@@ -99,27 +110,17 @@ async def _pesos(
     }
 
 
-def _pontuacao(
-    perfil: dict,
-    pesos: dict,
-) -> float:
+def _pontuacao(perfil: dict, pesos: dict) -> float:
+    def numero(valor):
+        try:
+            return max(0.0, float(valor or 0))
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
 
     return (
-        perfil.get(
-            "xp",
-            0,
-        )
-        * pesos["xp"]
-        + perfil.get(
-            "vitorias",
-            0,
-        )
-        * pesos["vitoria"]
-        + perfil.get(
-            "mvps",
-            0,
-        )
-        * pesos["mvp"]
+        numero(perfil.get("xp", 0)) * numero(pesos.get("xp", PESOS_PADRAO["xp"]))
+        + numero(perfil.get("vitorias", 0)) * numero(pesos.get("vitoria", PESOS_PADRAO["vitoria"]))
+        + numero(perfil.get("mvps", 0)) * numero(pesos.get("mvp", PESOS_PADRAO["mvp"]))
     )
 
 
@@ -132,64 +133,53 @@ async def _pontuacoes_atuais(
         {},
     )
 
-    perfis_guild = todos.get(
-        str(guild_id),
-        {},
-    )
+    if not isinstance(todos, dict):
+        return {}
+    perfis_guild = todos.get(str(guild_id), {})
+    if not isinstance(perfis_guild, dict):
+        return {}
 
-    pesos = await _pesos(
-        guild_id
-    )
-
-    return {
-        uid: _pontuacao(
-            perfil,
-            pesos,
-        )
-        for uid, perfil
-        in perfis_guild.items()
-    }
+    pesos = await _pesos(guild_id)
+    resultado = {}
+    for uid, perfil in perfis_guild.items():
+        if not isinstance(perfil, dict):
+            continue
+        try:
+            resultado[str(uid)] = _pontuacao(perfil, pesos)
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return resultado
 
 
-async def configurar(
-    guild_id: int,
-    **campos,
-):
+async def configurar(guild_id: int, **campos):
+    if campos.get("duracao_dias") is not None:
+        try:
+            duracao = int(campos["duracao_dias"])
+        except (TypeError, ValueError, OverflowError) as erro:
+            raise ValueError("A duração precisa ser um número inteiro.") from erro
+        if duracao < 1 or duracao > 365:
+            raise ValueError("A duração deve ficar entre 1 e 365 dias.")
+        campos["duracao_dias"] = duracao
 
-    estado = await get_estado(
-        guild_id
-    )
+    for campo in ("bonus_ouro", "bonus_prata", "bonus_bronze"):
+        if campos.get(campo) is None:
+            continue
+        try:
+            bonus = int(campos[campo])
+        except (TypeError, ValueError, OverflowError) as erro:
+            raise ValueError(f"{campo} precisa ser um número inteiro.") from erro
+        if bonus < 0:
+            raise ValueError("Os bônus de XP não podem ser negativos.")
+        campos[campo] = bonus
 
-    estado.update(
-        {
-            chave: valor
-            for chave, valor
-            in campos.items()
-            if valor is not None
-        }
-    )
-
-    if (
-        estado["inicio_timestamp"]
-        is None
-    ):
-
-        estado["inicio_timestamp"] = (
-            time.time()
-        )
-
-        estado["baseline"] = (
-            await _pontuacoes_atuais(
-                guild_id
-            )
-        )
-
-    await _salvar_estado(
-        guild_id,
-        estado,
-    )
-
-    return estado
+    async with _ENCERRAR_TEMPORADA_LOCK:
+        estado = await get_estado(guild_id)
+        estado.update({chave: valor for chave, valor in campos.items() if valor is not None})
+        if estado["inicio_timestamp"] is None:
+            estado["inicio_timestamp"] = time.time()
+            estado["baseline"] = await _pontuacoes_atuais(guild_id)
+        await _salvar_estado(guild_id, estado)
+        return estado
 
 
 async def top_da_temporada(
