@@ -12,10 +12,8 @@ _STATUS_RESPOSTA_LOCK = asyncio.Lock()
 
 
 async def _tudo_formularios():
-    return await carregar(
-        ARQUIVO_FORMULARIOS,
-        {},
-    )
+    dados = await carregar(ARQUIVO_FORMULARIOS, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def _salvar_formularios_guild(
@@ -24,7 +22,9 @@ async def _salvar_formularios_guild(
 ):
     dados = await _tudo_formularios()
 
-    dados[str(guild_id)] = lista
+    dados[str(guild_id)] = [
+        item for item in lista if isinstance(item, dict)
+    ] if isinstance(lista, list) else []
 
     await salvar(
         ARQUIVO_FORMULARIOS,
@@ -38,10 +38,8 @@ async def listar_formularios(
 
     dados = await _tudo_formularios()
 
-    return dados.get(
-        str(guild_id),
-        [],
-    )
+    lista = dados.get(str(guild_id), [])
+    return [item for item in lista if isinstance(item, dict)] if isinstance(lista, list) else []
 
 
 async def get_formulario(
@@ -322,10 +320,8 @@ async def remover_cargo_notificar(
 # ============================================================
 
 async def _tudo_respostas():
-    return await carregar(
-        ARQUIVO_RESPOSTAS,
-        {},
-    )
+    dados = await carregar(ARQUIVO_RESPOSTAS, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 async def _salvar_respostas_guild(
@@ -334,7 +330,9 @@ async def _salvar_respostas_guild(
 ):
     dados = await _tudo_respostas()
 
-    dados[str(guild_id)] = lista
+    dados[str(guild_id)] = [
+        item for item in lista if isinstance(item, dict)
+    ] if isinstance(lista, list) else []
 
     await salvar(
         ARQUIVO_RESPOSTAS,
@@ -411,18 +409,12 @@ async def get_resposta(
 ):
 
     dados = await _tudo_respostas()
-
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
-
+    lista = dados.get(str(guild_id), [])
+    if not isinstance(lista, list):
+        return None
     return next(
-        (
-            resposta
-            for resposta in lista
-            if resposta.get("id") == resposta_id
-        ),
+        (resposta for resposta in lista
+         if isinstance(resposta, dict) and resposta.get("id") == resposta_id),
         None,
     )
 
@@ -440,13 +432,12 @@ async def definir_status_resposta(
     async with _STATUS_RESPOSTA_LOCK:
         dados = await _tudo_respostas()
         lista = dados.get(str(guild_id), [])
+        if not isinstance(lista, list):
+            lista = []
+        lista = [resposta for resposta in lista if isinstance(resposta, dict)]
 
         alvo = next(
-            (
-                resposta
-                for resposta in lista
-                if resposta.get("id") == resposta_id
-            ),
+            (resposta for resposta in lista if resposta.get("id") == resposta_id),
             None,
         )
 
@@ -468,10 +459,10 @@ async def listar_respostas(
 
     dados = await _tudo_respostas()
 
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
+    lista = dados.get(str(guild_id), [])
+    if not isinstance(lista, list):
+        return []
+    lista = [resposta for resposta in lista if isinstance(resposta, dict)]
 
     if formulario_id:
         lista = [
