@@ -111,7 +111,7 @@ async def fechar_canal_ticket(
                 try:
                     embed = criar_embed(
                         "✦・ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO ・✦",
-                        f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\\n\\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
+                        f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\n\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
                         rodape="NÊMESIS • Central de atendimento",
                     )
                     await dono.send(embed=embed, view=AvaliacaoTicketView(
