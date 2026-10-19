@@ -41,6 +41,22 @@ class TestSelecaoVencedoresSorteio(unittest.TestCase):
         )
         self.assertEqual(resultado, [])
 
+    def test_participantes_duplicados_nao_geram_vencedores_duplicados(self):
+        with patch("cogs.sorteios.random.sample", return_value=[20, 10]) as sample:
+            resultado = _selecionar_vencedores(
+                participantes=[10, 20, 10, "20", 30],
+                quantidade_solicitada=2,
+            )
+        self.assertEqual(resultado, [20, 10])
+        sample.assert_called_once_with([10, 20, 30], 2)
+
+    def test_quantidade_invalida_nao_interrompe_o_sorteio(self):
+        resultado = _selecionar_vencedores(
+            participantes=[10, 20],
+            quantidade_solicitada="inválida",
+        )
+        self.assertEqual(resultado, [])
+
 
 if __name__ == "__main__":
     unittest.main()
