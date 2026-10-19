@@ -471,41 +471,36 @@ class FecharTicketView(discord.ui.View):
         # Bloqueia a equipe comum de enviar mensagens; a pessoa responsável e
         # cargos administrativos recebem permissão explícita para continuar.
         try:
+            # Consolida as alterações num único PATCH do canal. Fazer um
+            # set_permissions por cargo gera dezenas de pedidos e pode causar 429.
+            overwrites = dict(canal.overwrites)
             for cargo in guild.roles:
                 if cargo.is_default():
                     continue
                 if cargo_suporte and cargo.position >= cargo_suporte.position:
-                    await canal.set_permissions(
-                        cargo,
-                        overwrite=discord.PermissionOverwrite(
-                            view_channel=True,
-                            send_messages=False,
-                            read_message_history=True,
-                        ),
-                        reason=f"Ticket assumido por {membro} ({membro.id})",
-                    )
+                    atual = overwrites.get(cargo, discord.PermissionOverwrite())
+                    atual.view_channel = True
+                    atual.send_messages = False
+                    atual.read_message_history = True
+                    overwrites[cargo] = atual
                 if cargo.permissions.administrator or cargo.permissions.manage_channels:
-                    await canal.set_permissions(
-                        cargo,
-                        overwrite=discord.PermissionOverwrite(
-                            view_channel=True,
-                            send_messages=True,
-                            read_message_history=True,
-                            manage_messages=True,
-                            manage_channels=True,
-                        ),
-                        reason="Permitir intervenção administrativa em ticket atribuído",
+                    overwrites[cargo] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        read_message_history=True,
+                        manage_messages=True,
+                        manage_channels=True,
                     )
 
-            await canal.set_permissions(
-                membro,
-                overwrite=discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    manage_messages=eh_admin,
-                ),
-                reason=f"Responsável pelo ticket: {membro} ({membro.id})",
+            overwrites[membro] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                manage_messages=eh_admin,
+            )
+            await canal.edit(
+                overwrites=overwrites,
+                reason=f"Ticket assumido por {membro} ({membro.id})",
             )
         except (discord.Forbidden, discord.HTTPException):
             # Evita deixar uma atribuição aparentemente concluída sem bloqueio.
