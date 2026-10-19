@@ -3,7 +3,8 @@ import logging
 
 import discord
 
-from utils.perfis import get_patentes, definir_patente
+from utils.perfis import ARQUIVO_PATENTES, definir_patente
+from utils.storage import carregar
 
 log = logging.getLogger(__name__)
 
@@ -68,18 +69,25 @@ async def sincronizar_cargo_patente(
         )
         return nome_patente
 
-    # Também reconhece IDs antigos que estejam salvos na configuração, para
-    # que a troca para os cargos oficiais limpe a patente anterior.
+    # Reconhece tanto os IDs oficiais quanto IDs antigos persistidos antes
+    # desta atualização, para substituir de fato o cargo anterior.
     ids_patentes = {cargo_id for _, _, cargo_id in PATENTES_NEMESIS}
     try:
-        configuradas = await get_patentes(guild.id)
+        todas_configuracoes = await carregar(ARQUIVO_PATENTES, {})
+        configuradas = (
+            todas_configuracoes.get(str(guild.id), [])
+            if isinstance(todas_configuracoes, dict)
+            else []
+        )
         for item in configuradas:
+            if not isinstance(item, dict):
+                continue
             cargo_id = item.get("cargo_id")
             if cargo_id:
                 try:
                     ids_patentes.add(int(cargo_id))
                 except (TypeError, ValueError):
-                    log.warning("ID de patente inválido na configuração: %r", cargo_id)
+                    log.warning("ID de patente inválido na configuração antiga: %r", cargo_id)
     except Exception:
         log.exception("Não foi possível ler a configuração antiga de patentes.")
 
