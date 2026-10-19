@@ -316,8 +316,6 @@ async def encerrar_temporada(
                 perfil["temporadas_bonus_aplicados"] = eventos[-500:]
                 await _salvar_perfil(guild_id, user_id, perfil)
 
-            # O marcador permite retomar o encerramento sem repetir o bônus.
-
         historico = estado.get("historico", [])
         if not isinstance(historico, list):
             historico = []
