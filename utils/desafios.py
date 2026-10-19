@@ -19,7 +19,6 @@ async def _salvar_guild(guild_id: int, lista: list):
     await salvar(ARQUIVO_DESAFIOS, dados)
 
 
-
 async def criar(
     guild_id: int,
     desafiante_id: int,
@@ -54,7 +53,6 @@ async def criar(
         guild_id,
         lista,
     )
-
 
     return desafio
 
@@ -113,7 +111,6 @@ async def definir_mensagem(
         lista,
     )
 
-
     return alvo
 
 
@@ -139,7 +136,6 @@ async def transicionar_status(
 
         alvo["status"] = status_novo
         await _salvar_guild(guild_id, lista)
-        return alvo
         return alvo
 
 
@@ -174,7 +170,6 @@ async def definir_status(
             guild_id,
             lista,
         )
-
 
         return alvo
 
@@ -216,7 +211,6 @@ async def definir_resultado(
             lista,
         )
 
-        return alvo
         return alvo
 
 
