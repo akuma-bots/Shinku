@@ -523,7 +523,7 @@ class Missoes(commands.Cog):
         )
         embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
         embed.set_footer(
-            text=f"RANKING {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
+            text=f"PÁGINA:{jogo} • RANKING {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
         )
         return embed
 
