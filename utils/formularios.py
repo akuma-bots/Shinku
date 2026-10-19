@@ -348,14 +348,14 @@ async def criar_resposta(
     autor_nome: str = None,
 ) -> dict:
     async with _STATUS_RESPOSTA_LOCK:
-    
+
         dados = await _tudo_respostas()
-    
-        lista = dados.get(
-            str(guild_id),
-            [],
-        )
-    
+
+        lista = dados.get(str(guild_id), [])
+        if not isinstance(lista, list):
+            lista = []
+        lista = [item for item in lista if isinstance(item, dict)]
+
         formulario = await get_formulario(guild_id, formulario_id) or {}
         perguntas = perguntas_flat(formulario)
         itens = [
@@ -365,10 +365,10 @@ async def criar_resposta(
             }
             for pergunta, resposta in zip(perguntas, respostas)
         ]
-    
+
         agora = time.time()
         agora_ms = int(agora * 1000)
-    
+
         resposta = {
             "id": str(uuid.uuid4())[:8],
             "guild_id": guild_id,
@@ -391,18 +391,18 @@ async def criar_resposta(
             "criadoEm": agora_ms,
             "atualizado_em": agora,
         }
-    
+
         lista.append(
             resposta
         )
-    
+
         await _salvar_respostas_guild(
             guild_id,
             lista,
         )
-    
+
         return resposta
-    
+
 
 async def get_resposta(
     guild_id: int,
