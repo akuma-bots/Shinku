@@ -1,4 +1,4 @@
-from utils.storage import salvar
+from utils.storage import carregar, salvar
 
 
 ARQUIVO_RECORDES = "recordes.json"
