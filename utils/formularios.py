@@ -347,61 +347,62 @@ async def criar_resposta(
     respostas: list,
     autor_nome: str = None,
 ) -> dict:
-
-    dados = await _tudo_respostas()
-
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
-
-    formulario = await get_formulario(guild_id, formulario_id) or {}
-    perguntas = perguntas_flat(formulario)
-    itens = [
-        {
-            "pergunta": str(pergunta),
-            "resposta": str(resposta if resposta is not None else "—") or "—",
+    async with _STATUS_RESPOSTA_LOCK:
+    
+        dados = await _tudo_respostas()
+    
+        lista = dados.get(
+            str(guild_id),
+            [],
+        )
+    
+        formulario = await get_formulario(guild_id, formulario_id) or {}
+        perguntas = perguntas_flat(formulario)
+        itens = [
+            {
+                "pergunta": str(pergunta),
+                "resposta": str(resposta if resposta is not None else "—") or "—",
+            }
+            for pergunta, resposta in zip(perguntas, respostas)
+        ]
+    
+        agora = time.time()
+        agora_ms = int(agora * 1000)
+    
+        resposta = {
+            "id": str(uuid.uuid4())[:8],
+            "guild_id": guild_id,
+            "formulario_id": formulario_id,
+            "autor_id": autor_id,
+            "nome": str(autor_nome or f"Usuário {autor_id}"),
+            "formTitulo": str(
+                formulario.get("titulo_painel")
+                or formulario.get("nome")
+                or "Formulário"
+            ),
+            # Campos legados e timestamps em milissegundos são mantidos para
+            # compatibilidade com registros antigos.
+            "itens": itens,
+            "respostas": respostas,
+            "status": "pendente",
+            "revisor_id": None,
+            "timestamp": agora,
+            "criado_em": agora,
+            "criadoEm": agora_ms,
+            "atualizado_em": agora,
         }
-        for pergunta, resposta in zip(perguntas, respostas)
-    ]
-
-    agora = time.time()
-    agora_ms = int(agora * 1000)
-
-    resposta = {
-        "id": str(uuid.uuid4())[:8],
-        "guild_id": guild_id,
-        "formulario_id": formulario_id,
-        "autor_id": autor_id,
-        "nome": str(autor_nome or f"Usuário {autor_id}"),
-        "formTitulo": str(
-            formulario.get("titulo_painel")
-            or formulario.get("nome")
-            or "Formulário"
-        ),
-        # Campos legados e timestamps em milissegundos são mantidos para
-        # compatibilidade com registros antigos.
-        "itens": itens,
-        "respostas": respostas,
-        "status": "pendente",
-        "revisor_id": None,
-        "timestamp": agora,
-        "criado_em": agora,
-        "criadoEm": agora_ms,
-        "atualizado_em": agora,
-    }
-
-    lista.append(
-        resposta
-    )
-
-    await _salvar_respostas_guild(
-        guild_id,
-        lista,
-    )
-
-    return resposta
-
+    
+        lista.append(
+            resposta
+        )
+    
+        await _salvar_respostas_guild(
+            guild_id,
+            lista,
+        )
+    
+        return resposta
+    
 
 async def get_resposta(
     guild_id: int,
