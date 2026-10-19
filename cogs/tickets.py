@@ -565,10 +565,15 @@ class FecharTicketView(discord.ui.View):
         except (TypeError, ValueError):
             suporte_id = None
 
+        cargo_suporte = guild.get_role(suporte_id) if suporte_id else None
         eh_suporte = (
             isinstance(membro, discord.Member)
-            and suporte_id is not None
-            and membro.get_role(suporte_id) is not None
+            and cargo_suporte is not None
+            and any(
+                cargo.id != guild.default_role.id
+                and cargo.position >= cargo_suporte.position
+                for cargo in membro.roles
+            )
         )
         eh_dono = str(membro.id) == str(registro.get("usuario_id"))
         eh_admin = (
