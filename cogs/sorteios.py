@@ -1323,7 +1323,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                     if cargo not in membro.roles:
                         await membro.add_roles(cargo, reason=f"Prêmio do sorteio NÊMESIS {sorteio.get('id')}")
                 elif tipo == "xp_perfil":
-                    from utils.perfis import get_perfil, _salvar_perfil, _sincronizar_site
+                    from utils.perfis import get_perfil, _salvar_perfil, _atualizar_ranking_competitivo
 
                     perfil = await get_perfil(guild.id, membro.id)
                     eventos = perfil.setdefault("sorteios_recompensados", [])
@@ -1333,8 +1333,8 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                         eventos.append(evento_id)
                         perfil["sorteios_recompensados"] = eventos[-500:]
                         await _salvar_perfil(guild.id, membro.id, perfil)
-                    # Também repara a sincronização com o site se o processo caiu após salvar o perfil.
-                    await _sincronizar_site(user_id=membro.id, perfil=perfil, nome=membro.display_name, delta_pontos=0)
+                    # Também repara a atualização do ranking interno se o processo caiu após salvar o perfil.
+                    await _atualizar_ranking_competitivo(user_id=membro.id, perfil=perfil, nome=membro.display_name, delta_pontos=0)
                 elif tipo == "xp_gangue":
                     cog = self.bot.get_cog("ProgressaoGangue")
                     if cog is None:
