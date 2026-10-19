@@ -297,6 +297,60 @@ async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
         logging.exception("Falha ao publicar a transcrição do ticket %s", ticket.get("id"))
 
 
+async def _estatisticas_atendente(guild_id: int, atendente_id: int) -> tuple[int, float | None]:
+    registros = await tickets.listar_tickets(guild_id)
+    atendidos = [t for t in registros if isinstance(t, dict) and str(t.get("atendido_por_id") or "") == str(atendente_id) and t.get("status") == "fechado"]
+    notas = [int(t["avaliacao"]) for t in atendidos if str(t.get("avaliacao", "")).isdigit() and 1 <= int(t["avaliacao"]) <= 5]
+    return len(atendidos), (sum(notas) / len(notas) if notas else None)
+
+
+class FeedbackTicketModal(discord.ui.Modal):
+    def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int, nota: int):
+        super().__init__(title=f"Avaliar atendimento — {nota}/5", custom_id=f"ticket:feedback:{ticket_id}")
+        self.guild_id, self.ticket_id, self.owner_id, self.atendente_id, self.nota = guild_id, ticket_id, owner_id, atendente_id, nota
+        self.comentario = discord.ui.TextInput(label="Comentário (opcional)", placeholder="Conte como foi o atendimento ou o que podemos melhorar.", style=discord.TextStyle.paragraph, required=False, max_length=1000)
+        self.add_item(self.comentario)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        ticket = await tickets.get_ticket(self.guild_id, self.ticket_id)
+        if not ticket or ticket.get("status") != "fechado":
+            await interaction.followup.send("Este ticket não foi encontrado ou ainda não foi encerrado.", ephemeral=True)
+            return
+        if str(ticket.get("usuario_id")) != str(self.owner_id) or ticket.get("avaliacao") is not None:
+            await interaction.followup.send("Esta avaliação já foi enviada ou não pertence a este atendimento.", ephemeral=True)
+            return
+        comentario = str(self.comentario.value or "").strip()
+        atualizado = await tickets.atualizar_ticket(self.guild_id, self.ticket_id, avaliacao=self.nota, feedback=comentario, avaliado_em=time.time())
+        if not atualizado:
+            await interaction.followup.send("Não consegui salvar sua avaliação. Tente novamente.", ephemeral=True)
+            return
+        guild = interaction.client.get_guild(self.guild_id)
+        canal = guild.get_channel(CANAL_AVALIACOES_TICKET_ID) if guild else None
+        if canal is None and guild:
+            try:
+                canal = await guild.fetch_channel(CANAL_AVALIACOES_TICKET_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                canal = None
+        total, media = await _estatisticas_atendente(self.guild_id, self.atendente_id) if self.atendente_id else (0, None)
+        rotulo = {5: "Excelente", 4: "Muito bom", 3: "Bom", 2: "Regular", 1: "Ruim"}[self.nota]
+        media_texto = f"{media:.2f}/5 ⭐" if media is not None else "Ainda sem avaliações"
+        if canal is not None and callable(getattr(canal, "send", None)):
+            embed = criar_embed("✦・ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO ・✦", f"Ticket #{self.ticket_id} • avaliação verificada", rodape="Central de atendimento NÊMESIS")
+            embed.add_field(name="Nota", value=f"{self.nota}/5 — {rotulo}\n{'⭐' * self.nota}", inline=True)
+            embed.add_field(name="Cliente", value=f"<@{self.owner_id}> · ID {self.owner_id}", inline=True)
+            embed.add_field(name="Responsável", value=f"<@{self.atendente_id}> · ID {self.atendente_id}" if self.atendente_id else "Não identificado", inline=True)
+            embed.add_field(name="Feedback", value=comentario[:1024] if comentario else "O cliente não deixou comentário.", inline=False)
+            embed.add_field(name="Tickets encerrados pelo responsável", value=str(total), inline=True)
+            embed.add_field(name="Média atual do responsável", value=media_texto, inline=True)
+            embed.add_field(name="Avaliado em", value=discord.utils.format_dt(discord.utils.utcnow(), style="F"), inline=False)
+            try:
+                await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Avaliação do ticket %s salva, mas não publicada.", self.ticket_id)
+        await interaction.followup.send(f"Obrigado pelo feedback! Sua avaliação foi registrada: {self.nota}/5 — {rotulo}.", ephemeral=True)
+
+
 class AvaliacaoTicketView(discord.ui.View):
     def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
         super().__init__(timeout=None)
@@ -318,31 +372,8 @@ class AvaliacaoTicketView(discord.ui.View):
             if ticket.get("avaliacao") is not None:
                 await interaction.response.send_message("Você já avaliou este atendimento.", ephemeral=True)
                 return
-            await tickets.atualizar_ticket(self.guild_id, self.ticket_id, avaliacao=nota, avaliado_em=time.time())
-            guild = interaction.client.get_guild(self.guild_id)
-            canal = guild.get_channel(CANAL_AVALIACOES_TICKET_ID) if guild else None
-            if canal is None and guild:
-                try:
-                    canal = await guild.fetch_channel(CANAL_AVALIACOES_TICKET_ID)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    canal = None
-            if canal is None or not callable(getattr(canal, "send", None)):
-                await interaction.response.send_message("Avaliação registrada, mas não consegui publicar no canal de avaliações. Avise a staff.", ephemeral=True)
-                return
-            rotulo = {5: "Excelente", 4: "Muito bom", 3: "Bom", 2: "Regular", 1: "Ruim"}[nota]
-            embed = criar_embed("Nova Avaliação de Atendimento", f"NÊMESIS • Ticket #{self.ticket_id} • avaliação verificada", rodape="Obrigado por avaliar! • NÊMESIS")
-            embed.add_field(name=f"{nota}/5 · {rotulo}", value="⭐" * nota, inline=False)
-            embed.add_field(name="Feedback", value="O cliente não deixou comentário.", inline=False)
-            embed.add_field(name="Cliente", value=f"<@{self.owner_id}> · ID {self.owner_id}", inline=False)
-            embed.add_field(name="Responsável", value=(f"<@{self.atendente_id}> · ID {self.atendente_id}" if self.atendente_id else "Não identificado"), inline=False)
-            embed.add_field(name="Atendimento", value=f"#{self.ticket_id}", inline=False)
-            embed.add_field(name="Avaliado", value=discord.utils.format_dt(discord.utils.utcnow(), style="F"), inline=False)
-            await canal.send(embed=embed)
-            for item in self.children:
-                item.disabled = True
-            await interaction.response.edit_message(content=f"Avaliação enviada: {nota}/5 — {rotulo}. Obrigado pelo feedback!", view=self)
+            await interaction.response.send_modal(FeedbackTicketModal(self.guild_id, self.ticket_id, self.owner_id, self.atendente_id, nota))
         return callback
-
 
 class FecharTicketView(discord.ui.View):
     def __init__(self):
