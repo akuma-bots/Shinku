@@ -27,21 +27,32 @@ def _selecionar_vencedores(
     vencedores_salvos=None,
     resultado_ja_sorteado: bool = False,
 ) -> list[int]:
-    """Seleciona uma vez e mantém a seleção estável durante tentativas de anúncio."""
+    """Seleciona vencedores únicos e mantém o resultado estável durante retries."""
+    if not isinstance(participantes, (list, tuple, set)):
+        participantes = []
+
+    # Dados antigos/corrompidos não podem fazer o mesmo usuário ocupar várias vagas.
+    participantes_ids = list(dict.fromkeys(
+        int(uid) for uid in participantes if str(uid).isdigit()
+    ))
+
     if resultado_ja_sorteado and isinstance(vencedores_salvos, list):
-        participantes_ids = {int(uid) for uid in participantes if str(uid).isdigit()}
+        participantes_validos = set(participantes_ids)
         resultado = []
         for user_id in vencedores_salvos:
             try:
                 user_id = int(user_id)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 continue
-            if user_id in participantes_ids and user_id not in resultado:
+            if user_id in participantes_validos and user_id not in resultado:
                 resultado.append(user_id)
         return resultado
 
-    participantes_ids = [int(uid) for uid in participantes if str(uid).isdigit()]
-    quantidade = max(0, min(len(participantes_ids), int(quantidade_solicitada)))
+    try:
+        solicitada = int(quantidade_solicitada)
+    except (TypeError, ValueError, OverflowError):
+        solicitada = 0
+    quantidade = max(0, min(len(participantes_ids), solicitada))
     return random.sample(participantes_ids, quantidade) if quantidade else []
 
 
