@@ -153,6 +153,9 @@ async def fechar_canal_ticket(
 
 async def _montar_select(guild_id: int) -> discord.ui.View:
     tipos = await tickets.get_tipos(guild_id)
+    if not tipos:
+        # O Discord não aceita um select vazio; recupera as categorias padrão.
+        tipos = list(tickets.TIPOS_PADRAO)
 
     # Emojis decorativos (◈, ✦, ◇ etc.) não são aceitos como emojis
     # de SelectOption pelo Discord. Usa apenas emojis Unicode válidos.
