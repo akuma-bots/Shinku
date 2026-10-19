@@ -295,21 +295,27 @@ async def _atualizar_ranking_competitivo(
 async def get_patentes(
     guild_id: int,
 ) -> list:
+    # A hierarquia oficial da NÊMESIS é fixa por ID e não depende de uma
+    # inicialização manual. Isso mantém XP, anúncios e cargos alinhados.
+    if int(guild_id) == 1543381737961160910:
+        return [
+            {"nome": "Lutador", "xp_minimo": 0, "cargo_id": 1561705759992057877},
+            {"nome": "Subtenente", "xp_minimo": 750, "cargo_id": 1559561987296469024},
+            {"nome": "Tenente", "xp_minimo": 2000, "cargo_id": 1558909073758625973},
+            {"nome": "Executor", "xp_minimo": 4000, "cargo_id": 1561715055077097603},
+            {"nome": "Especialista", "xp_minimo": 7000, "cargo_id": 1561715502508933150},
+            {"nome": "Elite", "xp_minimo": 11000, "cargo_id": 1561703280227262474},
+            {"nome": "Veterano", "xp_minimo": 16000, "cargo_id": 1561703510406602872},
+            {"nome": "Treinador", "xp_minimo": 22000, "cargo_id": 1561706517819039845},
+            {"nome": "Comandante", "xp_minimo": 30000, "cargo_id": 1561715380672798730},
+            {"nome": "Vice Capitão", "xp_minimo": 40000, "cargo_id": 1560370097577791569},
+            {"nome": "Capitão", "xp_minimo": 52000, "cargo_id": 1558909311315607723},
+            {"nome": "Capitão Geral", "xp_minimo": 68000, "cargo_id": 1561706215195541605},
+        ]
 
-    todas = await carregar(
-        ARQUIVO_PATENTES,
-        {},
-    )
-
-    lista = todas.get(
-        str(guild_id),
-        [],
-    )
-
-    return sorted(
-        lista,
-        key=lambda p: p["xp_minimo"],
-    )
+    todas = await carregar(ARQUIVO_PATENTES, {})
+    lista = todas.get(str(guild_id), [])
+    return sorted(lista, key=lambda p: p["xp_minimo"])
 
 
 async def salvar_patentes(
