@@ -157,6 +157,25 @@ PADROES_AMEACA = [
 # ============================================================
 
 PADROES_ASSÉDIO = [
+    r"\bcu\b",
+    r"\bpinto\b",
+    r"\bpenis\b",
+    r"\bfdpt\b",
+    r"\bfilh[oa]s?\s+da\s+puta\b",
+    r"\bmerd[a4]\b",
+    r"\bidiot[a4]\b",
+    r"\bbitch\b",
+    r"\basshole\b",
+    r"\bshit\b",
+    r"\bfuck(?:er|ing)?\b",
+    r"\bmotherfucker\b",
+    r"\bson\s+of\s+a\s+bitch\b",
+    r"\bbastard\b",
+    r"\bdamn\b",
+    r"\bkurwa\b",
+    r"\bchuj\b",
+    r"\bpierd\w*\b",
+    r"\bput[a4]\b",
     r"vai\s+se\s+foder",
     r"vai\s+se\s+fude",
     r"vai\s+se\s+fuder",
@@ -319,14 +338,21 @@ PADROES_GRAFICO = [
 # ============================================================
 
 def normalizar_texto(texto: str) -> str:
+    """Normaliza texto para detectar ofensas com acentos e separadores alterados."""
     if not texto:
         return ""
 
-    return re.sub(
-        r"\s+",
-        " ",
-        texto.lower(),
-    ).strip()
+    import unicodedata
+
+    texto = unicodedata.normalize("NFKD", texto.casefold())
+    texto = "".join(
+        caractere for caractere in texto
+        if not unicodedata.combining(caractere)
+    )
+    # Reduz separadores repetidos entre letras: f.d.p, f-d-p, f d p.
+    texto = re.sub(r"(?<=\w)[._*~|\-]+(?=\w)", "", texto)
+    texto = re.sub(r"\s+", " ", texto)
+    return texto.strip()
 
 
 def contem_padrao(
@@ -955,32 +981,6 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                     (
                         "Repetição excessiva "
                         "da mesma mensagem."
-                    ),
-                )
-            )
-
-        letras = [
-            caractere
-            for caractere
-            in message.content
-            if caractere.isalpha()
-        ]
-
-        if (
-            len(letras) >= 12
-            and porcentagem_maiusculas(
-                message.content
-            ) >= 0.80
-        ):
-
-            infracoes.append(
-                (
-                    1,
-                    "Excesso de letras maiúsculas",
-                    "02",
-                    (
-                        "Uso excessivo de "
-                        "letras maiúsculas."
                     ),
                 )
             )
