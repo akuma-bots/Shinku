@@ -1,4 +1,5 @@
 import time
+import io
 import asyncio
 import logging
 import unicodedata
@@ -101,6 +102,8 @@ async def fechar_canal_ticket(
                 fechado_por_id=fechado_por_id,
                 motivo=motivo,
             )
+            ticket = await tickets.get_ticket(canal.guild.id, ticket["id"]) or ticket
+            await _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id)
 
         if ticket:
             dono = canal.guild.get_member(int(ticket.get("usuario_id") or 0))
@@ -207,6 +210,92 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
 
 
 CANAL_AVALIACOES_TICKET_ID = 1545835885063438487
+
+CANAL_HISTORICO_TICKETS_ID = 1545840693921185903
+
+async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
+    destino = canal.guild.get_channel(CANAL_HISTORICO_TICKETS_ID)
+    if destino is None:
+        try:
+            destino = await canal.guild.fetch_channel(CANAL_HISTORICO_TICKETS_ID)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logging.error("Canal de histórico de tickets indisponível: %s", CANAL_HISTORICO_TICKETS_ID)
+            return
+    if not callable(getattr(destino, "send", None)):
+        return
+    usuario_id = int(ticket.get("usuario_id") or 0)
+    atendente_id = int(ticket.get("atendido_por_id") or 0)
+    registros = await tickets.listar_tickets(canal.guild.id)
+    atendidos = [t for t in registros if isinstance(t, dict) and str(t.get("atendido_por_id") or "") == str(atendente_id) and t.get("status") == "fechado"] if atendente_id else []
+    notas = [int(t["avaliacao"]) for t in atendidos if str(t.get("avaliacao", "")).isdigit() and 1 <= int(t["avaliacao"]) <= 5]
+    media = sum(notas) / len(notas) if notas else None
+    try:
+        mensagens = [m async for m in canal.history(limit=None, oldest_first=True)]
+    except (discord.Forbidden, discord.HTTPException):
+        logging.exception("Não foi possível ler o histórico do ticket %s", ticket.get("id"))
+        mensagens = []
+    linhas = [
+        f"TRANSCRIÇÃO DO TICKET #{ticket.get('id', '—')}",
+        f"Servidor: {canal.guild.name} ({canal.guild.id})",
+        f"Canal: {canal.name} ({canal.id})",
+        f"Categoria: {ticket.get('tipo', 'Não informada')}",
+        f"Cliente: {usuario_id}",
+        f"Responsável: {atendente_id or 'Não atribuído'}",
+        f"Tickets encerrados pelo responsável: {len(atendidos)}",
+        f"Média do responsável: {media:.2f}/5 ({len(notas)} avaliação(ões))" if media is not None else "Média do responsável: ainda sem avaliações",
+        f"Fechado por: {fechado_por_id or 'sistema'}",
+        f"Motivo: {motivo}",
+        "",
+        "================ CONVERSA COMPLETA ================",
+        "",
+    ]
+    for msg in mensagens:
+        linhas.append(f"[{discord.utils.format_dt(msg.created_at, style='F')}] {msg.author} (ID {msg.author.id}):")
+        linhas.append(msg.content or "[Sem texto]")
+        for anexo in msg.attachments:
+            linhas.append(f"Anexo: {anexo.filename} — {anexo.url}")
+        for emb in msg.embeds:
+            if emb.title: linhas.append(f"[Embed] {emb.title}")
+            if emb.description: linhas.append(f"[Embed] {emb.description}")
+            for campo in emb.fields: linhas.append(f"[Embed: {campo.name}] {campo.value}")
+        linhas.append("")
+    texto = "\n".join(linhas)
+    resumo = criar_embed(f"📁 Histórico do Ticket #{ticket.get('id', '—')}", "Transcrição preservada antes da exclusão do canal.", rodape="NÊMESIS • Auditoria de atendimento")
+    resumo.add_field(name="Cliente", value=f"<@{usuario_id}> · ID {usuario_id}", inline=True)
+    resumo.add_field(name="Responsável", value=f"<@{atendente_id}> · ID {atendente_id}" if atendente_id else "Não atribuído", inline=True)
+    resumo.add_field(name="Tickets encerrados", value=str(len(atendidos)), inline=True)
+    resumo.add_field(name="Média de estrelas", value=f"{media:.2f}/5 ⭐" if media is not None else "Sem avaliações", inline=True)
+    resumo.add_field(name="Mensagens preservadas", value=str(len(mensagens)), inline=True)
+    resumo.add_field(name="Motivo", value=str(motivo)[:1024], inline=False)
+    try:
+        await destino.send(embed=resumo, allowed_mentions=discord.AllowedMentions.none())
+        dados = texto.encode("utf-8")
+        if len(dados) <= 7_000_000:
+            await destino.send(file=discord.File(io.BytesIO(dados), filename=f"ticket-{ticket.get('id', 'historico')}.txt"), allowed_mentions=discord.AllowedMentions.none())
+        else:
+            parte = 1
+            bloco = ""
+            for linha in linhas:
+                while len(linha) > 1800:
+                    if bloco:
+                        await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{bloco}", allowed_mentions=discord.AllowedMentions.none())
+                        parte += 1
+                        bloco = ""
+                    await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{linha[:1800]}", allowed_mentions=discord.AllowedMentions.none())
+                    parte += 1
+                    linha = linha[1800:]
+                candidato = (bloco + "\n" + linha).strip()
+                if len(candidato) > 1800:
+                    await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{bloco}", allowed_mentions=discord.AllowedMentions.none())
+                    parte += 1
+                    bloco = linha
+                else:
+                    bloco = candidato
+            if bloco:
+                await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{bloco}", allowed_mentions=discord.AllowedMentions.none())
+    except (discord.Forbidden, discord.HTTPException):
+        logging.exception("Falha ao publicar a transcrição do ticket %s", ticket.get("id"))
+
 
 class AvaliacaoTicketView(discord.ui.View):
     def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
