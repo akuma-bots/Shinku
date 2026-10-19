@@ -260,6 +260,156 @@ class FecharTicketView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
+        label="🎯 Assumir atendimento",
+        style=discord.ButtonStyle.success,
+        custom_id="ticket:assumir",
+    )
+    async def assumir_atendimento(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ):
+        canal = interaction.channel
+        guild = interaction.guild
+        membro = interaction.user
+
+        if not guild or not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message(
+                "Este botão só pode ser usado dentro de um ticket.",
+                ephemeral=True,
+            )
+            return
+
+        info_topic = tickets.parse_topic(canal.topic)
+        registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
+        if not info_topic or not registro or registro.get("status") != "aberto":
+            await interaction.response.send_message(
+                "Este canal não é um ticket aberto válido.",
+                ephemeral=True,
+            )
+            return
+
+        config = await get_config(guild.id)
+        suporte_id = config.get("support_role_id")
+        try:
+            suporte_id = int(suporte_id) if suporte_id else None
+        except (TypeError, ValueError):
+            suporte_id = None
+
+        eh_admin = (
+            isinstance(membro, discord.Member)
+            and (
+                membro.guild_permissions.administrator
+                or membro.guild_permissions.manage_channels
+            )
+        )
+        cargo_suporte = guild.get_role(suporte_id) if suporte_id else None
+        eh_suporte = (
+            isinstance(membro, discord.Member)
+            and cargo_suporte is not None
+            and any(
+                cargo.id != guild.default_role.id
+                and cargo.position >= cargo_suporte.position
+                for cargo in membro.roles
+            )
+        )
+        if not (eh_admin or eh_suporte):
+            await interaction.response.send_message(
+                "Somente a equipe de suporte ou a administração pode assumir este atendimento.",
+                ephemeral=True,
+            )
+            return
+
+        responsavel_atual = registro.get("atendido_por_id")
+        if responsavel_atual:
+            if str(responsavel_atual) == str(membro.id):
+                await interaction.response.send_message(
+                    "Você já é o responsável por este ticket.",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_message(
+                    f"Este ticket já está sob responsabilidade de <@{responsavel_atual}>. "
+                    "Somente a administração pode intervir.",
+                    ephemeral=True,
+                )
+            return
+
+        # Atribuição persistente antes de restringir permissões no canal.
+        atualizado = await tickets.registrar_atendimento(
+            guild.id,
+            registro["id"],
+            membro.id,
+        )
+        if not atualizado:
+            await interaction.response.send_message(
+                "Não consegui registrar a responsabilidade. Tente novamente.",
+                ephemeral=True,
+            )
+            return
+
+        # Bloqueia a equipe comum de enviar mensagens; a pessoa responsável e
+        # cargos administrativos recebem permissão explícita para continuar.
+        try:
+            for cargo in guild.roles:
+                if cargo.is_default():
+                    continue
+                if cargo_suporte and cargo.position >= cargo_suporte.position:
+                    await canal.set_permissions(
+                        cargo,
+                        overwrite=discord.PermissionOverwrite(
+                            view_channel=True,
+                            send_messages=False,
+                            read_message_history=True,
+                        ),
+                        reason=f"Ticket assumido por {membro} ({membro.id})",
+                    )
+                if cargo.permissions.administrator or cargo.permissions.manage_channels:
+                    await canal.set_permissions(
+                        cargo,
+                        overwrite=discord.PermissionOverwrite(
+                            view_channel=True,
+                            send_messages=True,
+                            read_message_history=True,
+                            manage_messages=True,
+                            manage_channels=True,
+                        ),
+                        reason="Permitir intervenção administrativa em ticket atribuído",
+                    )
+
+            await canal.set_permissions(
+                membro,
+                overwrite=discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    manage_messages=eh_admin,
+                ),
+                reason=f"Responsável pelo ticket: {membro} ({membro.id})",
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            # Evita deixar uma atribuição aparentemente concluída sem bloqueio.
+            await tickets.atualizar_ticket(
+                guild.id,
+                registro["id"],
+                atendido_por_id=None,
+            )
+            await interaction.response.send_message(
+                "Não consegui aplicar as permissões de responsável. Verifique as permissões do bot.",
+                ephemeral=True,
+            )
+            return
+
+        button.label = f"Responsável: {membro.display_name}"[:80]
+        button.disabled = True
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send(
+            f"✅ Você agora é responsável por {canal.mention}. "
+            "A equipe comum não pode intervir; a administração continua com acesso.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(
         label="🔒 Fechar Ticket",
         style=discord.ButtonStyle.danger,
         custom_id="fechar_ticket_btn",
@@ -409,8 +559,7 @@ class Tickets(commands.Cog):
         )
 
         if cargo_suporte:
-            # O cargo de suporte e todos os cargos acima dele podem atender
-            # tickets. Administradores já ignoram overwrites pelo Discord.
+            # Equipe de suporte e cargos superiores recebem acesso inicial.
             for cargo in guild.roles:
                 if cargo.is_default() or cargo.position < cargo_suporte.position:
                     continue
@@ -418,6 +567,20 @@ class Tickets(commands.Cog):
                     view_channel=True,
                     send_messages=True,
                     read_message_history=True,
+                )
+
+        # Cargos administrativos devem continuar podendo intervir mesmo após
+        # o ticket ser assumido, inclusive se estiverem abaixo do cargo suporte.
+        for cargo in guild.roles:
+            if cargo.is_default():
+                continue
+            if cargo.permissions.administrator or cargo.permissions.manage_channels:
+                overwrites[cargo] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                    manage_messages=True,
+                    manage_channels=True,
                 )
 
         nome_canal = f"ticket-{tipo['valor']}-{user.name}"[:95]
@@ -672,7 +835,7 @@ class Tickets(commands.Cog):
             message.channel.id,
         )
 
-        if ticket_atual and eh_suporte:
+        if ticket_atual and eh_suporte and not ticket_atual.get("atendido_por_id"):
             await tickets.registrar_atendimento(
                 message.guild.id,
                 ticket_atual["id"],
