@@ -11,7 +11,6 @@ from utils.perfis import (
 
 
 ARQUIVO_TEMPORADAS = "temporadas.json"
-ARQUIVO_COMPETITIVO = "competitivo.json"
 
 
 PESOS_PADRAO = {
@@ -257,158 +256,6 @@ async def tempo_restante_segundos(
     )
 
 
-async def _sincronizar_perfil_site(
-    user_id: int,
-    perfil: dict,
-):
-    """
-    Atualiza o perfil competitivo compartilhado
-    pelo Dashboard sem alterar a pontuação ou o Elo existentes.
-    """
-
-    dados = await carregar(
-        ARQUIVO_COMPETITIVO,
-        {
-            "catalogo": [],
-            "perfis": {},
-        },
-    )
-
-    dados.setdefault(
-        "catalogo",
-        [],
-    )
-
-    dados.setdefault(
-        "perfis",
-        {},
-    )
-
-    chave = str(user_id)
-
-    competitivo = dados["perfis"].get(
-        chave,
-        {
-            "discordId": chave,
-            "nome": "",
-            "pontos": 0,
-            "elo": 1000,
-            "vitorias": 0,
-            "derrotas": 0,
-        },
-    )
-
-    competitivo["discordId"] = chave
-
-    competitivo["xp"] = int(
-        perfil.get(
-            "xp",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["vitorias"] = int(
-        perfil.get(
-            "vitorias",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["derrotas"] = int(
-        perfil.get(
-            "derrotas",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["kills"] = int(
-        perfil.get(
-            "kills",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["deaths"] = int(
-        perfil.get(
-            "deaths",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["mvps"] = int(
-        perfil.get(
-            "mvps",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["sequencia_atual"] = int(
-        perfil.get(
-            "sequencia_atual",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["maior_sequencia"] = int(
-        perfil.get(
-            "maior_sequencia",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["patente"] = perfil.get(
-        "patente"
-    )
-
-    competitivo["medalhas"] = list(
-        perfil.get(
-            "medalhas",
-            [],
-        )
-    )
-
-    mortes = int(
-        perfil.get(
-            "deaths",
-            0,
-        )
-        or 0
-    )
-
-    kills = int(
-        perfil.get(
-            "kills",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["kdr"] = (
-        round(
-            kills / mortes,
-            2,
-        )
-        if mortes > 0
-        else float(kills)
-    )
-
-    dados["perfis"][chave] = (
-        competitivo
-    )
-
-    await salvar(
-        ARQUIVO_COMPETITIVO,
-        dados,
-    )
-
 
 _ENCERRAR_TEMPORADA_LOCK = asyncio.Lock()
 
@@ -421,9 +268,8 @@ async def encerrar_temporada(
         estado = await get_estado(guild_id)
         pendente = estado.get("encerramento_pendente")
 
-        # Guarda o Top 3 antes de alterar perfis. Se uma gravação ou a
-        # sincronização com o site falhar, a próxima execução retoma a mesma
-        # temporada e os mesmos vencedores, sem recalcular o ranking alterado.
+        # Guarda o Top 3 antes de alterar perfis para que uma falha de gravação
+        # possa ser retomada sem recalcular o ranking após alterar os vencedores.
         if not isinstance(pendente, dict):
             top3 = await top_da_temporada(guild_id, limite=3)
             bonus = [
@@ -470,9 +316,7 @@ async def encerrar_temporada(
                 perfil["temporadas_bonus_aplicados"] = eventos[-500:]
                 await _salvar_perfil(guild_id, user_id, perfil)
 
-            # Mesmo se o XP já tiver sido persistido antes de uma falha,
-            # tenta novamente a sincronização sem repetir o bônus.
-            await _sincronizar_perfil_site(user_id, perfil)
+            # O marcador permite retomar o encerramento sem repetir o bônus.
 
         historico = estado.get("historico", [])
         if not isinstance(historico, list):
@@ -503,49 +347,3 @@ async def encerrar_temporada(
         }
 
 
-async def sincronizar_todos_site(
-    guild_id: int,
-) -> int:
-    """
-    Sincroniza todos os perfis envolvidos
-    no ranking de temporadas com o Dashboard.
-    """
-
-    todos = await carregar(
-        ARQUIVO_PERFIS,
-        {},
-    )
-
-    perfis = todos.get(
-        str(guild_id),
-        {},
-    )
-
-    quantidade = 0
-
-    for user_id, perfil in perfis.items():
-
-        if not isinstance(
-            perfil,
-            dict,
-        ):
-            continue
-
-        try:
-
-            await _sincronizar_perfil_site(
-                int(user_id),
-                perfil,
-            )
-
-            quantidade += 1
-
-        except Exception as erro:
-
-            print(
-                "[TEMPORADAS] "
-                f"Falha ao sincronizar "
-                f"{user_id}: {erro}"
-            )
-
-    return quantidade
