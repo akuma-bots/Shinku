@@ -618,8 +618,7 @@ class Tickets(commands.Cog):
     O painel mostra um menu suspenso configurável com /ticket-tipo-*.
     Cada opção cria um canal já identificado pelo tipo escolhido.
 
-    Os tickets agora também são persistidos em tickets.json através
-    de utils.tickets, permitindo que o Dashboard NÊMESIS enxergue:
+    Os tickets são persistidos em tickets.json através de utils.tickets, permitindo que o próprio bot mantenha:
     - tickets abertos;
     - tickets fechados;
     - usuário;

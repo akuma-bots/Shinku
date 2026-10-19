@@ -108,9 +108,9 @@ CAMPOS_ID = (
 
 def _normalizar_id(valor):
     """
-    Converte IDs vindos do dashboard/Upstash para int.
+    Converte IDs de configuração persistidos para int.
 
-    O site pode salvar IDs como strings, por exemplo:
+    IDs podem estar salvos como strings, por exemplo:
         "1545838386944938024"
 
     O discord.py espera:

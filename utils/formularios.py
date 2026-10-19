@@ -131,7 +131,7 @@ async def remover_formulario(
 def perguntas_flat(
     formulario: dict,
 ) -> list:
-    """Retorna as perguntas em ordem, aceitando o formato antigo do bot e o formato do site."""
+    """Retorna as perguntas em ordem, aceitando o formato atual e formatos legados dos formulários."""
     achatado = []
 
     for pagina in formulario.get("paginas", []):
@@ -381,8 +381,8 @@ async def criar_resposta(
             or formulario.get("nome")
             or "Formulário"
         ),
-        # O site usa "itens" e timestamps em milissegundos; os campos
-        # originais são mantidos para compatibilidade com o bot.
+        # Campos legados e timestamps em milissegundos são mantidos para
+        # compatibilidade com registros antigos.
         "itens": itens,
         "respostas": respostas,
         "status": "pendente",
@@ -492,7 +492,7 @@ async def listar_respostas(
     return lista
 
 
-async def sincronizar_todos_site(
+async def normalizar_registros_guild(
     guild_id: int,
 ) -> dict:
 

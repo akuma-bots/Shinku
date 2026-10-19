@@ -419,7 +419,7 @@ class RankingGeral(
                 quantidade_local += 1
         await salvar(ARQUIVO_PERFIS, todos_perfis)
 
-        # competitivo.json é compartilhado com o site; preserva catálogo e identidades.
+        # Preserva o catálogo competitivo e as identidades já registradas.
         competitivo = await carregar(
             ARQUIVO_COMPETITIVO,
             {"catalogo": [], "perfis": {}},
@@ -469,7 +469,7 @@ class RankingGeral(
         await interaction.followup.send(
             "RESET COMPLETO EXECUTADO.\n"
             f"Perfis locais zerados: **{quantidade_local}**.\n"
-            f"Perfis do Top Global/site zerados: **{quantidade_global}**.\n"
+            f"Perfis do ranking competitivo zerados: **{quantidade_global}**.\n"
             "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
             "tempo no Top 10 foram zerados. Os rankings de Shigaku, Gakuran e Fistborn "
             f"também foram limpos ({quantidade_rankings_jogo} rankings). O histórico sazonal "

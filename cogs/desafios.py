@@ -7,7 +7,7 @@ from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 
 from utils import desafios
 from utils.guild_config import get_config, set_config
-from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil, sincronizar_perfil_site
+from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 XP_VITORIA_PVP = 50
 COOLDOWN_PADRAO_MINUTOS = 15
@@ -80,11 +80,6 @@ async def _atualizar_stats_pvp(
             eventos_vitoria.append(evento_id)
             pv["resultados_pvp_aplicados"] = eventos_vitoria[-1000:]
         await _salvar_perfil(guild_id, vencedor_id, pv)
-    try:
-        await sincronizar_perfil_site(guild_id, vencedor_id)
-    except Exception as erro:
-        print(f"[PvP] Falha ao sincronizar vencedor {vencedor_id}: {erro}")
-
     pp = await get_perfil(guild_id, perdedor_id)
     eventos_derrota = pp.get("resultados_pvp_aplicados", [])
     if not isinstance(eventos_derrota, list):
@@ -96,11 +91,6 @@ async def _atualizar_stats_pvp(
             eventos_derrota.append(evento_id)
             pp["resultados_pvp_aplicados"] = eventos_derrota[-1000:]
         await _salvar_perfil(guild_id, perdedor_id, pp)
-    try:
-        await sincronizar_perfil_site(guild_id, perdedor_id)
-    except Exception as erro:
-        print(f"[PvP] Falha ao sincronizar perdedor {perdedor_id}: {erro}")
-
     return pv, patente_antiga
 
 

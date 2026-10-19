@@ -110,7 +110,7 @@ async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
 
 
 async def obter_mensagem_discord(guild_id: int, missao_id: str) -> dict:
-    """Busca os IDs em storage separado para que o painel do site não os apague."""
+    """Busca IDs em armazenamento separado para que a atualização do catálogo não sobrescreva as referências das mensagens do Discord."""
     dados = await carregar(ARQUIVO_MENSAGENS_DISCORD, {})
     guild = dados.get(str(guild_id), {})
     registro = guild.get(str(missao_id), {})

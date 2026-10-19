@@ -14,7 +14,7 @@ LIMITE_TOP_GLOBAL = 10
 
 async def atualizar_temporada_global(agora: float | None = None) -> dict:
     """
-    Mantém a temporada global no mesmo competitivo.json consumido pelo site.
+    Mantém a temporada competitiva global no armazenamento privado do bot.
     A cada 30 dias arquiva o Top 10 e zera somente a pontuação sazonal.
     """
     import time
@@ -204,10 +204,9 @@ async def somar_pontos_competitivo(
     evento_id: str = "",
 ) -> dict:
     """
-    Atualiza o mesmo competitivo.json usado pelo Dashboard da NÊMESIS.
+    Atualiza o registro competitivo privado da NÊMESIS.
 
-    O delta é somado à pontuação existente. Assim, alterações feitas
-    manualmente pelo Dashboard não são sobrescritas pelo bot.
+    O delta é somado à pontuação existente, preservando os pontos já registrados.
     """
 
     dados = await carregar(
@@ -278,9 +277,9 @@ async def migrar_perfil_se_necessario(
 ) -> dict:
     """
     Migra um perfil antigo do perfis.json para competitivo.json
-    somente se ele ainda não existir no ranking compartilhado.
+    somente se ele ainda não existir no ranking competitivo interno.
 
-    Se o usuário já tiver perfil criado pelo site, nada é sobrescrito.
+    Se o usuário já tiver perfil competitivo, nada é sobrescrito.
     """
 
     dados = await carregar(

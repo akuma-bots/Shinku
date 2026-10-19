@@ -313,7 +313,7 @@ async def reabrir_apos_falha_aplicacao(
         return alvo
 
 
-async def sincronizar_todos_site(
+async def normalizar_revisoes_guild(
     guild_id: int,
 ) -> int:
     async with _REVISOES_LOCK:

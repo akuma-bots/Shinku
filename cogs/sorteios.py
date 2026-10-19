@@ -480,10 +480,10 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         )
 
     # =========================================================
-    # VIEW DO DASHBOARD
+    # VIEW COMPATÍVEL COM BOTÕES LEGADOS
     # =========================================================
 
-    def criar_view_site(
+    def criar_view_legada(
         self,
         sorteio: dict,
     ) -> discord.ui.View:
@@ -543,13 +543,13 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         return view
 
     # =========================================================
-    # INTERAÇÕES DOS SORTEIOS DO SITE
+    # INTERAÇÕES DE BOTÕES LEGADOS
     # =========================================================
 
     @commands.Cog.listener(
         "on_interaction"
     )
-    async def sorteio_site_interaction(
+    async def sorteio_legado_interaction(
         self,
         interaction: discord.Interaction,
     ):
@@ -719,7 +719,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
 
         try:
             await interaction.message.edit(
-                view=self.criar_view_site(
+                view=self.criar_view_legada(
                     sorteio
                 )
             )
@@ -1019,16 +1019,16 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         sorteio["participantes"] = participantes
         quantidade = len(participantes)
 
-        # Sorteios vindos do Dashboard utilizam
-        # os custom_ids vinculados ao ID do sorteio.
+        # Sorteios antigos utilizam
+        # os identificadores antigos vinculados ao ID do sorteio.
         #
-        # Sorteios antigos criados pelo comando
+        # Sorteios criados pelo comando
         # continuam utilizando a view tradicional.
         if (
             sorteio.get("criado_por_id")
             is None
         ):
-            view = self.criar_view_site(
+            view = self.criar_view_legada(
                 sorteio
             )
 
