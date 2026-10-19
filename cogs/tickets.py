@@ -168,16 +168,16 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
     }
     options = [
         discord.SelectOption(
-            label=t["label"],
-            value=t["valor"],
-            description=t["descricao"][:100],
+            label=str(t.get("label") or "Atendimento")[:100],
+            value=str(t.get("valor") or "outro")[:100],
+            description=str(t.get("descricao") or "Solicitação de atendimento.")[:100],
             emoji=(
                 t.get("emoji")
                 if t.get("emoji") in {"⚔️", "🎖️", "⚖️", "🎯", "🛟", "🤝", "🎉", "💡"}
                 else emojis_validos.get(t["valor"])
             ),
         )
-        for t in tipos
+        for t in tipos[:25]
     ]
 
     select = discord.ui.Select(
