@@ -39,18 +39,8 @@ TICKET_PAINEL_CANAL_ID = 1545836351596011570
 
 TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO ・✦"
 DESCRICAO_PADRAO = (
-    "A Central de Atendimento é o canal oficial para tratar de assuntos da "
-    "gangue NÊMESIS e da comunidade. Selecione a categoria que melhor "
-    "representa sua solicitação para abrir um atendimento privado com a equipe.\n\n"
-    "╭────────────── ◈ ORIENTAÇÕES ◈ ──────────────╮\n"
-    "・Escolha a categoria correta e explique o caso com clareza.\n"
-    "・Inclua nomes, contexto, links ou provas quando forem relevantes.\n"
-    "・Não abra vários tickets para o mesmo assunto.\n"
-    "・Denúncias e informações sensíveis devem ser tratadas somente no ticket.\n"
-    "・Aguarde a equipe; não marque cargos repetidamente.\n"
-    "╰────────────────────────────────────────────╯\n\n"
-    "Cada ticket é privado e visível apenas para você e a equipe responsável. "
-    "Use este espaço com respeito; solicitações sem contexto podem atrasar o atendimento."
+    "Precisa de ajuda? Selecione abaixo a categoria que melhor representa "
+    "sua solicitação para abrir um atendimento privado com a equipe NÊMESIS."
 )
 
 
@@ -210,11 +200,28 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
         config.get("ticket_painel_descricao") or DESCRICAO_PADRAO,
-        rodape="NÊMESIS • Central de atendimento",
+        rodape="NÊMESIS • Suporte oficial",
     )
+    embed.add_field(
+        name="◈ ANTES DE ABRIR",
+        value=(
+            "➜ Escolha a categoria correta.\n"
+            "➜ Explique o caso com clareza e inclua provas, se necessário.\n"
+            "➜ Não abra tickets duplicados nem marque a equipe repetidamente."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="🔒 PRIVACIDADE",
+        value=(
+            "O ticket é privado e visível apenas para você e a equipe autorizada. "
+            "Denúncias e informações sensíveis devem ser tratadas dentro do atendimento."
+        ),
+        inline=False,
+    )
+    embed.color = 0x8B0000
 
     banner_url = config.get("ticket_painel_banner_url")
-
     if banner_url:
         embed.set_image(url=banner_url)
 
@@ -1137,17 +1144,27 @@ class Tickets(commands.Cog):
                 if not isinstance(canal, discord.TextChannel):
                     continue
 
+                embed = await _montar_embed_painel(guild.id)
+                view = await _montar_select(guild.id)
+
                 if mensagem_id:
                     try:
-                        await canal.fetch_message(int(mensagem_id))
+                        mensagem_existente = await canal.fetch_message(int(mensagem_id))
+                        # Atualiza apenas quando o conteúdo visual mudou; evita
+                        # editar o painel a cada ciclo e consumir limites do Discord.
+                        embed_atual = (
+                            mensagem_existente.embeds[0].to_dict()
+                            if mensagem_existente.embeds
+                            else None
+                        )
+                        if embed_atual != embed.to_dict():
+                            await mensagem_existente.edit(embed=embed, view=view)
                         continue
                     except discord.NotFound:
                         pass
                     except (discord.Forbidden, discord.HTTPException):
                         continue
 
-                embed = await _montar_embed_painel(guild.id)
-                view = await _montar_select(guild.id)
                 mensagem = await canal.send(
                     embed=embed,
                     view=view,
