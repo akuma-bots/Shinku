@@ -100,7 +100,7 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
 
     try:
         rank_atual = await _buscar_rank_no_grupo(roblox_id, grupo_id)
-    except aiohttp.ClientError as e:
+    except (aiohttp.ClientError, ValueError) as e:
         return f"Erro ao consultar a API do Roblox: {e}"
 
     cargo_id_correto = mapeamentos.get(rank_atual) if rank_atual else None
@@ -150,8 +150,8 @@ class Roblox(commands.Cog):
 
         try:
             usuario = await _buscar_usuario_roblox(usuario_roblox)
-        except aiohttp.ClientError as e:
-            await interaction.followup.send(f"Erro ao falar com a API do Roblox: {e}", ephemeral=True)
+        except (aiohttp.ClientError, ValueError) as e:
+            await interaction.followup.send("A API do Roblox está indisponível ou retornou dados inválidos. Tente novamente mais tarde.", ephemeral=True)
             return
 
         if not usuario:
@@ -188,8 +188,8 @@ class Roblox(commands.Cog):
 
         try:
             descricao = await _buscar_descricao_roblox(pendente["roblox_id"])
-        except aiohttp.ClientError as e:
-            await interaction.followup.send(f"Erro ao falar com a API do Roblox: {e}", ephemeral=True)
+        except (aiohttp.ClientError, ValueError) as e:
+            await interaction.followup.send("A API do Roblox está indisponível ou retornou dados inválidos. Tente novamente mais tarde.", ephemeral=True)
             return
 
         if pendente["codigo"] not in descricao:
@@ -200,35 +200,59 @@ class Roblox(commands.Cog):
             )
             return
 
-        vinculos = await carregar(ARQUIVO_VINCULOS, {})
-        guild_dados = vinculos.setdefault(str(interaction.guild.id), {})
-        roblox_id = int(pendente["roblox_id"])
-        vinculo_existente = next(
-            (
-                discord_id
-                for discord_id, dados in guild_dados.items()
-                if str(discord_id) != str(interaction.user.id)
-                and isinstance(dados, dict)
-                and str(dados.get("roblox_id")) == str(roblox_id)
-            ),
-            None,
-        )
-        if vinculo_existente is not None:
-            await interaction.followup.send(
-                "Esta conta Roblox já está vinculada a outro perfil Discord da NÊMESIS. "
-                "Se você acredita que houve um erro, abra um ticket para a staff verificar.",
-                ephemeral=True,
+        async with _ROBLOX_VINCULO_LOCK:
+            # Recarrega os dois arquivos dentro do lock para impedir que duas
+            # confirmações simultâneas vinculem a mesma conta Roblox.
+            vinculos = await carregar(ARQUIVO_VINCULOS, {})
+            pendentes = await carregar(ARQUIVO_PENDENTES, {})
+            if not isinstance(vinculos, dict):
+                vinculos = {}
+            if not isinstance(pendentes, dict):
+                pendentes = {}
+            guild_pendentes = pendentes.get(str(interaction.guild.id), {})
+            if not isinstance(guild_pendentes, dict):
+                guild_pendentes = {}
+            pendente_atual = guild_pendentes.get(str(interaction.user.id))
+            if not isinstance(pendente_atual, dict) or str(pendente_atual.get("codigo")) != str(pendente.get("codigo")):
+                await interaction.followup.send(
+                    "Esta verificação já foi processada ou substituída. Use /roblox-vincular para iniciar outra.",
+                    ephemeral=True,
+                )
+                return
+
+            guild_dados = vinculos.get(str(interaction.guild.id), {})
+            if not isinstance(guild_dados, dict):
+                guild_dados = {}
+            roblox_id = int(pendente_atual["roblox_id"])
+            vinculo_existente = next(
+                (
+                    discord_id
+                    for discord_id, dados in guild_dados.items()
+                    if str(discord_id) != str(interaction.user.id)
+                    and isinstance(dados, dict)
+                    and str(dados.get("roblox_id")) == str(roblox_id)
+                ),
+                None,
             )
-            return
+            if vinculo_existente is not None:
+                await interaction.followup.send(
+                    "Esta conta Roblox já está vinculada a outro perfil Discord da NÊMESIS. "
+                    "Se você acredita que houve um erro, abra um ticket para a staff verificar.",
+                    ephemeral=True,
+                )
+                return
 
-        guild_dados[str(interaction.user.id)] = {
-            "roblox_id": roblox_id,
-            "roblox_username": pendente["roblox_username"],
-        }
-        await salvar(ARQUIVO_VINCULOS, vinculos)
+            guild_dados[str(interaction.user.id)] = {
+                "roblox_id": roblox_id,
+                "roblox_username": str(pendente_atual.get("roblox_username") or pendente.get("roblox_username") or ""),
+            }
+            vinculos[str(interaction.guild.id)] = guild_dados
+            await salvar(ARQUIVO_VINCULOS, vinculos)
 
-        pendentes[str(interaction.guild.id)].pop(str(interaction.user.id), None)
-        await salvar(ARQUIVO_PENDENTES, pendentes)
+            guild_pendentes.pop(str(interaction.user.id), None)
+            pendentes[str(interaction.guild.id)] = guild_pendentes
+            await salvar(ARQUIVO_PENDENTES, pendentes)
+            pendente = pendente_atual
 
         mensagem = f"✅ Verificado! Sua conta Discord agora está vinculada a **{pendente['roblox_username']}** no Roblox."
 
