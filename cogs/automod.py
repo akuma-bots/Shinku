@@ -1596,7 +1596,29 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             elif medida == "ban_temp":
                 horas = max(1, min(duracao or 24, 8760))
                 await guild.ban(membro, reason=motivo, delete_message_seconds=0)
-                await self.registrar_banimento_temporario(guild.id, membro.id, horas * 3600)
+                persistido = await self.registrar_banimento_temporario(
+                    guild.id, membro.id, horas * 3600
+                )
+                if not persistido:
+                    # Sem registro de expiração, não deixamos um ban temporário
+                    # virar permanente silenciosamente.
+                    try:
+                        await guild.unban(
+                            discord.Object(id=membro.id),
+                            reason="Rollback: falha ao persistir expiração do AutoMod",
+                        )
+                    except discord.NotFound:
+                        pass
+                    except (discord.Forbidden, discord.HTTPException) as erro_rollback:
+                        print(
+                            f"[AUTOMOD][CRÍTICO] Falha ao reverter ban temporário de {membro.id}: {erro_rollback}"
+                        )
+                    await self.aviso_falha_punicao(
+                        message,
+                        infracao,
+                        "O ban temporário não pôde ser salvo no armazenamento. O bot tentou reverter o banimento; confira o log de auditoria.",
+                    )
+                    return
                 duracao = horas
                 tipo_historico = "ban"
                 nomes[medida] = f"Banimento temporário por {horas} hora(s)"
