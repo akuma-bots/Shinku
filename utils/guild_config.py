@@ -128,10 +128,12 @@ def _normalizar_id(valor):
 
 
 def _normalizar_config(config: dict) -> dict:
+    if not isinstance(config, dict):
+        config = {}
 
     resultado = {
         **PADRAO,
-        **(config or {}),
+        **config,
     }
 
     # Migra automaticamente o antigo cargo de suporte para o cargo oficial.
@@ -172,15 +174,26 @@ def _normalizar_config(config: dict) -> dict:
     # Contadores
     # --------------------------------------------------------
 
-    contadores = resultado.get(
-        "contadores",
-        [],
-    )
-
+    contadores = resultado.get("contadores", [])
     if not isinstance(contadores, list):
         contadores = []
 
-    resultado["contadores"] = contadores
+    contadores_validos = []
+    for contador in contadores:
+        if not isinstance(contador, dict):
+            continue
+        canal_id = _normalizar_id(contador.get("canal_id"))
+        if canal_id is None:
+            continue
+        cargo_id = _normalizar_id(contador.get("cargo_id"))
+        contadores_validos.append({
+            **contador,
+            "tipo": str(contador.get("tipo") or "").strip(),
+            "canal_id": canal_id,
+            "cargo_id": cargo_id,
+        })
+
+    resultado["contadores"] = contadores_validos
 
     return resultado
 
@@ -190,10 +203,8 @@ def _normalizar_config(config: dict) -> dict:
 # ============================================================
 
 async def _tudo():
-    return await carregar(
-        ARQUIVO,
-        {},
-    )
+    dados = await carregar(ARQUIVO, {})
+    return dados if isinstance(dados, dict) else {}
 
 
 # ============================================================
