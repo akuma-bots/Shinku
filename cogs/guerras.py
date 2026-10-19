@@ -1,4 +1,3 @@
-import asyncio
 import re
 import time
 import uuid
@@ -10,7 +9,6 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 
 ARQUIVO_GUERRAS = "guerras.json"
-_GUERRAS_LOCK = asyncio.Lock()
 COR_NEMESIS = 0xB51F32
 REGRAS_PADRAO = [
     "Respeitar todos os participantes e a staff.",
