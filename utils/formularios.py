@@ -381,8 +381,8 @@ async def criar_resposta(
             or formulario.get("nome")
             or "Formulário"
         ),
-        # O site usa "itens" e timestamps em milissegundos; os campos
-        # originais são mantidos para compatibilidade com o bot.
+        # Campos legados e timestamps em milissegundos são mantidos para
+        # compatibilidade com registros antigos.
         "itens": itens,
         "respostas": respostas,
         "status": "pendente",
