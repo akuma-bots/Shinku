@@ -293,17 +293,17 @@ async def criar(
         guild = await _guild(guild_id)
 
         missao = {
-        "id": str(uuid.uuid4())[:8],
-        "tipo": tipo,
-        "titulo": str(titulo),
-        "descricao": str(descricao),
-        "recompensa_xp": recompensa_xp,
-        "pontos": recompensa_xp,
-        "criado_por": criado_por,
-        "origem": origem,
-        "ativa": True,
-        "timestamp": time.time(),
-    }
+            "id": str(uuid.uuid4())[:8],
+            "tipo": tipo,
+            "titulo": str(titulo),
+            "descricao": str(descricao or ""),
+            "recompensa_xp": recompensa_xp,
+            "pontos": recompensa_xp,
+            "criado_por": criado_por,
+            "origem": origem,
+            "ativa": True,
+            "timestamp": time.time(),
+        }
 
         guild["missoes"].append(missao)
         await _salvar_guild(guild_id, guild)
