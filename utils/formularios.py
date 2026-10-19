@@ -131,7 +131,7 @@ async def remover_formulario(
 def perguntas_flat(
     formulario: dict,
 ) -> list:
-    """Retorna as perguntas em ordem, aceitando o formato antigo do bot e o formato do site."""
+    """Retorna as perguntas em ordem, aceitando o formato atual e formatos legados dos formulários."""
     achatado = []
 
     for pagina in formulario.get("paginas", []):
