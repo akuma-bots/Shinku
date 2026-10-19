@@ -42,7 +42,7 @@ TIPOS_PADRAO = [
         "valor": "suporte_comunidade",
         "label": "Suporte da Comunidade",
         "emoji": "🛟",
-        "descricao": "Ajuda com o servidor, bot, site, acesso ou funcionamento dos sistemas.",
+        "descricao": "Ajuda com o servidor, bot, acesso ou funcionamento dos sistemas.",
         "usa_ia": False,
     },
     {

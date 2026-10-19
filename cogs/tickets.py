@@ -111,7 +111,7 @@ async def fechar_canal_ticket(
                 try:
                     embed = criar_embed(
                         "✦・ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO ・✦",
-                        f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\\n\\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
+                        f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\n\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
                         rodape="NÊMESIS • Central de atendimento",
                     )
                     await dono.send(embed=embed, view=AvaliacaoTicketView(
@@ -153,6 +153,9 @@ async def fechar_canal_ticket(
 
 async def _montar_select(guild_id: int) -> discord.ui.View:
     tipos = await tickets.get_tipos(guild_id)
+    if not tipos:
+        # O Discord não aceita um select vazio; recupera as categorias padrão.
+        tipos = list(tickets.TIPOS_PADRAO)
 
     # Emojis decorativos (◈, ✦, ◇ etc.) não são aceitos como emojis
     # de SelectOption pelo Discord. Usa apenas emojis Unicode válidos.
@@ -168,16 +171,16 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
     }
     options = [
         discord.SelectOption(
-            label=t["label"],
-            value=t["valor"],
-            description=t["descricao"][:100],
+            label=str(t.get("label") or "Atendimento")[:100],
+            value=str(t.get("valor") or "outro")[:100],
+            description=str(t.get("descricao") or "Solicitação de atendimento.")[:100],
             emoji=(
                 t.get("emoji")
                 if t.get("emoji") in {"⚔️", "🎖️", "⚖️", "🎯", "🛟", "🤝", "🎉", "💡"}
                 else emojis_validos.get(t["valor"])
             ),
         )
-        for t in tipos
+        for t in tipos[:25]
     ]
 
     select = discord.ui.Select(
@@ -471,41 +474,36 @@ class FecharTicketView(discord.ui.View):
         # Bloqueia a equipe comum de enviar mensagens; a pessoa responsável e
         # cargos administrativos recebem permissão explícita para continuar.
         try:
+            # Consolida as alterações num único PATCH do canal. Fazer um
+            # set_permissions por cargo gera dezenas de pedidos e pode causar 429.
+            overwrites = dict(canal.overwrites)
             for cargo in guild.roles:
                 if cargo.is_default():
                     continue
                 if cargo_suporte and cargo.position >= cargo_suporte.position:
-                    await canal.set_permissions(
-                        cargo,
-                        overwrite=discord.PermissionOverwrite(
-                            view_channel=True,
-                            send_messages=False,
-                            read_message_history=True,
-                        ),
-                        reason=f"Ticket assumido por {membro} ({membro.id})",
-                    )
+                    atual = overwrites.get(cargo, discord.PermissionOverwrite())
+                    atual.view_channel = True
+                    atual.send_messages = False
+                    atual.read_message_history = True
+                    overwrites[cargo] = atual
                 if cargo.permissions.administrator or cargo.permissions.manage_channels:
-                    await canal.set_permissions(
-                        cargo,
-                        overwrite=discord.PermissionOverwrite(
-                            view_channel=True,
-                            send_messages=True,
-                            read_message_history=True,
-                            manage_messages=True,
-                            manage_channels=True,
-                        ),
-                        reason="Permitir intervenção administrativa em ticket atribuído",
+                    overwrites[cargo] = discord.PermissionOverwrite(
+                        view_channel=True,
+                        send_messages=True,
+                        read_message_history=True,
+                        manage_messages=True,
+                        manage_channels=True,
                     )
 
-            await canal.set_permissions(
-                membro,
-                overwrite=discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    manage_messages=eh_admin,
-                ),
-                reason=f"Responsável pelo ticket: {membro} ({membro.id})",
+            overwrites[membro] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                manage_messages=eh_admin,
+            )
+            await canal.edit(
+                overwrites=overwrites,
+                reason=f"Ticket assumido por {membro} ({membro.id})",
             )
         except (discord.Forbidden, discord.HTTPException):
             # Evita deixar uma atribuição aparentemente concluída sem bloqueio.
@@ -570,10 +568,15 @@ class FecharTicketView(discord.ui.View):
         except (TypeError, ValueError):
             suporte_id = None
 
+        cargo_suporte = guild.get_role(suporte_id) if suporte_id else None
         eh_suporte = (
             isinstance(membro, discord.Member)
-            and suporte_id is not None
-            and membro.get_role(suporte_id) is not None
+            and cargo_suporte is not None
+            and any(
+                cargo.id != guild.default_role.id
+                and cargo.position >= cargo_suporte.position
+                for cargo in membro.roles
+            )
         )
         eh_dono = str(membro.id) == str(registro.get("usuario_id"))
         eh_admin = (
@@ -725,19 +728,29 @@ class Tickets(commands.Cog):
         )
 
         embed = criar_embed(
-            f"{tipo.get('emoji', '🎫')} {tipo['label']}",
+            f"✦・ NÊMESIS — {tipo['label'].upper()} ・✦",
             (
-                "Seu atendimento foi aberto. Descreva o que precisa, "
-                "inclua o contexto necessário e aguarde a equipe."
+                f"Olá, {user.mention}. Seu atendimento foi iniciado com sucesso.\n\n"
+                "╭──────────── ◈ ATENDIMENTO ◈ ────────────╮\n"
+                "➜ Explique sua solicitação com detalhes.\n"
+                "➜ Envie provas, imagens ou contexto quando necessário.\n"
+                "➜ Aguarde a equipe responsável responder.\n"
+                "➜ Use **Fechar Ticket** quando o atendimento terminar.\n"
+                "╰─────────────────────────────────────────╯"
             ),
-            rodape="NÊMESIS • Atendimento privado",
+            rodape="NÊMESIS • Central de atendimento privada",
+            timestamp=True,
         )
+        embed.add_field(name="Categoria", value=tipo["label"][:1024], inline=True)
+        embed.add_field(name="Solicitante", value=f"{user.mention}\n`{user.id}`", inline=True)
+        embed.add_field(name="Status", value="🟢 Aguardando atendimento", inline=True)
+        embed.set_thumbnail(url=user.display_avatar.url)
 
         try:
             mensagem = await canal.send(
-                content=user.mention,
                 embed=embed,
                 view=FecharTicketView(),
+                allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
 
             # Salva o registro depois de publicar a mensagem inicial.
