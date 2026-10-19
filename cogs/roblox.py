@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import random
 import string
 import aiohttp
@@ -10,30 +12,46 @@ ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {rob
 ARQUIVO_PENDENTES = "roblox_pendentes.json"     # { guild_id: { discord_id: {roblox_id, roblox_username, codigo} } }
 ARQUIVO_GRUPO = "roblox_grupo_config.json"      # { guild_id: {"grupo_id": int, "mapeamentos": {rank_nome: cargo_id}} }
 
+_LOG = logging.getLogger(__name__)
+_ROBLOX_VINCULO_LOCK = asyncio.Lock()
+
 
 async def _buscar_usuario_roblox(nome_usuario: str):
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
             json={"usernames": [nome_usuario], "excludeBannedUsers": False},
         ) as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
+    if not isinstance(dados, dict):
+        raise ValueError("A API do Roblox retornou uma resposta inválida.")
     resultados = dados.get("data", [])
-    return resultados[0] if resultados else None
+    return resultados[0] if isinstance(resultados, list) and resultados else None
 
 
 async def _buscar_descricao_roblox(roblox_id: int) -> str:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://users.roblox.com/v1/users/{roblox_id}") as resposta:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"https://users.roblox.com/v1/users/{int(roblox_id)}") as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
+    if not isinstance(dados, dict):
+        raise ValueError("A API do Roblox retornou uma resposta inválida.")
     return dados.get("description", "") or ""
 
 
 async def _buscar_grupos_roblox(roblox_id: int) -> list:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://groups.roblox.com/v2/users/{roblox_id}/groups/roles") as resposta:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"https://groups.roblox.com/v2/users/{int(roblox_id)}/groups/roles") as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
-    return dados.get("data", [])
+    if not isinstance(dados, dict):
+        raise ValueError("A API de grupos do Roblox retornou uma resposta inválida.")
+    grupos = dados.get("data", [])
+    return grupos if isinstance(grupos, list) else []
 
 
 async def _buscar_rank_no_grupo(roblox_id: int, grupo_id: int):
@@ -46,7 +64,29 @@ async def _buscar_rank_no_grupo(roblox_id: int, grupo_id: int):
 
 async def _config_grupo(guild_id: int) -> dict:
     todos = await carregar(ARQUIVO_GRUPO, {})
-    return todos.get(str(guild_id), {"grupo_id": None, "mapeamentos": {}})
+    if not isinstance(todos, dict):
+        todos = {}
+    config = todos.get(str(guild_id), {})
+    if not isinstance(config, dict):
+        config = {}
+    grupo_id = config.get("grupo_id")
+    try:
+        grupo_id = int(grupo_id) if grupo_id not in (None, "") else None
+    except (TypeError, ValueError, OverflowError):
+        grupo_id = None
+    mapeamentos = config.get("mapeamentos", {})
+    if not isinstance(mapeamentos, dict):
+        mapeamentos = {}
+    normalizados = {}
+    for rank, cargo_id in mapeamentos.items():
+        try:
+            cargo_id = int(cargo_id)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        nome_rank = str(rank or "").strip()
+        if nome_rank:
+            normalizados[nome_rank] = cargo_id
+    return {"grupo_id": grupo_id, "mapeamentos": normalizados}
 
 
 async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member, roblox_id: int) -> str:
