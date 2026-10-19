@@ -655,19 +655,13 @@ class Moderacao(commands.Cog):
                 "Não consigo executar esta ação porque faltam permissões no bot: "
                 f"**{permissoes}**. Peça à administração para revisar as permissões."
             )
-
-            if interaction.response.is_done():
-                await interaction.followup.send(
-                    mensagem,
-                    ephemeral=True
-                )
-            else:
-                await interaction.response.send_message(
-                    mensagem,
-                    ephemeral=True
-                )
         else:
             raise error
+
+        if interaction.response.is_done():
+            await interaction.followup.send(mensagem, ephemeral=True)
+        else:
+            await interaction.response.send_message(mensagem, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
