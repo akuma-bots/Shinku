@@ -13,7 +13,7 @@ _CONFIG_LOCK = asyncio.Lock()
 # ============================================================
 
 PADRAO = {
-    "support_role_id": 1549832967495491645,
+    "support_role_id": 1547307501345579219,
     "log_channel_id": 1545838386944938024,
     "ticket_category_id": 1545835749369446603,
 
@@ -133,6 +133,10 @@ def _normalizar_config(config: dict) -> dict:
         **PADRAO,
         **(config or {}),
     }
+
+    # Migra automaticamente o antigo cargo de suporte para o cargo oficial.
+    if _normalizar_id(resultado.get("support_role_id")) == 1549832967495491645:
+        resultado["support_role_id"] = PADRAO["support_role_id"]
 
     # --------------------------------------------------------
     # Normaliza todos os IDs Discord
