@@ -720,7 +720,7 @@ class Missoes(commands.Cog):
                         user_id=usuario_id,
                         quantidade=quantidade,
                         tipo=tipo_progressao,
-                        evento_id=evento_site,
+                        evento_id=evento_id,
                     )
                 except Exception as erro:
                     log.exception(
