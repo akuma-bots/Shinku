@@ -1,3 +1,5 @@
+import time
+
 import discord
 
 from discord import app_commands
@@ -26,7 +28,10 @@ from utils.competitivo_sync import (
 )
 
 
+# O cálculo de tempo no Top 10 roda a cada minuto, mas o painel do Discord
+# não deve ser editado com essa frequência: mensagens antigas têm limite de edições.
 INTERVALO_RANKING_MINUTOS = 1
+INTERVALO_PAINEL_JOGOS_SEGUNDOS = 20 * 60
 
 
 def _negrito(
@@ -90,6 +95,7 @@ class RankingGeral(
     ):
 
         self.bot = bot
+        self._ultima_atualizacao_painel_jogos = {}
 
         self.atualizar_ranking_automatico.start()
 
@@ -252,12 +258,21 @@ class RankingGeral(
                     guild
                 )
 
-                # Atualiza o tempo no Top 10 dos rankings por jogo sem criar novos canais.
+                # O tempo de permanência no Top 10 precisa ser contabilizado por minuto.
+                # A edição da mensagem pública é limitada separadamente para evitar 429/30046.
                 from utils import ranking_missoes_jogos
                 await ranking_missoes_jogos.atualizar_tempo_top_jogos(guild.id)
+
                 cog_missoes = self.bot.get_cog("Missoes")
                 if cog_missoes is not None:
-                    await cog_missoes._atualizar_ranking_jogo(guild, "shigaku")
+                    agora = time.monotonic()
+                    ultima = self._ultima_atualizacao_painel_jogos.get(guild.id)
+                    if ultima is None:
+                        # A sincronização inicial do cog Missoes publica/atualiza o painel.
+                        self._ultima_atualizacao_painel_jogos[guild.id] = agora
+                    elif agora - ultima >= INTERVALO_PAINEL_JOGOS_SEGUNDOS:
+                        await cog_missoes._atualizar_ranking_jogo(guild, "shigaku")
+                        self._ultima_atualizacao_painel_jogos[guild.id] = agora
 
             except Exception as erro:
 
