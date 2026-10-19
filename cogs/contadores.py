@@ -1,5 +1,3 @@
-import time
-
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -9,10 +7,6 @@ from utils.guild_config import (
     adicionar_contador,
     remover_contador,
 )
-from utils.storage import carregar, salvar
-
-
-ARQUIVO_CONTADORES = "contadores.json"
 
 TIPOS_VALIDOS = [
     "membros",
@@ -25,81 +19,9 @@ TIPOS_VALIDOS = [
 INTERVALO_ATUALIZACAO_MINUTOS = 10
 
 
-async def _tudo_contadores():
-    return await carregar(
-        ARQUIVO_CONTADORES,
-        {},
-    )
-
-
-async def _salvar_contadores(dados):
-    await salvar(
-        ARQUIVO_CONTADORES,
-        dados,
-    )
-
-
-async def _sincronizar_contadores_guild(
-    guild_id: int,
-    lista: list,
-):
-    dados = await _tudo_contadores()
-
-    dados[str(guild_id)] = {
-        "guildId": str(guild_id),
-        "contadores": [
-            {
-                "tipo": item.get("tipo"),
-                "canalId": str(item.get("canal_id")),
-                "cargoId": (
-                    str(item["cargo_id"])
-                    if item.get("cargo_id")
-                    else None
-                ),
-                "atualizadoEm": time.time(),
-            }
-            for item in lista
-        ],
-    }
-
-    await _salvar_contadores(dados)
-
-
-async def sincronizar_todos_site(bot: commands.Bot):
-    """
-    Sincroniza os contadores configurados em guild_config.json
-    para contadores.json, usado pelo Dashboard.
-    """
-
-    total = 0
-
-    for guild in bot.guilds:
-        try:
-            config = await get_config(guild.id)
-            lista = config.get("contadores", [])
-
-            await _sincronizar_contadores_guild(
-                guild.id,
-                lista,
-            )
-
-            total += len(lista)
-
-        except Exception as erro:
-            print(
-                "[CONTADORES] "
-                f"Falha ao sincronizar guild {guild.id}: "
-                f"{erro}"
-            )
-
-    return total
-
-
 class Contadores(commands.Cog):
     """
-    Canais de voz que exibem contagens atualizadas
-    automaticamente e mantêm os dados sincronizados
-    com o Dashboard da NÊMESIS.
+    Canais de voz atualizados automaticamente com dados internos do bot.
     """
 
     def __init__(self, bot: commands.Bot):
@@ -248,13 +170,6 @@ class Contadores(commands.Cog):
             cargo.id if cargo else None,
         )
 
-        config = await get_config(guild.id)
-
-        await _sincronizar_contadores_guild(
-            guild.id,
-            config.get("contadores", []),
-        )
-
         await interaction.followup.send(
             f"✅ Contador criado: {canal.mention}. "
             f"Ele se atualiza a cada "
@@ -295,15 +210,6 @@ class Contadores(commands.Cog):
             )
         except discord.HTTPException:
             pass
-
-        config = await get_config(
-            interaction.guild.id
-        )
-
-        await _sincronizar_contadores_guild(
-            interaction.guild.id,
-            config.get("contadores", []),
-        )
 
         await interaction.response.send_message(
             "🗑️ Contador removido.",
@@ -351,35 +257,6 @@ class Contadores(commands.Cog):
 
         await interaction.response.send_message(
             "\n".join(linhas),
-            ephemeral=True,
-        )
-
-    @app_commands.command(
-        name="contadores-sincronizar",
-        description=(
-            "Sincroniza os contadores "
-            "com o Dashboard da NÊMESIS."
-        ),
-    )
-    @app_commands.checks.has_permissions(
-        administrator=True
-    )
-    async def contadores_sincronizar(
-        self,
-        interaction: discord.Interaction,
-    ):
-
-        await interaction.response.defer(
-            ephemeral=True
-        )
-
-        quantidade = await sincronizar_todos_site(
-            self.bot
-        )
-
-        await interaction.followup.send(
-            f"✅ {quantidade} contador(es) "
-            "sincronizado(s) com o Dashboard.",
             ephemeral=True,
         )
 
@@ -441,11 +318,6 @@ class Contadores(commands.Cog):
 
                         except discord.HTTPException:
                             pass
-
-                await _sincronizar_contadores_guild(
-                    guild.id,
-                    lista,
-                )
 
             except Exception as erro:
                 print(
