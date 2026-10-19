@@ -170,7 +170,10 @@ class Musica(commands.Cog):
                 raise ValueError("O provedor retornou uma resposta inválida.")
             if "entries" in dados:
                 entradas = dados.get("entries")
-                dados = next((item for item in entradas if isinstance(item, dict)), None) if isinstance(entradas, (list, tuple)) else None
+                try:
+                    dados = next((item for item in entradas if isinstance(item, dict)), None)
+                except TypeError:
+                    dados = None
             if not isinstance(dados, dict):
                 raise ValueError("Nenhum resultado de áudio foi encontrado.")
 
