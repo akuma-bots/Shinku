@@ -53,3 +53,11 @@ def test_storage_aceita_nome_de_arquivo_simples():
     caminho = _path("perfil_teste.json")
     assert caminho.name == "perfil_teste.json"
     assert caminho.parent == Path(__file__).resolve().parents[1] / "data"
+
+
+def test_cogs_criticos_importam_sem_integracao_com_site():
+    """Regressão: desafios e missões não podem depender de helpers removidos."""
+    import importlib
+
+    assert importlib.import_module("cogs.desafios") is not None
+    assert importlib.import_module("cogs.missoes") is not None
