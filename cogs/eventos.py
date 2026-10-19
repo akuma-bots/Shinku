@@ -102,8 +102,8 @@ class Eventos(commands.Cog):
     Sistema de eventos da NÊMESIS.
 
     Os eventos do Discord continuam sendo eventos nativos,
-    mas seus dados também são persistidos em eventos.json,
-    permitindo que o Dashboard consulte o mesmo estado pelo Upstash.
+    e seus dados também são persistidos em eventos.json para histórico
+    interno e recuperação após reinicializações.
     """
 
     def __init__(
@@ -481,8 +481,7 @@ class Eventos(commands.Cog):
     @app_commands.command(
         name="eventos-sincronizar",
         description=(
-            "Sincroniza os eventos atuais do Discord "
-            "com o Dashboard."
+            "Atualiza o registro interno dos eventos atuais do Discord."
         ),
     )
     @app_commands.checks.has_permissions(
