@@ -52,7 +52,7 @@ async def get_estado(
     normalizado = {**ESTADO_PADRAO, **estado}
     try:
         normalizado["numero_atual"] = max(1, int(normalizado.get("numero_atual", 1) or 1))
-        normalizado["duracao_dias"] = max(1, int(normalizado.get("duracao_dias", 30) or 30))
+        normalizado["duracao_dias"] = max(1, int(normalizado.get("duracao_dias", 30)))
         for campo, padrao in (("bonus_ouro", 200), ("bonus_prata", 100), ("bonus_bronze", 50)):
             normalizado[campo] = max(0, int(normalizado.get(campo, padrao) or 0))
     except (TypeError, ValueError, OverflowError):
