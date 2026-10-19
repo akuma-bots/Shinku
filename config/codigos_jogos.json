@@ -1,5 +1,5 @@
 {
-  "atualizado_em": "2026-10-18",
+  "atualizado_em": "2026-10-19",
   "jogos": {
     "shigaku": {
       "nome": "Shigaku",
@@ -722,7 +722,11 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "Ryujin",
+          "codigo": "Vampire",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Legacies",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
@@ -903,8 +907,8 @@
     }
   },
   "semana_referente": {
-    "inicio": "2026-10-12",
-    "fim": "2026-10-18",
+    "inicio": "2026-10-19",
+    "fim": "2026-10-25",
     "fuso": "America/Sao_Paulo"
   }
 }
