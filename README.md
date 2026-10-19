@@ -56,7 +56,7 @@ Configure as seguintes variáveis de ambiente. Não coloque credenciais no códi
 | `DISCORD_TOKEN` | Sim | Token privado do bot. |
 | `NEMESIS_GUILD_ID` | Sim | ID numérico do servidor oficial da NÊMESIS. |
 | `UPSTASH_REDIS_REST_URL` | Sim em produção | URL REST do banco compartilhado. |
-| `UPSTASH_REDIS_REST_TOKEN` | Sim em produção | Token privado do banco compartilhado. |
+| `UPSTASH_REDIS_REST_TOKEN` | Sim em produção | Token privado do armazenamento privado do bot. |
 | `PORT` | Não | Porta HTTP de health check; usa 8080 como padrão fora de plataformas que definem a porta. |
 
 Em produção no Render, configure o Upstash para manter os dados persistentes entre reinicializações. Sem ele, o bot pode recorrer ao armazenamento local, que não é confiável em disco efêmero.
