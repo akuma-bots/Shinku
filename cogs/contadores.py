@@ -1,3 +1,5 @@
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -17,6 +19,7 @@ TIPOS_VALIDOS = [
 ]
 
 INTERVALO_ATUALIZACAO_MINUTOS = 10
+_LOG = logging.getLogger(__name__)
 
 
 class Contadores(commands.Cog):
@@ -166,7 +169,8 @@ class Contadores(commands.Cog):
                 canal.id,
                 cargo.id if cargo else None,
             )
-        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
+        except Exception:
+            _LOG.exception("Falha ao criar contador (guild=%s, tipo=%s).", guild.id, tipo)
             # Se a configuração falhar depois da criação do canal, evita deixar
             # um canal órfão que não será mais gerenciado pelo bot.
             if canal is not None:
