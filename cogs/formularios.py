@@ -44,6 +44,7 @@ def _limpar_sessoes_formularios(agora: float | None = None) -> None:
             SESSOES_FORMULARIOS.pop(chave, None)
 GUILD_NEMESIS_ID = 1543381737961160910
 CARGOS_AUTORIZADOS_FORMULARIO_STAFF = {1547306211458940968, 1547306457526181939}
+CARGO_INSTRUTOR_FORMULARIO_ID = 1558909311315607723
 NOME_FORMULARIO_STAFF = "Inscrição para Staff"
 _LOCK_PAINÉIS_AUTOMÁTICOS = asyncio.Lock()
 ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
@@ -444,9 +445,13 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                     logging.exception("Falha ao publicar candidatura %s no canal.", resposta.get("id"))
                     break
 
-        # Mantém também as notificações por DM para os cargos configurados.
+        # Instrutores/aprovadores recebem todas as candidaturas por DM.
+        cargos_notificar = list(formulario.get("cargos_notificar", []))
+        if CARGO_INSTRUTOR_FORMULARIO_ID not in cargos_notificar:
+            cargos_notificar.append(CARGO_INSTRUTOR_FORMULARIO_ID)
+
         notificados = set()
-        for cargo_id in formulario.get("cargos_notificar", []):
+        for cargo_id in cargos_notificar:
             try:
                 cargo_id_int = int(cargo_id)
             except (TypeError, ValueError):
@@ -688,28 +693,27 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 guild_encontrada.id,
                 resposta.get("formulario_id", ""),
             )
-            if formulario_resposta and formulario_resposta.get("nome") == NOME_FORMULARIO_STAFF:
-                # A candidatura de Staff só pode ser aprovada/recusada pelos cargos autorizados.
-                membro_revisor = guild_encontrada.get_member(interaction.user.id)
-                if membro_revisor is None:
-                    try:
-                        membro_revisor = await guild_encontrada.fetch_member(interaction.user.id)
-                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        membro_revisor = None
+            # Apenas instrutores/aprovadores e administradores podem revisar formulários.
+            membro_revisor = guild_encontrada.get_member(interaction.user.id)
+            if membro_revisor is None:
+                try:
+                    membro_revisor = await guild_encontrada.fetch_member(interaction.user.id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    membro_revisor = None
 
-                autorizado = bool(
-                    membro_revisor
-                    and any(
-                        cargo.id in CARGOS_AUTORIZADOS_FORMULARIO_STAFF
-                        for cargo in membro_revisor.roles
-                    )
+            autorizado = bool(
+                membro_revisor
+                and (
+                    membro_revisor.guild_permissions.administrator
+                    or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in membro_revisor.roles)
                 )
-                if not autorizado:
-                    await interaction.response.send_message(
-                        "Você não tem autorização para revisar o formulário Staff da NÊMESIS.",
-                        ephemeral=True,
-                    )
-                    return
+            )
+            if not autorizado:
+                await interaction.response.send_message(
+                    "Você precisa do cargo Instrutor/Aprovador ou da permissão Administrador para revisar formulários.",
+                    ephemeral=True,
+                )
+                return
 
             if resposta["status"] != "pendente":
                 await interaction.response.send_message(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
@@ -738,13 +742,38 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             )
             await interaction.response.edit_message(embed=embed, view=None)
 
-            candidato = guild_encontrada.get_member(resposta["autor_id"])
+            status_texto = "APROVADA" if aprovado else "RECUSADA"
+            nome_formulario = (formulario_resposta or {}).get("nome", "Formulário")
+            texto_resultado = (
+                f"{'🎉' if aprovado else '❌'} Sua candidatura para **{nome_formulario}** foi "
+                f"**{status_texto}** por {interaction.user} no servidor **{guild_encontrada.name}**."
+            )
+
+            candidato = guild_encontrada.get_member(int(resposta["autor_id"]))
+            if candidato is None:
+                try:
+                    candidato = await guild_encontrada.fetch_member(int(resposta["autor_id"]))
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    candidato = None
             if candidato:
                 try:
-                    texto = "🎉 Sua candidatura foi **aprovada**!" if aprovado else "❌ Sua candidatura foi recusada."
-                    await candidato.send(f"{texto} (servidor: {guild_encontrada.name})")
-                except discord.Forbidden:
-                    pass
+                    await candidato.send(texto_resultado)
+                except (discord.Forbidden, discord.HTTPException):
+                    logging.info("Não foi possível enviar o resultado da candidatura %s ao candidato %s por DM.", resposta_id, resposta["autor_id"])
+
+            # Informa os instrutores/aprovadores do resultado.
+            cargo_instrutor = guild_encontrada.get_role(CARGO_INSTRUTOR_FORMULARIO_ID)
+            if cargo_instrutor:
+                for instrutor in cargo_instrutor.members:
+                    if instrutor.bot:
+                        continue
+                    try:
+                        await instrutor.send(
+                            f"Resultado de formulário: {nome_formulario} — candidatura ID {resposta_id} "
+                            f"de {resposta['autor_id']} foi {status_texto} por {interaction.user}."
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        logging.info("Não foi possível notificar instrutor %s sobre candidatura %s.", instrutor.id, resposta_id)
 
 
 async def setup(bot: commands.Bot):
