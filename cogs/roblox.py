@@ -58,8 +58,21 @@ async def _buscar_rank_no_grupo(roblox_id: int, grupo_id: int):
     """Devolve o nome do cargo (rank) da pessoa dentro do grupo configurado,
     ou None se ela não estiver no grupo."""
     grupos = await _buscar_grupos_roblox(roblox_id)
-    entrada = next((g for g in grupos if g["group"]["id"] == grupo_id), None)
-    return entrada["role"]["name"] if entrada else None
+    for entrada in grupos:
+        if not isinstance(entrada, dict):
+            continue
+        grupo = entrada.get("group")
+        cargo = entrada.get("role")
+        if not isinstance(grupo, dict) or not isinstance(cargo, dict):
+            continue
+        try:
+            corresponde = int(grupo.get("id")) == int(grupo_id)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        nome = cargo.get("name")
+        if corresponde and isinstance(nome, str) and nome.strip():
+            return nome.strip()
+    return None
 
 
 async def _config_grupo(guild_id: int) -> dict:
