@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import random
 import string
 import aiohttp
@@ -10,43 +12,94 @@ ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {rob
 ARQUIVO_PENDENTES = "roblox_pendentes.json"     # { guild_id: { discord_id: {roblox_id, roblox_username, codigo} } }
 ARQUIVO_GRUPO = "roblox_grupo_config.json"      # { guild_id: {"grupo_id": int, "mapeamentos": {rank_nome: cargo_id}} }
 
+_LOG = logging.getLogger(__name__)
+_ROBLOX_VINCULO_LOCK = asyncio.Lock()
+
 
 async def _buscar_usuario_roblox(nome_usuario: str):
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.post(
             "https://users.roblox.com/v1/usernames/users",
             json={"usernames": [nome_usuario], "excludeBannedUsers": False},
         ) as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
+    if not isinstance(dados, dict):
+        raise ValueError("A API do Roblox retornou uma resposta inválida.")
     resultados = dados.get("data", [])
-    return resultados[0] if resultados else None
+    return resultados[0] if isinstance(resultados, list) and resultados else None
 
 
 async def _buscar_descricao_roblox(roblox_id: int) -> str:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://users.roblox.com/v1/users/{roblox_id}") as resposta:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"https://users.roblox.com/v1/users/{int(roblox_id)}") as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
+    if not isinstance(dados, dict):
+        raise ValueError("A API do Roblox retornou uma resposta inválida.")
     return dados.get("description", "") or ""
 
 
 async def _buscar_grupos_roblox(roblox_id: int) -> list:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"https://groups.roblox.com/v2/users/{roblox_id}/groups/roles") as resposta:
+    timeout = aiohttp.ClientTimeout(total=15)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"https://groups.roblox.com/v2/users/{int(roblox_id)}/groups/roles") as resposta:
+            resposta.raise_for_status()
             dados = await resposta.json()
-    return dados.get("data", [])
+    if not isinstance(dados, dict):
+        raise ValueError("A API de grupos do Roblox retornou uma resposta inválida.")
+    grupos = dados.get("data", [])
+    return grupos if isinstance(grupos, list) else []
 
 
 async def _buscar_rank_no_grupo(roblox_id: int, grupo_id: int):
     """Devolve o nome do cargo (rank) da pessoa dentro do grupo configurado,
     ou None se ela não estiver no grupo."""
     grupos = await _buscar_grupos_roblox(roblox_id)
-    entrada = next((g for g in grupos if g["group"]["id"] == grupo_id), None)
-    return entrada["role"]["name"] if entrada else None
+    for entrada in grupos:
+        if not isinstance(entrada, dict):
+            continue
+        grupo = entrada.get("group")
+        cargo = entrada.get("role")
+        if not isinstance(grupo, dict) or not isinstance(cargo, dict):
+            continue
+        try:
+            corresponde = int(grupo.get("id")) == int(grupo_id)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        nome = cargo.get("name")
+        if corresponde and isinstance(nome, str) and nome.strip():
+            return nome.strip()
+    return None
 
 
 async def _config_grupo(guild_id: int) -> dict:
     todos = await carregar(ARQUIVO_GRUPO, {})
-    return todos.get(str(guild_id), {"grupo_id": None, "mapeamentos": {}})
+    if not isinstance(todos, dict):
+        todos = {}
+    config = todos.get(str(guild_id), {})
+    if not isinstance(config, dict):
+        config = {}
+    grupo_id = config.get("grupo_id")
+    try:
+        grupo_id = int(grupo_id) if grupo_id not in (None, "") else None
+    except (TypeError, ValueError, OverflowError):
+        grupo_id = None
+    mapeamentos = config.get("mapeamentos", {})
+    if not isinstance(mapeamentos, dict):
+        mapeamentos = {}
+    normalizados = {}
+    for rank, cargo_id in mapeamentos.items():
+        try:
+            cargo_id = int(cargo_id)
+        except (TypeError, ValueError, OverflowError):
+            continue
+        nome_rank = str(rank or "").strip()
+        if nome_rank:
+            normalizados[nome_rank] = cargo_id
+    return {"grupo_id": grupo_id, "mapeamentos": normalizados}
 
 
 async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member, roblox_id: int) -> str:
@@ -60,7 +113,7 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
 
     try:
         rank_atual = await _buscar_rank_no_grupo(roblox_id, grupo_id)
-    except aiohttp.ClientError as e:
+    except (aiohttp.ClientError, ValueError) as e:
         return f"Erro ao consultar a API do Roblox: {e}"
 
     cargo_id_correto = mapeamentos.get(rank_atual) if rank_atual else None
@@ -110,8 +163,8 @@ class Roblox(commands.Cog):
 
         try:
             usuario = await _buscar_usuario_roblox(usuario_roblox)
-        except aiohttp.ClientError as e:
-            await interaction.followup.send(f"Erro ao falar com a API do Roblox: {e}", ephemeral=True)
+        except (aiohttp.ClientError, ValueError) as e:
+            await interaction.followup.send("A API do Roblox está indisponível ou retornou dados inválidos. Tente novamente mais tarde.", ephemeral=True)
             return
 
         if not usuario:
@@ -148,8 +201,8 @@ class Roblox(commands.Cog):
 
         try:
             descricao = await _buscar_descricao_roblox(pendente["roblox_id"])
-        except aiohttp.ClientError as e:
-            await interaction.followup.send(f"Erro ao falar com a API do Roblox: {e}", ephemeral=True)
+        except (aiohttp.ClientError, ValueError) as e:
+            await interaction.followup.send("A API do Roblox está indisponível ou retornou dados inválidos. Tente novamente mais tarde.", ephemeral=True)
             return
 
         if pendente["codigo"] not in descricao:
@@ -160,35 +213,59 @@ class Roblox(commands.Cog):
             )
             return
 
-        vinculos = await carregar(ARQUIVO_VINCULOS, {})
-        guild_dados = vinculos.setdefault(str(interaction.guild.id), {})
-        roblox_id = int(pendente["roblox_id"])
-        vinculo_existente = next(
-            (
-                discord_id
-                for discord_id, dados in guild_dados.items()
-                if str(discord_id) != str(interaction.user.id)
-                and isinstance(dados, dict)
-                and str(dados.get("roblox_id")) == str(roblox_id)
-            ),
-            None,
-        )
-        if vinculo_existente is not None:
-            await interaction.followup.send(
-                "Esta conta Roblox já está vinculada a outro perfil Discord da NÊMESIS. "
-                "Se você acredita que houve um erro, abra um ticket para a staff verificar.",
-                ephemeral=True,
+        async with _ROBLOX_VINCULO_LOCK:
+            # Recarrega os dois arquivos dentro do lock para impedir que duas
+            # confirmações simultâneas vinculem a mesma conta Roblox.
+            vinculos = await carregar(ARQUIVO_VINCULOS, {})
+            pendentes = await carregar(ARQUIVO_PENDENTES, {})
+            if not isinstance(vinculos, dict):
+                vinculos = {}
+            if not isinstance(pendentes, dict):
+                pendentes = {}
+            guild_pendentes = pendentes.get(str(interaction.guild.id), {})
+            if not isinstance(guild_pendentes, dict):
+                guild_pendentes = {}
+            pendente_atual = guild_pendentes.get(str(interaction.user.id))
+            if not isinstance(pendente_atual, dict) or str(pendente_atual.get("codigo")) != str(pendente.get("codigo")):
+                await interaction.followup.send(
+                    "Esta verificação já foi processada ou substituída. Use /roblox-vincular para iniciar outra.",
+                    ephemeral=True,
+                )
+                return
+
+            guild_dados = vinculos.get(str(interaction.guild.id), {})
+            if not isinstance(guild_dados, dict):
+                guild_dados = {}
+            roblox_id = int(pendente_atual["roblox_id"])
+            vinculo_existente = next(
+                (
+                    discord_id
+                    for discord_id, dados in guild_dados.items()
+                    if str(discord_id) != str(interaction.user.id)
+                    and isinstance(dados, dict)
+                    and str(dados.get("roblox_id")) == str(roblox_id)
+                ),
+                None,
             )
-            return
+            if vinculo_existente is not None:
+                await interaction.followup.send(
+                    "Esta conta Roblox já está vinculada a outro perfil Discord da NÊMESIS. "
+                    "Se você acredita que houve um erro, abra um ticket para a staff verificar.",
+                    ephemeral=True,
+                )
+                return
 
-        guild_dados[str(interaction.user.id)] = {
-            "roblox_id": roblox_id,
-            "roblox_username": pendente["roblox_username"],
-        }
-        await salvar(ARQUIVO_VINCULOS, vinculos)
+            guild_dados[str(interaction.user.id)] = {
+                "roblox_id": roblox_id,
+                "roblox_username": str(pendente_atual.get("roblox_username") or pendente.get("roblox_username") or ""),
+            }
+            vinculos[str(interaction.guild.id)] = guild_dados
+            await salvar(ARQUIVO_VINCULOS, vinculos)
 
-        pendentes[str(interaction.guild.id)].pop(str(interaction.user.id), None)
-        await salvar(ARQUIVO_PENDENTES, pendentes)
+            guild_pendentes.pop(str(interaction.user.id), None)
+            pendentes[str(interaction.guild.id)] = guild_pendentes
+            await salvar(ARQUIVO_PENDENTES, pendentes)
+            pendente = pendente_atual
 
         mensagem = f"✅ Verificado! Sua conta Discord agora está vinculada a **{pendente['roblox_username']}** no Roblox."
 
