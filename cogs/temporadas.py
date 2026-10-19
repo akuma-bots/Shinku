@@ -86,13 +86,19 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
     async def temporada_configurar(self, interaction: discord.Interaction, duracao_dias: int = None,
                                     canal: discord.TextChannel = None, cargo_campeao: discord.Role = None,
                                     bonus_ouro: int = None, bonus_prata: int = None, bonus_bronze: int = None):
-        await temporadas.configurar(
-            interaction.guild.id,
-            duracao_dias=duracao_dias,
-            canal_id=canal.id if canal else None,
-            cargo_campeao_id=cargo_campeao.id if cargo_campeao else None,
-            bonus_ouro=bonus_ouro, bonus_prata=bonus_prata, bonus_bronze=bonus_bronze,
-        )
+        try:
+            await temporadas.configurar(
+                interaction.guild.id,
+                duracao_dias=duracao_dias,
+                canal_id=canal.id if canal else None,
+                cargo_campeao_id=cargo_campeao.id if cargo_campeao else None,
+                bonus_ouro=bonus_ouro,
+                bonus_prata=bonus_prata,
+                bonus_bronze=bonus_bronze,
+            )
+        except ValueError as erro:
+            await interaction.response.send_message(f"❌ {erro}", ephemeral=True)
+            return
         await interaction.response.send_message("✅ Configuração de temporada atualizada.", ephemeral=True)
 
     @app_commands.command(name="temporada-encerrar-agora", description="Encerra a temporada atual agora, sem esperar o prazo.")
