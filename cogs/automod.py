@@ -332,6 +332,35 @@ PADROES_GRAFICO = [
     r"\bviol[eê]ncia\s+gr[aá]fica\b",
 ]
 
+# ============================================================
+# DADOS PESSOAIS E ARQUIVOS POTENCIALMENTE PERIGOSOS
+# ============================================================
+
+PADROES_DADOS_PESSOAIS = [
+    # CPF em formato comum; não tenta validar o dígito verificador.
+    r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b",
+    # Endereço IPv4 público/privado em formato textual.
+    r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+    # Telefones brasileiros com DDD.
+    r"(?<!\d)(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}(?!\d)",
+]
+
+EXTENSOES_PERIGOSAS = (
+    ".exe", ".scr", ".bat", ".cmd", ".ps1", ".msi",
+    ".dll", ".com", ".jar", ".apk", ".vbs", ".hta",
+    ".reg", ".pif", ".iso",
+)
+
+PADROES_LINK_SUSPEITO = [
+    r"discord(?:-)?nitro\.[a-z]{2,}",
+    r"steamcommun[i1]ty\.",
+    r"disc[o0]rdapp\.",
+    r"free[-_]?nitro",
+    r"nitro[-_]?gift",
+    r"login.{0,20}(?:discord|roblox|steam)",
+    r"(?:discord|roblox|steam).{0,20}verify.{0,10}account",
+]
+
 
 # ============================================================
 # AUXILIARES
@@ -937,7 +966,8 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             message.content
         )
 
-        if not texto:
+        anexos = list(getattr(message, "attachments", []) or [])
+        if not texto and not anexos:
             return None
 
         regras = (
@@ -1001,6 +1031,39 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         # ----------------------------------------------------
         # NÍVEL 2
         # ----------------------------------------------------
+
+        # Arquivos executáveis e formatos frequentemente usados para
+        # distribuir malware são bloqueados pela extensão do nome.
+        for anexo in anexos:
+            nome = str(getattr(anexo, "filename", "") or "").casefold()
+            if nome.endswith(EXTENSOES_PERIGOSAS):
+                infracoes.append((
+                    4,
+                    "Arquivo potencialmente perigoso",
+                    "03",
+                    f"Anexo com extensão de risco: {nome[:100]}",
+                ))
+                break
+
+        # Detecta tentativas conhecidas de phishing mesmo quando não usam
+        # exatamente as frases listadas nos padrões iniciais.
+        if contem_padrao(texto, PADROES_LINK_SUSPEITO):
+            infracoes.append((
+                4,
+                "Link suspeito/Phishing",
+                "03",
+                "A mensagem contém um padrão de link associado a phishing ou fraude.",
+            ))
+
+        # Dados pessoais numéricos publicados no chat podem configurar doxxing.
+        # A detecção é heurística e a equipe deve considerar o contexto no painel.
+        if contem_padrao(texto, PADROES_DADOS_PESSOAIS):
+            infracoes.append((
+                4,
+                "Possível exposição de dados pessoais",
+                "04",
+                "A mensagem contém um padrão semelhante a CPF, IP ou telefone.",
+            ))
 
         if self.detectar_divulgacao(
             texto
