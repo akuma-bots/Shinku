@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -6,6 +9,9 @@ from utils.guild_config import (
     definir_canal_cargo_automatico,
     remover_canal_cargo_automatico,
 )
+
+_LOG = logging.getLogger(__name__)
+_AUTO_ROLE_LOCK = asyncio.Lock()
 
 
 class CargoAutomatico(commands.Cog):
@@ -24,10 +30,17 @@ class CargoAutomatico(commands.Cog):
     @app_commands.describe(canal="Canal que vai dar o cargo", cargo="Cargo que a pessoa recebe ao postar ali")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def definir_canal_cargo(self, interaction: discord.Interaction, canal: discord.TextChannel, cargo: discord.Role):
-        if cargo >= interaction.guild.me.top_role:
+        bot_member = interaction.guild.me
+        if (
+            bot_member is None
+            or not bot_member.guild_permissions.manage_roles
+            or cargo >= bot_member.top_role
+            or cargo.is_default()
+            or cargo.managed
+        ):
             await interaction.response.send_message(
-                "⚠️ Esse cargo está acima (ou igual) ao meu cargo mais alto — eu não vou conseguir atribuir ele. "
-                "Suba meu cargo na lista de cargos do servidor, acima do cargo escolhido, e tente de novo.",
+                "⚠️ Não consigo atribuir esse cargo. Confira se tenho a permissão **Gerenciar cargos** "
+                "e se o cargo escolhido é atribuível e está abaixo do meu cargo mais alto.",
                 ephemeral=True,
             )
             return
@@ -88,17 +101,41 @@ class CargoAutomatico(commands.Cog):
         if cargo in membro.roles:
             return  # já tem o cargo, não faz nada
 
-        try:
-            await membro.add_roles(cargo, reason=f"Postou em {message.channel.name} (cargo automático).")
-        except discord.Forbidden:
-            canal_logs_id = config["log_channel_id"]
-            canal_logs = message.guild.get_channel(canal_logs_id) if canal_logs_id else None
-            if canal_logs:
-                await canal_logs.send(
-                    f"⚠️ Não consegui dar o cargo {cargo.mention} para {membro.mention} "
-                    f"(faltam permissões ou o cargo está acima do meu)."
+        async with _AUTO_ROLE_LOCK:
+            # Outro evento pode ter atribuído o cargo enquanto este aguardava o lock.
+            membro = message.guild.get_member(message.author.id) or membro
+            if cargo in membro.roles:
+                return
+            bot_member = message.guild.me
+            if (
+                bot_member is None
+                or not bot_member.guild_permissions.manage_roles
+                or cargo >= bot_member.top_role
+                or cargo.managed
+            ):
+                _LOG.warning(
+                    "Cargo automático não atribuível (guild=%s, channel=%s, role=%s).",
+                    message.guild.id, message.channel.id, cargo.id,
                 )
-            return
+                return
+            try:
+                await membro.add_roles(cargo, reason=f"Postou em {message.channel.name} (cargo automático).")
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception(
+                    "Falha ao atribuir cargo automático (guild=%s, member=%s, role=%s).",
+                    message.guild.id, membro.id, cargo.id,
+                )
+                canal_logs_id = config.get("log_channel_id")
+                canal_logs = message.guild.get_channel(canal_logs_id) if canal_logs_id else None
+                if canal_logs:
+                    try:
+                        await canal_logs.send(
+                            f"⚠️ Não consegui atribuir o cargo automático (membro ID: {membro.id}, cargo ID: {cargo.id}).",
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                    except discord.HTTPException:
+                        _LOG.warning("Falha ao enviar aviso de cargo automático (guild=%s).", message.guild.id)
+                return
 
         try:
             await message.add_reaction("✅")
