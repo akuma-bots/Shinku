@@ -277,7 +277,7 @@ async def migrar_perfil_se_necessario(
 ) -> dict:
     """
     Migra um perfil antigo do perfis.json para competitivo.json
-    somente se ele ainda não existir no ranking compartilhado.
+    somente se ele ainda não existir no ranking competitivo interno.
 
     Se o usuário já tiver perfil competitivo, nada é sobrescrito.
     """
