@@ -1,70 +1,126 @@
+import logging
 import time
+
 import discord
 from discord.ext import commands
+
 from utils.guild_config import get_config
 
+
+logger = logging.getLogger(__name__)
+
 JANELA_SEGUNDOS = 10
-LIMITE_ENTRADAS = 6          # X membros entrando na janela = suspeita de raid
-IDADE_MINIMA_CONTA_HORAS = 24  # contas mais novas que isso, durante um raid, são expulsas
+LIMITE_ENTRADAS = 6
+IDADE_MINIMA_CONTA_HORAS = 24
 
 
 class AntiRaid(commands.Cog):
-    """Detecta picos anormais de entrada de membros (possível raid/ataque em massa),
-    avisa a equipe de suporte e expulsa automaticamente contas muito novas
-    que entrarem durante a janela de suspeita."""
+    """Detecta picos de entrada e aplica proteção limitada contra contas novas."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._entradas_por_guild = {}   # guild_id -> [timestamps]
-        self._raid_ativo = {}           # guild_id -> bool
+        self._entradas_por_guild = {}
+        self._raid_ativo = {}
+
+    @staticmethod
+    def _alvo_elegivel(member: discord.Member) -> bool:
+        """Nunca expulsa bots ou membros com privilégios administrativos."""
+        if member.bot or member.id == member.guild.owner_id:
+            return False
+        permissoes = member.guild_permissions
+        if permissoes.administrator or permissoes.manage_guild:
+            return False
+        return True
 
     async def _canal_logs(self, guild: discord.Guild):
-        config = await get_config(guild.id)
-        log_id = config["log_channel_id"]
-        return guild.get_channel(log_id) if log_id else None
+        try:
+            config = await get_config(guild.id)
+            log_id = config.get("log_channel_id")
+            if not log_id:
+                return None
+            canal = guild.get_channel(int(log_id))
+            if canal is None:
+                try:
+                    canal = await self.bot.fetch_channel(int(log_id))
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    return None
+            return canal if callable(getattr(canal, "send", None)) else None
+        except Exception:
+            logger.exception("Falha ao resolver canal de logs do anti-raid (guild=%s).", guild.id)
+            return None
 
-    async def _mencao_suporte(self, guild: discord.Guild) -> str:
-        config = await get_config(guild.id)
-        cargo_id = config["support_role_id"]
-        return f"<@&{cargo_id}>" if cargo_id else "Equipe de suporte"
+    async def _avisar(self, guild: discord.Guild, texto: str, mencionar_suporte: bool = False):
+        canal = await self._canal_logs(guild)
+        if canal is None:
+            return
+        try:
+            if mencionar_suporte:
+                config = await get_config(guild.id)
+                cargo_id = config.get("support_role_id")
+                prefixo = f"<@&{cargo_id}> " if cargo_id else ""
+                await canal.send(
+                    prefixo + texto,
+                    allowed_mentions=discord.AllowedMentions(
+                        roles=bool(cargo_id), users=False, everyone=False,
+                    ),
+                )
+            else:
+                await canal.send(
+                    texto,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            logger.warning("Não foi possível enviar aviso anti-raid (guild=%s, channel=%s).", guild.id, getattr(canal, "id", None))
+        except Exception:
+            logger.exception("Erro inesperado ao enviar aviso anti-raid (guild=%s).", guild.id)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         agora = time.time()
         guild_id = member.guild.id
-
         historico = self._entradas_por_guild.setdefault(guild_id, [])
 
-        # se já fazia mais de 30s desde a última entrada, o raid anterior (se havia) acabou
         if historico and agora - historico[-1] > 30:
             self._raid_ativo[guild_id] = False
 
         historico.append(agora)
-        self._entradas_por_guild[guild_id] = [t for t in historico if agora - t <= JANELA_SEGUNDOS]
+        recentes = [timestamp for timestamp in historico if agora - timestamp <= JANELA_SEGUNDOS]
+        self._entradas_por_guild[guild_id] = recentes
 
-        raid_suspeito = len(self._entradas_por_guild[guild_id]) >= LIMITE_ENTRADAS
-
+        raid_suspeito = len(recentes) >= LIMITE_ENTRADAS
         if raid_suspeito and not self._raid_ativo.get(guild_id):
             self._raid_ativo[guild_id] = True
-            canal = await self._canal_logs(member.guild)
-            if canal:
-                await canal.send(
-                    f"🚨 {await self._mencao_suporte(member.guild)} **Possível raid detectado!** "
-                    f"{len(self._entradas_por_guild[guild_id])} membros entraram em menos de {JANELA_SEGUNDOS}s. "
-                    f"Contas com menos de {IDADE_MINIMA_CONTA_HORAS}h de criação serão expulsas automaticamente "
-                    f"enquanto durar o pico de entradas."
-                )
+            await self._avisar(
+                member.guild,
+                f"🚨 **Possível raid detectado!** {len(recentes)} membros entraram em menos de "
+                f"{JANELA_SEGUNDOS}s. Contas com menos de {IDADE_MINIMA_CONTA_HORAS}h serão avaliadas "
+                "pela proteção automática durante o pico.",
+                mencionar_suporte=True,
+            )
 
-        if self._raid_ativo.get(guild_id):
-            idade_conta = (discord.utils.utcnow() - member.created_at).total_seconds() / 3600
-            if idade_conta < IDADE_MINIMA_CONTA_HORAS:
-                try:
-                    await member.kick(reason="Anti-raid: conta muito nova durante pico de entradas suspeito.")
-                    canal = await self._canal_logs(member.guild)
-                    if canal:
-                        await canal.send(f"👢 {member.mention} expulso automaticamente (anti-raid, conta nova).")
-                except discord.Forbidden:
-                    pass
+        if not self._raid_ativo.get(guild_id) or not self._alvo_elegivel(member):
+            return
+
+        idade_conta = (discord.utils.utcnow() - member.created_at).total_seconds() / 3600
+        if idade_conta >= IDADE_MINIMA_CONTA_HORAS:
+            return
+
+        try:
+            await member.kick(reason="Anti-raid: conta muito nova durante pico de entradas suspeito.")
+            await self._avisar(
+                member.guild,
+                f"🛡️ Um membro com conta criada há menos de {IDADE_MINIMA_CONTA_HORAS}h foi expulso automaticamente pelo anti-raid (ID: {member.id}).",
+            )
+        except discord.Forbidden:
+            logger.warning(
+                "Sem permissão/hierarquia para expulsar possível conta de raid (guild=%s, member=%s).",
+                guild_id, member.id,
+            )
+        except discord.HTTPException:
+            logger.exception(
+                "Falha HTTP ao expulsar possível conta de raid (guild=%s, member=%s).",
+                guild_id, member.id,
+            )
 
 
 async def setup(bot: commands.Bot):
