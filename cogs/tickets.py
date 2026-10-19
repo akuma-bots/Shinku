@@ -14,6 +14,12 @@ from utils import tickets
 log = logging.getLogger(__name__)
 
 
+async def _preparar_resposta_interacao(interaction: discord.Interaction) -> None:
+    """Adia a resposta do componente sem tentar reconhecer a interação duas vezes."""
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+
 CANAIS_ESCALADOS = set()        # tickets já entregues para atendimento humano
 ULTIMA_ATIVIDADE = {}           # channel_id -> timestamp da última mensagem
 CANAIS_FECHANDO = set()         # evita fechar o mesmo canal duas vezes ao mesmo tempo
@@ -400,7 +406,7 @@ class FecharTicketView(discord.ui.View):
         membro = interaction.user
 
         # Responde imediatamente para evitar expiração da interação durante I/O.
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await _preparar_resposta_interacao(interaction)
 
         if not guild or not isinstance(canal, discord.TextChannel):
             await interaction.followup.send(
@@ -551,7 +557,7 @@ class FecharTicketView(discord.ui.View):
 
         # O fechamento executa operações de armazenamento e exclusão de canal.
         # Adia a resposta para não deixar a interação expirar após 3 segundos.
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        await _preparar_resposta_interacao(interaction)
 
         if not guild or not isinstance(canal, discord.TextChannel):
             await interaction.followup.send(
