@@ -469,6 +469,24 @@ async def registrar_atendimento(
     )
 
 
+async def remover_responsavel_atendimento(
+    guild_id: int,
+    ticket_id: str,
+):
+    """Remove a atribuição quando a aplicação de permissões falha."""
+    dados = await _tudo_tickets()
+    lista = dados.get(str(guild_id), [])
+    alvo = next(
+        (ticket for ticket in lista if ticket.get("id") == ticket_id),
+        None,
+    )
+    if not alvo:
+        return None
+    alvo["atendido_por_id"] = None
+    await _salvar_tickets(dados)
+    return alvo
+
+
 async def sincronizar_canal_ticket(
     guild_id: int,
     canal_id: int,
