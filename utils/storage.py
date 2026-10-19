@@ -41,7 +41,7 @@ USANDO_UPSTASH = bool(
 )
 UPSTASH_CONFIG_INCOMPLETA = bool(UPSTASH_URL) != bool(UPSTASH_TOKEN)
 
-# Namespace exclusivo do bot; os dados deixam de compartilhar chaves com o site.
+# Namespace exclusivo do bot; os dados não compartilham chaves operacionais com outros sistemas.
 PREFIXO_CHAVES = "nemesis_bot:"
 
 
