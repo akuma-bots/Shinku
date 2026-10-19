@@ -1545,17 +1545,141 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
     async def aplicar_punicao(
         self,
-        message,
-        infracao,
+        message: discord.Message,
+        infracao: dict,
     ):
-        """Registra a ocorrência e aguarda a decisão da moderação nos botões."""
+        """Aplica automaticamente a medida configurada para o nível detectado."""
+        guild = message.guild
+        membro = message.author
+        if guild is None or not isinstance(membro, discord.Member):
+            return
 
+        nivel = int(infracao["nivel"])
+        config = await get_config(guild.id)
+        custom = (config.get("automod_niveis") or {}).get(str(nivel), {})
+        medida = custom.get("medida") or {
+            1: "warn", 2: "timeout", 3: "kick",
+            4: "ban_temp", 5: "ban_permanente",
+        }[nivel]
+        duracao = int(custom.get("duracao") or (10 if medida == "timeout" else 24 if medida == "ban_temp" else 0))
+        motivo = f"AutoMod NÊMESIS | Nível {nivel} — {infracao['tipo']}: {infracao['motivo']}"
+        nomes = {
+            "warn": "Advertência automática",
+            "timeout": f"Timeout por {max(1, duracao)} minuto(s)",
+            "kick": "Expulsão automática",
+            "ban_temp": f"Banimento temporário por {max(1, duracao)} hora(s)",
+            "ban_permanente": "Banimento permanente",
+        }
+        if medida not in nomes:
+            medida = {1: "warn", 2: "timeout", 3: "kick", 4: "ban_temp", 5: "ban_permanente"}[nivel]
+
+        # Remoção da mensagem primeiro reduz a exposição do conteúdo nocivo.
         try:
             await message.delete()
         except discord.HTTPException:
             pass
 
-        await self.aviso(message, infracao)
+        try:
+            if medida == "warn":
+                tipo_historico = "warn"
+            elif medida == "timeout":
+                minutos = max(1, min(duracao or 10, 40320))
+                await membro.timeout(datetime.timedelta(minutes=minutos), reason=motivo)
+                duracao = minutos
+                tipo_historico = "mute"
+                nomes[medida] = f"Timeout por {minutos} minuto(s)"
+            elif medida == "kick":
+                await membro.kick(reason=motivo)
+                tipo_historico = "kick"
+            elif medida == "ban_temp":
+                horas = max(1, min(duracao or 24, 8760))
+                await guild.ban(membro, reason=motivo, delete_message_seconds=0)
+                await self.registrar_banimento_temporario(guild.id, membro.id, horas * 3600)
+                duracao = horas
+                tipo_historico = "ban"
+                nomes[medida] = f"Banimento temporário por {horas} hora(s)"
+            else:
+                await guild.ban(membro, reason=motivo, delete_message_seconds=0)
+                tipo_historico = "ban"
+        except (discord.Forbidden, discord.HTTPException) as erro:
+            print(f"[AUTOMOD][ERRO] Não foi possível aplicar {medida} em {membro.id}: {erro}")
+            await self.aviso_falha_punicao(message, infracao, str(erro))
+            return
+
+        await registrar_punicao(guild.id, membro.id, tipo_historico, motivo, None)
+        await self.registrar_decisao(
+            guild.id, membro.id, "punido", nivel, infracao["motivo"], 0, infracao["tipo"]
+        )
+
+        embed = discord.Embed(
+            title="🛡️ AutoMod — Punição automática aplicada",
+            description=(
+                f"**Usuário:** <@{membro.id}> ({membro.id})\n"
+                f"**Infração:** {infracao['tipo']}\n"
+                f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\n"
+                f"**Diretriz:** {infracao.get('regra_titulo', 'Regra oficial')}\n"
+                f"**Medida aplicada:** {nomes[medida]}\n"
+                f"**Canal:** <#{message.channel.id}>\n"
+                f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
+            ),
+            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+        )
+        try:
+            canal = guild.get_channel(CANAL_INFRACOES_ID) or await self.bot.fetch_channel(CANAL_INFRACOES_ID)
+            if isinstance(canal, discord.TextChannel):
+                await canal.send(embed=embed)
+        except discord.HTTPException as erro:
+            print(f"[AUTOMOD][ERRO] Falha ao publicar registro automático: {erro}")
+
+        try:
+            detalhe_duracao = (
+                f"\nDuração: {duracao} hora(s)." if medida == "ban_temp"
+                else f"\nDuração: {duracao} minuto(s)." if medida == "timeout"
+                else ""
+            )
+            await membro.send(
+                f"**NÊMESIS — Punição automática**\n"
+                f"Infração: {infracao['tipo']}\n"
+                f"Nível: {nivel} — {NIVEIS[nivel]['nome']}\n"
+                f"Medida: {nomes[medida]}\nMotivo: {infracao['motivo']}{detalhe_duracao}"
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+        auditoria = discord.Embed(
+            title="🛡️ Auditoria — AutoMod automático",
+            description=(
+                f"**Resultado:** Punição aplicada\n**Membro:** <@{membro.id}> ({membro.id})\n"
+                f"**Infração:** {infracao['tipo']}\n**Nível:** {nivel}\n"
+                f"**Medida:** {nomes[medida]}\n**Responsável:** Sistema AutoMod\n"
+                f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
+            ),
+            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+        )
+        await self.enviar_auditoria(guild, auditoria)
+
+    async def aviso_falha_punicao(self, message: discord.Message, infracao: dict, erro: str):
+        """Registra uma falha de aplicação para que a equipe possa corrigi-la."""
+        embed = discord.Embed(
+            title="⚠️ AutoMod — Punição não aplicada",
+            description=(
+                f"**Usuário:** {message.author.mention}\n"
+                f"**Infração:** {infracao.get('tipo', 'Não identificada')}\n"
+                f"**Nível:** {infracao.get('nivel', '?')}\n"
+                f"**Motivo:** {infracao.get('motivo', 'Não informado')}\n"
+                "A ação foi detectada, mas o Discord recusou a punição. "
+                "Verifique as permissões e a hierarquia de cargos."
+            ),
+            color=discord.Color.orange(),
+        )
+        try:
+            canal = message.guild.get_channel(CANAL_INFRACOES_ID) or await self.bot.fetch_channel(CANAL_INFRACOES_ID)
+            if isinstance(canal, discord.TextChannel):
+                await canal.send(embed=embed)
+        except discord.HTTPException:
+            pass
 
     async def enviar_auditoria(self, guild: discord.Guild, embed: discord.Embed):
         try:
