@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import re
 import time
@@ -635,6 +636,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         self.punicoes_em_andamento = set()
         self.decisoes_em_andamento = set()
+        self._banimentos_lock = asyncio.Lock()
 
         self.verificar_banimentos.start()
 
@@ -1594,7 +1596,29 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             elif medida == "ban_temp":
                 horas = max(1, min(duracao or 24, 8760))
                 await guild.ban(membro, reason=motivo, delete_message_seconds=0)
-                await self.registrar_banimento_temporario(guild.id, membro.id, horas * 3600)
+                persistido = await self.registrar_banimento_temporario(
+                    guild.id, membro.id, horas * 3600
+                )
+                if not persistido:
+                    # Sem registro de expiração, não deixamos um ban temporário
+                    # virar permanente silenciosamente.
+                    try:
+                        await guild.unban(
+                            discord.Object(id=membro.id),
+                            reason="Rollback: falha ao persistir expiração do AutoMod",
+                        )
+                    except discord.NotFound:
+                        pass
+                    except (discord.Forbidden, discord.HTTPException) as erro_rollback:
+                        print(
+                            f"[AUTOMOD][CRÍTICO] Falha ao reverter ban temporário de {membro.id}: {erro_rollback}"
+                        )
+                    await self.aviso_falha_punicao(
+                        message,
+                        infracao,
+                        "O ban temporário não pôde ser salvo no armazenamento. O bot tentou reverter o banimento; confira o log de auditoria.",
+                    )
+                    return
                 duracao = horas
                 tipo_historico = "ban"
                 nomes[medida] = f"Banimento temporário por {horas} hora(s)"
@@ -1839,182 +1863,105 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
     # BANIMENTOS TEMPORÁRIOS
     # ========================================================
 
-    async def carregar_banimentos_temporarios(
-        self,
-    ):
-
+    async def carregar_banimentos_temporarios(self):
+        """Retorna None em falha de storage para não confundir erro com arquivo vazio."""
         try:
-
-            dados = await carregar(
-                ARQUIVO_BANIMENTOS_TEMPORARIOS,
-                {},
-            )
-
-            return (
-                dados
-                if isinstance(
-                    dados,
-                    dict,
-                )
-                else {}
-            )
-
-        except Exception as erro:
-
-            print(
-                "[AUTOMOD][ERRO] "
-                "Falha ao carregar banimentos "
-                f"temporários: {erro}"
-            )
-
-            return {}
-
-    async def salvar_banimentos_temporarios(
-        self,
-        dados,
-    ):
-
-        try:
-
-            await salvar(
-                ARQUIVO_BANIMENTOS_TEMPORARIOS,
-                dados,
-            )
-
-        except Exception as erro:
-
-            print(
-                "[AUTOMOD][ERRO] "
-                "Falha ao salvar banimentos "
-                f"temporários: {erro}"
-            )
-
-    async def registrar_banimento_temporario(
-        self,
-        guild_id,
-        user_id,
-        duracao,
-    ):
-
-        try:
-            dados = await self.carregar_banimentos_temporarios()
+            dados = await carregar(ARQUIVO_BANIMENTOS_TEMPORARIOS, {})
         except Exception:
             import logging
             logging.getLogger(__name__).exception(
-                "Falha ao carregar banimentos temporários; a verificação será repetida no próximo ciclo."
+                "Falha ao carregar banimentos temporários; nenhuma expiração será descartada."
             )
-            return
-
+            return None
         if not isinstance(dados, dict):
             import logging
             logging.getLogger(__name__).error(
                 "Armazenamento de banimentos temporários possui formato inválido."
             )
-            return
+            return None
+        return dados
 
-        dados[
-            f"{guild_id}:{user_id}"
-        ] = {
-            "guild_id": guild_id,
-            "user_id": user_id,
-            "expira_em": (
-                time.time()
-                + duracao
-            ),
-        }
+    async def salvar_banimentos_temporarios(self, dados) -> bool:
+        if not isinstance(dados, dict):
+            return False
+        try:
+            await salvar(ARQUIVO_BANIMENTOS_TEMPORARIOS, dados)
+            return True
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Falha ao salvar banimentos temporários; a operação não será considerada persistida."
+            )
+            return False
 
-        await self.salvar_banimentos_temporarios(
-            dados
-        )
+    async def registrar_banimento_temporario(self, guild_id, user_id, duracao) -> bool:
+        async with self._banimentos_lock:
+            dados = await self.carregar_banimentos_temporarios()
+            if not isinstance(dados, dict):
+                return False
+            try:
+                duracao = max(1, int(duracao))
+            except (TypeError, ValueError, OverflowError):
+                return False
 
-    @tasks.loop(
-        seconds=30
-    )
-    async def verificar_banimentos(
-        self,
-    ):
+            dados[f"{int(guild_id)}:{int(user_id)}"] = {
+                "guild_id": int(guild_id),
+                "user_id": int(user_id),
+                "expira_em": time.time() + duracao,
+            }
+            return await self.salvar_banimentos_temporarios(dados)
 
+    @tasks.loop(seconds=30)
+    async def verificar_banimentos(self):
         await self.bot.wait_until_ready()
 
-        dados = (
-            await self.carregar_banimentos_temporarios()
-        )
+        async with self._banimentos_lock:
+            dados = await self.carregar_banimentos_temporarios()
+            if not isinstance(dados, dict):
+                # Não apagamos registros quando o storage está indisponível/corrompido.
+                return
 
-        alterado = False
-
-        agora = time.time()
-
-        for chave, registro in list(
-            dados.items()
-        ):
-
-            try:
-
-                if (
-                    agora
-                    < float(
-                        registro["expira_em"]
-                    )
-                ):
+            alterado = False
+            agora = time.time()
+            for chave, registro in list(dados.items()):
+                if not isinstance(registro, dict):
+                    continue
+                try:
+                    expira_em = float(registro["expira_em"])
+                    guild_id = int(registro["guild_id"])
+                    user_id = int(registro["user_id"])
+                except (KeyError, TypeError, ValueError, OverflowError):
                     continue
 
-                guild = self.bot.get_guild(
-                    int(
-                        registro["guild_id"]
+                if agora < expira_em:
+                    continue
+
+                guild = self.bot.get_guild(guild_id)
+                if guild is None:
+                    # A guild pode ainda não estar no cache; tenta novamente no próximo ciclo.
+                    continue
+
+                try:
+                    await guild.unban(
+                        discord.Object(id=user_id),
+                        reason="Fim do banimento temporário do AutoMod",
                     )
-                )
+                except discord.NotFound:
+                    # Já está desbanido; é seguro remover o registro expirado.
+                    pass
+                except (discord.Forbidden, discord.HTTPException) as erro:
+                    print(
+                        "[AUTOMOD][ERRO] "
+                        f"Falha ao expirar ban temporário (guild={guild_id}, user={user_id}): {erro}"
+                    )
+                    # Mantém o registro para tentar novamente no próximo ciclo.
+                    continue
 
-                if guild:
-
-                    try:
-
-                        await guild.unban(
-                            discord.Object(
-                                id=int(
-                                    registro[
-                                        "user_id"
-                                    ]
-                                )
-                            ),
-                            reason=(
-                                "Fim do banimento "
-                                "temporário do AutoMod"
-                            ),
-                        )
-
-                    except discord.NotFound:
-                        pass
-
-                    except (
-                        discord.Forbidden,
-                        discord.HTTPException,
-                    ) as erro:
-
-                        print(
-                            "[AUTOMOD][ERRO] "
-                            f"Unban: {erro}"
-                        )
-
-                del dados[chave]
-
+                dados.pop(chave, None)
                 alterado = True
 
-            except Exception as erro:
-
-                print(
-                    "[AUTOMOD][ERRO] "
-                    "Ban temporário: "
-                    f"{erro}"
-                )
-
-        if alterado:
-            try:
-                await self.salvar_banimentos_temporarios(dados)
-            except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "Falha ao persistir banimentos temporários; estado será reavaliado no próximo ciclo."
-                )
+            if alterado and not await self.salvar_banimentos_temporarios(dados):
+                print("[AUTOMOD][ERRO] Não consegui persistir a remoção de banimentos expirados; será reavaliado no próximo ciclo.")
 
     @verificar_banimentos.before_loop
     async def antes_verificar_banimentos(
