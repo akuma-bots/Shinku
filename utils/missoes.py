@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uuid
 
@@ -5,6 +6,7 @@ from utils.storage import carregar, salvar
 
 
 ARQUIVO_MISSOES = "missoes.json"
+_MISSOES_LOCK = asyncio.Lock()
 
 
 PADRAO = {
@@ -63,8 +65,10 @@ def _normalizar_missao(missao: dict) -> dict:
 
     try:
         recompensa = int(recompensa or 0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         recompensa = 0
+    # Recompensas negativas em dados legados nunca devem virar débito de XP.
+    recompensa = max(0, recompensa)
 
     return {
         **missao,
@@ -161,7 +165,8 @@ async def _tudo():
             dados,
         )
 
-    dados.setdefault("guilds", {})
+    if not isinstance(dados.get("guilds"), dict):
+        dados["guilds"] = {}
 
     return dados
 
@@ -179,13 +184,21 @@ async def _guild(guild_id: int) -> dict:
             "submissoes": [],
         }
 
-    guild.setdefault("missoes", [])
-    guild.setdefault("submissoes", [])
+    missoes = guild.get("missoes", [])
+    submissoes = guild.get("submissoes", [])
+    if not isinstance(missoes, list):
+        missoes = []
+    if not isinstance(submissoes, list):
+        submissoes = []
 
     guild["missoes"] = [
         _normalizar_missao(m)
-        for m in guild["missoes"]
+        for m in missoes
         if isinstance(m, dict)
+    ]
+    guild["submissoes"] = [
+        submissao for submissao in submissoes
+        if isinstance(submissao, dict)
     ]
 
     return guild
@@ -266,37 +279,35 @@ async def criar(
         )
 
     try:
-        recompensa_xp = int(
-            recompensa_xp
-        )
-    except (TypeError, ValueError):
-        recompensa_xp = 0
+        recompensa_xp = int(recompensa_xp)
+    except (TypeError, ValueError, OverflowError) as erro:
+        raise ValueError("A recompensa precisa ser um número inteiro válido.") from erro
+    if recompensa_xp < 0:
+        raise ValueError("A recompensa de XP não pode ser negativa.")
 
-    guild = await _guild(guild_id)
+    titulo = str(titulo or "").strip()
+    if not titulo:
+        raise ValueError("O título da missão não pode ficar vazio.")
 
-    missao = {
-        "id": str(uuid.uuid4())[:8],
-        "tipo": tipo,
-        "titulo": str(titulo),
-        "descricao": str(descricao),
-        "recompensa_xp": recompensa_xp,
-        "pontos": recompensa_xp,
-        "criado_por": criado_por,
-        "origem": origem,
-        "ativa": True,
-        "timestamp": time.time(),
-    }
+    async with _MISSOES_LOCK:
+        guild = await _guild(guild_id)
 
-    guild["missoes"].append(
-        missao
-    )
+        missao = {
+            "id": str(uuid.uuid4())[:8],
+            "tipo": tipo,
+            "titulo": str(titulo),
+            "descricao": str(descricao or ""),
+            "recompensa_xp": recompensa_xp,
+            "pontos": recompensa_xp,
+            "criado_por": criado_por,
+            "origem": origem,
+            "ativa": True,
+            "timestamp": time.time(),
+        }
 
-    await _salvar_guild(
-        guild_id,
-        guild,
-    )
-
-    return missao
+        guild["missoes"].append(missao)
+        await _salvar_guild(guild_id, guild)
+        return missao
 
 
 async def get(
@@ -323,61 +334,29 @@ async def desativar(
     guild_id: int,
     missao_id: str,
 ) -> bool:
-    guild = await _guild(guild_id)
-
-    alvo = next(
-        (
-            m
-            for m in guild.get(
-                "missoes",
-                [],
-            )
-            if str(m.get("id"))
-            == str(missao_id)
-        ),
-        None,
-    )
-
-    if not alvo:
-        return False
-
-    alvo["ativa"] = False
-
-    await _salvar_guild(
-        guild_id,
-        guild,
-    )
-
-    return True
+    async with _MISSOES_LOCK:
+        guild = await _guild(guild_id)
+        alvo = next(
+            (m for m in guild.get("missoes", []) if str(m.get("id")) == str(missao_id)),
+            None,
+        )
+        if not alvo:
+            return False
+        alvo["ativa"] = False
+        await _salvar_guild(guild_id, guild)
+        return True
 
 
 async def desativar_todas_por_origem(
     guild_id: int,
     origem: str,
 ):
-    guild = await _guild(guild_id)
-
-    for missao in guild.get(
-        "missoes",
-        [],
-    ):
-        if (
-            missao.get(
-                "origem",
-                "lider",
-            )
-            == origem
-            and missao.get(
-                "ativa",
-                True,
-            )
-        ):
-            missao["ativa"] = False
-
-    await _salvar_guild(
-        guild_id,
-        guild,
-    )
+    async with _MISSOES_LOCK:
+        guild = await _guild(guild_id)
+        for missao in guild.get("missoes", []):
+            if missao.get("origem", "lider") == origem and missao.get("ativa", True):
+                missao["ativa"] = False
+        await _salvar_guild(guild_id, guild)
 
 
 async def listar_submissoes(
@@ -386,21 +365,12 @@ async def listar_submissoes(
 ) -> list:
     guild = await _guild(guild_id)
 
-    lista = guild.get(
-        "submissoes",
-        [],
-    )
-
+    lista = guild.get("submissoes", [])
+    if not isinstance(lista, list):
+        return []
+    lista = [submissao for submissao in lista if isinstance(submissao, dict)]
     if status:
-        lista = [
-            submissao
-            for submissao in lista
-            if submissao.get(
-                "status"
-            )
-            == status
-        ]
-
+        lista = [submissao for submissao in lista if submissao.get("status") == status]
     return lista
 
 
@@ -408,18 +378,10 @@ async def salvar_submissoes(
     guild_id: int,
     submissoes: list,
 ):
-    guild = await _guild(guild_id)
-
-    guild["submissoes"] = (
-        submissoes
-        if isinstance(
-            submissoes,
-            list,
-        )
-        else []
-    )
-
-    await _salvar_guild(
-        guild_id,
-        guild,
-    )
+    async with _MISSOES_LOCK:
+        guild = await _guild(guild_id)
+        guild["submissoes"] = [
+            submissao for submissao in submissoes
+            if isinstance(submissao, dict)
+        ] if isinstance(submissoes, list) else []
+        await _salvar_guild(guild_id, guild)
