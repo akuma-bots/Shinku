@@ -504,7 +504,7 @@ class Eventos(commands.Cog):
 
         await interaction.response.send_message(
             f"✓ {len(eventos)} evento(s) "
-            "sincronizado(s) com o Dashboard.",
+            "sincronizado(s) no armazenamento interno do bot.",
             ephemeral=True,
         )
 
