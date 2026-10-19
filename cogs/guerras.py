@@ -55,7 +55,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         dados["temporada_atual"] = max(1, _inteiro_seguro(dados.get("temporada_atual", 1), 1))
         dados["guerras"] = [item for item in guerras if isinstance(item, dict)] if isinstance(guerras, list) else []
         dados["agendamentos"] = [item for item in agendamentos if isinstance(item, dict)] if isinstance(agendamentos, list) else []
-        dados["regras"] = [str(item) for item in regras if str(item).strip()] if isinstance(regras, list) else REGRAS_PADRAO.copy()
+        dados["regras"] = [str(item).strip() for item in regras if item is not None and str(item).strip()] if isinstance(regras, list) else REGRAS_PADRAO.copy()
         return dados
 
     async def _salvar_dados_guild(self, guild_id: int, dados: dict):
