@@ -72,10 +72,36 @@ class Perfil(commands.Cog):
             if dias_top else f"{horas_top}h {minutos_restantes}min"
         )
 
-        proxima = next((pt for pt in patentes if pt["xp_minimo"] > p["xp"]), None)
-        progresso = f"\nPróxima patente: **{proxima['nome']}** em {proxima['xp_minimo'] - p['xp']} XP" if proxima else ""
+        patente_anterior = next(
+            (pt for pt in reversed(patentes) if int(pt.get("xp_minimo", 0) or 0) <= p["xp"]),
+            None,
+        )
+        proxima = next((pt for pt in patentes if int(pt.get("xp_minimo", 0) or 0) > p["xp"]), None)
+        if proxima:
+            inicio_xp = int(patente_anterior.get("xp_minimo", 0) or 0) if patente_anterior else 0
+            alvo_xp = int(proxima["xp_minimo"])
+            percentual = max(0.0, min(1.0, (p["xp"] - inicio_xp) / max(1, alvo_xp - inicio_xp)))
+            preenchido = int(percentual * 10)
+            barra_xp = "▰" * preenchido + "▱" * (10 - preenchido)
+            texto_progresso = (
+                f"{barra_xp}  **{int(percentual * 100)}%**\\n"
+                f"Próxima patente: **{proxima['nome']}** · faltam **{alvo_xp - p['xp']:,} XP**"
+            ).replace(",", ".")
+        else:
+            barra_xp = "▰" * 10
+            texto_progresso = "🏆 **Patente máxima alcançada**"
 
-        embed = criar_embed(f"N̷ÊMESIS ━ PERFIL DE {alvo.display_name.upper()}"[:256], rodape="NÊMESIS • Perfil do membro")
+        descricao_perfil = (
+            "╭────────────── ◈ ──────────────╮\\n"
+            "        **DOSSIÊ DE COMBATE**\\n"
+            "  PROGRESSÃO  •  DESEMPENHO  •  IDENTIDADE\\n"
+            "╰────────────── ◈ ──────────────╯"
+        )
+        embed = criar_embed(
+            f"N̷ÊMESIS ━ PERFIL DE {alvo.display_name.upper()}"[:256],
+            descricao_perfil,
+            rodape="NÊMESIS • Perfil de combate",
+        )
         embed.set_thumbnail(url=alvo.display_avatar.url)
         embed.add_field(name="◈ NOME", value=discord.utils.escape_markdown(alvo.display_name)[:256], inline=True)
         embed.add_field(name="◈ USUÁRIO", value=f"`{discord.utils.escape_markdown(alvo.name)}`", inline=True)
@@ -95,7 +121,11 @@ class Perfil(commands.Cog):
             inline=True,
         )
         embed.add_field(name="◈ PATENTE", value=p["patente"] or "Sem patente", inline=True)
-        embed.add_field(name="◈ XP", value=str(p["xp"]) + progresso, inline=True)
+        embed.add_field(
+            name="◈ XP / PROGRESSO",
+            value=f"**{p['xp']:,} XP**\\n{barra_xp}\\n{texto_progresso}".replace(",", "."),
+            inline=False,
+        )
         embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
         embed.add_field(name="◈ P.C. DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
         embed.add_field(name="◈ TEMPORADA", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
