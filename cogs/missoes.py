@@ -555,7 +555,48 @@ class Missoes(commands.Cog):
                     pass
             else:
                 await mensagem.edit(embed=embed, view=NavegacaoRankingJogosView(self))
-        except (discord.Forbidden, discord.HTTPException):
+        except (discord.Forbidden, discord.HTTPException) as erro:
+            # O Discord rejeita edições após a mensagem atingir o limite de edições
+            # (código 30046). Nesse caso, publica uma mensagem nova e troca o ID
+            # persistido para que as próximas sincronizações não fiquem presas nela.
+            if getattr(erro, "code", None) == 30046 and mensagem is not None:
+                try:
+                    nova_mensagem = await canal.send(
+                        embed=embed,
+                        view=NavegacaoRankingJogosView(self),
+                    )
+                    await ranking_missoes_jogos.salvar_painel(
+                        guild.id, "ranking", nova_mensagem.id
+                    )
+                except Exception:
+                    log.exception(
+                        "O limite de edições do ranking foi atingido, mas não foi "
+                        "possível publicar e registrar o painel substituto."
+                    )
+                    return
+
+                try:
+                    await nova_mensagem.pin(reason="Painel de ranking por jogo NÊMESIS")
+                except discord.HTTPException:
+                    log.warning("Não foi possível fixar o novo painel de ranking.")
+
+                try:
+                    await mensagem.delete(
+                        reason="Substituição do painel após limite de edições do Discord"
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    log.warning(
+                        "O painel antigo de ranking %s não pôde ser removido.",
+                        getattr(mensagem, "id", "desconhecido"),
+                    )
+
+                log.warning(
+                    "Painel de ranking substituído após o limite de edições do Discord "
+                    "(mensagem nova: %s).",
+                    nova_mensagem.id,
+                )
+                return
+
             log.exception("Não foi possível atualizar o painel de ranking.")
     @staticmethod
     def _expandir_catalogo_por_jogo(catalogo: list) -> list:
