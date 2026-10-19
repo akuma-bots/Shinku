@@ -137,47 +137,24 @@ class Eventos(commands.Cog):
         criado_por_id: int | None = None,
     ):
 
-        dados = await _todos_eventos()
+        async with _EVENTOS_LOCK:
+            dados = await _todos_eventos()
+            antigo = dados.get(str(evento.id), {})
+            if not isinstance(antigo, dict):
+                antigo = {}
 
-        antigo = dados.get(
-            str(evento.id),
-            {},
-        )
+            registro = _evento_para_dados(
+                evento,
+                evento.guild.id,
+                criado_por_id or antigo.get("criado_por_id"),
+            )
+            registro["criado_em"] = antigo.get("criado_em") or time.time()
+            participantes = antigo.get("participantes", [])
+            registro["participantes"] = participantes if isinstance(participantes, list) else []
 
-        registro = _evento_para_dados(
-            evento,
-            evento.guild.id,
-            criado_por_id
-            or antigo.get(
-                "criado_por_id"
-            ),
-        )
-
-        if antigo.get(
-            "criado_em"
-        ):
-            registro["criado_em"] = antigo[
-                "criado_em"
-            ]
-        else:
-            registro["criado_em"] = time.time()
-
-        if antigo.get(
-            "participantes"
-        ) is not None:
-            registro["participantes"] = antigo[
-                "participantes"
-            ]
-        else:
-            registro["participantes"] = []
-
-        dados[str(evento.id)] = registro
-
-        await _salvar_eventos(
-            dados
-        )
-
-        return registro
+            dados[str(evento.id)] = registro
+            await _salvar_eventos(dados)
+            return registro
 
     @app_commands.command(
         name="configurar-canal-eventos",
@@ -491,22 +468,15 @@ class Eventos(commands.Cog):
         evento: discord.ScheduledEvent,
     ):
 
-        dados = await _todos_eventos()
-
-        registro = dados.get(
-            str(evento.id)
-        )
-
-        if registro:
-
+        async with _EVENTOS_LOCK:
+            dados = await _todos_eventos()
+            registro = dados.get(str(evento.id))
+            if not isinstance(registro, dict):
+                return
             registro["status"] = "deleted"
             registro["atualizado_em"] = time.time()
-
             dados[str(evento.id)] = registro
-
-            await _salvar_eventos(
-                dados
-            )
+            await _salvar_eventos(dados)
 
     @app_commands.command(
         name="eventos-sincronizar",
