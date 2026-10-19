@@ -401,12 +401,17 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                         except discord.NotFound:
                             mensagem_existente = None
 
-                    if mensagem_existente is not None:
-                        continue
-
                     embeds = _embeds_painel(formulario)
                     view = _view_painel(formulario)
-                    mensagem = await canal.send(embeds=embeds, view=view)
+                    if mensagem_existente is not None:
+                        # Mantém os painéis atualizados sem criar duplicatas em reconexões.
+                        await mensagem_existente.edit(embeds=embeds, view=view)
+                        mensagem = mensagem_existente
+                        acao = "atualizado"
+                    else:
+                        mensagem = await canal.send(embeds=embeds, view=view)
+                        acao = "publicado"
+
                     estado[chave] = {
                         "canal_id": definicao["canal_id"],
                         "mensagem_id": mensagem.id,
@@ -414,8 +419,8 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                     }
                     await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
                     logging.info(
-                        "Painel automático publicado: %s (canal=%s, mensagem=%s).",
-                        definicao["nome"], definicao["canal_id"], mensagem.id,
+                        "Painel automático %s: %s (canal=%s, mensagem=%s).",
+                        acao, definicao["nome"], definicao["canal_id"], mensagem.id,
                     )
                 except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
                     logging.exception("Falha ao publicar o painel automático %s.", definicao["nome"])
