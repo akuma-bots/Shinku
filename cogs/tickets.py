@@ -389,10 +389,9 @@ class FecharTicketView(discord.ui.View):
             )
         except (discord.Forbidden, discord.HTTPException):
             # Evita deixar uma atribuição aparentemente concluída sem bloqueio.
-            await tickets.atualizar_ticket(
+            await tickets.remover_responsavel_atendimento(
                 guild.id,
                 registro["id"],
-                atendido_por_id=None,
             )
             await interaction.response.send_message(
                 "Não consegui aplicar as permissões de responsável. Verifique as permissões do bot.",
