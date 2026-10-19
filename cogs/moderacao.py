@@ -320,7 +320,13 @@ class Moderacao(commands.Cog):
         await membro.timeout(None)
 
         await interaction.response.send_message(
-            f"🔊 {membro.mention} não está mais silenciado."
+            f"🔊 {membro.mention} não está mais silenciado.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        await self._log(
+            interaction,
+            f"🔊 **/unmute** — {membro.mention} teve o silenciamento removido por "
+            f"{interaction.user.mention}.",
         )
 
     @app_commands.command(
@@ -641,13 +647,13 @@ class Moderacao(commands.Cog):
         interaction: discord.Interaction,
         error: app_commands.AppCommandError
     ):
-        if isinstance(
-            error,
-            app_commands.MissingPermissions
-        ):
+        if isinstance(error, app_commands.MissingPermissions):
+            mensagem = "Você não tem permissão para usar esse comando."
+        elif isinstance(error, app_commands.BotMissingPermissions):
+            permissoes = ", ".join(error.missing_permissions)
             mensagem = (
-                "Você não tem permissão "
-                "para usar esse comando."
+                "Não consigo executar esta ação porque faltam permissões no bot: "
+                f"**{permissoes}**. Peça à administração para revisar as permissões."
             )
 
             if interaction.response.is_done():
