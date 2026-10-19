@@ -11,10 +11,13 @@ JOGOS = {
 
 async def obter_dados(guild_id: int) -> dict:
     todos = await carregar(ARQUIVO, {})
+    if not isinstance(todos, dict):
+        todos = {}
     registro = todos.get(str(guild_id), {})
     if not isinstance(registro, dict):
         registro = {}
-    registro.setdefault("jogos", {})
+    jogos = registro.get("jogos", {})
+    registro["jogos"] = jogos if isinstance(jogos, dict) else {}
     return registro
 
 
@@ -72,23 +75,51 @@ async def registrar_pontos(
     todos = await carregar(ARQUIVO, {})
     if not isinstance(todos, dict):
         todos = {}
-    registro = todos.setdefault(str(guild_id), {})
-    jogos = registro.setdefault("jogos", {})
-    atual = jogos.setdefault(jogo, {
-        "nome": JOGOS[jogo]["nome"],
-        "pontuacao": {},
-        "eventos_aplicados": [],
-    })
-    eventos = atual.setdefault("eventos_aplicados", [])
+    registro = todos.get(str(guild_id))
+    if not isinstance(registro, dict):
+        registro = {}
+        todos[str(guild_id)] = registro
+    jogos = registro.get("jogos")
+    if not isinstance(jogos, dict):
+        jogos = {}
+        registro["jogos"] = jogos
+    atual = jogos.get(jogo)
+    if not isinstance(atual, dict):
+        atual = {
+            "nome": JOGOS[jogo]["nome"],
+            "pontuacao": {},
+            "eventos_aplicados": [],
+        }
+        jogos[jogo] = atual
+
+    eventos = atual.get("eventos_aplicados", [])
+    if isinstance(eventos, str):
+        eventos = [eventos] if eventos.strip() else []
+    elif not isinstance(eventos, (list, tuple, set)):
+        eventos = []
+    eventos = list(dict.fromkeys(str(evento).strip() for evento in eventos if str(evento).strip()))
+
     chave_evento = str(evento_id or "").strip()
     if not chave_evento or chave_evento in eventos:
         return False
-    pontuacao = atual.setdefault("pontuacao", {})
+
+    pontuacao = atual.get("pontuacao")
+    if not isinstance(pontuacao, dict):
+        pontuacao = {}
+        atual["pontuacao"] = pontuacao
     uid = str(user_id)
-    perfil = pontuacao.setdefault(uid, {"nome": nome or "", "pontos": 0})
+    perfil = pontuacao.get(uid)
+    if not isinstance(perfil, dict):
+        perfil = {"nome": nome or "", "pontos": 0}
+        pontuacao[uid] = perfil
     if nome:
         perfil["nome"] = nome
-    perfil["pontos"] = int(perfil.get("pontos", 0) or 0) + int(pontos)
+    try:
+        pontos_atuais = max(0, int(perfil.get("pontos", 0) or 0))
+    except (TypeError, ValueError, OverflowError):
+        pontos_atuais = 0
+    perfil["pontos"] = pontos_atuais + int(pontos)
+
     eventos.append(chave_evento)
     atual["eventos_aplicados"] = eventos[-5000:]
     await salvar(ARQUIVO, todos)
@@ -97,16 +128,28 @@ async def registrar_pontos(
 
 async def obter_ranking(guild_id: int, jogo: str, limite: int = 10) -> list:
     registro = await obter_dados(guild_id)
-    dados_jogo = registro.get("jogos", {}).get(jogo, {})
+    jogos = registro.get("jogos", {})
+    dados_jogo = jogos.get(jogo, {}) if isinstance(jogos, dict) else {}
+    if not isinstance(dados_jogo, dict):
+        return []
     pontuacao = dados_jogo.get("pontuacao", {})
+    if not isinstance(pontuacao, dict):
+        return []
     linhas = []
     for uid, perfil in pontuacao.items():
         if not isinstance(perfil, dict):
             continue
-        pontos = int(perfil.get("pontos", 0) or 0)
+        try:
+            pontos = max(0, int(perfil.get("pontos", 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            continue
         if pontos > 0:
             linhas.append((str(uid), str(perfil.get("nome") or ""), pontos))
-    return sorted(linhas, key=lambda item: (item[2], item[1].casefold()), reverse=True)[:limite]
+    try:
+        limite = max(0, int(limite))
+    except (TypeError, ValueError, OverflowError):
+        limite = 10
+    return sorted(linhas, key=lambda item: (-item[2], item[1].casefold(), item[0]))[:limite]
 async def obter_paineis(guild_id: int) -> dict:
     todos = await carregar(ARQUIVO, {})
     registro = todos.get(str(guild_id), {})
