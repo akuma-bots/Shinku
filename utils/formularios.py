@@ -492,7 +492,7 @@ async def listar_respostas(
     return lista
 
 
-async def sincronizar_todos_site(
+async def normalizar_registros_guild(
     guild_id: int,
 ) -> dict:
 
