@@ -153,27 +153,36 @@ class Contadores(commands.Cog):
             f"{self._rotulo(tipo, cargo)}: {valor}"
         )
 
-        canal = await guild.create_voice_channel(
-            name=nome_canal,
-            reason="Contador criado via /criar-contador",
-        )
-
-        await canal.set_permissions(
-            guild.default_role,
-            connect=False,
-        )
-
-        await adicionar_contador(
-            guild.id,
-            tipo,
-            canal.id,
-            cargo.id if cargo else None,
-        )
+        canal = None
+        try:
+            canal = await guild.create_voice_channel(
+                name=nome_canal,
+                reason="Contador criado via /criar-contador",
+            )
+            await canal.set_permissions(guild.default_role, connect=False)
+            await adicionar_contador(
+                guild.id,
+                tipo,
+                canal.id,
+                cargo.id if cargo else None,
+            )
+        except (discord.Forbidden, discord.HTTPException, ValueError) as erro:
+            # Se a configuração falhar depois da criação do canal, evita deixar
+            # um canal órfão que não será mais gerenciado pelo bot.
+            if canal is not None:
+                try:
+                    await canal.delete(reason="Rollback de contador não configurado")
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+            await interaction.followup.send(
+                "❌ Não consegui concluir a criação do contador. Confira as permissões do bot e tente novamente.",
+                ephemeral=True,
+            )
+            return
 
         await interaction.followup.send(
             f"✅ Contador criado: {canal.mention}. "
-            f"Ele se atualiza a cada "
-            f"{INTERVALO_ATUALIZACAO_MINUTOS} minutos.",
+            f"Ele se atualiza a cada {INTERVALO_ATUALIZACAO_MINUTOS} minutos.",
             ephemeral=True,
         )
 
@@ -196,25 +205,35 @@ class Contadores(commands.Cog):
         canal: discord.VoiceChannel,
     ):
 
-        await remover_contador(
-            interaction.guild.id,
-            canal.id,
-        )
+        config = await get_config(interaction.guild.id)
+        registrados = config.get("contadores", [])
+        if not any(
+            isinstance(item, dict) and item.get("canal_id") == canal.id
+            for item in registrados
+        ):
+            await interaction.response.send_message(
+                "Esse canal não está registrado como contador. Nenhum canal foi apagado.",
+                ephemeral=True,
+            )
+            return
 
         try:
-            await canal.delete(
-                reason=(
-                    "Contador removido via "
-                    "/remover-contador"
-                )
+            await canal.delete(reason="Contador removido via /remover-contador")
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "Não tenho permissão para apagar esse canal. O contador continua registrado.",
+                ephemeral=True,
             )
+            return
         except discord.HTTPException:
-            pass
+            await interaction.response.send_message(
+                "O Discord não permitiu apagar o canal. O contador continua registrado.",
+                ephemeral=True,
+            )
+            return
 
-        await interaction.response.send_message(
-            "🗑️ Contador removido.",
-            ephemeral=True,
-        )
+        await remover_contador(interaction.guild.id, canal.id)
+        await interaction.response.send_message("🗑️ Contador removido.", ephemeral=True)
 
     @app_commands.command(
         name="contadores",
@@ -286,9 +305,13 @@ class Contadores(commands.Cog):
                     if not canal:
                         continue
 
+                    tipo = item.get("tipo")
+                    if tipo not in TIPOS_VALIDOS:
+                        continue
+
                     valor = self._calcular_valor(
                         guild,
-                        item["tipo"],
+                        tipo,
                         item.get("cargo_id"),
                     )
 
