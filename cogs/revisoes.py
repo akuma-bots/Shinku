@@ -318,6 +318,12 @@ class Revisoes(commands.Cog):
 
         else:
             revisao = await revisoes.rejeitar(interaction.guild.id, revisao_id, interaction.user.id)
+            if not revisao:
+                await interaction.followup.send(
+                    "Esta revisão já foi processada por outra interação. Atualize a mensagem antes de tentar novamente.",
+                    ephemeral=True,
+                )
+                return
             embed = _embed_revisao(revisao)
             embed.color = 0xED4245
             embed.add_field(name="❌ Rejeitado por", value=interaction.user.mention, inline=False)
