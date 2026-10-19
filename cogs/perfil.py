@@ -154,58 +154,7 @@ class Perfil(commands.Cog):
 
         await interaction.response.send_message(embed=embed)
 
-    # ---------------- Patentes ----------------
-    @app_commands.command(name="patente-configurar", description="Cria ou atualiza uma patente (evolução automática por XP).")
-    @app_commands.describe(nome="Nome da patente", xp_minimo="XP mínimo pra alcançar essa patente", cargo_recompensa="Cargo dado automaticamente ao alcançar (opcional)")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def patente_configurar(self, interaction: discord.Interaction, nome: str, xp_minimo: int, cargo_recompensa: discord.Role = None):
-        patentes = await get_patentes(interaction.guild.id)
-        patentes = [p for p in patentes if p["nome"].lower() != nome.lower()]
-        patentes.append({"nome": nome, "xp_minimo": xp_minimo, "cargo_id": cargo_recompensa.id if cargo_recompensa else None})
-        await salvar_patentes(interaction.guild.id, patentes)
-        await interaction.response.send_message(f"✅ Patente **{nome}** configurada (a partir de {xp_minimo} XP).", ephemeral=True)
-
-    @app_commands.command(name="patente-remover", description="Remove uma patente configurada.")
-    @app_commands.describe(nome="Nome exato da patente")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def patente_remover(self, interaction: discord.Interaction, nome: str):
-        patentes = await get_patentes(interaction.guild.id)
-        nova_lista = [p for p in patentes if p["nome"].lower() != nome.lower()]
-        if len(nova_lista) == len(patentes):
-            await interaction.response.send_message("Não achei nenhuma patente com esse nome.", ephemeral=True)
-            return
-        await salvar_patentes(interaction.guild.id, nova_lista)
-        await interaction.response.send_message(f"🗑️ Patente **{nome}** removida.", ephemeral=True)
-
-    @app_commands.command(name="patente-listar", description="Lista as patentes configuradas neste servidor.")
-    async def patente_listar(self, interaction: discord.Interaction):
-        patentes = await get_patentes(interaction.guild.id)
-        if not patentes:
-            await interaction.response.send_message("Nenhuma patente configurada ainda.", ephemeral=True)
-            return
-        linhas = [f"**{p['nome']}** — a partir de {p['xp_minimo']} XP" + (f" (cargo: <@&{p['cargo_id']}>)" if p.get("cargo_id") else "") for p in patentes]
-        embed = criar_embed("N̷ÊMESIS ━ HIERARQUIA DE PATENTES", "\n".join(linhas), rodape="NÊMESIS • Progressão e patentes")
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
-    @app_commands.describe(membro="Quem promover", patente="Nome exato da patente configurada")
-    @app_commands.checks.has_permissions(manage_guild=True)
-    async def patente_promover(self, interaction: discord.Interaction, membro: discord.Member, patente: str):
-        patentes = await get_patentes(interaction.guild.id)
-        alvo = next((p for p in patentes if p["nome"].lower() == patente.lower()), None)
-        if not alvo:
-            await interaction.response.send_message("Não achei essa patente configurada. Use `/patente-listar` pra ver as opções.", ephemeral=True)
-            return
-
-        await definir_patente(interaction.guild.id, membro.id, alvo["nome"])
-        if alvo.get("cargo_id"):
-            cargo = interaction.guild.get_role(alvo["cargo_id"])
-            if cargo:
-                try:
-                    await membro.add_roles(cargo, reason=f"Promovido manualmente por {interaction.user}")
-                except discord.Forbidden:
-                    pass
-        await interaction.response.send_message(f"✅ {membro.mention} agora é **{alvo['nome']}**.")
+    # Comandos manuais de patentes removidos; a progressão permanece automática por XP.
 
     # ---------------- Rankings ----------------
     @app_commands.command(name="ranking-jogadores", description="Top jogadores do servidor por uma métrica.")
