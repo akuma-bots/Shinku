@@ -6,7 +6,7 @@ from utils import temporadas
 
 class TestIntegridadeTemporadas(unittest.IsolatedAsyncioTestCase):
     async def test_storage_raiz_invalido_retorna_estado_padrao(self):
-        with patch.object(temporadas, "_tudo", new=AsyncMock(return_value=[])):
+        with patch.object(temporadas, "carregar", new=AsyncMock(return_value=[])):
             estado = await temporadas.get_estado(123)
 
         self.assertEqual(estado["numero_atual"], 1)
@@ -14,7 +14,7 @@ class TestIntegridadeTemporadas(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(estado["historico"], [])
 
     async def test_estado_legado_normaliza_duracao_e_bonus(self):
-        with patch.object(temporadas, "_tudo", new=AsyncMock(return_value={
+        with patch.object(temporadas, "carregar", new=AsyncMock(return_value={
             "123": {
                 "numero_atual": -4,
                 "duracao_dias": 0,
