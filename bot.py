@@ -291,37 +291,35 @@ async def on_ready():
 
 
     # ========================================================
-    # SEGURANÇA
+    # DIAGNÓSTICO DE SERVIDORES
     # ========================================================
-    # O bot pertence exclusivamente à NÊMESIS.
-    # Caso apareça em outro servidor, sai automaticamente.
+    # Não sair automaticamente de servidores durante a inicialização:
+    # uma variável de ambiente incorreta pode remover o bot do servidor
+    # oficial. Apenas registra os servidores visíveis para diagnóstico.
     # ========================================================
 
-    for guild in list(bot.guilds):
+    logging.info(
+        "Identidade do bot: user_id=%s | servidor_configurado=%s",
+        getattr(bot.user, "id", "desconhecido"),
+        NEMESIS_GUILD_ID,
+    )
 
-        if guild.id == NEMESIS_GUILD_ID:
-            continue
-
-        try:
-
-            print(
-                f"Servidor não autorizado detectado: "
-                f"{guild.name} ({guild.id}). "
-                "Saindo..."
+    if bot.guilds:
+        for guild in bot.guilds:
+            logging.info(
+                "Servidor visível no Gateway: %s (id=%s)",
+                guild.name,
+                guild.id,
             )
-
-            await guild.leave()
-
-        except Exception as erro:
-
-            print(
-                f"Erro ao sair de "
-                f"'{guild.name}': {erro}"
-            )
+    else:
+        logging.warning(
+            "O Discord não entregou servidores ao cache do bot. "
+            "Verifique a aplicação/token e a associação ao servidor."
+        )
 
 
-    # Se o servidor autorizado não estiver acessível, já removemos as
-    # associações não autorizadas acima e não tentamos sincronizar comandos.
+    # Se o servidor autorizado não estiver acessível, não sincroniza
+    # comandos. Nenhum servidor é abandonado automaticamente.
     if servidor is None:
         return
 
