@@ -1,5 +1,5 @@
 {
-  "atualizado_em": "2026-10-22",
+  "atualizado_em": "2026-10-23",
   "jogos": {
     "shigaku": {
       "nome": "Shigaku",
@@ -48,6 +48,10 @@
         {
           "codigo": "WEREBACK",
           "recompensa": "150 rerolls"
+        },
+        {
+          "codigo": "GiveMePity",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
         }
       ],
       "requisitos": "Entre na comunidade/grupo oficial do Shigaku no Roblox. No jogo, abra Settings (Configurações), selecione Codes e resgate cada código. Códigos podem expirar ou ser usados apenas uma vez por conta.",
