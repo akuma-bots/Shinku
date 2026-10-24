@@ -1,5 +1,5 @@
 {
-  "atualizado_em": "2026-10-23",
+  "atualizado_em": "2026-10-24",
   "jogos": {
     "shigaku": {
       "nome": "Shigaku",
@@ -674,14 +674,6 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
-          "codigo": "Player",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
-          "codigo": "time",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
           "codigo": "Data",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
@@ -718,19 +710,19 @@
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
+          "codigo": "Marvel",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
+          "codigo": "Omega",
+          "recompensa": "Recompensa não confirmada; consulte a fonte"
+        },
+        {
           "codigo": "Samurai",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
           "codigo": "Duels",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
-          "codigo": "Vampire",
-          "recompensa": "Recompensa não confirmada; consulte a fonte"
-        },
-        {
-          "codigo": "Legacies",
           "recompensa": "Recompensa não confirmada; consulte a fonte"
         },
         {
