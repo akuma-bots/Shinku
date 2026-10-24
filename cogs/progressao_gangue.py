@@ -19,16 +19,18 @@ COOLDOWN_MENSAGENS = 60
 XP_POR_MENSAGEM = 5
 
 RANKS = [
-    {"no": 10, "nome": "Recruta", "xp": 0},
-    {"no": 9, "nome": "Iniciado", "xp": 100},
-    {"no": 8, "nome": "Operador", "xp": 250},
-    {"no": 7, "nome": "Membro", "xp": 500},
-    {"no": 6, "nome": "Veterano", "xp": 900},
-    {"no": 5, "nome": "Especialista", "xp": 1400},
-    {"no": 4, "nome": "Elite", "xp": 2100},
-    {"no": 3, "nome": "Executor", "xp": 3000},
-    {"no": 2, "nome": "Comandante", "xp": 4200},
-    {"no": 1, "nome": "Lenda", "xp": 6000},
+    {"no": 12, "nome": "Lutador", "xp": 0},
+    {"no": 11, "nome": "Subtenente", "xp": 750},
+    {"no": 10, "nome": "Tenente", "xp": 2000},
+    {"no": 9, "nome": "Executor", "xp": 4000},
+    {"no": 8, "nome": "Especialista", "xp": 7000},
+    {"no": 7, "nome": "Elite", "xp": 11000},
+    {"no": 6, "nome": "Veterano", "xp": 16000},
+    {"no": 5, "nome": "Treinador", "xp": 22000},
+    {"no": 4, "nome": "Comandante", "xp": 30000},
+    {"no": 3, "nome": "Vice Capitão", "xp": 40000},
+    {"no": 2, "nome": "Capitão", "xp": 52000},
+    {"no": 1, "nome": "Capitão Geral", "xp": 68000},
 ]
 
 
@@ -516,9 +518,9 @@ class ProgressaoGangue(commands.Cog):
                 log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
 
     @app_commands.command(name="gangue-configurar-cargo", description="Vincula um cargo Discord a um rank de progressão.")
-    @app_commands.describe(rank_no="Número do rank de membro (1 a 10)", cargo="Cargo atribuído automaticamente ao alcançar o rank")
+    @app_commands.describe(rank_no="Número do cargo de progressão (1 a 12)", cargo="Cargo atribuído automaticamente ao alcançar o rank")
     @app_commands.default_permissions(administrator=True)
-    async def gangue_configurar_cargo(self, interaction: discord.Interaction, rank_no: app_commands.Range[int, 1, 10], cargo: discord.Role):
+    async def gangue_configurar_cargo(self, interaction: discord.Interaction, rank_no: app_commands.Range[int, 1, 12], cargo: discord.Role):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
             return
