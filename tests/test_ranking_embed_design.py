@@ -8,7 +8,7 @@ from utils import ranking_missoes_jogos
 
 class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
     async def test_ranking_usa_hierarquia_visual_compacta(self):
-        guild = SimpleNamespace(id=1543381737961160910)
+        guild = SimpleNamespace(id=1563995879981981817)
         cog = Missoes.__new__(Missoes)
         with (
             patch.object(
@@ -49,7 +49,7 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.color.value, 0x9F2035)
 
     async def test_ranking_vazio_mostra_mensagem_curta(self):
-        guild = SimpleNamespace(id=1543381737961160910)
+        guild = SimpleNamespace(id=1563995879981981817)
         cog = Missoes.__new__(Missoes)
         with patch.object(
             ranking_missoes_jogos,
