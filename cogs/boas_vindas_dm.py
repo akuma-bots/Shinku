@@ -8,7 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 logger = logging.getLogger(__name__)
-GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1543381737961160910"))
+GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
 CONVITE_NEMESIS = "https://discord.gg/WsfjRQPhAg"
 TAG_GANGUE = "NΞM"
 CAMINHO_CODIGOS = Path(__file__).resolve().parent.parent / "config" / "codigos_jogos.json"
