@@ -168,7 +168,7 @@ class Missoes(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        guild = self.bot.get_guild(1543381737961160910)
+        guild = self.bot.get_guild(1563995879981981817)
         if guild is None:
             log.warning("Missões padrão: servidor NÊMESIS não encontrado no cache.")
             return
