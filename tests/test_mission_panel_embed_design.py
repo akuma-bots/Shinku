@@ -39,7 +39,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             ]
         }
         cog = Missoes.__new__(Missoes)
-        guild = SimpleNamespace(id=1543381737961160910)
+        guild = SimpleNamespace(id=1563995879981981817)
 
         with patch("cogs.missoes.missoes._guild", new=AsyncMock(return_value=dados)):
             embed = await cog._montar_painel_missoes(guild, "shigaku")
@@ -71,7 +71,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             ]
         }
         cog = Missoes.__new__(Missoes)
-        guild = SimpleNamespace(id=1543381737961160910)
+        guild = SimpleNamespace(id=1563995879981981817)
         with patch("cogs.missoes.missoes._guild", new=AsyncMock(return_value=dados)):
             embed = await cog._montar_painel_missoes(guild, "shigaku")
         self.assertTrue(any("0 P.C." in field.name for field in embed.fields))
@@ -97,7 +97,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             for i in range(1, 26)
         ]
         cog = Missoes.__new__(Missoes)
-        guild = SimpleNamespace(id=1543381737961160910)
+        guild = SimpleNamespace(id=1563995879981981817)
         with patch(
             "cogs.missoes.missoes._guild",
             new=AsyncMock(return_value={"missoes": atividades}),
