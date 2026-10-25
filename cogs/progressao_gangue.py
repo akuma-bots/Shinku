@@ -11,7 +11,7 @@ from utils.storage import carregar, salvar
 
 log = logging.getLogger(__name__)
 
-GUILD_ID = 1543381737961160910
+GUILD_ID = 1563995879981981817
 CANAL_PROGRESSAO_ID = 1545832891681087628
 CANAL_REGISTRO_ATIVIDADE_ID = 1545833111860936804
 ARQUIVO = "progressao_gangue.json"
