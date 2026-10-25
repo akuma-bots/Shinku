@@ -11,7 +11,7 @@ from utils import ranking_missoes_jogos
 class TestRankingPanelEditLimit(unittest.IsolatedAsyncioTestCase):
     async def test_replaces_panel_when_discord_edit_limit_is_reached(self):
         guild = Mock()
-        guild.id = 1543381737961160910
+        guild.id = 1563995879981981817
 
         canal = Mock()
         mensagem_antiga = Mock()
