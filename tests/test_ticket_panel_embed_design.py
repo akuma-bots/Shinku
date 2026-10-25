@@ -7,7 +7,7 @@ from cogs.tickets import _montar_embed_painel
 class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
     async def test_painel_padrao_tem_orientacoes_e_privacidade_separadas(self):
         with patch("cogs.tickets.get_config", new=AsyncMock(return_value={})):
-            embed = await _montar_embed_painel(1543381737961160910)
+            embed = await _montar_embed_painel(1563995879981981817)
 
         self.assertIn("CENTRAL DE ATENDIMENTO", embed.title)
         self.assertIn("Selecione abaixo a categoria", embed.description)
