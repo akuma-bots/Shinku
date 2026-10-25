@@ -860,19 +860,17 @@ class Missoes(commands.Cog):
                 )
 
             nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
-            if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
-                await definir_patente(guild.id, usuario_id, nova_patente["nome"])
-                cargo_id = nova_patente.get("cargo_id")
-                cargo = guild.get_role(int(cargo_id)) if cargo_id else None
-                if membro and cargo:
-                    try:
-                        await membro.add_roles(
-                            cargo,
-                            reason="Promoção automática por conclusão de missão",
-                        )
-                    except discord.Forbidden:
-                        pass
-                mensagens[-1] += f" • Nova patente: **{nova_patente['nome']}**"
+            if nova_patente:
+                patente_mudou = nova_patente.get("nome") != perfil.get("patente")
+                if patente_mudou:
+                    await definir_patente(guild.id, usuario_id, nova_patente["nome"])
+                if membro:
+                    from utils.hierarquia import sincronizar_cargo_patente
+                    await sincronizar_cargo_patente(
+                        guild, membro, perfil["xp"], atualizar_perfil=False
+                    )
+                if patente_mudou:
+                    mensagens[-1] += f" • Nova patente: **{nova_patente['nome']}**"
 
         if auxiliar_id:
             cabecalho = (
