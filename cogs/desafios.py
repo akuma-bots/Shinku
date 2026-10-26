@@ -440,7 +440,7 @@ class Desafios(commands.Cog):
 
         config = await get_config(interaction.guild.id)
         canal_id = config.get("canal_provas_pvp_id")
-        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1563995881655509054)
+        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1563995882540498999)
         if canal is None or not hasattr(canal, "send"):
             await interaction.response.send_message(
                 "❌ Canal de provas PvP não encontrado. Confira o ID padrão em utils/guild_config.py.",
@@ -525,7 +525,7 @@ class Desafios(commands.Cog):
         canais = [
             ("Desafios", "canal_desafios_id", 1563995881508831341),
             ("Lutas", "canal_lutas_id", 1563995881655509052),
-            ("Provas PvP", "canal_provas_pvp_id", 1563995881655509054),
+            ("Provas PvP", "canal_provas_pvp_id", 1563995882540498999),
             ("Ranking", "canal_ranking_id", 1563995881508831338),
             ("Provas de missões", "canal_provas_missao_id", 1563995882540498998),
             ("Provas de contribuições", "canal_provas_contribuicao_id", 1563995882540498999),
