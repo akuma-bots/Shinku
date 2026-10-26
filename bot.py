@@ -97,6 +97,8 @@ bot = NemesisBot(
     command_prefix="!",
     intents=intents,
 )
+# Cogs e comandos podem validar o servidor autorizado sem repetir IDs.
+bot.nemesis_guild_id = NEMESIS_GUILD_ID
 
 
 @bot.tree.error
