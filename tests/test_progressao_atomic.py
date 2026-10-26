@@ -1,6 +1,6 @@
 import copy
 import unittest
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 from cogs.progressao_gangue import ProgressaoGangue
 
@@ -106,6 +106,51 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(destino["xp"], 800)
         self.assertEqual(rank_origem_antigo["nome"], "Subtenente")
         self.assertEqual(rank_destino_antigo["nome"], "Lutador")
+
+
+    async def test_recompensa_nao_reaplica_cargo_se_rank_nao_mudar(self):
+        membro = Mock()
+        guild = Mock()
+        guild.id = 123
+        guild.get_member.return_value = membro
+        self.dados = {
+            "123": {
+                "membros": {
+                    "456": {
+                        "xp": 100, "mensagens": 0, "missoes": 0,
+                        "guerras": 0, "rank_no": 12, "eventos_recompensa": [],
+                    }
+                }
+            }
+        }
+        self.cog._aplicar_cargo_rank = AsyncMock()
+
+        await self.cog.registrar_recompensa(guild, 456, 25, evento_id="missao:sem-rank")
+
+        self.cog._aplicar_cargo_rank.assert_not_awaited()
+
+    async def test_recompensa_aplica_cargo_ao_alcancar_novo_rank(self):
+        membro = Mock()
+        guild = Mock()
+        guild.id = 123
+        guild.get_member.return_value = membro
+        self.dados = {
+            "123": {
+                "membros": {
+                    "456": {
+                        "xp": 740, "mensagens": 0, "missoes": 0,
+                        "guerras": 0, "rank_no": 12, "eventos_recompensa": [],
+                    }
+                }
+            }
+        }
+        self.cog._aplicar_cargo_rank = AsyncMock()
+        self.cog._anunciar_rank = AsyncMock()
+
+        await self.cog.registrar_recompensa(guild, 456, 20, evento_id="missao:novo-rank")
+
+        self.cog._aplicar_cargo_rank.assert_awaited_once()
+        self.cog._anunciar_rank.assert_awaited_once()
 
 
 if __name__ == "__main__":
