@@ -232,7 +232,7 @@ class Desafios(commands.Cog):
                 return
 
         canal_id = config.get("canal_desafios_id")
-        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545834386128375909)
+        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1563995881508831341)
         if canal is None or not hasattr(canal, "send"):
             await interaction.response.send_message("❌ Canal de desafios não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
             return
@@ -383,7 +383,7 @@ class Desafios(commands.Cog):
 
             config = await get_config(interaction.guild.id)
             canal_id = config.get("canal_lutas_id")
-            canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545834447944028170)
+            canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1563995881655509052)
             if canal is None or not hasattr(canal, "send"):
                 await interaction.followup.send("⚠️ Canal de lutas não encontrado. Configure novamente com /desafio-canais.", ephemeral=True)
                 return
@@ -437,7 +437,7 @@ class Desafios(commands.Cog):
 
         config = await get_config(interaction.guild.id)
         canal_id = config.get("canal_provas_pvp_id")
-        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1545853928736952420)
+        canal = await _resolver_canal(interaction.guild, canal_id, interaction.channel, fallback_id=1563995881655509054)
         if canal is None or not hasattr(canal, "send"):
             await interaction.response.send_message(
                 "❌ Canal de provas PvP não encontrado. Confira o ID padrão em utils/guild_config.py.",
@@ -520,14 +520,14 @@ class Desafios(commands.Cog):
         guild = interaction.guild
         config = await get_config(guild.id)
         canais = [
-            ("Desafios", "canal_desafios_id", 1545834386128375909),
-            ("Lutas", "canal_lutas_id", 1545834447944028170),
-            ("Provas PvP", "canal_provas_pvp_id", 1545853928736952420),
-            ("Ranking", "canal_ranking_id", 1545834182406574241),
-            ("Provas de missões", "canal_provas_missao_id", 1556543417843056641),
-            ("Provas de contribuições", "canal_provas_contribuicao_id", 1556543628296593448),
-            ("Provas especiais", "canal_provas_especial_id", 1556543872534839336),
-            ("Auditoria", "canal_auditoria_id", 1545837705609617428),
+            ("Desafios", "canal_desafios_id", 1563995881508831341),
+            ("Lutas", "canal_lutas_id", 1563995881655509052),
+            ("Provas PvP", "canal_provas_pvp_id", 1563995881655509054),
+            ("Ranking", "canal_ranking_id", 1563995881508831338),
+            ("Provas de missões", "canal_provas_missao_id", 1563995882540498998),
+            ("Provas de contribuições", "canal_provas_contribuicao_id", 1563995882540498999),
+            ("Provas especiais", "canal_provas_especial_id", 1563995882540499000),
+            ("Auditoria", "canal_auditoria_id", 1563995882234450005),
         ]
         linhas = []
         bot_member = guild.me
