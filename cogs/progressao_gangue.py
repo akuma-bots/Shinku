@@ -250,15 +250,16 @@ class ProgressaoGangue(commands.Cog):
             if cargo.id in ids_progressao and cargo.id != cargo_alvo_id
         ]
         try:
-            if remover:
-                await membro.remove_roles(
-                    *remover,
-                    reason="Substituição automática do rank da NÊMESIS",
-                )
+            # Aplica primeiro o cargo novo; só remove o anterior depois do sucesso.
             if adicionar not in membro.roles:
                 await membro.add_roles(
                     adicionar,
                     reason="Rank alcançado por XP na NÊMESIS",
+                )
+            if remover:
+                await membro.remove_roles(
+                    *remover,
+                    reason="Substituição automática do rank da NÊMESIS",
                 )
         except discord.Forbidden:
             log.warning(
