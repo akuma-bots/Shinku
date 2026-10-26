@@ -180,8 +180,8 @@ class ProgressaoGangue(commands.Cog):
             await self._salvar_dados(dados)
             return dict(perfil), rank_antigo, rank_novo, True
 
-    async def _transferir_xp(self, guild_id: int, origem_id: int, destino_id: int, quantidade: int) -> tuple[dict, dict]:
-        """Executa a transferência como uma única operação de leitura/alteração/gravação."""
+    async def _transferir_xp(self, guild_id: int, origem_id: int, destino_id: int, quantidade: int) -> tuple[dict, dict, dict, dict]:
+        """Transfere XP atomicamente e devolve ranks anteriores e atuais."""
         async with self._lock:
             dados = await self._dados()
             guild = dados.setdefault(str(guild_id), {})
@@ -204,14 +204,19 @@ class ProgressaoGangue(commands.Cog):
             origem = obter(origem_id)
             destino = obter(destino_id)
             saldo_origem = max(0, int(origem.get("xp", 0)))
+            saldo_destino = max(0, int(destino.get("xp", 0)))
+            rank_origem_anterior = rank_por_xp(saldo_origem)
+            rank_destino_anterior = rank_por_xp(saldo_destino)
             if quantidade <= 0:
                 raise ValueError("A quantidade precisa ser maior que zero.")
             if saldo_origem < quantidade:
                 raise ValueError(f"Saldo insuficiente. Você possui {saldo_origem:,} XP.".replace(",", "."))
             origem["xp"] = saldo_origem - quantidade
-            destino["xp"] = max(0, int(destino.get("xp", 0))) + quantidade
-            origem["rank_no"] = rank_por_xp(origem["xp"])["no"]
-            destino["rank_no"] = rank_por_xp(destino["xp"])["no"]
+            destino["xp"] = saldo_destino + quantidade
+            rank_origem_atual = rank_por_xp(origem["xp"])
+            rank_destino_atual = rank_por_xp(destino["xp"])
+            origem["rank_no"] = rank_origem_atual["no"]
+            destino["rank_no"] = rank_destino_atual["no"]
 
             historico = guild.setdefault("transferencias_xp", [])
             historico.append({
@@ -222,7 +227,7 @@ class ProgressaoGangue(commands.Cog):
             })
             guild["transferencias_xp"] = historico[-500:]
             await self._salvar_dados(dados)
-            return dict(origem), dict(destino)
+            return dict(origem), dict(destino), rank_origem_anterior, rank_destino_anterior
 
     async def _config(self, guild_id: int) -> dict:
         dados = await self._dados()
@@ -417,10 +422,9 @@ class ProgressaoGangue(commands.Cog):
             log.info("Recompensa duplicada ignorada: guild=%s user=%s evento=%s", guild.id, user_id, evento_id)
             return
         membro = guild.get_member(user_id)
-        if membro is not None:
+        if membro is not None and rank_novo["no"] != rank_antigo["no"]:
             await self._aplicar_cargo_rank(guild, membro, rank_novo)
-            if rank_novo["no"] != rank_antigo["no"]:
-                await self._anunciar_rank(guild, membro, rank_novo, perfil["xp"])
+            await self._anunciar_rank(guild, membro, rank_novo, perfil["xp"])
 
     @app_commands.command(name="gangue-perfil", description="Mostra o progresso de um membro na hierarquia da NÊMESIS.")
     @app_commands.describe(membro="Membro para consultar; padrão: você")
@@ -516,7 +520,12 @@ class ProgressaoGangue(commands.Cog):
             return
 
         try:
-            perfil_origem, perfil_destino = await self._transferir_xp(
+            (
+                perfil_origem,
+                perfil_destino,
+                rank_origem_anterior,
+                rank_destino_anterior,
+            ) = await self._transferir_xp(
                 interaction.guild.id, interaction.user.id, destinatario.id, int(quantidade)
             )
         except ValueError as erro:
@@ -526,9 +535,12 @@ class ProgressaoGangue(commands.Cog):
         rank_origem = rank_por_xp(int(perfil_origem["xp"]))
         rank_destino = rank_por_xp(int(perfil_destino["xp"]))
         membro_origem = interaction.guild.get_member(interaction.user.id)
-        if membro_origem:
+        if membro_origem and rank_origem["no"] != rank_origem_anterior["no"]:
             await self._aplicar_cargo_rank(interaction.guild, membro_origem, rank_origem)
-        await self._aplicar_cargo_rank(interaction.guild, destinatario, rank_destino)
+            await self._anunciar_rank(interaction.guild, membro_origem, rank_origem, perfil_origem["xp"])
+        if rank_destino["no"] != rank_destino_anterior["no"]:
+            await self._aplicar_cargo_rank(interaction.guild, destinatario, rank_destino)
+            await self._anunciar_rank(interaction.guild, destinatario, rank_destino, perfil_destino["xp"])
 
         embed = discord.Embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  TRANSFERÊNCIA CONCLUÍDA",
@@ -586,8 +598,8 @@ class ProgressaoGangue(commands.Cog):
             int(quantidade),
             tipo=atividade.value,
         )
-        await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
         if rank_novo["no"] != rank_antigo["no"]:
+            await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
             await self._anunciar_rank(interaction.guild, membro, rank_novo, perfil["xp"])
         total_xp = int(perfil["xp"])
         motivo_seguro = discord.utils.escape_markdown(motivo)
