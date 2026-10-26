@@ -136,10 +136,10 @@ def _normalizar_id(valor):
     Converte IDs de configuração persistidos para int.
 
     IDs podem estar salvos como strings, por exemplo:
-        "1545838386944938024"
+        "1563995882234450005"
 
     O discord.py espera:
-        1545838386944938024
+        1563995882234450005
     """
 
     if valor is None or valor == "":
