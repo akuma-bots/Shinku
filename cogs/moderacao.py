@@ -6,7 +6,7 @@ from discord.ext import commands
 from utils.punicoes import registrar_punicao, historico_punicoes
 
 
-CANAL_REGRAS_ID = 1545831172796583987
+CANAL_REGRAS_ID = 1563995880833421508
 
 
 class Moderacao(commands.Cog):
@@ -24,7 +24,7 @@ class Moderacao(commands.Cog):
 
         try:
             config = await get_config(interaction.guild.id)
-            log_id = config.get("log_channel_id") or 1545838386944938024
+            log_id = config.get("log_channel_id") or 1563995882234450005
             if not log_id:
                 return
 
