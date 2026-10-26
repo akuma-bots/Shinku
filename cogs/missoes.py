@@ -862,16 +862,7 @@ class Missoes(commands.Cog):
             nova_patente = await calcular_patente_atual(guild.id, perfil["xp"])
             if nova_patente and nova_patente.get("nome") != perfil.get("patente"):
                 await definir_patente(guild.id, usuario_id, nova_patente["nome"])
-                cargo_id = nova_patente.get("cargo_id")
-                cargo = guild.get_role(int(cargo_id)) if cargo_id else None
-                if membro and cargo:
-                    try:
-                        await membro.add_roles(
-                            cargo,
-                            reason="Promoção automática por conclusão de missão",
-                        )
-                    except discord.Forbidden:
-                        pass
+                # Os cargos de progressão são gerenciados por ProgressaoGangue.
                 mensagens[-1] += f" • Nova patente: **{nova_patente['nome']}**"
 
         if auxiliar_id:
