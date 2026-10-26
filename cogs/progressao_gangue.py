@@ -340,6 +340,29 @@ class ProgressaoGangue(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 log.exception("Não foi possível atualizar o painel de progressão.")
                 return
+
+        # Recupera o painel do bot se o ID salvo foi perdido.
+        try:
+            async for candidata in canal.history(limit=200):
+                if candidata.author.id != self.bot.user.id or not candidata.embeds:
+                    continue
+                embed_candidato = candidata.embeds[0]
+                if (
+                    embed_candidato.title == "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  SISTEMA DE PROGRESSÃO"
+                    or (
+                        embed_candidato.footer
+                        and "PROGRESSÃO OFICIAL" in embed_candidato.footer.text
+                    )
+                ):
+                    await candidata.edit(embed=embed)
+                    config["painel_mensagem_id"] = candidata.id
+                    await self._salvar_dados(dados)
+                    self._prontos.add(guild.id)
+                    return
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Não foi possível procurar painel de progressão existente.")
+            return
+
         try:
             msg = await canal.send(embed=embed)
             config["painel_mensagem_id"] = msg.id
