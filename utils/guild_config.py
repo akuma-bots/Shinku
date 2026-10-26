@@ -20,7 +20,7 @@ PADRAO = {
     "canais_cargo_automatico": {},
 
     "canal_eventos_id": 1563995880623841336,
-    "canal_parcerias_id": 1563995880833421513,
+    "canal_parcerias_id": 1563995881655509058,
     "cargo_categoria_parcerias_id": None,
 
     "contadores": [],
@@ -110,7 +110,7 @@ MIGRACAO_IDS = {
     "log_channel_id": {1545838386944938024: 1563995882234450005},
     "ticket_category_id": {1545835749369446603: 1563995881655509056},
     "canal_eventos_id": {1545835097830334536: 1563995880623841336},
-    "canal_parcerias_id": {1545831702444777492: 1563995880833421513},
+    "canal_parcerias_id": {1545831702444777492: 1563995881655509058},
     "cargo_categoria_parcerias_id": {1553019315664461934: None},
     "canal_auditoria_id": {1545837705609617428: 1563995882234450005},
     "canal_guerras_id": {1545834530085142678: 1563995881655509053},
