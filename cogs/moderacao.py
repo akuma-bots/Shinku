@@ -140,9 +140,26 @@ class Moderacao(commands.Cog):
             return False
 
         autor = interaction.user
+
+        # Cargos com Administrador ficam imunes à moderação manual do bot.
+        # Apenas o proprietário do servidor pode contornar essa proteção.
+        if (
+            isinstance(membro, discord.Member)
+            and membro.guild_permissions.administrator
+            and autor.id != guild.owner_id
+        ):
+            await interaction.response.send_message(
+                "Este membro possui permissão de Administrador e não pode ser punido por este comando.",
+                ephemeral=True,
+            )
+            return False
+
+        # Administradores podem moderar membros independentemente da hierarquia
+        # dos cargos; o proprietário continua sendo protegido acima.
         if (
             isinstance(autor, discord.Member)
             and autor.id != guild.owner_id
+            and not autor.guild_permissions.administrator
             and membro.top_role >= autor.top_role
         ):
             await interaction.response.send_message(
