@@ -139,12 +139,12 @@ TIPOS = {
 }
 
 CANAIS_PADRAO = {
-    "canal_missoes_missao_id": 1556543214885019668,
-    "canal_missoes_contribuicao_id": 1556543539213639760,
-    "canal_missoes_especial_id": 1556543708478972015,
-    "canal_provas_missao_id": 1556543417843056641,
-    "canal_provas_contribuicao_id": 1556543628296593448,
-    "canal_provas_especial_id": 1556543872534839336,
+    "canal_missoes_missao_id": 1563995881315897549,
+    "canal_missoes_contribuicao_id": 1563995881315897551,
+    "canal_missoes_especial_id": 1563995880623841336,
+    "canal_provas_missao_id": 1563995882540498998,
+    "canal_provas_contribuicao_id": 1563995882540498999,
+    "canal_provas_especial_id": 1563995882540499000,
 }
 
 NOMES_CANAIS = {}
@@ -586,7 +586,7 @@ class Missoes(commands.Cog):
     async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
         """Atualiza o painel único de ranking sem criar canais por jogo."""
         config = await get_config(guild.id)
-        canal_id = config.get("canal_ranking_id") or 1545834182406574241
+        canal_id = config.get("canal_ranking_id") or 1563995881508831338
         canal = await self._resolver_canal(guild, int(canal_id))
         if canal is None:
             log.warning("Canal de ranking atual não encontrado; painel não atualizado.")
