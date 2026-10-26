@@ -306,7 +306,7 @@ class RankingGeral(
             await set_config(guild.id, ranking_mensagem_id=0)
             return
 
-        candidatos = [config.get("canal_ranking_id"), 1545834182406574241]
+        candidatos = [config.get("canal_ranking_id"), 1563995881508831338]
         vistos = set()
         mensagem_removida = False
         for valor in candidatos:
@@ -501,7 +501,7 @@ class RankingGeral(
         interaction: discord.Interaction,
     ):
         config = await get_config(interaction.guild.id)
-        canal_id = config.get("canal_ranking_id") or 1545834182406574241
+        canal_id = config.get("canal_ranking_id") or 1563995881508831338
         canal = interaction.guild.get_channel(int(canal_id))
         mention = canal.mention if canal is not None else f"<#{canal_id}>"
         await interaction.response.send_message(
