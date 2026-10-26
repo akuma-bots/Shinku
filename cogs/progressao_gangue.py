@@ -375,8 +375,10 @@ class ProgressaoGangue(commands.Cog):
         )
         if not aplicada:
             return
+        # Sincroniza também o cargo-base (Lutador) no primeiro ganho de XP,
+        # mesmo quando o número do rank não mudou.
+        await self._aplicar_cargo_rank(message.guild, message.author, rank_novo)
         if rank_novo["no"] != rank_antigo["no"]:
-            await self._aplicar_cargo_rank(message.guild, message.author, rank_novo)
             await self._anunciar_rank(message.guild, message.author, rank_novo, perfil["xp"])
 
     async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao", evento_id: str = ""):
