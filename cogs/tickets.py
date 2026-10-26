@@ -1155,28 +1155,62 @@ class Tickets(commands.Cog):
                 embed = await _montar_embed_painel(guild.id)
                 view = await _montar_select(guild.id)
 
+                mensagem_existente = None
+
+                # 1) Usa o ID salvo, se ainda existir.
                 if mensagem_id:
                     try:
                         mensagem_existente = await canal.fetch_message(int(mensagem_id))
-                        # Atualiza apenas quando o conteúdo visual mudou; evita
-                        # editar o painel a cada ciclo e consumir limites do Discord.
-                        embed_atual = (
-                            mensagem_existente.embeds[0].to_dict()
-                            if mensagem_existente.embeds
-                            else None
-                        )
-                        if embed_atual != embed.to_dict():
-                            await mensagem_existente.edit(embed=embed, view=view)
-                        continue
                     except discord.NotFound:
-                        pass
+                        mensagem_existente = None
                     except (discord.Forbidden, discord.HTTPException):
                         continue
 
-                mensagem = await canal.send(
-                    embed=embed,
-                    view=view,
-                )
+                # 2) Se o estado local perdeu o ID, procura o painel do próprio bot
+                # no canal antes de enviar outra mensagem. Isso evita duplicatas
+                # após reinicializações/redeploys ou perda do armazenamento local.
+                if mensagem_existente is None:
+                    try:
+                        async for candidata in canal.history(limit=200):
+                            if candidata.author.id != self.bot.user.id:
+                                continue
+                            tem_painel_ticket = any(
+                                getattr(componente, "custom_id", None) == CUSTOM_ID_SELECT
+                                for linha in (candidata.components or [])
+                                for componente in getattr(linha, "children", [])
+                            )
+                            titulo_painel = bool(
+                                candidata.embeds
+                                and candidata.embeds[0].title == TITULO_PADRAO
+                            )
+                            if tem_painel_ticket or titulo_painel:
+                                mensagem_existente = candidata
+                                break
+                    except (discord.Forbidden, discord.HTTPException):
+                        # Sem histórico acessível, não enviar às cegas e gerar duplicata.
+                        continue
+
+                if mensagem_existente is not None:
+                    # Sempre sincroniza embed e componentes na mensagem encontrada.
+                    embed_atual = (
+                        mensagem_existente.embeds[0].to_dict()
+                        if mensagem_existente.embeds
+                        else None
+                    )
+                    if (
+                        embed_atual != embed.to_dict()
+                        or not mensagem_existente.components
+                    ):
+                        await mensagem_existente.edit(embed=embed, view=view)
+                    mensagem = mensagem_existente
+                else:
+                    mensagem = await canal.send(embed=embed, view=view)
+                    try:
+                        await mensagem.pin(
+                            reason="Painel permanente de tickets NÊMESIS"
+                        )
+                    except (discord.Forbidden, discord.HTTPException):
+                        pass
                 try:
                     await mensagem.pin(
                         reason="Restaurando o painel permanente de tickets NÊMESIS"
