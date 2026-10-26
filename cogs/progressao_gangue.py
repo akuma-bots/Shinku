@@ -18,17 +18,21 @@ ARQUIVO = "progressao_gangue.json"
 COOLDOWN_MENSAGENS = 60
 XP_POR_MENSAGEM = 5
 
+# Patentes oficiais da NÊMESIS, do menor para o maior requisito de XP.
+# Os cargos são os IDs confirmados no inventário do servidor atual.
 RANKS = [
-    {"no": 10, "nome": "Recruta", "xp": 0},
-    {"no": 9, "nome": "Iniciado", "xp": 100},
-    {"no": 8, "nome": "Operador", "xp": 250},
-    {"no": 7, "nome": "Membro", "xp": 500},
-    {"no": 6, "nome": "Veterano", "xp": 900},
-    {"no": 5, "nome": "Especialista", "xp": 1400},
-    {"no": 4, "nome": "Elite", "xp": 2100},
-    {"no": 3, "nome": "Executor", "xp": 3000},
-    {"no": 2, "nome": "Comandante", "xp": 4200},
-    {"no": 1, "nome": "Lenda", "xp": 6000},
+    {"no": 12, "nome": "Lutador", "xp": 0, "cargo_id": 1563995879990624373},
+    {"no": 11, "nome": "Subtenente", "xp": 750, "cargo_id": 1563995879990624374},
+    {"no": 10, "nome": "Tenente", "xp": 2000, "cargo_id": 1563995879990624375},
+    {"no": 9, "nome": "Executor", "xp": 4000, "cargo_id": 1563995879990624376},
+    {"no": 8, "nome": "Especialista", "xp": 7000, "cargo_id": 1563995879990624377},
+    {"no": 7, "nome": "Elite", "xp": 11000, "cargo_id": 1563995879998754937},
+    {"no": 6, "nome": "Veterano", "xp": 16000, "cargo_id": 1563995879998754938},
+    {"no": 5, "nome": "Treinador", "xp": 22000, "cargo_id": 1563995879998754939},
+    {"no": 4, "nome": "Comandante", "xp": 30000, "cargo_id": 1563995879998754940},
+    {"no": 3, "nome": "Vice Capitão", "xp": 40000, "cargo_id": 1563995879998754941},
+    {"no": 2, "nome": "Capitão", "xp": 52000, "cargo_id": 1563995879998754942},
+    {"no": 1, "nome": "Capitão Geral", "xp": 68000, "cargo_id": 1563995879998754943},
 ]
 
 
@@ -228,24 +232,44 @@ class ProgressaoGangue(commands.Cog):
         return guild
 
     async def _aplicar_cargo_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict):
-        config = await self._config(guild.id)
-        cargos = config.get("cargos", {})
-        cargo_alvo_id = cargos.get(str(rank["no"]))
-        # Não mexe nos cargos atuais enquanto este rank não tiver cargo configurado.
-        if not cargo_alvo_id:
+        cargo_alvo_id = int(rank.get("cargo_id") or 0)
+        ids_progressao = {
+            int(item["cargo_id"])
+            for item in RANKS
+            if item.get("cargo_id")
+        }
+        adicionar = guild.get_role(cargo_alvo_id) if cargo_alvo_id else None
+        if adicionar is None:
+            log.error("Cargo do rank %s não existe no servidor %s.", rank.get("nome"), guild.id)
             return
-        ids_progressao = {int(cid) for cid in cargos.values() if str(cid).isdigit()}
-        remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != int(cargo_alvo_id)]
-        adicionar = guild.get_role(int(cargo_alvo_id))
+
+        # Remove somente os cargos desta progressão; cargos de Staff/OCTÓGONO
+        # e demais cargos do membro permanecem intactos.
+        remover = [
+            cargo for cargo in membro.roles
+            if cargo.id in ids_progressao and cargo.id != cargo_alvo_id
+        ]
         try:
             if remover:
-                await membro.remove_roles(*remover, reason="Atualização automática da progressão da NÊMESIS")
-            if adicionar and adicionar not in membro.roles:
-                await membro.add_roles(adicionar, reason="Rank alcançado na progressão da NÊMESIS")
+                await membro.remove_roles(
+                    *remover,
+                    reason="Substituição automática do rank da NÊMESIS",
+                )
+            if adicionar not in membro.roles:
+                await membro.add_roles(
+                    adicionar,
+                    reason="Rank alcançado por XP na NÊMESIS",
+                )
         except discord.Forbidden:
-            log.warning("Sem hierarquia/permissão para atualizar cargo de progressão do membro %s.", membro.id)
+            log.warning(
+                "Sem hierarquia/permissão para atualizar cargo de progressão do membro %s.",
+                membro.id,
+            )
         except discord.HTTPException:
-            log.exception("Falha ao atualizar cargo de progressão do membro %s.", membro.id)
+            log.exception(
+                "Falha ao atualizar cargo de progressão do membro %s.",
+                membro.id,
+            )
 
     async def _anunciar_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict, xp: int):
         canal = guild.get_channel(CANAL_PROGRESSAO_ID)
@@ -514,28 +538,6 @@ class ProgressaoGangue(commands.Cog):
                 )
             except (discord.Forbidden, discord.HTTPException):
                 log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
-
-    @app_commands.command(name="gangue-configurar-cargo", description="Vincula um cargo Discord a um rank de progressão.")
-    @app_commands.describe(rank_no="Número do rank de membro (1 a 10)", cargo="Cargo atribuído automaticamente ao alcançar o rank")
-    @app_commands.default_permissions(administrator=True)
-    async def gangue_configurar_cargo(self, interaction: discord.Interaction, rank_no: app_commands.Range[int, 1, 10], cargo: discord.Role):
-        if interaction.guild is None:
-            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
-            return
-        bot_member = interaction.guild.me
-        if cargo.is_default() or cargo.managed or (bot_member and cargo >= bot_member.top_role):
-            await interaction.response.send_message("Esse cargo não pode ser atribuído pelo bot. Escolha um cargo abaixo do cargo mais alto do bot.", ephemeral=True)
-            return
-        dados = await self._dados()
-        config = dados.setdefault(str(interaction.guild.id), {})
-        cargos = config.setdefault("cargos", {})
-        cargos[str(rank_no)] = cargo.id
-        await self._salvar_dados(dados)
-        nome_rank = next(r["nome"] for r in RANKS if r["no"] == rank_no)
-        await interaction.response.send_message(
-            f"Cargo {cargo.mention} vinculado ao rank **No.{rank_no} — {nome_rank}**.",
-            ephemeral=True,
-        )
 
     @app_commands.command(name="gangue-registrar-atividade", description="Registra missão, contribuição ou guerra concluída para a progressão.")
     @app_commands.describe(membro="Membro reconhecido", atividade="Tipo de atividade", quantidade="XP de recompensa", motivo="Prova ou motivo do registro")
