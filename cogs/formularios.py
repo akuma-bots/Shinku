@@ -18,7 +18,8 @@ PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
 LIMITE_SESSOES_FORMULARIO = 5000
-CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
+CANAL_PAINEIS_FORMULARIOS = 1563995880623841331
+CANAL_RESPOSTAS_FORMULARIOS = 1563995881806758058
 
 
 def _limpar_sessoes_formularios(agora: float | None = None) -> None:
@@ -43,8 +44,8 @@ def _limpar_sessoes_formularios(agora: float | None = None) -> None:
         for chave, _ in ordenadas[:excesso]:
             SESSOES_FORMULARIOS.pop(chave, None)
 GUILD_NEMESIS_ID = 1563995879981981817
-CARGOS_AUTORIZADOS_FORMULARIO_STAFF = {1547306211458940968, 1547306457526181939}
-CARGO_INSTRUTOR_FORMULARIO_ID = 1558909311315607723
+CARGOS_AUTORIZADOS_FORMULARIO_STAFF = {1563995880007139424, 1563995880007139423}
+CARGO_INSTRUTOR_FORMULARIO_ID = 1563995880007139422
 NOME_FORMULARIO_STAFF = "Inscrição para Staff"
 _LOCK_PAINÉIS_AUTOMÁTICOS = asyncio.Lock()
 ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
@@ -65,7 +66,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Ter disponibilidade para auxiliar a comunidade.\n\n"
             "O envio não garante aprovação. A equipe analisará sua candidatura."
         ),
-        "canal_id": 1545835428530360401,
+        "canal_id": CANAL_PAINEIS_FORMULARIOS,
         "paginas": [[
             "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
             "Por que deseja fazer parte da Staff da NÊMESIS?",
@@ -111,7 +112,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Objetivo da aliança e formas de cooperação.\n\n"
             "A proposta será avaliada pela liderança da NÊMESIS. O envio não representa aprovação automática."
         ),
-        "canal_id": 1547774529965662228,
+        "canal_id": 1563995880833421513,
         "paginas": [[
             "Qual é o nome oficial da gangue/comunidade e sua tag?",
             "Quem é o líder responsável e qual é seu usuário do Discord?",
@@ -433,10 +434,10 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         view = _view_resposta(resposta["id"])
 
         # Publica todas as partes da candidatura; os botões ficam na primeira.
-        canal_candidaturas = guild.get_channel(1545835428530360401)
+        canal_candidaturas = guild.get_channel(CANAL_RESPOSTAS_FORMULARIOS)
         if canal_candidaturas is None:
             try:
-                canal_candidaturas = await guild.fetch_channel(1545835428530360401)
+                canal_candidaturas = await guild.fetch_channel(CANAL_RESPOSTAS_FORMULARIOS)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 canal_candidaturas = None
         if canal_candidaturas is not None:
