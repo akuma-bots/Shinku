@@ -103,6 +103,24 @@ class CargoAutomatico(commands.Cog):
         if not cargo:
             return
 
+        # Cargos competitivos são exclusivos da progressão oficial por XP.
+        # Impede que a automação por canal contorne os requisitos de rank.
+        cargos_progressao_xp = {
+            1563995879990624373, 1563995879990624374,
+            1563995879990624375, 1563995879990624376,
+            1563995879990624377, 1563995879998754937,
+            1563995879998754938, 1563995879998754939,
+            1563995879998754940, 1563995879998754941,
+            1563995879998754942, 1563995879998754943,
+        }
+        if cargo.id in cargos_progressao_xp:
+            _LOG.warning(
+                "Cargo de progressão por XP bloqueado na automação por canal "
+                "(guild=%s, channel=%s, role=%s).",
+                message.guild.id, message.channel.id, cargo.id,
+            )
+            return
+
         membro = message.author
         if cargo in membro.roles:
             return  # já tem o cargo, não faz nada
