@@ -14,6 +14,27 @@ COR_NEMESIS = 0xB3132B
 CONCORRENCIA_DMS = 4
 
 
+def _adicionar_campos_em_blocos(embed: discord.Embed, titulo: str, itens: list[str], prefixo: str):
+    """Divide listas em campos compatíveis com o limite de 1.024 caracteres do Discord."""
+    blocos: list[str] = []
+    atual = ""
+    for item in itens:
+        linha = f"{prefixo} {discord.utils.escape_markdown(item)}"
+        if len(linha) > 1000:
+            linha = linha[:997] + "..."
+        candidato = f"{atual}\n{linha}" if atual else linha
+        if len(candidato) > 1000:
+            blocos.append(atual)
+            atual = linha
+        else:
+            atual = candidato
+    if atual:
+        blocos.append(atual)
+    for indice, bloco in enumerate(blocos):
+        nome = titulo if indice == 0 else f"{titulo} (continuação {indice + 1})"
+        embed.add_field(name=nome[:256], value=bloco, inline=False)
+
+
 class NotasAtualizacao(commands.Cog):
     """Publica notas de atualização da NÊMESIS por mensagem direta aos membros."""
 
@@ -30,16 +51,16 @@ class NotasAtualizacao(commands.Cog):
     @app_commands.describe(
         versao="Versão ou identificação da atualização (ex.: Update 2.4)",
         resumo="Resumo curto do objetivo desta atualização.",
-        novidades="Lista do que mudou ou foi adicionado. Separe cada novidade por uma nova linha.",
+        novidades="O que mudou ou foi adicionado. Separe cada item por uma nova linha.",
         correcoes="Correções e melhorias adicionais (opcional).",
     )
     async def nota_atualizacao(
         self,
         interaction: discord.Interaction,
-        versao: app_commands.Range[str, 1, 80],
-        resumo: app_commands.Range[str, 1, 500],
-        novidades: app_commands.Range[str, 1, 3500],
-        correcoes: app_commands.Range[str, 1, 1500] | None = None,
+        versao: str,
+        resumo: str,
+        novidades: str,
+        correcoes: str | None = None,
     ):
         if interaction.guild_id != GUILD_NEMESIS_ID or interaction.guild is None:
             await interaction.response.send_message(
@@ -55,6 +76,25 @@ class NotasAtualizacao(commands.Cog):
             )
             return
 
+        if not versao.strip() or len(versao) > 80 or not resumo.strip() or len(resumo) > 500:
+            await interaction.response.send_message(
+                "A versão deve ter até 80 caracteres e o resumo até 500 caracteres.",
+                ephemeral=True,
+            )
+            return
+        if not novidades.strip() or len(novidades) > 3500:
+            await interaction.response.send_message(
+                "Informe as novidades (até 3.500 caracteres), uma por linha.",
+                ephemeral=True,
+            )
+            return
+        if correcoes and len(correcoes) > 1500:
+            await interaction.response.send_message(
+                "As correções podem ter até 1.500 caracteres.",
+                ephemeral=True,
+            )
+            return
+
         guild = interaction.guild
         if guild.id in self._envios_em_andamento:
             await interaction.response.send_message(
@@ -63,45 +103,33 @@ class NotasAtualizacao(commands.Cog):
             )
             return
 
-        self._envios_em_andamento.add(guild.id)
-        await interaction.response.defer(ephemeral=True, thinking=True)
-
         linhas = [linha.strip() for linha in novidades.splitlines() if linha.strip()]
         if not linhas:
-            self._envios_em_andamento.discard(guild.id)
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "Informe pelo menos uma novidade, cada uma em uma linha.",
                 ephemeral=True,
             )
             return
 
         embed = discord.Embed(
-            title=f"✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
+            title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
             description=(
-                f"⟡・ **{discord.utils.escape_markdown(versao)}**\n"
-                f"{discord.utils.escape_markdown(resumo)}"
+                f"⟡・ **{discord.utils.escape_markdown(versao.strip())}**\n"
+                f"{discord.utils.escape_markdown(resumo.strip())}"
             ),
             color=COR_NEMESIS,
             timestamp=datetime.now(timezone.utc),
         )
-        embed.add_field(
-            name="✦ O QUE HÁ DE NOVO",
-            value="\n".join(f"➜ {discord.utils.escape_markdown(item)}" for item in linhas),
-            inline=False,
-        )
+        _adicionar_campos_em_blocos(embed, "✦ O QUE HÁ DE NOVO", linhas, "➜")
+
         if correcoes and correcoes.strip():
             correcoes_linhas = [
                 linha.strip() for linha in correcoes.splitlines() if linha.strip()
             ]
-            valor = "\n".join(
-                f"✓ {discord.utils.escape_markdown(item)}" for item in correcoes_linhas
+            _adicionar_campos_em_blocos(
+                embed, "⚙️ CORREÇÕES E MELHORIAS", correcoes_linhas, "✓"
             )
-            # Limita o campo ao máximo aceito pelo Discord.
-            embed.add_field(
-                name="⚙️ CORREÇÕES E MELHORIAS",
-                value=valor[:1024],
-                inline=False,
-            )
+
         embed.add_field(
             name="⟡・ ACOMPANHE AS NOVIDADES",
             value=(
@@ -113,6 +141,8 @@ class NotasAtualizacao(commands.Cog):
         embed.set_footer(text="NÊMESIS • Update Notes • Comunicado oficial")
 
         membros = [membro for membro in guild.members if not membro.bot]
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        self._envios_em_andamento.add(guild.id)
         sucesso = 0
         falhas = 0
         bloqueados = 0
@@ -150,7 +180,7 @@ class NotasAtualizacao(commands.Cog):
             falhas,
         )
         await interaction.followup.send(
-            f"**Notas de atualização processadas — {discord.utils.escape_markdown(versao)}**\n"
+            f"**Notas de atualização processadas — {discord.utils.escape_markdown(versao.strip())}**\n"
             f"• Entregues: **{sucesso}**\n"
             f"• DMs fechadas ou bloqueadas: **{bloqueados}**\n"
             f"• Outras falhas: **{falhas}**\n"
