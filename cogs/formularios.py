@@ -89,7 +89,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Esteja ciente de que a participação exige atividade e cooperação.\n\n"
             "A candidatura será analisada pela equipe responsável; o envio não garante entrada."
         ),
-        "canal_id": 1545835428530360401,
+        "canal_id": CANAL_PAINEIS_FORMULARIOS,
         "paginas": [[
             "Qual é seu nome/apelido e seu usuário do Roblox, se tiver?",
             "Quais jogos você joga com mais frequência?",
