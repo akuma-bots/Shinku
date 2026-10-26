@@ -18,6 +18,7 @@ PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
 LIMITE_SESSOES_FORMULARIO = 5000
+FORMULARIOS_AUTOMATICOS_ATIVOS = False  # Ativar somente quando os formulários estiverem finalizados
 CANAL_PAINEIS_FORMULARIOS = None  # Aguardando o canal de formulários ser criado
 CANAL_RESPOSTAS_FORMULARIOS = None  # Aguardando o canal de respostas ser definido
 
@@ -349,6 +350,12 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
     async def on_ready(self):
         """Publica os três painéis oficiais uma vez e recupera painéis apagados."""
         async with _LOCK_PAINÉIS_AUTOMÁTICOS:
+            if not FORMULARIOS_AUTOMATICOS_ATIVOS:
+                logging.info(
+                    "Painéis automáticos pausados: formulários da NÊMESIS ainda estão em preparação."
+                )
+                return
+
             guild = self.bot.get_guild(GUILD_NEMESIS_ID)
             if guild is None:
                 logging.warning("Painéis automáticos: servidor NÊMESIS não está disponível.")
@@ -407,6 +414,28 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                             mensagem_existente = await canal.fetch_message(int(registro["mensagem_id"]))
                         except discord.NotFound:
                             mensagem_existente = None
+
+                    # Se o ID persistido sumiu, procura um painel equivalente do bot
+                    # no canal antes de publicar outra mensagem.
+                    if mensagem_existente is None:
+                        try:
+                            async for candidata in canal.history(limit=200):
+                                if candidata.author.id != self.bot.user.id:
+                                    continue
+                                if any(
+                                    componente.custom_id.startswith(PREFIXO_ABRIR)
+                                    for linha in (candidata.components or [])
+                                    for componente in getattr(linha, "children", [])
+                                    if getattr(componente, "custom_id", None)
+                                ):
+                                    mensagem_existente = candidata
+                                    break
+                        except (discord.Forbidden, discord.HTTPException):
+                            logging.exception(
+                                "Não foi possível verificar mensagens existentes no canal %s.",
+                                canal.id,
+                            )
+                            continue
 
                     embeds = _embeds_painel(formulario)
                     view = _view_painel(formulario)
