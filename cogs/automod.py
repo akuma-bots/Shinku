@@ -13,8 +13,8 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 
 
-CANAL_REGRAS_ID = 1545831172796583987
-CANAL_INFRACOES_ID = 1545838433229082655
+CANAL_REGRAS_ID = 1563995880833421508
+CANAL_INFRACOES_ID = 1563995882234450006
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
 
@@ -1708,7 +1708,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
     async def enviar_auditoria(self, guild: discord.Guild, embed: discord.Embed):
         try:
             config = await get_config(guild.id)
-            canal_id = int(config.get("canal_auditoria_id") or 1545837705609617428)
+            canal_id = int(config.get("canal_auditoria_id") or 1563995882234450005)
             canal = guild.get_channel(canal_id)
             if canal is None:
                 canal = await self.bot.fetch_channel(canal_id)
