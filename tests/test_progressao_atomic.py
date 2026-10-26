@@ -88,5 +88,25 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(self.dados["123"]["membros"]["456"], dict)
 
 
+    async def test_transferencia_identifica_se_rank_mudou(self):
+        self.dados = {
+            "123": {
+                "membros": {
+                    "456": {"xp": 1000, "mensagens": 0, "missoes": 0, "guerras": 0, "rank_no": 11},
+                    "789": {"xp": 700, "mensagens": 0, "missoes": 0, "guerras": 0, "rank_no": 12},
+                }
+            }
+        }
+
+        origem, destino, rank_origem_antigo, rank_destino_antigo = await self.cog._transferir_xp(
+            123, 456, 789, 100
+        )
+
+        self.assertEqual(origem["xp"], 900)
+        self.assertEqual(destino["xp"], 800)
+        self.assertEqual(rank_origem_antigo["nome"], "Subtenente")
+        self.assertEqual(rank_destino_antigo["nome"], "Lutador")
+
+
 if __name__ == "__main__":
     unittest.main()
