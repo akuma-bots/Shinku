@@ -1991,8 +1991,15 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         membro = message.author
 
-        # As regras também se aplicam à Staff e à Administração.
-        # Apenas bots e o canal oficial de regras são ignorados acima.
+        # Exceção administrativa da NÊMESIS:
+        # membros com a permissão nativa Administrador não entram no AutoMod
+        # do bot e não recebem punições automáticas por mensagens.
+        # Isso não altera as regras/permissões nativas configuradas no Discord.
+        if (
+            isinstance(membro, discord.Member)
+            and membro.guild_permissions.administrator
+        ):
+            return
 
         chave = (
             message.guild.id,
