@@ -13,58 +13,58 @@ _CONFIG_LOCK = asyncio.Lock()
 # ============================================================
 
 PADRAO = {
-    "support_role_id": 1547307501345579219,
-    "log_channel_id": 1545838386944938024,
-    "ticket_category_id": 1545835749369446603,
+    "support_role_id": 1563995879998754946,
+    "log_channel_id": 1563995882234450005,
+    "ticket_category_id": 1563995881655509056,
 
     "canais_cargo_automatico": {},
 
-    "canal_eventos_id": 1545835097830334536,
-    "canal_parcerias_id": 1545831702444777492,
-    "cargo_categoria_parcerias_id": 1553019315664461934,
+    "canal_eventos_id": 1563995880623841336,
+    "canal_parcerias_id": 1563995880833421513,
+    "cargo_categoria_parcerias_id": None,
 
     "contadores": [],
 
-    "canal_auditoria_id": 1545837705609617428,
-    "canal_guerras_id": 1545834530085142678,
+    "canal_auditoria_id": 1563995882234450005,
+    "canal_guerras_id": 1563995881655509053,
 
     # ========================================================
     # COMPETITIVO
     # ========================================================
 
-    "canal_desafios_id": 1545834386128375909,
+    "canal_desafios_id": 1563995881508831341,
     "desafio_cooldown_minutos": 60,
 
-    "canal_lutas_id": 1545834447944028170,
-    "canal_provas_pvp_id": 1545853928736952420,
-    "canal_ranking_id": 1545834182406574241,
+    "canal_lutas_id": 1563995881655509052,
+    "canal_provas_pvp_id": 1563995881655509054,
+    "canal_ranking_id": 1563995881508831338,
 
     # ========================================================
     # MISSÕES
     # ========================================================
 
-    "canal_missoes_missao_id": 1556543214885019668,
-    "canal_provas_missao_id": 1556543417843056641,
+    "canal_missoes_missao_id": 1563995881315897549,
+    "canal_provas_missao_id": 1563995882540498998,
 
     # ========================================================
     # CONTRIBUIÇÕES
     # ========================================================
 
-    "canal_missoes_contribuicao_id": 1556543539213639760,
-    "canal_provas_contribuicao_id": 1556543628296593448,
+    "canal_missoes_contribuicao_id": 1563995881315897551,
+    "canal_provas_contribuicao_id": 1563995882540498999,
 
     # ========================================================
     # MISSÕES ESPECIAIS
     # ========================================================
 
-    "canal_missoes_especial_id": 1556543708478972015,
-    "canal_provas_especial_id": 1556543872534839336,
+    "canal_missoes_especial_id": 1563995880623841336,
+    "canal_provas_especial_id": 1563995882540499000,
 
     # ========================================================
     # RECORDES
     # ========================================================
 
-    "canal_recordes_id": 1545834618182303874,
+    "canal_recordes_id": 1563995881655509055,
 }
 
 
@@ -101,6 +101,31 @@ CAMPOS_ID = (
     "canal_recordes_id",
 )
 
+
+
+# Valores legados migrados para os IDs confirmados no inventário do servidor atual.
+# None indica que o cargo equivalente ainda não existe no inventário recebido.
+MIGRACAO_IDS = {
+    "support_role_id": {1547307501345579219: 1563995879998754946},
+    "log_channel_id": {1545838386944938024: 1563995882234450005},
+    "ticket_category_id": {1545835749369446603: 1563995881655509056},
+    "canal_eventos_id": {1545835097830334536: 1563995880623841336},
+    "canal_parcerias_id": {1545831702444777492: 1563995880833421513},
+    "cargo_categoria_parcerias_id": {1553019315664461934: None},
+    "canal_auditoria_id": {1545837705609617428: 1563995882234450005},
+    "canal_guerras_id": {1545834530085142678: 1563995881655509053},
+    "canal_desafios_id": {1545834386128375909: 1563995881508831341},
+    "canal_lutas_id": {1545834447944028170: 1563995881655509052},
+    "canal_provas_pvp_id": {1545853928736952420: 1563995881655509054},
+    "canal_ranking_id": {1545834182406574241: 1563995881508831338},
+    "canal_missoes_missao_id": {1556543214885019668: 1563995881315897549},
+    "canal_provas_missao_id": {1556543417843056641: 1563995882540498998},
+    "canal_missoes_contribuicao_id": {1556543539213639760: 1563995881315897551},
+    "canal_provas_contribuicao_id": {1556543628296593448: 1563995882540498999},
+    "canal_missoes_especial_id": {1556543708478972015: 1563995880623841336},
+    "canal_provas_especial_id": {1556543872534839336: 1563995882540499000},
+    "canal_recordes_id": {1545834618182303874: 1563995881655509055},
+}
 
 # ============================================================
 # NORMALIZAÇÃO DOS IDs
@@ -139,6 +164,16 @@ def _normalizar_config(config: dict) -> dict:
     # Migra automaticamente o antigo cargo de suporte para o cargo oficial.
     if _normalizar_id(resultado.get("support_role_id")) == 1549832967495491645:
         resultado["support_role_id"] = PADRAO["support_role_id"]
+
+    # --------------------------------------------------------
+    # Migra IDs antigos persistidos antes da normalização.
+    # Assim, configs salvas não sobrescrevem os novos padrões.
+    # --------------------------------------------------------
+
+    for campo, mapa in MIGRACAO_IDS.items():
+        valor_legado = _normalizar_id(resultado.get(campo))
+        if valor_legado in mapa:
+            resultado[campo] = mapa[valor_legado]
 
     # --------------------------------------------------------
     # Normaliza todos os IDs Discord
