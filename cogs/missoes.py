@@ -507,6 +507,24 @@ class Missoes(commands.Cog):
             except (discord.Forbidden, discord.HTTPException) as erro:
                 log.warning("Não foi possível buscar o painel de missões: %s", erro)
                 return
+        if mensagem is None:
+            try:
+                async for candidata in canal.history(limit=200):
+                    if candidata.author.id != self.bot.user.id or not candidata.embeds:
+                        continue
+                    embed_candidato = candidata.embeds[0]
+                    if (
+                        embed_candidato.author
+                        and embed_candidato.author.name == "NÊMESIS  /  CENTRAL DE OPERAÇÕES"
+                        and embed_candidato.footer
+                        and "MISSÕES" in (embed_candidato.title or "").upper()
+                    ):
+                        mensagem = candidata
+                        await ranking_missoes_jogos.salvar_painel(guild.id, "missoes", mensagem.id)
+                        break
+            except (discord.Forbidden, discord.HTTPException):
+                log.warning("Não foi possível procurar um painel de missões existente.")
+                return
         jogo = self._slug_da_mensagem(mensagem, "PÁGINA", "shigaku")
         embed = await self._montar_painel_missoes(guild, jogo)
         try:
@@ -600,6 +618,23 @@ class Missoes(commands.Cog):
                 mensagem = None
             except (discord.Forbidden, discord.HTTPException) as erro:
                 log.warning("Não foi possível buscar o painel de ranking: %s", erro)
+                return
+        if mensagem is None:
+            try:
+                async for candidata in canal.history(limit=200):
+                    if candidata.author.id != self.bot.user.id or not candidata.embeds:
+                        continue
+                    embed_candidato = candidata.embeds[0]
+                    if (
+                        embed_candidato.footer
+                        and "RANKING" in (embed_candidato.title or "").upper()
+                        and "NÊMESIS" in embed_candidato.footer.text.upper()
+                    ):
+                        mensagem = candidata
+                        await ranking_missoes_jogos.salvar_painel(guild.id, "ranking", mensagem.id)
+                        break
+            except (discord.Forbidden, discord.HTTPException):
+                log.warning("Não foi possível procurar um painel de ranking existente.")
                 return
         pagina = self._slug_da_mensagem(mensagem, "PÁGINA", jogo)
         embed = await self._montar_painel_ranking(guild, pagina)
