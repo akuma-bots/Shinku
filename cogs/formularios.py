@@ -18,8 +18,8 @@ PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
 LIMITE_SESSOES_FORMULARIO = 5000
-CANAL_PAINEIS_FORMULARIOS = 1563995880623841331
-CANAL_RESPOSTAS_FORMULARIOS = 1563995881806758058
+CANAL_PAINEIS_FORMULARIOS = None  # Aguardando o canal de formulários ser criado
+CANAL_RESPOSTAS_FORMULARIOS = None  # Aguardando o canal de respostas ser definido
 
 
 def _limpar_sessoes_formularios(agora: float | None = None) -> None:
@@ -66,7 +66,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Ter disponibilidade para auxiliar a comunidade.\n\n"
             "O envio não garante aprovação. A equipe analisará sua candidatura."
         ),
-        "canal_id": CANAL_PAINEIS_FORMULARIOS,
+        "canal_id": None,
         "paginas": [[
             "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
             "Por que deseja fazer parte da Staff da NÊMESIS?",
@@ -112,7 +112,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Objetivo da aliança e formas de cooperação.\n\n"
             "A proposta será avaliada pela liderança da NÊMESIS. O envio não representa aprovação automática."
         ),
-        "canal_id": 1563995880833421513,
+        "canal_id": None,
         "paginas": [[
             "Qual é o nome oficial da gangue/comunidade e sua tag?",
             "Quem é o líder responsável e qual é seu usuário do Discord?",
@@ -354,6 +354,12 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 logging.warning("Painéis automáticos: servidor NÊMESIS não está disponível.")
                 return
 
+            if CANAL_PAINEIS_FORMULARIOS is None:
+                logging.info(
+                    "Painéis automáticos de formulários pausados: o canal ainda não foi criado/configurado."
+                )
+                return
+
             try:
                 estado = await carregar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, {})
             except Exception:
@@ -432,6 +438,14 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
         embeds = _embeds_resposta(formulario, resposta, guild)
         view = _view_resposta(resposta["id"])
+
+        # O canal de respostas ainda não foi definido no servidor atual.
+        if CANAL_RESPOSTAS_FORMULARIOS is None:
+            logging.warning(
+                "Candidatura %s recebida, mas não publicada em canal: destino de formulários ainda não configurado.",
+                resposta.get("id"),
+            )
+            return
 
         # Publica todas as partes da candidatura; os botões ficam na primeira.
         canal_candidaturas = guild.get_channel(CANAL_RESPOSTAS_FORMULARIOS)
