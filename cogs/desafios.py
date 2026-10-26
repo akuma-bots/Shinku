@@ -140,6 +140,26 @@ class Desafios(commands.Cog):
             xp_extra,
             desafio_id=str(desafio["id"]),
         )
+
+        # A vitória PvP também alimenta a progressão oficial de cargos.
+        # O evento é idempotente para impedir XP duplicado em retries.
+        progressao = self.bot.get_cog("ProgressaoGangue")
+        if progressao is not None:
+            try:
+                await progressao.registrar_recompensa(
+                    guild=guild,
+                    user_id=int(desafio["vencedor_id"]),
+                    quantidade=XP_VITORIA_PVP + xp_extra,
+                    tipo="pvp",
+                    evento_id=f"desafio:{desafio['id']}:vencedor",
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Estatísticas PvP salvas, mas a progressão de XP falhou para o desafio %s.",
+                    desafio["id"],
+                )
+
         await desafios.definir_status(guild.id, desafio["id"], "concluido")
 
         texto = f"🏆 <@{desafio['vencedor_id']}> venceu! +{XP_VITORIA_PVP} XP, +1 vitória. <@{desafio['perdedor_id']}> +1 derrota."
