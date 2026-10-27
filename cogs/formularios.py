@@ -336,6 +336,23 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 logging.exception("Não foi possível carregar o estado dos painéis automáticos.")
                 return
 
+            # Remove o painel antigo de entrada e limpa seu registro persistente.
+            registro_entrada = estado.pop("entrada", None)
+            if registro_entrada and registro_entrada.get("mensagem_id"):
+                try:
+                    canal_entrada = guild.get_channel(int(registro_entrada.get("canal_id", 0)))
+                    if canal_entrada is None:
+                        canal_entrada = await guild.fetch_channel(int(registro_entrada["canal_id"]))
+                    mensagem_entrada = await canal_entrada.fetch_message(int(registro_entrada["mensagem_id"]))
+                    await mensagem_entrada.delete()
+                    logging.info("Painel automático de entrada removido (canal=%s, mensagem=%s).",
+                                 registro_entrada.get("canal_id"), registro_entrada["mensagem_id"])
+                except discord.NotFound:
+                    logging.info("Painel antigo de entrada já não existia; registro removido.")
+                except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+                    logging.exception("Não foi possível remover o painel antigo de entrada.")
+            await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
+
             for definicao in FORMULARIOS_AUTOMATICOS:
                 chave = definicao["chave"]
                 try:
