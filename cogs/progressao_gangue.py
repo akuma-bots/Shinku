@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 GUILD_ID = 1563995879981981817
 CANAL_PROGRESSAO_ID = 1563995881315897548
 CANAL_REGISTRO_ATIVIDADE_ID = 1545833111860936804
+CARGO_NEMESIS_ID = 1563995879990624372
 ARQUIVO = "progressao_gangue.json"
 COOLDOWN_MENSAGENS = 60
 XP_POR_MENSAGEM = 2
@@ -338,6 +339,11 @@ class ProgressaoGangue(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.guild is None or message.guild.id != GUILD_ID or message.author.bot:
+            return
+        # Somente integrantes com o cargo oficial podem acumular XP de gangue.
+        if not isinstance(message.author, discord.Member) or not any(
+            cargo.id == CARGO_NEMESIS_ID for cargo in message.author.roles
+        ):
             return
         if message.channel.id == CANAL_PROGRESSAO_ID:
             return
