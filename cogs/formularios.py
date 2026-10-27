@@ -74,29 +74,6 @@ FORMULARIOS_AUTOMATICOS = [
             "Como agiria se dois membros começassem uma discussão séria?"
         ]],
     },
-    {
-        "chave": "alianca",
-        "nome": "Proposta de Aliança",
-        "titulo": "NÊMESIS — PROPOSTA DE ALIANÇA",
-        "descricao": (
-            "RELAÇÕES INSTITUCIONAIS • ALIANÇAS ENTRE GANGUES\n\n"
-            "Este canal recebe propostas oficiais de aliança. A liderança da organização solicitante "
-            "deve preencher o formulário com informações verificáveis e uma proposta objetiva.\n\n"
-            "INFORMAÇÕES NECESSÁRIAS\n"
-            "— Identificação e contato da liderança.\n"
-            "— Tamanho e atividade atual da organização.\n"
-            "— Objetivo da aliança e formas de cooperação.\n\n"
-            "A proposta será avaliada pela liderança da NÊMESIS. O envio não representa aprovação automática."
-        ),
-        "canal_id": 1547774529965662228,
-        "paginas": [[
-            "Qual é o nome oficial da gangue/comunidade e sua tag?",
-            "Quem é o líder responsável e qual é seu usuário do Discord?",
-            "Quantos membros ativos sua organização possui?",
-            "Qual é o foco da organização e em quais jogos atua?",
-            "Qual é a proposta de aliança e como as duas organizações cooperariam?"
-        ]],
-    },
 ]
 
 
@@ -323,7 +300,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @commands.Cog.listener()
     async def on_ready(self):
-        """Publica os três painéis oficiais uma vez e recupera painéis apagados."""
+        """Mantém somente o painel oficial de inscrição para Staff."""
         async with _LOCK_PAINÉIS_AUTOMÁTICOS:
             guild = self.bot.get_guild(GUILD_NEMESIS_ID)
             if guild is None:
@@ -336,21 +313,45 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 logging.exception("Não foi possível carregar o estado dos painéis automáticos.")
                 return
 
-            # Remove o painel antigo de entrada e limpa seu registro persistente.
-            registro_entrada = estado.pop("entrada", None)
-            if registro_entrada and registro_entrada.get("mensagem_id"):
+            # Remove painéis antigos e mantém apenas o registro de Staff.
+            for chave_removida in [chave for chave in list(estado) if chave != "staff"]:
+                registro_antigo = estado.pop(chave_removida, None)
+                if not registro_antigo or not registro_antigo.get("mensagem_id"):
+                    continue
                 try:
-                    canal_entrada = guild.get_channel(int(registro_entrada.get("canal_id", 0)))
-                    if canal_entrada is None:
-                        canal_entrada = await guild.fetch_channel(int(registro_entrada["canal_id"]))
-                    mensagem_entrada = await canal_entrada.fetch_message(int(registro_entrada["mensagem_id"]))
-                    await mensagem_entrada.delete()
-                    logging.info("Painel automático de entrada removido (canal=%s, mensagem=%s).",
-                                 registro_entrada.get("canal_id"), registro_entrada["mensagem_id"])
+                    canal_antigo = guild.get_channel(int(registro_antigo.get("canal_id", 0)))
+                    if canal_antigo is None:
+                        canal_antigo = await guild.fetch_channel(int(registro_antigo["canal_id"]))
+                    mensagem_antiga = await canal_antigo.fetch_message(int(registro_antigo["mensagem_id"]))
+                    await mensagem_antiga.delete()
+                    logging.info("Painel automático removido (tipo=%s, mensagem=%s).", chave_removida, registro_antigo["mensagem_id"])
                 except discord.NotFound:
-                    logging.info("Painel antigo de entrada já não existia; registro removido.")
+                    logging.info("Painel automático antigo já não existia (tipo=%s).", chave_removida)
                 except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
-                    logging.exception("Não foi possível remover o painel antigo de entrada.")
+                    logging.exception("Não foi possível remover painel antigo (tipo=%s).", chave_removida)
+
+            # Remove os formulários e respostas antigos, preservando o formulário e candidaturas de Staff.
+            formularios_existentes = await formularios.listar_formularios(guild.id)
+            ids_removidos = {
+                item.get("id") for item in formularios_existentes
+                if item.get("nome") != NOME_FORMULARIO_STAFF
+            }
+            for item in formularios_existentes:
+                if item.get("nome") != NOME_FORMULARIO_STAFF:
+                    await formularios.remover_formulario(guild.id, item.get("id", ""))
+
+            if ids_removidos:
+                arquivo_respostas = await carregar("formularios_respostas.json", {})
+                if isinstance(arquivo_respostas, dict):
+                    respostas_guild = arquivo_respostas.get(str(guild.id), [])
+                    if isinstance(respostas_guild, list):
+                        arquivo_respostas[str(guild.id)] = [
+                            resposta for resposta in respostas_guild
+                            if not isinstance(resposta, dict)
+                            or resposta.get("formulario_id") not in ids_removidos
+                        ]
+                        await salvar("formularios_respostas.json", arquivo_respostas)
+
             await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
 
             for definicao in FORMULARIOS_AUTOMATICOS:
