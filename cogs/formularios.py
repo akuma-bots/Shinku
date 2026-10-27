@@ -65,7 +65,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Ter disponibilidade para auxiliar a comunidade.\n\n"
             "O envio não garante aprovação. A equipe analisará sua candidatura."
         ),
-        "canal_id": 1545835428530360401,
+        "canal_id": 1563995880623841338,
         "paginas": [[
             "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
             "Por que deseja fazer parte da Staff da NÊMESIS?",
