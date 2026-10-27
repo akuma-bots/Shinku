@@ -75,29 +75,6 @@ FORMULARIOS_AUTOMATICOS = [
         ]],
     },
     {
-        "chave": "entrada",
-        "nome": "Entrada na NÊMESIS",
-        "titulo": "NÊMESIS — FORMULÁRIO DE RECRUTAMENTO",
-        "descricao": (
-            "CENTRAL DE RECRUTAMENTO • INGRESSO NA NÊMESIS\n\n"
-            "Preencha este formulário para solicitar sua entrada na NÊMESIS. Informe seus dados "
-            "corretamente e responda às perguntas de forma objetiva.\n\n"
-            "ANTES DE ENVIAR\n"
-            "— Leia e aceite as regras do servidor.\n"
-            "— Mantenha respeito pelos membros e pela liderança.\n"
-            "— Esteja ciente de que a participação exige atividade e cooperação.\n\n"
-            "A candidatura será analisada pela equipe responsável; o envio não garante entrada."
-        ),
-        "canal_id": 1563995880623841331,
-        "paginas": [[
-            "Qual é seu nome/apelido e seu usuário do Roblox, se tiver?",
-            "Quais jogos você joga com mais frequência?",
-            "Por que quer entrar na NÊMESIS?",
-            "Com que frequência pretende participar das atividades?",
-            "Você leu as regras e concorda em respeitá-las?"
-        ]],
-    },
-    {
         "chave": "alianca",
         "nome": "Proposta de Aliança",
         "titulo": "NÊMESIS — PROPOSTA DE ALIANÇA",
