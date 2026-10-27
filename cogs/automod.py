@@ -1991,8 +1991,14 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         membro = message.author
 
-        # As regras também se aplicam à Staff e à Administração.
-        # Apenas bots e o canal oficial de regras são ignorados acima.
+        # Isenção explícita para o proprietário e administradores do servidor.
+        # Não isenta automaticamente moderadores com permissões parciais.
+        # O AutoMod não remove nem pune mensagens enviadas por administradores.
+        if (
+            membro.id == message.guild.owner_id
+            or membro.guild_permissions.administrator
+        ):
+            return
 
         chave = (
             message.guild.id,
