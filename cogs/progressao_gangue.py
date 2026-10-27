@@ -515,28 +515,6 @@ class ProgressaoGangue(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
 
-    @app_commands.command(name="gangue-configurar-cargo", description="Define o cargo automático de um rank da progressão.")
-    @app_commands.describe(rank_no="Posição da progressão (1 a 10)", cargo="Cargo que será entregue automaticamente ao alcançar essa posição")
-    @app_commands.default_permissions(administrator=True)
-    async def gangue_configurar_cargo(self, interaction: discord.Interaction, rank_no: app_commands.Range[int, 1, 10], cargo: discord.Role):
-        if interaction.guild is None:
-            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
-            return
-        bot_member = interaction.guild.me
-        if cargo.is_default() or cargo.managed or (bot_member and cargo >= bot_member.top_role):
-            await interaction.response.send_message("Esse cargo não pode ser atribuído pelo bot. Escolha um cargo abaixo do cargo mais alto do bot.", ephemeral=True)
-            return
-        dados = await self._dados()
-        config = dados.setdefault(str(interaction.guild.id), {})
-        cargos = config.setdefault("cargos", {})
-        cargos[str(rank_no)] = cargo.id
-        await self._salvar_dados(dados)
-        nome_rank = next(r["nome"] for r in RANKS if r["no"] == rank_no)
-        await interaction.response.send_message(
-            f"Cargo {cargo.mention} vinculado ao rank **No.{rank_no} — {nome_rank}**.",
-            ephemeral=True,
-        )
-
     @app_commands.command(name="gangue-registrar-atividade", description="Registra missão, contribuição ou guerra concluída para a progressão.")
     @app_commands.describe(membro="Membro reconhecido", atividade="Tipo de atividade", quantidade="XP de recompensa", motivo="Prova ou motivo do registro")
     @app_commands.choices(atividade=[
