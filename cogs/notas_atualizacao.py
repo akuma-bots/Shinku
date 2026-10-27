@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.4.7"
-RESUMO_PADRAO = "Progressão mais exigente, ganho de XP ajustado e cargos automáticos por posição."
+VERSAO_PADRAO = "1.4.8"
+RESUMO_PADRAO = "Proteção da equipe contra punições automáticas indevidas e auditoria mais clara."
 NOVIDADES_PADRAO = [
+    "AutoMod reforçado com dupla verificação: proprietário, administradores e membros com permissões efetivas de moderação são ignorados tanto na análise quanto no ponto de aplicação da punição.",
+    "Correção de exclusões automáticas indevidas: a isenção agora considera as permissões reais do Discord (Administrador, Gerenciar servidor, Gerenciar mensagens, Expulsar e Banir membros), não só a permissão Administrador.",
+    "Os logs permanecem somente para auditoria e não apagam mensagens; o evento de exclusão registra mensagens removidas por automod, moderadores ou outros agentes quando o Discord fornece o evento.",
     "Progressão da NÊMESIS recalibrada: cada mensagem válida recompensa 2 XP, respeitando o intervalo anti-spam de 60 segundos.",
     "Requisitos de XP aumentados progressivamente até 16.000 XP para o rank máximo, tornando a hierarquia mais difícil de alcançar.",
     "Cada posição pode ser vinculada a um cargo do Discord pelo comando /gangue-configurar-cargo; ao alcançar a posição, o bot entrega o cargo configurado.",
