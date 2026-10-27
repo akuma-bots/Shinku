@@ -13,6 +13,22 @@ COLOR = 0xB3132B
 SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
+# Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
+VERSAO_PADRAO = "1.1.0"
+RESUMO_PADRAO = "Atualização dos sistemas de entrada, convites e organização dos painéis da NÊMESIS."
+NOVIDADES_PADRAO = [
+    "Sistema de convites com identificação do convidador e registro persistente dos membros convidados.",
+    "Novos comandos /meus-convites e /ranking-convites para consultar convites identificados.",
+    "Atribuição automática dos três cargos-base aos membros humanos que entram no servidor.",
+    "Verificação dos membros existentes para completar a atribuição dos cargos-base em caso de ausência.",
+    "Painéis de Inscrição para Staff e Entrada na NÊMESIS direcionados ao canal atualizado.",
+]
+CORRECOES_PADRAO = [
+    "Corrigida a configuração de canal que causava erro 404 nos painéis de Staff e Entrada.",
+    "A atribuição de convites só contabiliza casos identificados com segurança, evitando atribuições ambíguas.",
+    "Os comandos de consulta de convites informam apenas dados registrados pelo sistema.",
+]
+
 
 def _chunks(lines: list[str], prefix: str, limit: int = 950) -> list[str]:
     chunks: list[str] = []
@@ -42,8 +58,21 @@ def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefi
         embed.add_field(name=nome[:256], value=bloco or "—", inline=False)
 
 
+def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str]) -> discord.Embed:
+    embed = discord.Embed(
+        title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
+        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\n{discord.utils.escape_markdown(resumo)}",
+        color=COLOR,
+        timestamp=datetime.now(timezone.utc),
+    )
+    _adicionar_secao(embed, "✦ NOVIDADES", novidades, "➜")
+    if correcoes:
+        _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", correcoes, "✓")
+    embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
+    return embed
+
+
 async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
-    """Retorna enviada, bloqueada ou falha após tentativas limitadas."""
     for tentativa in range(1, MAX_RETRIES + 1):
         try:
             await member.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
@@ -69,100 +98,39 @@ async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
     return "falha"
 
 
-class NotasAtualizacao(commands.Cog):
-    """Prévia e envio explícito de notas de atualização para membros humanos."""
+class ConfirmarEnvioNotas(discord.ui.View):
+    def __init__(self, cog: "NotasAtualizacao", guild_id: int, autor_id: int):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.guild_id = guild_id
+        self.autor_id = autor_id
 
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-        self._sending: set[int] = set()
-
-    @app_commands.command(name="nota-atualizacao", description="Preparar, visualizar e enviar notas de atualização.")
-    @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(
-        versao="Versão ou identificador da atualização (até 80 caracteres).",
-        resumo="Resumo curto do que mudou (até 450 caracteres).",
-        novidades="Novidades, uma por linha.",
-        correcoes="Correções e melhorias, uma por linha (opcional).",
-        confirmar_envio="Marque verdadeiro somente depois de revisar a prévia.",
-    )
-    async def nota_atualizacao(
-        self,
-        interaction: discord.Interaction,
-        versao: str,
-        resumo: str,
-        novidades: str,
-        correcoes: str | None = None,
-        confirmar_envio: bool = False,
-    ):
-        guild = interaction.guild
-        if guild is None or interaction.guild_id != GUILD_ID:
-            await interaction.response.send_message("Comando exclusivo da NÊMESIS.", ephemeral=True)
+    @discord.ui.button(label="Enviar atualização por DM", style=discord.ButtonStyle.danger, emoji="📨")
+    async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message("Somente quem preparou esta nota pode confirmar o envio.", ephemeral=True)
             return
-        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Somente administradores podem usar este comando.", ephemeral=True)
+        if interaction.guild_id != self.guild_id or not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Apenas um administrador da NÊMESIS pode confirmar o envio.", ephemeral=True)
             return
-        if guild.id in self._sending:
-            await interaction.response.send_message("Já existe um envio de notas em andamento. Aguarde a conclusão.", ephemeral=True)
+        if self.guild_id in self.cog._sending:
+            await interaction.response.send_message("Já existe um envio de notas em andamento.", ephemeral=True)
             return
 
-        versao, resumo, novidades = versao.strip(), resumo.strip(), novidades.strip()
-        correcoes = (correcoes or "").strip()
-        if not versao or len(versao) > 80 or not resumo or len(resumo) > 450:
-            await interaction.response.send_message("Informe uma versão (até 80 caracteres) e um resumo (até 450).", ephemeral=True)
-            return
-        if not novidades or len(novidades) > 3000 or len(correcoes) > 1200:
-            await interaction.response.send_message("Novidades: até 3.000 caracteres; correções: até 1.200.", ephemeral=True)
-            return
-
-        updates = [line.strip().lstrip("-•* ").strip() for line in novidades.splitlines() if line.strip()]
-        fixes = [line.strip().lstrip("-•* ").strip() for line in correcoes.splitlines() if line.strip()]
-        if not updates or any(not item for item in updates):
-            await interaction.response.send_message("Inclua pelo menos uma novidade válida, uma por linha.", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
-            description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\n{discord.utils.escape_markdown(resumo)}",
-            color=COLOR,
-            timestamp=datetime.now(timezone.utc),
-        )
-        _adicionar_secao(embed, "✦ NOVIDADES", updates, "➜")
-        if fixes:
-            _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", fixes, "✓")
-        embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
-
-        if not confirmar_envio:
-            await interaction.response.defer(ephemeral=True, thinking=True)
-            try:
-                membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-                count_text = str(len(membros))
-            except discord.HTTPException:
-                log.exception("Falha ao contar membros para prévia das notas.")
-                count_text = "não foi possível confirmar"
-            preview = embed.copy()
-            preview.add_field(
-                name="PRÉVIA — NENHUMA DM ENVIADA",
-                value=f"Destinatários humanos estimados: **{count_text}**.\nRevise o conteúdo e execute novamente com confirmar_envio verdadeiro para enviar.",
-                inline=False,
-            )
-            await interaction.followup.send("Prévia pronta. Nenhuma mensagem foi enviada.", embed=preview, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
-            return
-
-        self._sending.add(guild.id)
+        self.cog._sending.add(self.guild_id)
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(content="Envio confirmado. Preparando a lista de membros…", view=self)
         try:
-            await interaction.response.defer(ephemeral=True, thinking=True)
+            guild = interaction.guild
             membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
         except discord.HTTPException:
-            self._sending.discard(guild.id)
+            self.cog._sending.discard(self.guild_id)
             log.exception("Falha ao carregar membros para envio das notas.")
-            mensagem = "Não consegui carregar a lista completa de membros. Nenhuma nota foi enviada."
-            if interaction.response.is_done():
-                await interaction.followup.send(mensagem, ephemeral=True)
-            else:
-                await interaction.response.send_message(mensagem, ephemeral=True)
+            await interaction.followup.send("Não consegui carregar todos os membros. Nenhuma nota foi enviada.", ephemeral=True)
             return
 
+        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
         entregues = bloqueadas = falhas = 0
         try:
             total = len(membros)
@@ -176,18 +144,61 @@ class NotasAtualizacao(commands.Cog):
                     falhas += 1
                 if index % 25 == 0 and index < total:
                     try:
-                        await interaction.edit_original_response(content=f"**Enviando notas {versao}**\nProcessados: **{index}/{total}** · Entregues: **{entregues}** · Bloqueadas: **{bloqueadas}** · Falhas: **{falhas}**")
+                        await interaction.edit_original_response(content=f"**Enviando notas {VERSAO_PADRAO}**\nProcessados: **{index}/{total}** · Entregues: **{entregues}** · Bloqueadas: **{bloqueadas}** · Falhas: **{falhas}**", view=self)
                     except discord.HTTPException:
                         log.debug("Não foi possível atualizar o progresso do envio.")
                 await asyncio.sleep(SEND_DELAY)
         finally:
-            self._sending.discard(guild.id)
+            self.cog._sending.discard(self.guild_id)
 
-        log.info("Notas de atualização concluídas (guild=%s, versao=%s, total=%s, entregues=%s, bloqueadas=%s, falhas=%s, autor=%s).", guild.id, versao, len(membros), entregues, bloqueadas, falhas, interaction.user.id)
-        await interaction.followup.send(
-            f"**Notas processadas — {discord.utils.escape_markdown(versao)}**\n"
-            f"• Membros humanos: **{len(membros)}**\n• Entregues: **{entregues}**\n• DMs bloqueadas/indisponíveis: **{bloqueadas}**\n• Falhas após tentativas: **{falhas}**",
+        log.info("Notas concluídas (guild=%s, versao=%s, total=%s, entregues=%s, bloqueadas=%s, falhas=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, len(membros), entregues, bloqueadas, falhas, interaction.user.id)
+        await interaction.edit_original_response(
+            content=f"**Notas processadas — {VERSAO_PADRAO}**\n"
+            f"• Membros humanos: **{len(membros)}**\n• Entregues: **{entregues}**\n"
+            f"• DMs bloqueadas/indisponíveis: **{bloqueadas}**\n• Falhas após tentativas: **{falhas}**",
+            view=self,
+        )
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖")
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message("Somente quem preparou esta nota pode cancelar.", ephemeral=True)
+            return
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(content="Envio cancelado. Nenhuma DM foi enviada.", view=self)
+        self.stop()
+
+
+class NotasAtualizacao(commands.Cog):
+    """Prepara um modelo oficial pronto e envia após confirmação explícita."""
+
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self._sending: set[int] = set()
+
+    @app_commands.command(name="notas-atualizacao", description="Abrir as notas prontas da última atualização da NÊMESIS.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    async def notas_atualizacao(self, interaction: discord.Interaction):
+        if interaction.guild_id != GUILD_ID or interaction.guild is None:
+            await interaction.response.send_message("Comando exclusivo da NÊMESIS.", ephemeral=True)
+            return
+        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Somente administradores podem usar este comando.", ephemeral=True)
+            return
+        if interaction.guild_id in self._sending:
+            await interaction.response.send_message("Já existe um envio de notas em andamento. Aguarde a conclusão.", ephemeral=True)
+            return
+
+        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
+        view = ConfirmarEnvioNotas(self, interaction.guild_id, interaction.user.id)
+        await interaction.response.send_message(
+            "Modelo da atualização pronto. Revise a nota abaixo e clique em **Enviar atualização por DM** para enviar a todos os membros humanos. Nenhuma DM será enviada antes da confirmação.",
+            embed=embed,
+            view=view,
             ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
 
