@@ -16,19 +16,19 @@ CANAL_PROGRESSAO_ID = 1563995881315897548
 CANAL_REGISTRO_ATIVIDADE_ID = 1545833111860936804
 ARQUIVO = "progressao_gangue.json"
 COOLDOWN_MENSAGENS = 60
-XP_POR_MENSAGEM = 5
+XP_POR_MENSAGEM = 2
 
 RANKS = [
     {"no": 10, "nome": "Recruta", "xp": 0},
-    {"no": 9, "nome": "Iniciado", "xp": 100},
-    {"no": 8, "nome": "Operador", "xp": 250},
-    {"no": 7, "nome": "Membro", "xp": 500},
-    {"no": 6, "nome": "Veterano", "xp": 900},
-    {"no": 5, "nome": "Especialista", "xp": 1400},
-    {"no": 4, "nome": "Elite", "xp": 2100},
-    {"no": 3, "nome": "Executor", "xp": 3000},
-    {"no": 2, "nome": "Comandante", "xp": 4200},
-    {"no": 1, "nome": "Lenda", "xp": 6000},
+    {"no": 9, "nome": "Iniciado", "xp": 200},
+    {"no": 8, "nome": "Operador", "xp": 600},
+    {"no": 7, "nome": "Membro", "xp": 1200},
+    {"no": 6, "nome": "Veterano", "xp": 2200},
+    {"no": 5, "nome": "Especialista", "xp": 3600},
+    {"no": 4, "nome": "Elite", "xp": 5400},
+    {"no": 3, "nome": "Executor", "xp": 8000},
+    {"no": 2, "nome": "Comandante", "xp": 11500},
+    {"no": 1, "nome": "Lenda", "xp": 16000},
 ]
 
 
@@ -515,8 +515,8 @@ class ProgressaoGangue(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
 
-    @app_commands.command(name="gangue-configurar-cargo", description="Vincula um cargo Discord a um rank de progressão.")
-    @app_commands.describe(rank_no="Número do rank de membro (1 a 10)", cargo="Cargo atribuído automaticamente ao alcançar o rank")
+    @app_commands.command(name="gangue-configurar-cargo", description="Define o cargo automático de um rank da progressão.")
+    @app_commands.describe(rank_no="Posição da progressão (1 a 10)", cargo="Cargo que será entregue automaticamente ao alcançar essa posição")
     @app_commands.default_permissions(administrator=True)
     async def gangue_configurar_cargo(self, interaction: discord.Interaction, rank_no: app_commands.Range[int, 1, 10], cargo: discord.Role):
         if interaction.guild is None:
