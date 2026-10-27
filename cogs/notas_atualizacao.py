@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.2"
-RESUMO_PADRAO = "AutoMod com isenção reforçada para a equipe, regras oficiais atualizadas e auditoria de exclusões mais clara."
+VERSAO_PADRAO = "1.5.3"
+RESUMO_PADRAO = "Correção da fonte de regras do AutoMod e reforço da proteção contra exclusões indevidas de mensagens da equipe."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.3: canal oficial de regras corrigido para 1545831172796583987, conforme o canal oficial indicado pela liderança.",
+    "Proteção do AutoMod mantida em duas camadas: a equipe com permissões efetivas de moderação/administração é ignorada antes da análise e novamente antes da exclusão/punição.",
+    "Esclarecimento de auditoria: o listener de logs apenas registra eventos de mensagens excluídas; ele não executa exclusões. O evento do Discord não confirma sozinho quem apagou a mensagem.",
     "Canal oficial de regras do AutoMod atualizado para 1563995880833421508, conforme informado pela liderança da NÊMESIS.",
     "Isenção do AutoMod ampliada para permissões efetivas de moderação e administração, incluindo gerenciar canais, cargos, webhooks e visualizar registro de auditoria; a proteção é verificada antes da análise e novamente antes da punição.",
     "Logs de mensagens excluídas agora mostram título de auditoria, IDs da mensagem e do canal, horário e uma nota clara de que o listener apenas registra eventos e não apaga mensagens.",
@@ -51,6 +54,7 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Corrigido o ID do canal de regras que causava a mensagem de falha ao carregar as regras oficiais.",
     "Corrigido o ID do canal oficial de regras para 1563995880833421508.",
     "Reduzidos falsos positivos de moderação automática para membros com permissões reais de administração/moderação.",
     "Auditoria de exclusão de mensagens enriquecida sem executar exclusões nem atribuir um autor de exclusão que o evento do Discord não informa.",
