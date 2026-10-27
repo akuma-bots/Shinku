@@ -18,7 +18,6 @@ PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
 LIMITE_SESSOES_FORMULARIO = 5000
-CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
 
 
 def _limpar_sessoes_formularios(agora: float | None = None) -> None:
@@ -65,7 +64,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Ter disponibilidade para auxiliar a comunidade.\n\n"
             "O envio não garante aprovação. A equipe analisará sua candidatura."
         ),
-        "canal_id": 1545835428530360401,
+        "canal_id": 1563995880623841338,
         "paginas": [[
             "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
             "Por que deseja fazer parte da Staff da NÊMESIS?",
@@ -88,7 +87,7 @@ FORMULARIOS_AUTOMATICOS = [
             "— Esteja ciente de que a participação exige atividade e cooperação.\n\n"
             "A candidatura será analisada pela equipe responsável; o envio não garante entrada."
         ),
-        "canal_id": 1545835428530360401,
+        "canal_id": 1563995880623841338,
         "paginas": [[
             "Qual é seu nome/apelido e seu usuário do Roblox, se tiver?",
             "Quais jogos você joga com mais frequência?",
@@ -97,29 +96,7 @@ FORMULARIOS_AUTOMATICOS = [
             "Você leu as regras e concorda em respeitá-las?"
         ]],
     },
-    {
-        "chave": "alianca",
-        "nome": "Proposta de Aliança",
-        "titulo": "NÊMESIS — PROPOSTA DE ALIANÇA",
-        "descricao": (
-            "RELAÇÕES INSTITUCIONAIS • ALIANÇAS ENTRE GANGUES\n\n"
-            "Este canal recebe propostas oficiais de aliança. A liderança da organização solicitante "
-            "deve preencher o formulário com informações verificáveis e uma proposta objetiva.\n\n"
-            "INFORMAÇÕES NECESSÁRIAS\n"
-            "— Identificação e contato da liderança.\n"
-            "— Tamanho e atividade atual da organização.\n"
-            "— Objetivo da aliança e formas de cooperação.\n\n"
-            "A proposta será avaliada pela liderança da NÊMESIS. O envio não representa aprovação automática."
-        ),
-        "canal_id": 1547774529965662228,
-        "paginas": [[
-            "Qual é o nome oficial da gangue/comunidade e sua tag?",
-            "Quem é o líder responsável e qual é seu usuário do Discord?",
-            "Quantos membros ativos sua organização possui?",
-            "Qual é o foco da organização e em quais jogos atua?",
-            "Qual é a proposta de aliança e como as duas organizações cooperariam?"
-        ]],
-    },
+
 ]
 
 
@@ -346,7 +323,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @commands.Cog.listener()
     async def on_ready(self):
-        """Publica os três painéis oficiais uma vez e recupera painéis apagados."""
+        """Publica os painéis oficiais uma vez e recupera painéis apagados."""
         async with _LOCK_PAINÉIS_AUTOMÁTICOS:
             guild = self.bot.get_guild(GUILD_NEMESIS_ID)
             if guild is None:
@@ -432,23 +409,8 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         embeds = _embeds_resposta(formulario, resposta, guild)
         view = _view_resposta(resposta["id"])
 
-        # Publica todas as partes da candidatura; os botões ficam na primeira.
-        canal_candidaturas = guild.get_channel(1545835428530360401)
-        if canal_candidaturas is None:
-            try:
-                canal_candidaturas = await guild.fetch_channel(1545835428530360401)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                canal_candidaturas = None
-        if canal_candidaturas is not None:
-            for indice, embed in enumerate(embeds):
-                try:
-                    await canal_candidaturas.send(
-                        embed=embed,
-                        view=view if indice == 0 else None,
-                    )
-                except (discord.Forbidden, discord.HTTPException):
-                    logging.exception("Falha ao publicar candidatura %s no canal.", resposta.get("id"))
-                    break
+        # As respostas das candidaturas não são publicadas em canal público.
+        # Os aprovadores recebem os embeds e os botões de decisão por DM.
 
         # Instrutores/aprovadores recebem todas as candidaturas por DM.
         cargos_notificar = list(formulario.get("cargos_notificar", []))
