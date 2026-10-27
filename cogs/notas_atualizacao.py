@@ -14,13 +14,16 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.3.0"
-RESUMO_PADRAO = "Contagem de convites por membros ativos, com histórico de convidador e prevenção de duplicatas."
+VERSAO_PADRAO = "1.4.0"
+RESUMO_PADRAO = "Correção do canal de progressão e melhoria do registro público de entrada com identificação de convidador."
 NOVIDADES_PADRAO = [
     "Sistema de entrada integrado ao rastreamento de convites, reunindo membro e convidador em uma única mensagem quando identificável.",
     "Comando /convites para consultar convidados que continuam no servidor.",
     "Ranking de convites baseado apenas nos convidados atualmente presentes na NÊMESIS.",
     "Histórico persistente por ID do Discord: sair desconta o membro e reentrar restaura o vínculo original sem duplicar.",
+    "Mensagem de entrada redesenhada com ícone da NÊMESIS, avatar, membro, convidador identificado e guia /tutorial.",
+    "Falhas ao enviar a mensagem de entrada agora ficam registradas explicitamente nos logs técnicos.",
+    "Canal oficial de progressão atualizado para o ID fornecido pela liderança.",
     "Embed de novo membro com ícone da NÊMESIS, avatar do membro, título, descrição, convidador e orientação para o guia do servidor.",
     "Atribuição automática dos três cargos-base aos membros humanos que entram no servidor.",
     "Verificação dos membros existentes para completar a atribuição dos cargos-base em caso de ausência.",
@@ -33,6 +36,7 @@ CORRECOES_PADRAO = [
     "Comando pessoal renomeado para /convites; entradas repetidas do mesmo ID não criam convites duplicados.",
     "A atribuição de convites só contabiliza casos identificados com segurança, evitando atribuições ambíguas.",
     "Falhas ao publicar a mensagem de entrada ficam explícitas nos logs técnicos.",
+    "Corrigido o ID antigo do canal de progressão que causava erro na inicialização e nos anúncios de rank.",
 ]
 
 
