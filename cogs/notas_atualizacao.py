@@ -60,7 +60,7 @@ CORRECOES_PADRAO = [
     "Auditoria de exclusão de mensagens enriquecida sem executar exclusões nem atribuir um autor de exclusão que o evento do Discord não informa.",
     "Autorização global centralizada para slash commands e comandos por prefixo com mensagem explícita de acesso restrito.",
     "XP de progressão bloqueado para membros sem o cargo oficial, sem alterar os dados já acumulados.",
-    "Painel, perfil, ranking e cálculo de próximo rank usam a nova hierarquia de 12 cargos a partir da constante única de progressão."
+    "Painel, perfil, ranking e cálculo de próximo rank usam a nova hierarquia de 12 cargos a partir da constante única de progressão.",
     "Removido o comando de configuração manual de cargos da progressão sem apagar as associações já existentes no armazenamento.",
     "Painel e descrição da progressão passam a refletir o ganho de 2 XP e o intervalo anti-spam, evitando informar recompensas antigas.",
     "Corrigida a execução do listener principal do AutoMod para encerrar a análise antes de acumular histórico, aplicar cooldown ou tentar excluir mensagens administrativas.",
