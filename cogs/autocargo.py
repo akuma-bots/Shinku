@@ -44,9 +44,8 @@ class CargoAutomatico(commands.Cog):
         1563995879981981818,
     )
 
-    @commands.Cog.listener()
-    async def on_member_join(self, membro: discord.Member):
-        """Atribui os três cargos-base quando alguém entra no servidor oficial."""
+    async def _atribuir_cargos_entrada(self, membro: discord.Member):
+        """Atribui os cargos-base imediatamente, sem espera artificial."""
         if membro.guild.id != self.GUILD_ID_CARGOS_ENTRADA or membro.bot:
             return
 
@@ -57,15 +56,16 @@ class CargoAutomatico(commands.Cog):
             if cargo is None:
                 ausentes.append(cargo_id)
                 continue
-            if cargo not in membro.roles:
-                if not _cargo_atribuivel(membro.guild, cargo):
-                    _LOG.warning(
-                        "Cargo de entrada não atribuível (guild=%s, member=%s, role=%s). "
-                        "Verifique Gerenciar cargos e a hierarquia.",
-                        membro.guild.id, membro.id, cargo.id,
-                    )
-                    continue
-                cargos.append(cargo)
+            if cargo in membro.roles:
+                continue
+            if not _cargo_atribuivel(membro.guild, cargo):
+                _LOG.warning(
+                    "Cargo de entrada não atribuível (guild=%s, member=%s, role=%s). "
+                    "Verifique Gerenciar cargos e a hierarquia.",
+                    membro.guild.id, membro.id, cargo.id,
+                )
+                continue
+            cargos.append(cargo)
 
         if ausentes:
             _LOG.error(
@@ -76,7 +76,10 @@ class CargoAutomatico(commands.Cog):
             return
 
         try:
-            await membro.add_roles(*cargos, reason="Atribuição automática de cargos ao entrar na NÊMESIS.")
+            await membro.add_roles(
+                *cargos,
+                reason="Cargos automáticos de entrada da NÊMESIS (sem atraso).",
+            )
             _LOG.info(
                 "Cargos de entrada atribuídos (guild=%s, member=%s, roles=%s).",
                 membro.guild.id, membro.id, [cargo.id for cargo in cargos],
@@ -85,6 +88,28 @@ class CargoAutomatico(commands.Cog):
             _LOG.exception(
                 "Falha ao atribuir cargos de entrada (guild=%s, member=%s).",
                 membro.guild.id, membro.id,
+            )
+
+    @commands.Cog.listener()
+    async def on_member_join(self, membro: discord.Member):
+        """Entrega os cargos imediatamente quando alguém entra no servidor."""
+        await self._atribuir_cargos_entrada(membro)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Entrega os cargos também a membros que já estavam no servidor."""
+        guild = self.bot.get_guild(self.GUILD_ID_CARGOS_ENTRADA)
+        if guild is None:
+            _LOG.error("Servidor da NÊMESIS não encontrado para sincronizar cargos de entrada.")
+            return
+
+        try:
+            async for membro in guild.fetch_members(limit=None):
+                await self._atribuir_cargos_entrada(membro)
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.exception(
+                "Falha ao verificar membros existentes para cargos de entrada (guild=%s).",
+                guild.id,
             )
 
     @app_commands.command(
