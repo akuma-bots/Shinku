@@ -8,6 +8,8 @@ from utils.storage import carregar
 
 
 logger = logging.getLogger(__name__)
+GUILD_NEMESIS_ID = 1563995879981981817
+CANAL_ENTRADAS_ID = 1563995880623841331
 
 
 class Logs(commands.Cog):
@@ -71,10 +73,17 @@ class Logs(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         if member.guild.id != 1563995879981981817:
             return
-        canal = await self._canal_logs(member.guild)
-        if not canal:
-            logger.error("Entrada não publicada: canal de logs não configurado/acessível (guild=%s, member=%s).",
-                         member.guild.id, member.id)
+        canal = member.guild.get_channel(CANAL_ENTRADAS_ID)
+        if canal is None:
+            try:
+                canal = await self.bot.fetch_channel(CANAL_ENTRADAS_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.exception("Entrada não publicada: canal de entradas indisponível (guild=%s, channel=%s, member=%s).",
+                                 member.guild.id, CANAL_ENTRADAS_ID, member.id)
+                return
+        if not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID:
+            logger.error("Entrada não publicada: destino não é um canal de texto válido da NÊMESIS (channel=%s).",
+                         CANAL_ENTRADAS_ID)
             return
 
         # Dá tempo ao rastreador para persistir a atribuição deste evento.
