@@ -216,7 +216,7 @@ class ConvitesNemesis(commands.Cog):
                 reverse=True,
             )
             linhas = []
-            for posicao, (user_id, total) in enumerate((item for item in ranking if item[1] > 0)[:10], start=1):
+            for posicao, (user_id, total) in enumerate([item for item in ranking if item[1] > 0][:10], start=1):
                 linhas.append(f"**{posicao}.** <@{user_id}> — **{total}** membro(s) ativo(s)")
             embed = discord.Embed(
                 title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — RANKING DE CONVITES・✦",
