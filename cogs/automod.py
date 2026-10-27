@@ -13,7 +13,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 
 
-CANAL_REGRAS_ID = 1545831172796583987
+CANAL_REGRAS_ID = 1563995880833421508
 CANAL_INFRACOES_ID = 1545838433229082655
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
@@ -424,13 +424,28 @@ def porcentagem_maiusculas(
 
 
 def membro_pode_moderar(membro) -> bool:
-    return isinstance(membro, discord.Member) and (
-        membro.guild_permissions.administrator
-        or membro.guild_permissions.manage_guild
-        or membro.guild_permissions.manage_messages
-        or membro.guild_permissions.kick_members
-        or membro.guild_permissions.ban_members
-    )
+    """Identifica a equipe por permissões efetivas do Discord, não por nome de cargo.
+
+    Membros com ferramentas reais de administração/moderação são excluídos da
+    análise automática e da aplicação de punições. A isenção não concede
+    permissões novas: apenas impede que o AutoMod interfira na equipe.
+    """
+    if not isinstance(membro, discord.Member):
+        return False
+
+    permissoes = membro.guild_permissions
+    return any((
+        permissoes.administrator,
+        permissoes.manage_guild,
+        permissoes.manage_messages,
+        permissoes.manage_channels,
+        permissoes.manage_roles,
+        permissoes.manage_webhooks,
+        permissoes.view_audit_log,
+        permissoes.kick_members,
+        permissoes.ban_members,
+        permissoes.moderate_members,
+    ))
 
 
 class ModalMotivoDecisao(discord.ui.Modal):
