@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.10"
-RESUMO_PADRAO = "Canal oficial de regras unificado na publicação, no AutoMod e na moderação manual."
+VERSAO_PADRAO = "1.5.11"
+RESUMO_PADRAO = "Correção da verificação de cargos no AutoMod e auditoria de exclusões."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.11: o AutoMod prioriza o objeto Member recebido no evento da mensagem, evitando que dados antigos do cache substituam cargos/permissões atuais e causem exclusões indevidas.",
+    "Diagnóstico de auditoria: o listener de logs registra exclusões e não as executa; o evento do Discord não identifica sozinho o autor da exclusão.",
     "Versão 1.5.10: bypass explícito para proprietário, Administrador, Gerenciar mensagens e Gerenciar servidor antes da análise e imediatamente antes da exclusão/punição automática.",
     "Correção do canal de regras aplicada à moderação manual, ao AutoMod e ao publicador oficial; fonte única: 1563995880833421508.",
     "Versão 1.5.9: todas as referências operacionais ao canal de regras foram unificadas no canal confirmado pela liderança: 1563995880833421508.",
