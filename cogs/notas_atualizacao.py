@@ -14,18 +14,21 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.6"
-RESUMO_PADRAO = "Publicação administrativa do Código de Conduta e proteção contra exclusões indevidas pelo AutoMod."
+VERSAO_PADRAO = "1.5.7"
+RESUMO_PADRAO = "Correção definitiva do canal de regras e reforço da proteção de administradores contra ações automáticas indevidas."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.7: canal de regras do AutoMod corrigido para 1563995880833421508, conforme confirmação direta da liderança; o canal antigo não é mais usado como fonte oficial.",
+    "Reforço de segurança: mensagens de proprietário, Administrador e equipe com permissões efetivas de moderação/administração devem ser ignoradas antes da análise e antes de qualquer exclusão ou punição automática.",
+    "Logs de exclusão são apenas auditoria e não devem apagar mensagens; o evento de exclusão do Discord não identifica necessariamente quem executou a ação.",
     "Versão 1.5.6: novo comando /regras-publicar publica o Código de Conduta oficial em partes organizadas no canal de regras, sem apagar mensagens existentes; restrito a administradores da NÊMESIS.",
     "Versão 1.5.5: isenção do AutoMod agora resolve o membro pelo servidor antes da análise; se não for possível verificar o autor com segurança, a mensagem não é analisada nem removida. A isenção é revalidada antes da punição.",
-    "Fonte oficial das regras do AutoMod alinhada ao canal de regras previamente definido pela NÊMESIS: 1545831172796583987.",
+    "Fonte antiga de regras (1545831172796583987) substituída pelo canal correto confirmado pela liderança: 1563995880833421508.",
     "Código de Conduta fornecido pela liderança preparado como referência oficial: conduta, comunicação, conteúdo, segurança, divulgação, atendimento, autoridade, competições, denúncias, disciplina e disposições.",
     "Versão 1.5.4: canal oficial de regras atualizado para 1563995880833421508; o AutoMod ignora membros com permissões efetivas de moderação concedidas no servidor ou diretamente no canal antes de analisar e antes de punir.",
     "Versão 1.5.3: canal oficial de regras corrigido para 1545831172796583987, conforme o canal oficial indicado pela liderança.",
     "Proteção do AutoMod mantida em duas camadas: a equipe com permissões efetivas de moderação/administração é ignorada antes da análise e novamente antes da exclusão/punição.",
     "Esclarecimento de auditoria: o listener de logs apenas registra eventos de mensagens excluídas; ele não executa exclusões. O evento do Discord não confirma sozinho quem apagou a mensagem.",
-    "Canal oficial de regras do AutoMod atualizado para 1563995880833421508, conforme informado pela liderança da NÊMESIS.",
+    "Canal oficial de regras do AutoMod confirmado pela liderança: 1563995880833421508.",
     "Isenção do AutoMod ampliada para permissões efetivas de moderação e administração, incluindo gerenciar canais, cargos, webhooks e visualizar registro de auditoria; a proteção é verificada antes da análise e novamente antes da punição.",
     "Logs de mensagens excluídas agora mostram título de auditoria, IDs da mensagem e do canal, horário e uma nota clara de que o listener apenas registra eventos e não apaga mensagens.",
     "Controle central de comandos: slash commands e comandos por prefixo exigem o cargo oficial da NÊMESIS (ID 1563995879990624372), sem bypass por permissões administrativas.",
