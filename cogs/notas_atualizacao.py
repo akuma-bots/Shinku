@@ -14,19 +14,20 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.1.0"
-RESUMO_PADRAO = "Atualização dos sistemas de entrada, convites e organização dos painéis da NÊMESIS."
+VERSAO_PADRAO = "1.2.0"
+RESUMO_PADRAO = "Integração do rastreamento de convites ao registro de novos membros e melhoria das notas de atualização."
 NOVIDADES_PADRAO = [
-    "Sistema de convites com identificação do convidador e registro persistente dos membros convidados.",
-    "Novos comandos /meus-convites e /ranking-convites para consultar convites identificados.",
+    "Sistema de entrada integrado ao rastreamento de convites, reunindo membro e convidador em uma única mensagem quando identificável.",
+    "Embed de novo membro com ícone da NÊMESIS, avatar do membro, título, descrição, convidador e orientação para o guia do servidor.",
     "Atribuição automática dos três cargos-base aos membros humanos que entram no servidor.",
     "Verificação dos membros existentes para completar a atribuição dos cargos-base em caso de ausência.",
-    "Painéis de Inscrição para Staff e Entrada na NÊMESIS direcionados ao canal atualizado.",
+    "Registro de entrada enviado ao canal de logs configurado, com falhas de canal e permissão registradas nos logs técnicos.",
+    "Modelo de notas da versão atual mantido pronto para revisão e envio pelo comando administrativo.",
 ]
 CORRECOES_PADRAO = [
-    "Corrigida a configuração de canal que causava erro 404 nos painéis de Staff e Entrada.",
+    "Removido o cog separado de convites; a identificação do convidador passa a integrar a mensagem de entrada.",
     "A atribuição de convites só contabiliza casos identificados com segurança, evitando atribuições ambíguas.",
-    "Os comandos de consulta de convites informam apenas dados registrados pelo sistema.",
+    "Falhas ao publicar a mensagem de entrada ficam explícitas nos logs técnicos.",
 ]
 
 
