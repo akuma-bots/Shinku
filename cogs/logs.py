@@ -91,24 +91,55 @@ class Logs(commands.Cog):
         await asyncio.sleep(0.8)
         convidador_id = await self._convidador_do_membro(member.guild.id, member.id)
         conta_criada = discord.utils.format_dt(member.created_at, style="R")
+        total_membros = member.guild.member_count or 0
+        agora = datetime.now(timezone.utc)
         embed = discord.Embed(
-            title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOVO MEMBRO ・✦",
-            description=f"⟡・Damos as boas-vindas a {member.mention}. Que sua jornada na NÊMESIS comece bem!",
-            color=0xB51F32,
-            timestamp=datetime.now(timezone.utc),
+            title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOVA PRESENÇA ・✦",
+            description=(
+                "╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
+                "     **UMA NOVA JORNADA COMEÇA**\n"
+                "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
+                f"⟡・Seja bem-vindo(a), {member.mention}.\n"
+                "Você acaba de entrar na **NÊMESIS** — um espaço de competição, evolução "
+                "e união para quem leva os jogos a sério. Explore, participe e conquiste seu lugar."
+            ),
+            color=0xB3132B,
+            timestamp=agora,
         )
         if member.guild.icon:
-            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒", icon_url=member.guild.icon.url)
+            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  |  CENTRAL DE INTEGRAÇÃO", icon_url=member.guild.icon.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="Membro que entrou", value=f"{member.mention} (`{member.id}`)", inline=False)
-        embed.add_field(name="Pessoa que convidou",
-                        value=f"<@{convidador_id}>" if convidador_id else "Não foi possível identificar com segurança.",
-                        inline=False)
-        embed.add_field(name="Guia do servidor",
-                        value="Use `/tutorial` para consultar as orientações e os recursos da NÊMESIS.",
-                        inline=False)
-        embed.add_field(name="Conta criada", value=conta_criada, inline=True)
-        embed.set_footer(text="NÊMESIS • Registro de entrada")
+        embed.add_field(
+            name="◈  IDENTIFICAÇÃO",
+            value=f"**Integrante:** {member.mention}\n**Registro:** `{member.id}`\n**Efetivo atual:** `{total_membros:,}`",
+            inline=False,
+        )
+        embed.add_field(
+            name="◈  RECRUTAMENTO",
+            value=f"**Convidador:** <@{convidador_id}>" if convidador_id else
+                  "**Convidador:** Não identificado com segurança.",
+            inline=True,
+        )
+        embed.add_field(
+            name="◈  REGISTRO",
+            value=f"**Conta criada:** {conta_criada}\n**Entrada:** {discord.utils.format_dt(agora, style='F')}",
+            inline=True,
+        )
+        embed.add_field(
+            name="╭・SEU PRIMEIRO PASSO",
+            value=(
+                "➜ **Consulte as orientações:** use `/tutorial`.\n"
+                "➜ **Conheça a estrutura:** explore os canais e cargos disponíveis.\n"
+                "➜ **Faça parte da ação:** participe das atividades e construa sua trajetória."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="✦  SEU PRÓXIMO CAPÍTULO COMEÇA AGORA",
+            value="A NÊMESIS reconhece atitude, consistência e espírito competitivo. **Mostre do que você é capaz.**",
+            inline=False,
+        )
+        embed.set_footer(text="NÊMESIS • Sistema oficial de integração")
         enviado = await self._enviar_log(canal, embed)
         if enviado:
             logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
