@@ -15,7 +15,7 @@ IDADE_MINIMA_CONTA_HORAS = 24
 
 
 class AntiRaid(commands.Cog):
-    """Detecta picos de entrada e aplica proteção limitada contra contas novas."""
+    """Detecta picos de entrada e sinaliza contas recentes para revisão humana."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -24,7 +24,7 @@ class AntiRaid(commands.Cog):
 
     @staticmethod
     def _alvo_elegivel(member: discord.Member) -> bool:
-        """Nunca expulsa bots ou membros com privilégios administrativos."""
+        """Ignora bots e membros com privilégios administrativos ao avaliar alertas."""
         if member.bot or member.id == member.guild.owner_id:
             return False
         permissoes = member.guild_permissions
@@ -94,7 +94,7 @@ class AntiRaid(commands.Cog):
                 member.guild,
                 f"🚨 **Possível raid detectado!** {len(recentes)} membros entraram em menos de "
                 f"{JANELA_SEGUNDOS}s. Contas com menos de {IDADE_MINIMA_CONTA_HORAS}h serão avaliadas "
-                "pela proteção automática durante o pico.",
+                "para revisão da equipe; nenhuma punição será aplicada automaticamente.",
                 mencionar_suporte=True,
             )
 
@@ -105,22 +105,15 @@ class AntiRaid(commands.Cog):
         if idade_conta >= IDADE_MINIMA_CONTA_HORAS:
             return
 
-        try:
-            await member.kick(reason="Anti-raid: conta muito nova durante pico de entradas suspeito.")
-            await self._avisar(
-                member.guild,
-                f"🛡️ Um membro com conta criada há menos de {IDADE_MINIMA_CONTA_HORAS}h foi expulso automaticamente pelo anti-raid (ID: {member.id}).",
-            )
-        except discord.Forbidden:
-            logger.warning(
-                "Sem permissão/hierarquia para expulsar possível conta de raid (guild=%s, member=%s).",
-                guild_id, member.id,
-            )
-        except discord.HTTPException:
-            logger.exception(
-                "Falha HTTP ao expulsar possível conta de raid (guild=%s, member=%s).",
-                guild_id, member.id,
-            )
+        await self._avisar(
+            member.guild,
+            f"🛡️ **Revisão recomendada:** <@{member.id}> (ID: `{member.id}`) entrou durante um pico suspeito e a conta tem menos de {IDADE_MINIMA_CONTA_HORAS}h. Nenhuma punição automática foi aplicada; a equipe deve verificar o contexto.",
+            mencionar_suporte=True,
+        )
+        logger.warning(
+            "Conta recente sinalizada para revisão manual (guild=%s, member=%s, idade_horas=%.2f).",
+            guild_id, member.id, idade_conta,
+        )
 
 
 async def setup(bot: commands.Bot):
