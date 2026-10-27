@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.4.6"
-RESUMO_PADRAO = "Correção de segurança no AutoMod e auditoria de mensagens mais clara."
+VERSAO_PADRAO = "1.4.7"
+RESUMO_PADRAO = "Progressão mais exigente, ganho de XP ajustado e cargos automáticos por posição."
 NOVIDADES_PADRAO = [
+    "Progressão da NÊMESIS recalibrada: cada mensagem válida recompensa 2 XP, respeitando o intervalo anti-spam de 60 segundos.",
+    "Requisitos de XP aumentados progressivamente até 16.000 XP para o rank máximo, tornando a hierarquia mais difícil de alcançar.",
+    "Cada posição pode ser vinculada a um cargo do Discord pelo comando /gangue-configurar-cargo; ao alcançar a posição, o bot entrega o cargo configurado.",
     "AutoMod agora ignora mensagens do proprietário e de membros com permissão Administrador, evitando exclusões e punições automáticas indevidas.",
     "Permissões parciais de moderação não concedem isenção total do AutoMod; a exceção é restrita ao proprietário e administradores do servidor.",
     "Logs de mensagens são registros de auditoria: não executam exclusão nem punição, e continuam documentando mensagens removidas por outros agentes quando o evento é recebido.",
@@ -40,6 +43,7 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Painel e descrição da progressão passam a refletir o ganho de 2 XP e o intervalo anti-spam, evitando informar recompensas antigas.",
     "Corrigida a execução do listener principal do AutoMod para encerrar a análise antes de acumular histórico, aplicar cooldown ou tentar excluir mensagens administrativas.",
     "A central de ajuda não omite mais subcomandos apenas por estarem agrupados em comandos slash.",
     "Reduzido o risco de expulsões indevidas durante falsos positivos de raid; a decisão de punição permanece com a equipe responsável.",
