@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 from utils.guild_config import get_config
+from utils.storage import carregar
 
 
 logger = logging.getLogger(__name__)
@@ -55,18 +56,57 @@ class Logs(commands.Cog):
             logger.exception("Erro inesperado ao publicar log (channel=%s).", getattr(canal, "id", "desconhecido"))
         return False
 
+    async def _convidador_do_membro(self, guild_id: int, member_id: int):
+        try:
+            dados = await carregar("convites_nemesis.json", {})
+            servidor = dados.get(str(guild_id), {}) if isinstance(dados, dict) else {}
+            historico = servidor.get("_historico", {}) if isinstance(servidor, dict) else {}
+            convidador_id = historico.get(str(member_id))
+            return int(convidador_id) if convidador_id else None
+        except Exception:
+            logger.exception("Falha ao consultar convidador (guild=%s, member=%s).", guild_id, member_id)
+            return None
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
+        if member.guild.id != 1563995879981981817:
+            return
         canal = await self._canal_logs(member.guild)
         if not canal:
+            logger.error("Entrada não publicada: canal de logs não configurado/acessível (guild=%s, member=%s).",
+                         member.guild.id, member.id)
             return
+
+        # Dá tempo ao rastreador para persistir a atribuição deste evento.
+        import asyncio
+        await asyncio.sleep(0.8)
+        convidador_id = await self._convidador_do_membro(member.guild.id, member.id)
         conta_criada = discord.utils.format_dt(member.created_at, style="R")
         embed = discord.Embed(
-            description=f"📥 {member.mention} entrou no servidor.\nConta criada {conta_criada}.",
-            color=0x57F287,
+            title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOVO MEMBRO ・✦",
+            description=f"⟡・Damos as boas-vindas a {member.mention}. Que sua jornada na NÊMESIS comece bem!",
+            color=0xB51F32,
+            timestamp=datetime.now(timezone.utc),
         )
+        if member.guild.icon:
+            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒", icon_url=member.guild.icon.url)
         embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed)
+        embed.add_field(name="Membro que entrou", value=f"{member.mention} (`{member.id}`)", inline=False)
+        embed.add_field(name="Pessoa que convidou",
+                        value=f"<@{convidador_id}>" if convidador_id else "Não foi possível identificar com segurança.",
+                        inline=False)
+        embed.add_field(name="Guia do servidor",
+                        value="Use `/tutorial` para consultar as orientações e os recursos da NÊMESIS.",
+                        inline=False)
+        embed.add_field(name="Conta criada", value=conta_criada, inline=True)
+        embed.set_footer(text="NÊMESIS • Registro de entrada")
+        enviado = await self._enviar_log(canal, embed)
+        if enviado:
+            logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
+                        member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
+        else:
+            logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
+                         member.guild.id, member.id, canal.id)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
