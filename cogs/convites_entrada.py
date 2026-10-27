@@ -98,10 +98,21 @@ class ConvitesEntrada(commands.Cog):
             return
         used = None
         async with self._lock:
-            previous = self._uses.copy()
-            current = await self._refresh(member.guild)
-            if current is not None:
-                used = next((i for i in current if (i.uses or 0) > previous.get(i.code, 0)), None)
+            # Na primeira leitura, inicializamos a referência sem atribuir usos antigos
+            # ao membro recém-chegado.
+            if not self._cache_ready:
+                await self._refresh(member.guild)
+            else:
+                previous = self._uses.copy()
+                current = await self._refresh(member.guild)
+                if current is not None:
+                    increased = [
+                        invite for invite in current
+                        if (invite.uses or 0) > previous.get(invite.code, 0)
+                    ]
+                    # A atribuição é aproximada: entradas simultâneas podem ser ambíguas.
+                    if len(increased) == 1:
+                        used = increased[0]
         await asyncio.gather(
             self._send_embed(member.guild, ENTRY_CHANNEL_ID, make_entry_embed(member)),
             self._send_embed(member.guild, INVITES_CHANNEL_ID, self._make_invite_embed(member, used)),
@@ -117,7 +128,7 @@ class ConvitesEntrada(commands.Cog):
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="NOVO MEMBRO", value=f"{member.display_name}\nID: {member.id}", inline=True)
+        embed.add_field(name="NOVO MEMBRO", value=f"{discord.utils.escape_markdown(member.display_name)}\nID: {member.id}", inline=True)
         embed.add_field(name="CONVIDADO POR", value=inviter.mention if inviter else "Não identificado", inline=True)
         if invite:
             embed.add_field(name="CÓDIGO", value=invite.code, inline=True)
