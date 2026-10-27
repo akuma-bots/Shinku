@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.1"
-RESUMO_PADRAO = "Controle de acesso por cargo oficial, progressão restrita e proteções reforçadas de moderação."
+VERSAO_PADRAO = "1.5.2"
+RESUMO_PADRAO = "AutoMod com isenção reforçada para a equipe, regras oficiais atualizadas e auditoria de exclusões mais clara."
 NOVIDADES_PADRAO = [
+    "Canal oficial de regras do AutoMod atualizado para 1563995880833421508, conforme informado pela liderança da NÊMESIS.",
+    "Isenção do AutoMod ampliada para permissões efetivas de moderação e administração, incluindo gerenciar canais, cargos, webhooks e visualizar registro de auditoria; a proteção é verificada antes da análise e novamente antes da punição.",
+    "Logs de mensagens excluídas agora mostram título de auditoria, IDs da mensagem e do canal, horário e uma nota clara de que o listener apenas registra eventos e não apaga mensagens.",
     "Controle central de comandos: slash commands e comandos por prefixo exigem o cargo oficial da NÊMESIS (ID 1563995879990624372), sem bypass por permissões administrativas.",
     "Progressão da gangue agora só concede XP por mensagens a membros que possuem o cargo oficial da NÊMESIS.",
     "AutoMod verifica proprietário, Administrador e permissões efetivas de moderação antes de analisar mensagens e novamente antes de apagar/punir.",
@@ -48,6 +51,9 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Corrigido o ID do canal oficial de regras para 1563995880833421508.",
+    "Reduzidos falsos positivos de moderação automática para membros com permissões reais de administração/moderação.",
+    "Auditoria de exclusão de mensagens enriquecida sem executar exclusões nem atribuir um autor de exclusão que o evento do Discord não informa.",
     "Autorização global centralizada para slash commands e comandos por prefixo com mensagem explícita de acesso restrito.",
     "XP de progressão bloqueado para membros sem o cargo oficial, sem alterar os dados já acumulados.",
     "Painel, perfil, ranking e cálculo de próximo rank usam a nova hierarquia de 12 cargos a partir da constante única de progressão."
