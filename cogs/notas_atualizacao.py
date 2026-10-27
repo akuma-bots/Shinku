@@ -14,9 +14,10 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.5"
-RESUMO_PADRAO = "Código de Conduta oficial da NÊMESIS consolidado e proteção administrativa do AutoMod reforçada."
+VERSAO_PADRAO = "1.5.6"
+RESUMO_PADRAO = "Publicação administrativa do Código de Conduta e proteção contra exclusões indevidas pelo AutoMod."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.6: novo comando /regras-publicar publica o Código de Conduta oficial em partes organizadas no canal de regras, sem apagar mensagens existentes; restrito a administradores da NÊMESIS.",
     "Versão 1.5.5: isenção do AutoMod agora resolve o membro pelo servidor antes da análise; se não for possível verificar o autor com segurança, a mensagem não é analisada nem removida. A isenção é revalidada antes da punição.",
     "Fonte oficial das regras do AutoMod alinhada ao canal de regras previamente definido pela NÊMESIS: 1545831172796583987.",
     "Código de Conduta fornecido pela liderança preparado como referência oficial: conduta, comunicação, conteúdo, segurança, divulgação, atendimento, autoridade, competições, denúncias, disciplina e disposições.",
