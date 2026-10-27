@@ -17,6 +17,9 @@ MAX_RETRIES = 3
 VERSAO_PADRAO = "1.5.8"
 RESUMO_PADRAO = "Proteção administrativa reforçada, auditoria mais resiliente e notas compatíveis com os limites do Discord."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.8: notas de atualização compactadas para respeitar o limite de 6.000 caracteres por embed do Discord.",
+    "Correção de proteção: objetos Member já resolvidos não são substituídos por uma consulta de cache que poderia retornar None e liberar análise automática indevida.",
+    "Tratamento de erros aprimorado: interações expiradas ou já respondidas não provocam uma segunda falha ao tentar notificar o usuário.",
     "Versão 1.5.8: AutoMod isenta cargos Admin/Administrador/Staff/Moderação mesmo sem a flag Administrator; embed de notas reduzido para respeitar o limite de 6.000 caracteres; erro de interação expirada tratado sem traceback secundário.",
     "Versão 1.5.7: canal de regras do AutoMod corrigido para 1563995880833421508, conforme confirmação direta da liderança; o canal antigo não é mais usado como fonte oficial.",
     "Reforço de segurança: mensagens de proprietário, Administrador e equipe com permissões efetivas de moderação/administração devem ser ignoradas antes da análise e antes de qualquer exclusão ou punição automática.",
@@ -63,6 +66,9 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Corrigido HTTP 400 / Embed size exceeds maximum size of 6000 no comando /notas-atualizacao.",
+    "Corrigido o tratamento do erro 10062 (Unknown interaction) para evitar traceback secundário durante o tratamento de falhas.",
+    "Corrigido o caminho de isenção do AutoMod para manter as permissões do membro já resolvido.",
     "Corrigida a verificação do autor em eventos do AutoMod para resolver Member pelo servidor e falhar de forma segura sem excluir mensagens quando a identidade/permissões não puderem ser verificadas.",
     "Canal oficial de regras restaurado para o ID 1545831172796583987, consistente com o sistema de moderação manual.",
     "Corrigida a divergência entre o ID do canal oficial de regras e a constante usada pelo AutoMod; ampliada a verificação de permissões efetivas para incluir overrides do canal.",
