@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.9"
+VERSAO_PADRAO = "1.5.10"
 RESUMO_PADRAO = "Canal oficial de regras unificado na publicação, no AutoMod e na moderação manual."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.10: bypass explícito para proprietário, Administrador, Gerenciar mensagens e Gerenciar servidor antes da análise e imediatamente antes da exclusão/punição automática.",
+    "Correção do canal de regras aplicada à moderação manual, ao AutoMod e ao publicador oficial; fonte única: 1563995880833421508.",
     "Versão 1.5.9: todas as referências operacionais ao canal de regras foram unificadas no canal confirmado pela liderança: 1563995880833421508.",
     "Ajustada a fonte usada pela moderação manual e pelo publicador de regras, eliminando a divergência que fazia comandos procurarem o canal antigo.",
     "AutoMod mantém a isenção de proprietário, administradores e equipe com permissões efetivas de moderação antes da análise e antes da exclusão/punição automática.",
