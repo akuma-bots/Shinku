@@ -19,16 +19,18 @@ COOLDOWN_MENSAGENS = 60
 XP_POR_MENSAGEM = 2
 
 RANKS = [
-    {"no": 10, "nome": "Recruta", "xp": 0},
-    {"no": 9, "nome": "Iniciado", "xp": 200},
-    {"no": 8, "nome": "Operador", "xp": 600},
-    {"no": 7, "nome": "Membro", "xp": 1200},
-    {"no": 6, "nome": "Veterano", "xp": 2200},
-    {"no": 5, "nome": "Especialista", "xp": 3600},
-    {"no": 4, "nome": "Elite", "xp": 5400},
-    {"no": 3, "nome": "Executor", "xp": 8000},
-    {"no": 2, "nome": "Comandante", "xp": 11500},
-    {"no": 1, "nome": "Lenda", "xp": 16000},
+    {"no": 12, "nome": "Lutador", "xp": 0},
+    {"no": 11, "nome": "Subtenente", "xp": 800},
+    {"no": 10, "nome": "Tenente", "xp": 2200},
+    {"no": 9, "nome": "Executor", "xp": 4500},
+    {"no": 8, "nome": "Especialista", "xp": 7500},
+    {"no": 7, "nome": "Elite", "xp": 11500},
+    {"no": 6, "nome": "Veterano", "xp": 16500},
+    {"no": 5, "nome": "Treinador", "xp": 23000},
+    {"no": 4, "nome": "Comandante", "xp": 31000},
+    {"no": 3, "nome": "Vice Capitão", "xp": 41000},
+    {"no": 2, "nome": "Capitão", "xp": 54000},
+    {"no": 1, "nome": "Capitão Geral", "xp": 70000},
 ]
 
 
