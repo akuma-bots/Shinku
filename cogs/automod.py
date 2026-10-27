@@ -430,8 +430,12 @@ def membro_pode_moderar(membro, canal=None) -> bool:
     apenas User. A isenção é aplicada antes de contabilizar histórico e também
     imediatamente antes de qualquer exclusão ou punição.
     """
-    if isinstance(membro, discord.User) and getattr(membro, "guild", None) is not None:
-        membro = membro.guild.get_member(membro.id)
+    # Member herda de User: preserve o objeto já resolvido. Um lookup no cache
+    # que retorne None não pode desativar a proteção de administradores/equipe.
+    if not isinstance(membro, discord.Member):
+        guild_origem = getattr(membro, "guild", None)
+        if isinstance(membro, discord.User) and guild_origem is not None:
+            membro = guild_origem.get_member(membro.id)
     if not isinstance(membro, discord.Member):
         return False
 
