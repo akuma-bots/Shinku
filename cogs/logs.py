@@ -165,6 +165,7 @@ class Logs(commands.Cog):
         if not canal or canal.id == message.channel.id:
             return  # evita loop se o canal de logs for o mesmo onde a mensagem foi apagada
         conteudo = message.content or "*(sem texto disponível no cache do Discord)*"
+        conteudo = conteudo[:1800]  # protege contra embeds inválidos por conteúdo excessivo
         anexos = "\n".join(
             f"[{anexo.filename}]({anexo.url})" for anexo in message.attachments[:8]
         )
