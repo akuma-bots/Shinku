@@ -14,9 +14,10 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.7"
-RESUMO_PADRAO = "Correção definitiva do canal de regras e reforço da proteção de administradores contra ações automáticas indevidas."
+VERSAO_PADRAO = "1.5.8"
+RESUMO_PADRAO = "Proteção administrativa reforçada, auditoria mais resiliente e notas compatíveis com os limites do Discord."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.8: AutoMod isenta cargos Admin/Administrador/Staff/Moderação mesmo sem a flag Administrator; embed de notas reduzido para respeitar o limite de 6.000 caracteres; erro de interação expirada tratado sem traceback secundário.",
     "Versão 1.5.7: canal de regras do AutoMod corrigido para 1563995880833421508, conforme confirmação direta da liderança; o canal antigo não é mais usado como fonte oficial.",
     "Reforço de segurança: mensagens de proprietário, Administrador e equipe com permissões efetivas de moderação/administração devem ser ignoradas antes da análise e antes de qualquer exclusão ou punição automática.",
     "Logs de exclusão são apenas auditoria e não devem apagar mensagens; o evento de exclusão do Discord não identifica necessariamente quem executou a ação.",
@@ -118,38 +119,21 @@ def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefi
 
 
 def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str]) -> discord.Embed:
-    """Cria uma prévia compacta, respeitando o limite de 6.000 caracteres do Discord."""
+    """Monta um embed com margem de segurança abaixo do limite de 6.000 caracteres."""
     embed = discord.Embed(
         title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
-        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo[:500])}",
+        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo)[:700]}",
         color=COLOR,
         timestamp=datetime.now(timezone.utc),
     )
-    # O histórico completo é extenso. A prévia apresenta os itens mais recentes
-    # e deixa margem segura para o limite de tamanho imposto pelo Discord.
-    _adicionar_secao(embed, "✦ NOVIDADES RECENTES", novidades[:3], "➜")
+    _adicionar_secao(embed, "✦ NOVIDADES RECENTES", novidades[:8], "➜")
     if correcoes:
-        _adicionar_secao(embed, "⚙ CORREÇÕES RECENTES", correcoes[:3], "✓")
+        _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", correcoes[:5], "✓")
     embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
-    if len(embed) > 5500:
-        compactado = discord.Embed(
-            title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
-            description=f"**{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo[:700])}",
-            color=COLOR,
-            timestamp=datetime.now(timezone.utc),
-        )
-        compactado.add_field(
-            name="Novidades",
-            value="\\n".join(f"• {discord.utils.escape_markdown(x[:350])}" for x in novidades[:3])[:1000] or "Sem novidades registradas.",
-            inline=False,
-        )
-        compactado.add_field(
-            name="Correções",
-            value="\\n".join(f"• {discord.utils.escape_markdown(x[:350])}" for x in correcoes[:3])[:1000] or "Sem correções registradas.",
-            inline=False,
-        )
-        compactado.set_footer(text="NÊMESIS • Notas oficiais de atualização")
-        return compactado
+    while len(embed) > 5700 and embed.fields:
+        embed.remove_field(len(embed.fields) - 1)
+    if len(embed) > 5900:
+        embed.description = (embed.description or "")[:500]
     return embed
 
 async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
