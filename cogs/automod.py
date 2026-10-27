@@ -13,7 +13,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 
 
-CANAL_REGRAS_ID = 1545831172796583987
+CANAL_REGRAS_ID = 1563995880833421508
 CANAL_INFRACOES_ID = 1545838433229082655
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
