@@ -14,9 +14,13 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.0"
-RESUMO_PADRAO = "Hierarquia competitiva de 12 cargos e progressão de XP mais exigente."
+VERSAO_PADRAO = "1.5.1"
+RESUMO_PADRAO = "Controle de acesso por cargo oficial, progressão restrita e proteções reforçadas de moderação."
 NOVIDADES_PADRAO = [
+    "Controle central de comandos: slash commands e comandos por prefixo exigem o cargo oficial da NÊMESIS (ID 1563995879990624372), sem bypass por permissões administrativas.",
+    "Progressão da gangue agora só concede XP por mensagens a membros que possuem o cargo oficial da NÊMESIS.",
+    "AutoMod verifica proprietário, Administrador e permissões efetivas de moderação antes de analisar mensagens e novamente antes de apagar/punir.",
+    "Logs são somente registros de auditoria; não executam exclusões de mensagens.",
     "Progressão da gangue reorganizada em 12 cargos competitivos, de Lutador até Capitão Geral, com requisitos crescentes até 70.000 XP; Liderança continua exclusiva da direção.",
     "Comando manual /gangue-configurar-cargo removido da interface; a progressão automática por rank continua usando os vínculos de cargos já salvos.",
     "AutoMod reforçado com dupla verificação: proprietário, administradores e membros com permissões efetivas de moderação são ignorados tanto na análise quanto no ponto de aplicação da punição.",
@@ -44,6 +48,8 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Autorização global centralizada para slash commands e comandos por prefixo com mensagem explícita de acesso restrito.",
+    "XP de progressão bloqueado para membros sem o cargo oficial, sem alterar os dados já acumulados.",
     "Painel, perfil, ranking e cálculo de próximo rank usam a nova hierarquia de 12 cargos a partir da constante única de progressão."
     "Removido o comando de configuração manual de cargos da progressão sem apagar as associações já existentes no armazenamento.",
     "Painel e descrição da progressão passam a refletir o ganho de 2 XP e o intervalo anti-spam, evitando informar recompensas antigas.",
