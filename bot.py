@@ -154,8 +154,12 @@ async def tratar_erro_comando(
             await interaction.followup.send(mensagem, ephemeral=True)
         else:
             await interaction.response.send_message(mensagem, ephemeral=True)
-    except (discord.HTTPException, discord.InteractionResponded):
-        logging.exception("Não foi possível responder ao erro do comando.")
+    except (discord.HTTPException, discord.InteractionResponded, discord.NotFound):
+        logging.warning(
+            "Não foi possível responder à interação (command=%s, interaction=%s).",
+            getattr(interaction.command, "qualified_name", "desconhecido"),
+            getattr(interaction, "id", "desconhecido"),
+        )
 
 
 # ============================================================
