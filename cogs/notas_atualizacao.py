@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.3"
-RESUMO_PADRAO = "Correção da fonte de regras do AutoMod e reforço da proteção contra exclusões indevidas de mensagens da equipe."
+VERSAO_PADRAO = "1.5.4"
+RESUMO_PADRAO = "Canal de regras atualizado e proteção do AutoMod reforçada para permissões efetivas de canal e servidor."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.4: canal oficial de regras atualizado para 1563995880833421508; o AutoMod ignora membros com permissões efetivas de moderação concedidas no servidor ou diretamente no canal antes de analisar e antes de punir.",
+    "Canal de entrada atualizado para 1563995880833421508 conforme correção informada pela liderança.",
     "Versão 1.5.3: canal oficial de regras corrigido para 1545831172796583987, conforme o canal oficial indicado pela liderança.",
     "Proteção do AutoMod mantida em duas camadas: a equipe com permissões efetivas de moderação/administração é ignorada antes da análise e novamente antes da exclusão/punição.",
     "Esclarecimento de auditoria: o listener de logs apenas registra eventos de mensagens excluídas; ele não executa exclusões. O evento do Discord não confirma sozinho quem apagou a mensagem.",
@@ -54,6 +56,7 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Corrigida a divergência entre o ID do canal oficial de regras e a constante usada pelo AutoMod; ampliada a verificação de permissões efetivas para incluir overrides do canal.",
     "Corrigido o ID do canal de regras que causava a mensagem de falha ao carregar as regras oficiais.",
     "Corrigido o ID do canal oficial de regras para 1563995880833421508.",
     "Reduzidos falsos positivos de moderação automática para membros com permissões reais de administração/moderação.",
