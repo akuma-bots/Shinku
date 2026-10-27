@@ -38,7 +38,13 @@ class ConvitesNemesis(commands.Cog):
         if not isinstance(dados, dict):
             dados = {}
         servidor = dados.setdefault(str(GUILD_NEMESIS_ID), {})
-        servidor.setdefault("_historico", {})
+        historico = servidor.setdefault("_historico", {})
+        # Migra os registros antigos para preservar o convidador original.
+        for inviter_id, registro in servidor.items():
+            if inviter_id.startswith("_") or not isinstance(registro, dict):
+                continue
+            for member_id in registro.get("membros", []):
+                historico.setdefault(str(member_id), inviter_id)
         return dados, servidor
 
     async def _salvar_dados(self, dados):
@@ -53,7 +59,28 @@ class ConvitesNemesis(commands.Cog):
         if cache is not None:
             self._convites[guild.id] = cache
             self._inicializados.add(guild.id)
+            await self._reconciliar_membros_ativos(guild)
             logger.info("Cache de convites inicializado (guild=%s, convites=%s).", guild.id, len(cache))
+
+    async def _reconciliar_membros_ativos(self, guild: discord.Guild):
+        try:
+            presentes = {str(member.id) async for member in guild.fetch_members(limit=None) if not member.bot}
+            async with self._locks[guild.id]:
+                dados, servidor = await self._carregar_dados()
+                alterado = False
+                for inviter_id, registro in servidor.items():
+                    if inviter_id.startswith("_") or not isinstance(registro, dict):
+                        continue
+                    ativos = set(map(str, registro.get("membros", [])))
+                    filtrados = ativos & presentes
+                    if filtrados != ativos:
+                        registro["membros"] = sorted(filtrados)
+                        registro["total"] = len(filtrados)
+                        alterado = True
+                if alterado:
+                    await self._salvar_dados(dados)
+        except (discord.Forbidden, discord.HTTPException):
+            logger.exception("Não foi possível reconciliar convidados ativos (guild=%s).", guild.id)
 
     @commands.Cog.listener()
     async def on_invite_create(self, invite: discord.Invite):
