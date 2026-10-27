@@ -9,7 +9,7 @@ from utils.storage import carregar
 
 logger = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = 1563995879981981817
-CANAL_ENTRADAS_ID = 1563995880623841331
+CANAL_ENTRADAS_ID = 1563995880833421508
 
 
 class Logs(commands.Cog):
