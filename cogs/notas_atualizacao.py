@@ -18,7 +18,6 @@ VERSAO_PADRAO = "1.5.4"
 RESUMO_PADRAO = "Canal de regras atualizado e proteção do AutoMod reforçada para permissões efetivas de canal e servidor."
 NOVIDADES_PADRAO = [
     "Versão 1.5.4: canal oficial de regras atualizado para 1563995880833421508; o AutoMod ignora membros com permissões efetivas de moderação concedidas no servidor ou diretamente no canal antes de analisar e antes de punir.",
-    "Canal de entrada atualizado para 1563995880833421508 conforme correção informada pela liderança.",
     "Versão 1.5.3: canal oficial de regras corrigido para 1545831172796583987, conforme o canal oficial indicado pela liderança.",
     "Proteção do AutoMod mantida em duas camadas: a equipe com permissões efetivas de moderação/administração é ignorada antes da análise e novamente antes da exclusão/punição.",
     "Esclarecimento de auditoria: o listener de logs apenas registra eventos de mensagens excluídas; ele não executa exclusões. O evento do Discord não confirma sozinho quem apagou a mensagem.",
