@@ -6,7 +6,7 @@ from discord.ext import commands
 from utils.punicoes import registrar_punicao, historico_punicoes
 
 
-CANAL_REGRAS_ID = 1545831172796583987
+CANAL_REGRAS_ID = 1563995880833421508
 
 
 class Moderacao(commands.Cog):
