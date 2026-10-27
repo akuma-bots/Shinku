@@ -439,6 +439,18 @@ def membro_pode_moderar(membro, canal=None) -> bool:
     if membro.id == guild.owner_id:
         return True
 
+    # Cargos administrativos nomeados também são isentos, mesmo sem a flag
+    # Administrator do Discord. Evita apagar mensagens de cargos "Admin/Staff".
+    nomes_protegidos = {
+        "admin", "admins", "administrador", "administradora",
+        "administradores", "administracao", "administração",
+        "staff", "equipe administrativa", "equipe de moderacao",
+        "equipe de moderação", "moderador", "moderadora",
+        "moderadores", "moderacao", "moderação",
+    }
+    if any((cargo.name or "").strip().casefold() in nomes_protegidos for cargo in membro.roles):
+        return True
+
     permissoes = membro.guild_permissions
     try:
         permissoes_canal = canal.permissions_for(membro) if canal is not None else permissoes
