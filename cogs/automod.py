@@ -1556,6 +1556,12 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         if guild is None or not isinstance(membro, discord.Member):
             return
 
+        # Defesa em profundidade: nunca apagar nem punir proprietário,
+        # administradores ou membros com permissões efetivas de moderação.
+        # A mesma regra é aplicada no listener e no ponto de execução da punição.
+        if membro.id == guild.owner_id or membro_pode_moderar(membro):
+            return
+
         nivel = int(infracao["nivel"])
         config = await get_config(guild.id)
         custom = (config.get("automod_niveis") or {}).get(str(nivel), {})
@@ -1991,13 +1997,10 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         membro = message.author
 
-        # Isenção explícita para o proprietário e administradores do servidor.
-        # Não isenta automaticamente moderadores com permissões parciais.
-        # O AutoMod não remove nem pune mensagens enviadas por administradores.
-        if (
-            membro.id == message.guild.owner_id
-            or membro.guild_permissions.administrator
-        ):
+        # Proteção para proprietário, administradores e equipe com permissões
+        # efetivas de moderação. A checagem usa permissões do Discord, não apenas
+        # o nome de um cargo, evitando exclusões por falsos positivos em staff.
+        if membro.id == message.guild.owner_id or membro_pode_moderar(membro):
             return
 
         chave = (
