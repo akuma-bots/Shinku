@@ -13,7 +13,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config
 
 
-CANAL_REGRAS_ID = 1545831172796583987
+CANAL_REGRAS_ID = 1563995880833421508
 CANAL_INFRACOES_ID = 1545838433229082655
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
@@ -423,17 +423,17 @@ def porcentagem_maiusculas(
 
 
 
-def membro_pode_moderar(membro) -> bool:
-    """Identifica a equipe por permissões efetivas do Discord, não por nome de cargo.
+def membro_pode_moderar(membro, canal=None) -> bool:
+    """Detecta permissões administrativas/moderativas efetivas, inclusive overrides do canal.
 
-    Membros com ferramentas reais de administração/moderação são excluídos da
-    análise automática e da aplicação de punições. A isenção não concede
-    permissões novas: apenas impede que o AutoMod interfira na equipe.
+    A verificação por cargo/servidor sozinha não detecta permissões concedidas
+    diretamente no canal. Essa checagem é usada antes da análise e da punição.
     """
     if not isinstance(membro, discord.Member):
         return False
 
     permissoes = membro.guild_permissions
+    permissoes_canal = canal.permissions_for(membro) if canal is not None else permissoes
     return any((
         permissoes.administrator,
         permissoes.manage_guild,
@@ -445,6 +445,15 @@ def membro_pode_moderar(membro) -> bool:
         permissoes.kick_members,
         permissoes.ban_members,
         permissoes.moderate_members,
+        permissoes_canal.administrator,
+        permissoes_canal.manage_messages,
+        permissoes_canal.manage_channels,
+        permissoes_canal.manage_roles,
+        permissoes_canal.manage_webhooks,
+        permissoes_canal.view_audit_log,
+        permissoes_canal.kick_members,
+        permissoes_canal.ban_members,
+        permissoes_canal.moderate_members,
     ))
 
 
@@ -1574,7 +1583,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         # Defesa em profundidade: nunca apagar nem punir proprietário,
         # administradores ou membros com permissões efetivas de moderação.
         # A mesma regra é aplicada no listener e no ponto de execução da punição.
-        if membro.id == guild.owner_id or membro_pode_moderar(membro):
+        if membro.id == guild.owner_id or membro_pode_moderar(membro, message.channel):
             return
 
         nivel = int(infracao["nivel"])
@@ -2015,7 +2024,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         # Proteção para proprietário, administradores e equipe com permissões
         # efetivas de moderação. A checagem usa permissões do Discord, não apenas
         # o nome de um cargo, evitando exclusões por falsos positivos em staff.
-        if membro.id == message.guild.owner_id or membro_pode_moderar(membro):
+        if membro.id == message.guild.owner_id or membro_pode_moderar(membro, message.channel):
             return
 
         chave = (
