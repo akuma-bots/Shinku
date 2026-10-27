@@ -2046,16 +2046,19 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
             return
 
-        # Eventos de servidor normalmente entregam Member, mas resolvemos pelo
-        # cache do servidor explicitamente para evitar falha de isenção caso venha User.
-        membro = message.guild.get_member(message.author.id)
+        # Prioriza o Member anexado à própria mensagem: ele pode conter
+        # cargos/permissões mais recentes que uma entrada antiga no cache do guild.
+        # Só consulta o cache/API se o evento realmente trouxer apenas User.
+        membro = message.author if isinstance(message.author, discord.Member) else message.guild.get_member(message.author.id)
         if membro is None:
             try:
                 membro = await message.guild.fetch_member(message.author.id)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                # Falha fechada: não analisar nem apagar mensagem se não for possível
-                # verificar com segurança o status e as permissões do autor.
+                # Fail-safe: sem confirmar identidade/permissões, não analisar nem apagar.
                 return
+
+        # Atualiza a referência caso o autor do evento seja Member, evitando que
+        # uma cópia desatualizada do cache sobrescreva os cargos do evento.
 
         # Isenção administrativa executada antes de qualquer histórico/detecção.
         # Os administradores e responsáveis pela moderação têm bypass integral.
