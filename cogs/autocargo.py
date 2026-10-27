@@ -36,6 +36,57 @@ class CargoAutomatico(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # Cargos-base concedidos automaticamente a novos membros da NÊMESIS.
+    GUILD_ID_CARGOS_ENTRADA = 1563995879981981817
+    CARGOS_ENTRADA = (
+        1563995879990624371,
+        1563995879981981825,
+        1563995879981981818,
+    )
+
+    @commands.Cog.listener()
+    async def on_member_join(self, membro: discord.Member):
+        """Atribui os três cargos-base quando alguém entra no servidor oficial."""
+        if membro.guild.id != self.GUILD_ID_CARGOS_ENTRADA or membro.bot:
+            return
+
+        cargos = []
+        ausentes = []
+        for cargo_id in self.CARGOS_ENTRADA:
+            cargo = membro.guild.get_role(cargo_id)
+            if cargo is None:
+                ausentes.append(cargo_id)
+                continue
+            if cargo not in membro.roles:
+                if not _cargo_atribuivel(membro.guild, cargo):
+                    _LOG.warning(
+                        "Cargo de entrada não atribuível (guild=%s, member=%s, role=%s). "
+                        "Verifique Gerenciar cargos e a hierarquia.",
+                        membro.guild.id, membro.id, cargo.id,
+                    )
+                    continue
+                cargos.append(cargo)
+
+        if ausentes:
+            _LOG.error(
+                "Cargos de entrada não encontrados no servidor (guild=%s, ids=%s).",
+                membro.guild.id, ausentes,
+            )
+        if not cargos:
+            return
+
+        try:
+            await membro.add_roles(*cargos, reason="Atribuição automática de cargos ao entrar na NÊMESIS.")
+            _LOG.info(
+                "Cargos de entrada atribuídos (guild=%s, member=%s, roles=%s).",
+                membro.guild.id, membro.id, [cargo.id for cargo in cargos],
+            )
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.exception(
+                "Falha ao atribuir cargos de entrada (guild=%s, member=%s).",
+                membro.guild.id, membro.id,
+            )
+
     @app_commands.command(
         name="definir-canal-cargo",
         description="Define um canal onde postar qualquer mensagem dá um cargo automático.",
