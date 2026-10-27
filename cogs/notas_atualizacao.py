@@ -17,6 +17,10 @@ MAX_RETRIES = 3
 VERSAO_PADRAO = "1.5.9"
 RESUMO_PADRAO = "Canal oficial de regras unificado na publicação, no AutoMod e na moderação manual."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.9: todas as referências operacionais ao canal de regras foram unificadas no canal confirmado pela liderança: 1563995880833421508.",
+    "Ajustada a fonte usada pela moderação manual e pelo publicador de regras, eliminando a divergência que fazia comandos procurarem o canal antigo.",
+    "AutoMod mantém a isenção de proprietário, administradores e equipe com permissões efetivas de moderação antes da análise e antes da exclusão/punição automática.",
+    "O módulo de logs é apenas auditoria: registra exclusões recebidas do Discord e não apaga mensagens por conta própria.",
     "Versão 1.5.9: canal oficial de regras unificado em 1563995880833421508 nos sistemas de publicação e moderação; referências ao ID anterior removidas do código e das notas.",
     "Versão 1.5.8: notas de atualização compactadas para respeitar o limite de 6.000 caracteres por embed do Discord.",
     "Correção de proteção: objetos Member já resolvidos não são substituídos por uma consulta de cache que poderia retornar None e liberar análise automática indevida.",
