@@ -31,7 +31,7 @@ NOVIDADES_PADRAO = [
     "Logs de exclusão são apenas auditoria e não devem apagar mensagens; o evento de exclusão do Discord não identifica necessariamente quem executou a ação.",
     "Versão 1.5.6: novo comando /regras-publicar publica o Código de Conduta oficial em partes organizadas no canal de regras, sem apagar mensagens existentes; restrito a administradores da NÊMESIS.",
     "Versão 1.5.5: isenção do AutoMod agora resolve o membro pelo servidor antes da análise; se não for possível verificar o autor com segurança, a mensagem não é analisada nem removida. A isenção é revalidada antes da punição.",
-    "Fonte antiga de regras (1563995880833421508) substituída pelo canal correto confirmado pela liderança: 1563995880833421508.",
+    "Canal oficial de regras consolidado em 1563995880833421508 em todas as rotinas de publicação e moderação.",
     "Código de Conduta fornecido pela liderança preparado como referência oficial: conduta, comunicação, conteúdo, segurança, divulgação, atendimento, autoridade, competições, denúncias, disciplina e disposições.",
     "Versão 1.5.4: canal oficial de regras atualizado para 1563995880833421508; o AutoMod ignora membros com permissões efetivas de moderação concedidas no servidor ou diretamente no canal antes de analisar e antes de punir.",
     "Versão 1.5.3: canal oficial de regras corrigido para 1563995880833421508, conforme o canal oficial indicado pela liderança.",
