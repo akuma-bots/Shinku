@@ -103,8 +103,15 @@ class NotasAtualizacao(commands.Cog):
             )
             return
 
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Marcar antes do primeiro await evita que duas interações iniciem
+        # envios em massa simultâneos para o mesmo servidor.
         self._sending.add(guild.id)
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except Exception:
+            self._sending.discard(guild.id)
+            raise
+
         delivered = blocked = failed = 0
         members = [member for member in guild.members if not member.bot]
         try:
