@@ -67,6 +67,15 @@ def _comando_tem_acesso_controlado(comando: app_commands.Command) -> bool:
     )
 
 
+def _iterar_comandos(comandos):
+    """Percorre comandos e subcomandos, incluindo grupos slash aninhados."""
+    for comando in comandos:
+        if isinstance(comando, app_commands.Group):
+            yield from _iterar_comandos(comando.commands)
+        elif isinstance(comando, app_commands.Command):
+            yield comando
+
+
 class PaginacaoAjuda(
     discord.ui.View
 ):
@@ -181,16 +190,13 @@ class Ajuda(commands.Cog):
         # Os comandos da NÊMESIS são registrados no escopo do servidor,
         # não no escopo global. Consultar get_commands() sem guild retornava
         # uma árvore vazia e fazia o /help afirmar que não havia comandos.
+        comandos = _iterar_comandos(
+            self.bot.tree.get_commands(guild=membro.guild)
+        )
         for comando in sorted(
-            self.bot.tree.get_commands(guild=membro.guild),
-            key=lambda comando: comando.name,
+            comandos,
+            key=lambda comando: comando.qualified_name,
         ):
-
-            if not isinstance(
-                comando,
-                app_commands.Command,
-            ):
-                continue
 
 
 
@@ -257,7 +263,7 @@ class Ajuda(commands.Cog):
                     else ""
                 )
                 linha = (
-                    f"**/{comando.name}**{acesso} — "
+                    f"**/{comando.qualified_name}**{acesso} — "
                     f"{comando.description}"
                 )
                 candidato = f"{bloco_atual}\n{linha}"
