@@ -99,6 +99,31 @@ bot = NemesisBot(
 )
 
 
+# Controle central de acesso: os comandos da NÊMESIS exigem o cargo oficial.
+NEMESIS_ROLE_ID = 1563995879990624372
+
+
+def membro_tem_acesso_nemesis(membro) -> bool:
+    return (
+        isinstance(membro, discord.Member)
+        and membro.guild.id == NEMESIS_GUILD_ID
+        and any(cargo.id == NEMESIS_ROLE_ID for cargo in membro.roles)
+    )
+
+
+async def verificar_acesso_slash(interaction: discord.Interaction) -> bool:
+    # O bot é exclusivo da NÊMESIS; não libera acesso por ser administrador.
+    return membro_tem_acesso_nemesis(interaction.user)
+
+
+bot.tree.interaction_check = verificar_acesso_slash
+
+
+@bot.check
+async def verificar_acesso_comandos_prefixo(ctx: commands.Context) -> bool:
+    return membro_tem_acesso_nemesis(ctx.author)
+
+
 @bot.tree.error
 async def tratar_erro_comando(
     interaction: discord.Interaction,
@@ -112,7 +137,7 @@ async def tratar_erro_comando(
     elif isinstance(erro, app_commands.CommandOnCooldown):
         mensagem = f"Este comando está em cooldown. Tente novamente em {erro.retry_after:.1f} s."
     elif isinstance(erro, app_commands.CheckFailure):
-        mensagem = "Você não atende aos requisitos para usar este comando."
+        mensagem = "Acesso restrito: é necessário possuir o cargo oficial da NÊMESIS para utilizar os comandos do bot."
     else:
         mensagem = "Ocorreu um erro ao executar o comando. A equipe técnica foi registrada para investigar."
         logging.error(
