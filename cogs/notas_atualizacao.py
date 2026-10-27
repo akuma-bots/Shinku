@@ -14,8 +14,8 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.4.0"
-RESUMO_PADRAO = "Correção do canal de progressão e melhoria do registro público de entrada com identificação de convidador."
+VERSAO_PADRAO = "1.4.1"
+RESUMO_PADRAO = "Correção do ranking de convites e ajustes no sistema de entrada e progressão."
 NOVIDADES_PADRAO = [
     "Sistema de entrada integrado ao rastreamento de convites, reunindo membro e convidador em uma única mensagem quando identificável.",
     "Comando /convites para consultar convidados que continuam no servidor.",
@@ -29,6 +29,7 @@ NOVIDADES_PADRAO = [
     "Verificação dos membros existentes para completar a atribuição dos cargos-base em caso de ausência.",
     "Registro de entrada enviado ao canal de logs configurado, com falhas de canal e permissão registradas nos logs técnicos.",
     "Modelo de notas da versão atual mantido pronto para revisão e envio pelo comando administrativo.",
+    "Ranking de convites corrigido para filtrar e limitar os resultados sem erro de execução.",
 ]
 CORRECOES_PADRAO = [
     "Contagem de convites alterada para considerar somente membros presentes no servidor.",
@@ -37,6 +38,7 @@ CORRECOES_PADRAO = [
     "A atribuição de convites só contabiliza casos identificados com segurança, evitando atribuições ambíguas.",
     "Falhas ao publicar a mensagem de entrada ficam explícitas nos logs técnicos.",
     "Corrigido o ID antigo do canal de progressão que causava erro na inicialização e nos anúncios de rank.",
+    "Corrigido o filtro dos 10 primeiros colocados no ranking de convites: o gerador agora é materializado antes do fatiamento.",
 ]
 
 
