@@ -14,9 +14,10 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.8"
-RESUMO_PADRAO = "Proteção administrativa reforçada, auditoria mais resiliente e notas compatíveis com os limites do Discord."
+VERSAO_PADRAO = "1.5.9"
+RESUMO_PADRAO = "Canal oficial de regras unificado na publicação, no AutoMod e na moderação manual."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.9: canal oficial de regras unificado em 1563995880833421508 nos sistemas de publicação e moderação; referências ao ID anterior removidas do código e das notas.",
     "Versão 1.5.8: notas de atualização compactadas para respeitar o limite de 6.000 caracteres por embed do Discord.",
     "Correção de proteção: objetos Member já resolvidos não são substituídos por uma consulta de cache que poderia retornar None e liberar análise automática indevida.",
     "Tratamento de erros aprimorado: interações expiradas ou já respondidas não provocam uma segunda falha ao tentar notificar o usuário.",
@@ -26,10 +27,10 @@ NOVIDADES_PADRAO = [
     "Logs de exclusão são apenas auditoria e não devem apagar mensagens; o evento de exclusão do Discord não identifica necessariamente quem executou a ação.",
     "Versão 1.5.6: novo comando /regras-publicar publica o Código de Conduta oficial em partes organizadas no canal de regras, sem apagar mensagens existentes; restrito a administradores da NÊMESIS.",
     "Versão 1.5.5: isenção do AutoMod agora resolve o membro pelo servidor antes da análise; se não for possível verificar o autor com segurança, a mensagem não é analisada nem removida. A isenção é revalidada antes da punição.",
-    "Fonte antiga de regras (1545831172796583987) substituída pelo canal correto confirmado pela liderança: 1563995880833421508.",
+    "Fonte antiga de regras (1563995880833421508) substituída pelo canal correto confirmado pela liderança: 1563995880833421508.",
     "Código de Conduta fornecido pela liderança preparado como referência oficial: conduta, comunicação, conteúdo, segurança, divulgação, atendimento, autoridade, competições, denúncias, disciplina e disposições.",
     "Versão 1.5.4: canal oficial de regras atualizado para 1563995880833421508; o AutoMod ignora membros com permissões efetivas de moderação concedidas no servidor ou diretamente no canal antes de analisar e antes de punir.",
-    "Versão 1.5.3: canal oficial de regras corrigido para 1545831172796583987, conforme o canal oficial indicado pela liderança.",
+    "Versão 1.5.3: canal oficial de regras corrigido para 1563995880833421508, conforme o canal oficial indicado pela liderança.",
     "Proteção do AutoMod mantida em duas camadas: a equipe com permissões efetivas de moderação/administração é ignorada antes da análise e novamente antes da exclusão/punição.",
     "Esclarecimento de auditoria: o listener de logs apenas registra eventos de mensagens excluídas; ele não executa exclusões. O evento do Discord não confirma sozinho quem apagou a mensagem.",
     "Canal oficial de regras do AutoMod confirmado pela liderança: 1563995880833421508.",
@@ -66,11 +67,12 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Corrigida a divergência entre AutoMod, publicação do Código de Conduta e moderação manual: todos apontam para 1563995880833421508.",
     "Corrigido HTTP 400 / Embed size exceeds maximum size of 6000 no comando /notas-atualizacao.",
     "Corrigido o tratamento do erro 10062 (Unknown interaction) para evitar traceback secundário durante o tratamento de falhas.",
     "Corrigido o caminho de isenção do AutoMod para manter as permissões do membro já resolvido.",
     "Corrigida a verificação do autor em eventos do AutoMod para resolver Member pelo servidor e falhar de forma segura sem excluir mensagens quando a identidade/permissões não puderem ser verificadas.",
-    "Canal oficial de regras restaurado para o ID 1545831172796583987, consistente com o sistema de moderação manual.",
+    "Canal oficial de regras restaurado para o ID 1563995880833421508, consistente com o sistema de moderação manual.",
     "Corrigida a divergência entre o ID do canal oficial de regras e a constante usada pelo AutoMod; ampliada a verificação de permissões efetivas para incluir overrides do canal.",
     "Corrigido o ID do canal de regras que causava a mensagem de falha ao carregar as regras oficiais.",
     "Corrigido o ID do canal oficial de regras para 1563995880833421508.",
