@@ -1603,7 +1603,14 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         # Segunda barreira obrigatória: jamais apagar ou punir se o membro tiver
         # permissões administrativas/moderativas efetivas no servidor ou canal.
-        if membro_pode_moderar(membro, message.channel):
+        # Revalida também o autor original para cobrir diferenças de cache/objeto.
+        if (
+            membro.id == guild.owner_id
+            or membro.guild_permissions.administrator
+            or membro.guild_permissions.manage_messages
+            or membro.guild_permissions.manage_guild
+            or membro_pode_moderar(membro, message.channel)
+        ):
             return
 
         nivel = int(infracao["nivel"])
@@ -2051,7 +2058,15 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 return
 
         # Isenção administrativa executada antes de qualquer histórico/detecção.
-        if membro_pode_moderar(membro, message.channel):
+        # Os administradores e responsáveis pela moderação têm bypass integral.
+        permissoes = membro.guild_permissions
+        if (
+            membro.id == message.guild.owner_id
+            or permissoes.administrator
+            or permissoes.manage_messages
+            or permissoes.manage_guild
+            or membro_pode_moderar(membro, message.channel)
+        ):
             return
 
         chave = (
