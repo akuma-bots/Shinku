@@ -365,6 +365,15 @@ class ProgressaoGangue(commands.Cog):
 
     async def registrar_recompensa(self, guild: discord.Guild, user_id: int, quantidade: int, tipo: str = "missao", evento_id: str = ""):
         """Aplica recompensa com deduplicação e atualização atômica do saldo."""
+        membro_autorizado = guild.get_member(user_id)
+        if membro_autorizado is None or not any(
+            cargo.id == CARGO_NEMESIS_ID for cargo in membro_autorizado.roles
+        ):
+            log.info(
+                "Recompensa de progressão bloqueada: membro sem cargo oficial (guild=%s user=%s).",
+                guild.id, user_id,
+            )
+            return
         quantidade = max(0, int(quantidade))
         if quantidade <= 0:
             return
