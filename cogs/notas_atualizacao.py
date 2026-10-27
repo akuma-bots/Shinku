@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.4.3"
-RESUMO_PADRAO = "Sistema de entrada redesenhado com identidade visual premium e integração mais informativa."
+VERSAO_PADRAO = "1.4.4"
+RESUMO_PADRAO = "Refinamento de segurança e experiência da NÊMESIS, com análise de raid mais cautelosa e comunicação profissional."
 NOVIDADES_PADRAO = [
+    "Anti-raid aprimorado: picos de entrada e contas recentes geram alerta para revisão da equipe, sem expulsão automática baseada apenas na idade da conta.",
+    "Alertas de segurança explicam o motivo da sinalização e registram o caso nos logs técnicos para facilitar a investigação.",
     "Sistema de entrada integrado ao rastreamento de convites, reunindo membro e convidador em uma única mensagem quando identificável.",
     "Comando /convites para consultar convidados que continuam no servidor.",
     "Ranking de convites baseado apenas nos convidados atualmente presentes na NÊMESIS.",
@@ -34,6 +36,7 @@ NOVIDADES_PADRAO = [
     "Sistema de entrada redesenhado com identidade visual preto e vermelho, identificação do membro, total de integrantes, registro temporal e próximos passos.",
 ]
 CORRECOES_PADRAO = [
+    "Reduzido o risco de expulsões indevidas durante falsos positivos de raid; a decisão de punição permanece com a equipe responsável.",
     "Contagem de convites alterada para considerar somente membros presentes no servidor.",
     "Saída de membro remove sua participação da contagem ativa, preservando o convidador original para uma eventual reentrada.",
     "Comando pessoal renomeado para /convites; entradas repetidas do mesmo ID não criam convites duplicados.",
