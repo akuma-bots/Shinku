@@ -118,18 +118,39 @@ def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefi
 
 
 def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str]) -> discord.Embed:
+    """Cria uma prévia compacta, respeitando o limite de 6.000 caracteres do Discord."""
     embed = discord.Embed(
         title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
-        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\n{discord.utils.escape_markdown(resumo)}",
+        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo[:500])}",
         color=COLOR,
         timestamp=datetime.now(timezone.utc),
     )
-    _adicionar_secao(embed, "✦ NOVIDADES", novidades, "➜")
+    # O histórico completo é extenso. A prévia apresenta os itens mais recentes
+    # e deixa margem segura para o limite de tamanho imposto pelo Discord.
+    _adicionar_secao(embed, "✦ NOVIDADES RECENTES", novidades[:3], "➜")
     if correcoes:
-        _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", correcoes, "✓")
+        _adicionar_secao(embed, "⚙ CORREÇÕES RECENTES", correcoes[:3], "✓")
     embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
+    if len(embed) > 5500:
+        compactado = discord.Embed(
+            title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
+            description=f"**{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo[:700])}",
+            color=COLOR,
+            timestamp=datetime.now(timezone.utc),
+        )
+        compactado.add_field(
+            name="Novidades",
+            value="\\n".join(f"• {discord.utils.escape_markdown(x[:350])}" for x in novidades[:3])[:1000] or "Sem novidades registradas.",
+            inline=False,
+        )
+        compactado.add_field(
+            name="Correções",
+            value="\\n".join(f"• {discord.utils.escape_markdown(x[:350])}" for x in correcoes[:3])[:1000] or "Sem correções registradas.",
+            inline=False,
+        )
+        compactado.set_footer(text="NÊMESIS • Notas oficiais de atualização")
+        return compactado
     return embed
-
 
 async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
     for tentativa in range(1, MAX_RETRIES + 1):
