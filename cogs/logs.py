@@ -164,18 +164,28 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(message.guild)
         if not canal or canal.id == message.channel.id:
             return  # evita loop se o canal de logs for o mesmo onde a mensagem foi apagada
-        conteudo = message.content or "*(sem texto)*"
+        conteudo = message.content or "*(sem texto disponível no cache do Discord)*"
         anexos = "\n".join(
             f"[{anexo.filename}]({anexo.url})" for anexo in message.attachments[:8]
         )
         descricao = (
-            f"**Autor:** {message.author.mention} ({message.author.id})\n"
-            f"**Canal:** {message.channel.mention}\n"
-            f"**Mensagem:**\n{conteudo[:1200]}"
+            f"**Autor:** {message.author.mention} (ID: {message.author.id})\n"
+            f"**Canal de origem:** {message.channel.mention} (ID: {message.channel.id})\n"
+            f"**ID da mensagem:** {message.id}\n"
+            f"**Conteúdo registrado:**\n{conteudo[:1200]}"
         )
         if anexos:
             descricao += f"\n**Anexos:**\n{anexos[:1200]}"
-        embed = discord.Embed(description=descricao[:4000], color=0xED4245)
+        descricao += (
+            "\n\n*Auditoria informativa: o evento de exclusão do Discord não identifica "
+            "com segurança quem executou a exclusão. Este listener não apaga mensagens.*"
+        )
+        embed = discord.Embed(
+            title="AUDITORIA • MENSAGEM EXCLUÍDA",
+            description=descricao[:4000],
+            color=0xED4245,
+            timestamp=datetime.now(timezone.utc),
+        )
         await self._enviar_log(canal, embed)
 
     @commands.Cog.listener()
