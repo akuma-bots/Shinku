@@ -443,28 +443,31 @@ def membro_pode_moderar(membro, canal=None) -> bool:
     if membro.id == guild.owner_id:
         return True
 
-    # Cargos administrativos nomeados também são isentos, mesmo sem a flag
-    # Administrator do Discord. Evita apagar mensagens de cargos "Admin/Staff".
-    nomes_protegidos = {
-        "admin", "admins", "administrador", "administradora",
-        "administradores", "administracao", "administração",
-        "staff", "equipe administrativa", "equipe de moderacao",
-        "equipe de moderação", "moderador", "moderadora",
-        "moderadores", "moderacao", "moderação",
-    }
-    if any((cargo.name or "").strip().casefold() in nomes_protegidos for cargo in membro.roles):
-        return True
+    # Cargos administrativos/de confiança são isentos mesmo se a equipe não
+    # recebeu a flag Administrator. A comparação por fragmentos cobre variações
+    # reais de nomes (ex.: "Administração NÊMESIS", "Staff • OCTÓGONO").
+    nomes_protegidos = (
+        "admin", "administr", "staff", "modera", "moderador",
+        "octogono", "octógono", "lider", "líder", "diretor",
+        "diretoria", "gerencia", "gerência", "equipe de suporte",
+    )
+    for cargo in membro.roles:
+        nome = (cargo.name or "").strip().casefold()
+        if any(fragmento in nome for fragmento in nomes_protegidos):
+            return True
 
     permissoes = membro.guild_permissions
     try:
         permissoes_canal = canal.permissions_for(membro) if canal is not None else permissoes
     except (AttributeError, TypeError, discord.HTTPException):
+        # Se não for possível validar permissões de canal, preserve as permissões
+        # do servidor; nunca trate uma falha de leitura como autorização para punir.
         permissoes_canal = permissoes
 
     flags_protegidas = (
         "administrator", "manage_guild", "manage_messages", "manage_channels",
         "manage_roles", "manage_webhooks", "view_audit_log", "kick_members",
-        "ban_members", "moderate_members",
+        "ban_members", "moderate_members", "manage_threads",
     )
     return any(bool(getattr(permissoes, flag, False)) for flag in flags_protegidas) or any(
         bool(getattr(permissoes_canal, flag, False)) for flag in flags_protegidas
