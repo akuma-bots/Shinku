@@ -30,7 +30,8 @@ def _valor(valor, unidade: str) -> str:
     except (TypeError, ValueError):
         return f"{valor} {unidade}".strip()
     texto = f"{numero:,.2f}" if not numero.is_integer() else f"{int(numero):,}"
-    return f"{texto.replace(',', '.')} {unidade}".strip()
+    texto = texto.replace(",", "§").replace(".", ",").replace("§", ".")
+    return f"{texto} {unidade}".strip()
 
 
 class Recordes(commands.Cog):
