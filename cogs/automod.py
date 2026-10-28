@@ -424,18 +424,14 @@ def porcentagem_maiusculas(
 
 
 def membro_pode_moderar(membro, canal=None) -> bool:
-    """Isenta proprietário/admin e equipe com permissões efetivas de moderação.
+    """Fail-safe: isenta liderança/administração antes de qualquer análise ou ação.
 
-    Resolve novamente o membro a partir do servidor quando o evento fornece
-    apenas User. A isenção é aplicada antes de contabilizar histórico e também
-    imediatamente antes de qualquer exclusão ou punição.
+    Permissões efetivas e cargos confiáveis são tratados como proteção. A
+    normalização evita falhas por acentos, caixa, separadores ou caracteres
+    decorativos em nomes de cargos.
     """
-    # Member herda de User: preserve o objeto já resolvido. Um lookup no cache
-    # que retorne None não pode desativar a proteção de administradores/equipe.
-    if not isinstance(membro, discord.Member):
-        guild_origem = getattr(membro, "guild", None)
-        if isinstance(membro, discord.User) and guild_origem is not None:
-            membro = guild_origem.get_member(membro.id)
+    import unicodedata
+
     if not isinstance(membro, discord.Member):
         return False
 
@@ -443,35 +439,45 @@ def membro_pode_moderar(membro, canal=None) -> bool:
     if membro.id == guild.owner_id:
         return True
 
-    # Cargos administrativos/de confiança são isentos mesmo se a equipe não
-    # recebeu a flag Administrator. A comparação por fragmentos cobre variações
-    # reais de nomes (ex.: "Administração NÊMESIS", "Staff • OCTÓGONO").
+    def normalizar_nome(valor: str) -> str:
+        valor = unicodedata.normalize("NFKD", valor or "")
+        valor = "".join(c for c in valor if not unicodedata.combining(c))
+        return re.sub(r"[^a-z0-9]+", "", valor.casefold())
+
     nomes_protegidos = (
-        "admin", "administr", "staff", "modera", "moderador",
-        "octogono", "octógono", "lider", "líder", "diretor",
-        "diretoria", "gerencia", "gerência", "equipe de suporte",
+        "admin", "administr", "staff", "moder", "octogono",
+        "lider", "diretor", "gerencia", "suporte", "equipe",
     )
     for cargo in membro.roles:
-        nome = (cargo.name or "").strip().casefold()
-        if any(fragmento in nome for fragmento in nomes_protegidos):
+        nome = normalizar_nome(cargo.name)
+        if nome and any(fragmento in nome for fragmento in nomes_protegidos):
+            return True
+        # Um cargo com permissão de administrador é sempre isento,
+        # mesmo que seu nome não indique função administrativa.
+        if cargo.permissions.administrator:
             return True
 
     permissoes = membro.guild_permissions
-    try:
-        permissoes_canal = canal.permissions_for(membro) if canal is not None else permissoes
-    except (AttributeError, TypeError, discord.HTTPException):
-        # Se não for possível validar permissões de canal, preserve as permissões
-        # do servidor; nunca trate uma falha de leitura como autorização para punir.
-        permissoes_canal = permissoes
-
     flags_protegidas = (
-        "administrator", "manage_guild", "manage_messages", "manage_channels",
-        "manage_roles", "manage_webhooks", "view_audit_log", "kick_members",
-        "ban_members", "moderate_members", "manage_threads",
+        "administrator", "manage_guild", "manage_messages",
+        "manage_channels", "manage_roles", "manage_webhooks",
+        "view_audit_log", "kick_members", "ban_members",
+        "moderate_members", "manage_threads",
     )
-    return any(bool(getattr(permissoes, flag, False)) for flag in flags_protegidas) or any(
-        bool(getattr(permissoes_canal, flag, False)) for flag in flags_protegidas
-    )
+    if any(bool(getattr(permissoes, flag, False)) for flag in flags_protegidas):
+        return True
+
+    if canal is not None:
+        try:
+            efetivas = canal.permissions_for(membro)
+        except (AttributeError, TypeError, discord.HTTPException):
+            # Não concluir que a pessoa é comum se a validação falhar.
+            # Em caso de erro, bloquear o AutoMod para este membro.
+            return True
+        if any(bool(getattr(efetivas, flag, False)) for flag in flags_protegidas):
+            return True
+
+    return False
 
 
 class ModalMotivoDecisao(discord.ui.Modal):
