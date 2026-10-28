@@ -1656,6 +1656,23 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         if medida not in nomes:
             medida = {1: "warn", 2: "timeout", 3: "kick", 4: "ban_temp", 5: "ban_permanente"}[nivel]
 
+        # Última barreira imediatamente antes da exclusão. Não depender apenas
+        # da validação feita no início do listener: cargos/permissões podem mudar.
+        permissoes_finais = membro.guild_permissions
+        if (
+            membro.id == guild.owner_id
+            or permissoes_finais.administrator
+            or permissoes_finais.manage_messages
+            or permissoes_finais.manage_guild
+            or membro_pode_moderar(membro, message.channel)
+        ):
+            logger = __import__("logging").getLogger(__name__)
+            logger.info(
+                "AutoMod ignorou ação por isenção administrativa (guild=%s, member=%s, message=%s).",
+                guild.id, membro.id, message.id,
+            )
+            return
+
         # Remoção da mensagem primeiro reduz a exposição do conteúdo nocivo.
         try:
             await message.delete()
