@@ -14,9 +14,10 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.15"
-RESUMO_PADRAO = "Correção do canal de histórico dos tickets e reforço final do bypass administrativo do AutoMod."
+VERSAO_PADRAO = "1.5.16"
+RESUMO_PADRAO = "Avaliação de tickets redesenhada e direcionada ao canal oficial da NÊMESIS."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.16: avaliações de tickets enviadas ao canal 1563995881806758056; embed redesenhado com identidade NÊMESIS, nota/estrelas, cliente, responsável, comentário, média do atendente e horário do registro.",
     "Versão 1.5.15: canal de histórico de tickets atualizado para 1563995882540498997. AutoMod revalida o membro antes da ação e cancela exclusão/punição se a API não confirmar o estado atual; proprietário, Administrator, Gerenciar mensagens/servidor e equipe confiável têm bypass integral.",
     "Versão 1.5.14: bypass do AutoMod reforçado com normalização de nomes de cargos, isenção de cargos com permissão Administrator e fail-safe: se a validação de permissões no canal falhar, o bot não aplica a punição.",
     "Auditoria: cogs/logs.py registra mensagens que o Discord informa como excluídas; não chama message.delete(). Para evitar punições indevidas, o AutoMod revalida permissões e cargos antes de remover a mensagem.",
