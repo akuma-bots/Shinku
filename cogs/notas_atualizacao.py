@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.19"
-RESUMO_PADRAO = "Painel de sistema mais informativo e orientações de suporte aprimoradas."
+VERSAO_PADRAO = "1.5.20"
+RESUMO_PADRAO = "Painéis operacionais e arquivo competitivo com apresentação mais clara e consistente."
 NOVIDADES_PADRAO = [
+    "Arquivo de recordes reorganizado com categorias identificáveis, valores formatados e apresentação consistente com a identidade NÊMESIS.",
+    "Configuração do canal de recordes agora confirma a alteração em um painel informativo padronizado.",
     "Painel /sistema status agora apresenta latência, tempo ativo, comandos do servidor e estado dos módulos em uma única leitura.",
     "Diagnóstico de armazenamento apresenta resultados com identidade visual consistente e instruções mais claras para cada cenário.",
     "Tutorial de perfil orienta quais informações enviar ao suporte para facilitar a investigação de divergências.",
@@ -32,6 +34,7 @@ NOVIDADES_PADRAO = [
     "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
 ]
 CORRECOES_PADRAO = [
+    "O sistema de recordes trata falhas de anúncio sem interromper o fluxo de atualização das estatísticas.",
     "Padronizada a apresentação do diagnóstico do sistema para diferenciar estados operacionais, alertas e falhas.",
     "Reforçada a barreira de segurança para reduzir exclusões automáticas indevidas em contas com permissões administrativas.",
     "Corrigida a apresentação das notas para reduzir repetições e evitar excesso de informações técnicas.",
