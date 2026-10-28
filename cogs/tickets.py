@@ -236,7 +236,7 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     return embed
 
 
-CANAL_AVALIACOES_TICKET_ID = 1545835885063438487
+CANAL_AVALIACOES_TICKET_ID = 1563995881806758056
 
 CANAL_HISTORICO_TICKETS_ID = 1563995882540498997
 
@@ -363,18 +363,49 @@ class FeedbackTicketModal(discord.ui.Modal):
         rotulo = {5: "Excelente", 4: "Muito bom", 3: "Bom", 2: "Regular", 1: "Ruim"}[self.nota]
         media_texto = f"{media:.2f}/5 ⭐" if media is not None else "Ainda sem avaliações"
         if canal is not None and callable(getattr(canal, "send", None)):
-            embed = criar_embed("✦・ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO ・✦", f"Ticket #{self.ticket_id} • avaliação verificada", rodape="Central de atendimento NÊMESIS")
-            embed.add_field(name="Nota", value=f"{self.nota}/5 — {rotulo}\n{'⭐' * self.nota}", inline=True)
-            embed.add_field(name="Cliente", value=f"<@{self.owner_id}> · ID {self.owner_id}", inline=True)
-            embed.add_field(name="Responsável", value=f"<@{self.atendente_id}> · ID {self.atendente_id}" if self.atendente_id else "Não identificado", inline=True)
-            embed.add_field(name="Feedback", value=comentario[:1024] if comentario else "O cliente não deixou comentário.", inline=False)
-            embed.add_field(name="Tickets encerrados pelo responsável", value=str(total), inline=True)
-            embed.add_field(name="Média atual do responsável", value=media_texto, inline=True)
-            embed.add_field(name="Avaliado em", value=discord.utils.format_dt(discord.utils.utcnow(), style="F"), inline=False)
+            embed = criar_embed(
+                "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — AVALIAÇÃO DE ATENDIMENTO ・✦",
+                f"**Ticket #{self.ticket_id}** · avaliação confirmada\n\n"
+                "O feedback abaixo foi enviado pelo responsável pelo ticket e será usado "
+                "para acompanhar a qualidade da Central de Atendimento.",
+                rodape="NÊMESIS • Qualidade e experiência do membro",
+            )
+            embed.color = 0xB3132B
+            embed.add_field(
+                name="◈ NOTA DO ATENDIMENTO",
+                value=f"**{self.nota}/5 — {rotulo}**\n{'⭐' * self.nota}",
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ CLIENTE",
+                value=f"<@{self.owner_id}>\nID: `{self.owner_id}`",
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ RESPONSÁVEL",
+                value=f"<@{self.atendente_id}>\nID: `{self.atendente_id}`" if self.atendente_id else "Não identificado",
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ COMENTÁRIO",
+                value=(comentario[:1024] if comentario else "O cliente não deixou comentário."),
+                inline=False,
+            )
+            embed.add_field(name="ATENDIMENTOS ENCERRADOS", value=str(total), inline=True)
+            embed.add_field(name="MÉDIA DO RESPONSÁVEL", value=media_texto, inline=True)
+            embed.add_field(
+                name="REGISTRADO EM",
+                value=discord.utils.format_dt(discord.utils.utcnow(), style="F"),
+                inline=False,
+            )
             try:
                 await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
             except (discord.Forbidden, discord.HTTPException):
-                logging.exception("Avaliação do ticket %s salva, mas não publicada.", self.ticket_id)
+                logging.exception(
+                    "Avaliação do ticket %s salva, mas não publicada no canal %s.",
+                    self.ticket_id,
+                    CANAL_AVALIACOES_TICKET_ID,
+                )
         await interaction.followup.send(f"Obrigado pelo feedback! Sua avaliação foi registrada: {self.nota}/5 — {rotulo}.", ephemeral=True)
 
 
