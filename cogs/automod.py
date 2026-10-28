@@ -1604,16 +1604,19 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     return
 
-        # Segunda barreira obrigatória: jamais apagar ou punir se o membro tiver
-        # permissões administrativas/moderativas efetivas no servidor ou canal.
-        # Revalida também o autor original para cobrir diferenças de cache/objeto.
-        if (
-            membro.id == guild.owner_id
-            or membro.guild_permissions.administrator
-            or membro.guild_permissions.manage_messages
-            or membro.guild_permissions.manage_guild
-            or membro_pode_moderar(membro, message.channel)
-        ):
+        # Reconsulta o membro na API imediatamente antes de qualquer ação.
+        # O objeto do evento pode estar desatualizado após uma mudança de cargo
+        # ou permissão; falha de consulta significa NÃO apagar nem punir.
+        try:
+            membro_atual = await guild.fetch_member(message.author.id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            return
+        membro = membro_atual
+
+        # Barreira de segurança final: proprietário, administradores, moderação
+        # e cargos administrativos confiáveis nunca entram na punição automática.
+        # A função também considera permissões efetivas no canal.
+        if membro_pode_moderar(membro, message.channel):
             return
 
         nivel = int(infracao["nivel"])
