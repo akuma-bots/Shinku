@@ -14,7 +14,7 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.20"
+VERSAO_PADRAO = "1.5.21"
 RESUMO_PADRAO = "Painéis operacionais e arquivo competitivo com apresentação mais clara e consistente."
 NOVIDADES_PADRAO = [
     "Arquivo de recordes reorganizado com categorias identificáveis, valores formatados e apresentação consistente com a identidade NÊMESIS.",
@@ -34,6 +34,7 @@ NOVIDADES_PADRAO = [
     "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
 ]
 CORRECOES_PADRAO = [
+    "Formatação numérica do arquivo de recordes ajustada para o padrão brasileiro, com separadores de milhar e decimais corretos.",
     "O sistema de recordes trata falhas de anúncio sem interromper o fluxo de atualização das estatísticas.",
     "Padronizada a apresentação do diagnóstico do sistema para diferenciar estados operacionais, alertas e falhas.",
     "Reforçada a barreira de segurança para reduzir exclusões automáticas indevidas em contas com permissões administrativas.",
