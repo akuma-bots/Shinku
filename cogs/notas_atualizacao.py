@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Modelo pronto referente às melhorias já aplicadas ao bot da NÊMESIS.
-VERSAO_PADRAO = "1.5.13"
-RESUMO_PADRAO = "Revalidação de permissões antes de punições; logs seguem somente para auditoria."
+VERSAO_PADRAO = "1.5.14"
+RESUMO_PADRAO = "Bypass administrativo do AutoMod reforçado e auditoria de exclusões esclarecida."
 NOVIDADES_PADRAO = [
+    "Versão 1.5.14: bypass do AutoMod reforçado com normalização de nomes de cargos, isenção de cargos com permissão Administrator e fail-safe: se a validação de permissões no canal falhar, o bot não aplica a punição.",
+    "Auditoria: cogs/logs.py registra mensagens que o Discord informa como excluídas; não chama message.delete(). Para evitar punições indevidas, o AutoMod revalida permissões e cargos antes de remover a mensagem.",
+
     "Versão 1.5.13: AutoMod consulta o membro novamente na API imediatamente antes de apagar ou punir; se não conseguir confirmar cargos/permissões atuais, cancela a ação. A checagem final centraliza proprietário, Administrador, equipe confiável e permissões efetivas de moderação.",
     "Versão 1.5.12: isenção do AutoMod ampliada para variações de nomes de cargos administrativos e de liderança (Administração, Staff, Moderação, OCTÓGONO, Diretoria e equivalentes), além das permissões efetivas no servidor/canal. A checagem continua antes da análise e novamente antes de apagar ou punir.",
     "Esclarecimento operacional: cogs/logs.py apenas registra o evento de mensagem excluída; não chama message.delete(). A identificação do executor da exclusão exige correlacionar o registro de auditoria do Discord quando disponível.",
