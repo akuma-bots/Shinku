@@ -238,7 +238,7 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
 
 CANAL_AVALIACOES_TICKET_ID = 1545835885063438487
 
-CANAL_HISTORICO_TICKETS_ID = 1545840693921185903
+CANAL_HISTORICO_TICKETS_ID = 1563995882540498997
 
 async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
     destino = canal.guild.get_channel(CANAL_HISTORICO_TICKETS_ID)
