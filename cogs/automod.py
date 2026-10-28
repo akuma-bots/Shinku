@@ -1611,18 +1611,30 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                     return
 
         # Reconsulta o membro na API imediatamente antes de qualquer ação.
-        # O objeto do evento pode estar desatualizado após uma mudança de cargo
-        # ou permissão; falha de consulta significa NÃO apagar nem punir.
+        # Se não for possível confirmar cargos/permissões atuais, a ação é cancelada.
         try:
             membro_atual = await guild.fetch_member(message.author.id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning(
+                "AutoMod cancelado: não foi possível validar o membro antes da ação "
+                "(guild=%s, member=%s, message=%s).",
+                guild.id, message.author.id, message.id,
+            )
             return
         membro = membro_atual
 
-        # Barreira de segurança final: proprietário, administradores, moderação
-        # e cargos administrativos confiáveis nunca entram na punição automática.
-        # A função também considera permissões efetivas no canal.
-        if membro_pode_moderar(membro, message.channel):
+        # Barreira final redundante e explícita: qualquer permissão administrativa
+        # ou de moderação concede bypass integral, inclusive permissões efetivas
+        # do canal. A mensagem não é apagada e nenhuma punição é aplicada.
+        permissoes = membro.guild_permissions
+        if (
+            membro.id == guild.owner_id
+            or permissoes.administrator
+            or permissoes.manage_messages
+            or permissoes.manage_guild
+            or membro_pode_moderar(membro, message.channel)
+        ):
             return
 
         nivel = int(infracao["nivel"])
