@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.17"
-RESUMO_PADRAO = "Notas de atualização mais claras, objetivas e profissionais."
+VERSAO_PADRAO = "1.5.18"
+RESUMO_PADRAO = "Proteção administrativa do AutoMod reforçada e auditoria mais confiável."
 NOVIDADES_PADRAO = [
+    "AutoMod com verificação final de isenção administrativa imediatamente antes de excluir uma mensagem.",
+    "Registro técnico quando uma ação automática é interrompida pela proteção administrativa.",
     "Sistema de notas reorganizado para destacar somente novidades, recursos e melhorias percebidas pelos membros.",
     "Atualizações apresentadas em linguagem clara, com foco no que mudou e no benefício para a comunidade.",
     "Identidade visual da NÊMESIS mantida em preto e vermelho, com títulos e seções mais consistentes.",
@@ -27,6 +29,7 @@ NOVIDADES_PADRAO = [
     "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
 ]
 CORRECOES_PADRAO = [
+    "Reforçada a barreira de segurança para reduzir exclusões automáticas indevidas em contas com permissões administrativas.",
     "Corrigida a apresentação das notas para reduzir repetições e evitar excesso de informações técnicas.",
     "Corrigido o limite de conteúdo dos embeds para prevenir falhas ao exibir atualizações extensas.",
     "Aprimorado o tratamento de falhas no envio para que problemas de entrega não interrompam todo o processo.",
