@@ -14,9 +14,12 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.18"
-RESUMO_PADRAO = "Proteção administrativa do AutoMod reforçada e auditoria mais confiável."
+VERSAO_PADRAO = "1.5.19"
+RESUMO_PADRAO = "Painel de sistema mais informativo e orientações de suporte aprimoradas."
 NOVIDADES_PADRAO = [
+    "Painel /sistema status agora apresenta latência, tempo ativo, comandos do servidor e estado dos módulos em uma única leitura.",
+    "Diagnóstico de armazenamento apresenta resultados com identidade visual consistente e instruções mais claras para cada cenário.",
+    "Tutorial de perfil orienta quais informações enviar ao suporte para facilitar a investigação de divergências.",
     "AutoMod com verificação final de isenção administrativa imediatamente antes de excluir uma mensagem.",
     "Registro técnico quando uma ação automática é interrompida pela proteção administrativa.",
     "Sistema de notas reorganizado para destacar somente novidades, recursos e melhorias percebidas pelos membros.",
@@ -29,6 +32,7 @@ NOVIDADES_PADRAO = [
     "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
 ]
 CORRECOES_PADRAO = [
+    "Padronizada a apresentação do diagnóstico do sistema para diferenciar estados operacionais, alertas e falhas.",
     "Reforçada a barreira de segurança para reduzir exclusões automáticas indevidas em contas com permissões administrativas.",
     "Corrigida a apresentação das notas para reduzir repetições e evitar excesso de informações técnicas.",
     "Corrigido o limite de conteúdo dos embeds para prevenir falhas ao exibir atualizações extensas.",
