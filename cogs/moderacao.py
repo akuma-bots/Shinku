@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import datetime
 import logging
 import discord
@@ -512,7 +513,7 @@ class Moderacao(commands.Cog):
                     f" — Parte {indice}/{len(partes)}"
                 )
 
-            embed = discord.Embed(
+            embed = criar_embed(
                 title=titulo,
                 description=parte,
                 color=0x5865F2
@@ -631,7 +632,7 @@ class Moderacao(commands.Cog):
                 f" — {membro.display_name}"
             )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title=titulo,
             description="\n".join(linhas),
             color=0xED4245
