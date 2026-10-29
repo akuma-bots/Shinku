@@ -268,14 +268,27 @@ class Desafios(commands.Cog):
             return
 
         embed = criar_embed(
-            "N̷ÊMESIS ━ DESAFIO PvP",
-            f"{interaction.user.mention} desafiou {membro.mention} para uma luta!",
+            "⚔️ CONVOCAÇÃO DE COMBATE · PvP",
+            "**UM NOVO CONFRONTO FOI PROPOSTO**\n"
+            "O desafio só passa para a fase de luta depois que o oponente aceitar. "
+            "Após o combate, o resultado deverá ser enviado para revisão da equipe.",
             cor=COR_ERRO,
-            rodape="NÊMESIS • Desafios competitivos",
+            rodape=None,
         )
+        embed.set_author(name="NÊMESIS  /  ARENA COMPETITIVA")
+        embed.add_field(name="DESAFIANTE", value=f"{interaction.user.mention}\n`{interaction.user.display_name[:80]}`", inline=True)
+        embed.add_field(name="OPONENTE", value=f"{membro.mention}\n`{membro.display_name[:80]}`", inline=True)
+        embed.add_field(name="FASE ATUAL", value="🟡 Aguardando resposta do oponente", inline=False)
         if aposta_xp > 0:
-            embed.add_field(name="◈ APOSTA", value=f"{aposta_xp} XP de cada lado (quem vencer leva os {aposta_xp * 2} XP)")
-        embed.set_footer(text=f"ID: {desafio['id']}")
+            embed.add_field(
+                name="💠 XP EM DISPUTA",
+                value=f"Cada participante arrisca **{aposta_xp} XP**.\nO vencedor recebe **{aposta_xp * 2} XP** da aposta, além da recompensa de vitória prevista pelo sistema.",
+                inline=False,
+            )
+        else:
+            embed.add_field(name="💠 MODALIDADE", value="Duelo sem aposta de XP.", inline=False)
+        embed.add_field(name="PRÓXIMO PASSO", value="O oponente deve escolher **Aceitar** ou **Recusar**. Se aceitar, a luta será publicada no canal competitivo.", inline=False)
+        embed.set_footer(text=f"REGISTRO {desafio['id']}  •  NÊMESIS PvP")
         try:
             msg = await canal.send(
                 content=membro.mention,

@@ -396,6 +396,7 @@ class Missoes(commands.Cog):
         return padrao
 
     async def _montar_painel_missoes(self, guild: discord.Guild, jogo: str) -> discord.Embed:
+        """Painel operacional de missões: catálogo, estado e recompensa em leitura rápida."""
         jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
         dados = await missoes._guild(guild.id)
@@ -406,80 +407,54 @@ class Missoes(commands.Cog):
         atividades.sort(key=lambda item: (
             {"missao": 0, "contribuicao": 1, "especial": 2}.get(
                 str(item.get("tipo") or "missao").lower(), 9
-            ),
-            str(item.get("id") or ""),
+            ), str(item.get("id") or ""),
         ))
-
         abertas = sum(1 for item in atividades if item.get("ativa", True) is not False)
         encerradas = len(atividades) - abertas
+        pagina = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
         embed = criar_embed(
-            f"✦・ N̷ÊMESIS — CENTRAL DE MISSÕES ・✦",
-            (
-                f"**◈ JOGO SELECIONADO**  ·  {nome_jogo}\n"
-                "**CATÁLOGO DE OPERAÇÕES**\n"
-                "Escolha uma missão e envie a prova pelo comando "
-                "`/missao-enviar-prova`. A equipe validará a participação antes "
-                "da liberação das recompensas."
-            ),
-            cor=0x9F2035,
-            rodape=None,
+            f"🎯 CENTRAL DE MISSÕES · {nome_jogo.upper()}",
+            f"**CENTRAL DE MISSÕES NÊMESIS** · Jogo selecionado: **{nome_jogo}**\n"
+            "Selecione uma operação ativa no catálogo abaixo. Ao concluir o objetivo, envie a prova pelo comando `/missao-enviar-prova`; "
+            "a recompensa só é liberada após validação da equipe.\n\n"
+            "`01` Consulte o objetivo  ·  `02` Registre a prova  ·  `03` Aguarde a auditoria",
+            cor=0x9F2035, rodape=None,
         )
-        embed.set_author(name="NÊMESIS  /  CENTRAL DE OPERAÇÕES")
-        embed.add_field(name="◉ DISPONÍVEIS", value=f"`{abertas}`", inline=True)
-        embed.add_field(name="■ ENCERRADAS", value=f"`{encerradas}`", inline=True)
-        embed.add_field(name="◈ TOTAL", value=f"`{len(atividades)}`", inline=True)
-
+        embed.set_author(name="NÊMESIS  /  OPERAÇÕES E CONTRIBUIÇÕES")
+        embed.add_field(name="🟢 EM OPERAÇÃO", value=f"**{abertas}**", inline=True)
+        embed.add_field(name="⛔ ENCERRADAS", value=f"**{encerradas}**", inline=True)
+        embed.add_field(name="◈ NO CATÁLOGO", value=f"**{len(atividades)}**", inline=True)
         if not atividades:
             embed.add_field(
-                name="╭── ◈ CATÁLOGO VAZIO",
-                value="Ainda não há operações cadastradas para este jogo.",
+                name="◈ CATÁLOGO VAZIO",
+                value="Não há operações cadastradas para este jogo no momento. Consulte a equipe para saber quando novas missões serão publicadas.",
                 inline=False,
             )
-
-        for indice, item in enumerate(atividades[:20], start=1):
+        for indice, item in enumerate(atividades[:12], start=1):
             tipo_chave = str(item.get("tipo") or "missao").lower()
             tipo = TIPOS.get(tipo_chave, TIPOS["missao"])
             try:
-                recompensa = max(
-                    0,
-                    int(item.get("recompensa_xp", item.get("pontos", 0)) or 0),
-                )
+                recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
             except (TypeError, ValueError):
                 recompensa = 0
-            estado = "Disponível" if item.get("ativa", True) is not False else "Encerrada"
-            icone = tipo.get("emoji", "🎯")
+            ativa = item.get("ativa", True) is not False
+            estado = "🟢 ABERTA" if ativa else "⛔ ENCERRADA"
             titulo = str(item.get("titulo") or "Operação sem título").strip()
-            descricao = str(item.get("descricao") or "Sem descrição cadastrada").strip()
-            if not descricao:
-                descricao = "Sem descrição cadastrada"
+            descricao = str(item.get("descricao") or "Objetivo não detalhado.").strip() or "Objetivo não detalhado."
             identificador = str(item.get("id") or "—")
             embed.add_field(
-                name=f"{icone} {indice:02d} · {titulo[:75]} — {recompensa:,} P.C.".replace(",", ".")[:150],
+                name=f"{tipo.get('emoji', '🎯')} {indice:02d} · {titulo[:54]} · {recompensa:,} P.C.".replace(",", ".")[:256],
                 value=(
-                    f"{descricao[:110]}\n"
-                    f"┊ **Tipo:** {tipo['nome']}  ·  **Estado:** {estado}\n"
-                    f"┊ **ID:** `{identificador[:24]}`"
-                )[:1024],
+                    f"{descricao[:100]}\n"
+                    f"{estado} · {tipo['nome']}\n"
+                    f"**Recompensa:** `{recompensa:,}` P.C.\n"
+                    f"**ID:** `{identificador[:24]}`"
+                ).replace(",", ".")[:1024],
                 inline=False,
             )
-
-        if len(atividades) > 20:
-            embed.add_field(
-                name="◈ CATÁLOGO COMPLEMENTAR",
-                value=(
-                    f"Exibindo 20 de {len(atividades)} operações. "
-                    "Consulte os canais oficiais de missões para acessar as demais."
-                ),
-                inline=False,
-            )
-
-        embed.set_footer(
-            text=(
-                f"PÁGINA:{jogo} • JOGO "
-                f"{list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/"
-                f"{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
-            )
-        )
+        if len(atividades) > 12:
+            embed.add_field(name="◈ CATÁLOGO COMPLEMENTAR", value=f"Este painel exibe as primeiras 12 de {len(atividades)} operações. Use os canais oficiais para consultar as demais.", inline=False)
+        embed.set_footer(text=f"PÁGINA:{jogo} • CATÁLOGO {pagina}/{len(ranking_missoes_jogos.JOGOS)}  •  Use os botões para alternar o jogo")
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
@@ -523,56 +498,48 @@ class Missoes(commands.Cog):
             log.exception("Não foi possível atualizar o painel de missões.")
 
     async def _montar_painel_ranking(self, guild: discord.Guild, jogo: str) -> discord.Embed:
+        """Classificação competitiva com cartões por jogador e métricas resumidas."""
         jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
         linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
-        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
-        if linhas:
+        pagina = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
+        embed = criar_embed(
+            f"🏆 RANKING {nome_jogo.upper()} · CIRCUITO COMPETITIVO",
+            f"**JOGO SELECIONADO** · {nome_jogo}\n**QUADRO OFICIAL DE CLASSIFICAÇÃO**\n"
+            "A posição é definida pelos Pontos de Contribuição (P.C.) registrados após validação. "
+            "As métricas adicionais ajudam a comparar desempenho, consistência e participação.",
+            cor=0x9F2035, rodape=None,
+        )
+        embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
+        if not linhas:
+            embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos."
+            embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos.", inline=False)
+        else:
             estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
                 guild.id, [uid for uid, _, _ in linhas], jogo=jogo
             )
-            linhas_texto = []
+            medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
             for posicao, (uid, nome, pontos) in enumerate(linhas, start=1):
-                selo = medalhas.get(posicao, f"**{posicao:02d}.**")
                 stats = estatisticas.get(str(uid), {})
                 minutos = max(0, int(stats.get("tempo_top", 0))) // 60
                 dias, resto = divmod(minutos, 1440)
                 horas, minutos = divmod(resto, 60)
                 tempo = f"{dias}d {horas}h" if dias else f"{horas}h {minutos}min"
-                linhas_texto.append(
-                    f"{selo} <@{uid}>  ━  **{pontos:,} P.C.**".replace(",", ".")
-                    + f"\n┊ V/E/D **{stats.get('vitorias', 0)}/{stats.get('empates', 0)}/{stats.get('derrotas', 0)}**"
-                    + f"  ·  XP **{stats.get('xp', 0):,}**".replace(",", ".")
-                    + f"  ·  K/D **{stats.get('kills', 0)}/{stats.get('deaths', 0)}** ({stats.get('kdr', 0):.2f})"
-                    + f"\n┊ MVP **{stats.get('mvps', 0)}**  ·  Sequência **{stats.get('sequencia', 0)}/{stats.get('maior_sequencia', 0)}**"
-                    + f"  ·  Patente **{stats.get('patente', '—')}**"
-                    + f"\n┊ ⏱ Top 10 **{tempo}**"
+                selo = medalhas.get(posicao, f"#{posicao:02d}")
+                embed.description += f"\n\n{selo} <@{uid}> · **{pontos:,} P.C.**".replace(",", ".")
+                embed.add_field(
+                    name=f"{selo}  {nome[:70]}  ·  {pontos:,} P.C.".replace(",", ".")[:256],
+                    value=(
+                        f"<@{uid}>\n"
+                        f"**V / E / D**  `{stats.get('vitorias', 0)} / {stats.get('empates', 0)} / {stats.get('derrotas', 0)}`  ·  "
+                        f"**K/D**  `{stats.get('kills', 0)}/{stats.get('deaths', 0)}` ({stats.get('kdr', 0):.2f})\n"
+                        f"**XP**  `{int(stats.get('xp', 0)):,}`  ·  **MVP**  `{stats.get('mvps', 0)}`  ·  "
+                        f"**Patente**  `{str(stats.get('patente', '—'))[:40]}`\n"
+                        f"**Tempo no Top 10**  `{tempo}`  ·  **Sequência**  `{stats.get('sequencia', 0)}/{stats.get('maior_sequencia', 0)}`"
+                    ).replace(",", ".")[:1024],
+                    inline=False,
                 )
-            descricao = "\n\n".join(linhas_texto)
-        else:
-            descricao = (
-                "╭────────────── ◈ ──────────────╮\n"
-                "  Ainda não há jogadores classificados.\n"
-                "  As pontuações são registradas após a aprovação das provas.\n"
-                "╰────────────── ◈ ──────────────╯"
-            )
-        embed = criar_embed(
-            f"✦・ N̷ÊMESIS — RANKING {nome_jogo.upper()} ・✦",
-            (
-                f"**◈ JOGO SELECIONADO**  ·  {nome_jogo}\n"
-                "**CLASSIFICAÇÃO POR PONTOS DE COMBATE**\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                f"{descricao}\n\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "◂ Use os botões abaixo para alternar entre os jogos."
-            ),
-            cor=0x9F2035,
-            rodape=None,
-        )
-        embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
-        embed.set_footer(
-            text=f"PÁGINA:{jogo} • RANKING {list(ranking_missoes_jogos.JOGOS).index(jogo) + 1}/{len(ranking_missoes_jogos.JOGOS)}  •  NÊMESIS"
-        )
+        embed.set_footer(text=f"PÁGINA:{jogo} • RANKING {pagina}/{len(ranking_missoes_jogos.JOGOS)}  •  Use os botões para alternar entre jogos")
         return embed
 
     async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
