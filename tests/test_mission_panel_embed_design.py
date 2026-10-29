@@ -48,9 +48,9 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Shigaku", embed.description)
         self.assertIn("/missao-enviar-prova", embed.description)
         fields = {field.name: field.value for field in embed.fields}
-        self.assertEqual(fields["◉ DISPONÍVEIS"], "`1`")
-        self.assertEqual(fields["■ ENCERRADAS"], "`1`")
-        self.assertEqual(fields["◈ TOTAL"], "`2`")
+        self.assertEqual(fields["🟢 EM OPERAÇÃO"], "**1**")
+        self.assertEqual(fields["⛔ ENCERRADAS"], "**1**")
+        self.assertEqual(fields["◈ NO CATÁLOGO"], "**2**")
         self.assertTrue(any("Operação de Reconhecimento" in name for name in fields))
         self.assertTrue(any("Operação Encerrada" in name for name in fields))
         self.assertFalse(any("Outro jogo" in name for name in fields))
