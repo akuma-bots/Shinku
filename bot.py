@@ -7,6 +7,7 @@ import pkgutil
 from pathlib import Path
 
 import discord
+from utils.apresentacao import embed_aviso, embed_erro
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -133,13 +134,25 @@ async def tratar_erro_comando(
     original = getattr(erro, "original", erro)
 
     if isinstance(erro, app_commands.MissingPermissions):
-        mensagem = "Você não tem as permissões necessárias para usar este comando."
+        resposta = embed_erro(
+            "PERMISSÃO INSUFICIENTE",
+            "Sua conta não possui as permissões necessárias para executar esta ação.",
+        )
     elif isinstance(erro, app_commands.CommandOnCooldown):
-        mensagem = f"Este comando está em cooldown. Tente novamente em {erro.retry_after:.1f} s."
+        resposta = embed_aviso(
+            "AÇÃO EM COOLDOWN",
+            f"Este comando poderá ser usado novamente em **{erro.retry_after:.1f} segundos**.",
+        )
     elif isinstance(erro, app_commands.CheckFailure):
-        mensagem = "Acesso restrito: é necessário possuir o cargo oficial da NÊMESIS para utilizar os comandos do bot."
+        resposta = embed_erro(
+            "ACESSO RESTRITO",
+            "É necessário possuir o cargo oficial autorizado da NÊMESIS para utilizar os comandos do bot.",
+        )
     else:
-        mensagem = "Ocorreu um erro ao executar o comando. A equipe técnica foi registrada para investigar."
+        resposta = embed_erro(
+            "ERRO AO EXECUTAR COMANDO",
+            "A operação não pôde ser concluída. O erro foi registrado para análise técnica.",
+        )
         logging.error(
             "Falha em slash command %s (usuário=%s, servidor=%s): %s",
             getattr(interaction.command, "qualified_name", "desconhecido"),
@@ -151,9 +164,9 @@ async def tratar_erro_comando(
 
     try:
         if interaction.response.is_done():
-            await interaction.followup.send(mensagem, ephemeral=True)
+            await interaction.followup.send(embed=resposta, ephemeral=True)
         else:
-            await interaction.response.send_message(mensagem, ephemeral=True)
+            await interaction.response.send_message(embed=resposta, ephemeral=True)
     except (discord.HTTPException, discord.InteractionResponded, discord.NotFound):
         logging.warning(
             "Não foi possível responder à interação (command=%s, interaction=%s).",

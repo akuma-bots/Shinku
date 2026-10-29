@@ -5,6 +5,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import embed_erro, embed_info, embed_sucesso
+
 
 class ListarIDsServidor(commands.Cog):
     """Gera um inventário dos canais, categorias e cargos do servidor NÊMESIS."""
@@ -20,14 +22,14 @@ class ListarIDsServidor(commands.Cog):
     async def listar_ids_servidor(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message(
-                "Este comando só pode ser usado dentro do servidor NÊMESIS.",
+                embed=embed_erro("COMANDO INDISPONÍVEL", "Este comando só pode ser usado dentro de um servidor."),
                 ephemeral=True,
             )
             return
 
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                "Por segurança, somente o proprietário da aplicação pode usar este comando.",
+                embed=embed_erro("ACESSO RESTRITO", "Somente o proprietário da aplicação pode gerar o inventário de IDs."),
                 ephemeral=True,
             )
             return
@@ -35,7 +37,7 @@ class ListarIDsServidor(commands.Cog):
         guild_id = getattr(self.bot, "nemesis_guild_id", None)
         if guild_id is not None and interaction.guild.id != guild_id:
             await interaction.response.send_message(
-                "Este comando só funciona no servidor NÊMESIS configurado para o bot.",
+                embed=embed_erro("SERVIDOR NÃO AUTORIZADO", "Este comando só funciona no servidor NÊMESIS configurado para o bot."),
                 ephemeral=True,
             )
             return
@@ -89,9 +91,13 @@ class ListarIDsServidor(commands.Cog):
                 filename=f"nemesis_ids_{guild.id}.txt",
             )
             await interaction.followup.send(
-                content=(
-                    "Inventário concluído. O arquivo contém os IDs atuais de todas as "
-                    "categorias, canais e cargos deste servidor."
+                embed=embed_sucesso(
+                    "INVENTÁRIO CONCLUÍDO",
+                    f"Arquivo gerado para **{discord.utils.escape_markdown(guild.name)}**.\n"
+                    f"**Categorias:** {len(categories)}\n"
+                    f"**Canais:** {sum(not isinstance(ch, discord.CategoryChannel) for ch in guild.channels)}\n"
+                    f"**Cargos:** {len(guild.roles)}\n\n"
+                    "O anexo contém os IDs e posições atuais para auditoria e configuração.",
                 ),
                 file=file,
                 ephemeral=True,
@@ -104,7 +110,10 @@ class ListarIDsServidor(commands.Cog):
         except Exception:
             logging.exception("Falha ao gerar inventário de IDs do servidor.")
             await interaction.followup.send(
-                "Não consegui gerar o inventário. A falha foi registrada nos logs do bot.",
+                embed=embed_erro(
+                    "FALHA AO GERAR INVENTÁRIO",
+                    "Não foi possível concluir a exportação. O erro foi registrado nos logs do bot.",
+                ),
                 ephemeral=True,
             )
 

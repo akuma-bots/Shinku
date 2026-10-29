@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from utils.apresentacao import embed_erro, embed_info, embed_sucesso
 from utils.guild_config import (
     get_config,
     adicionar_contador,
@@ -142,8 +143,10 @@ class Contadores(commands.Cog):
 
         if tipo == "cargo" and cargo is None:
             await interaction.response.send_message(
-                "Pra contar por cargo, informe também "
-                "o parâmetro `cargo`.",
+                embed=embed_erro(
+                    "PARÂMETRO OBRIGATÓRIO",
+                    "Para criar um contador por cargo, selecione também o cargo que será contabilizado.",
+                ),
                 ephemeral=True,
             )
             return
@@ -187,14 +190,23 @@ class Contadores(commands.Cog):
                 except (discord.Forbidden, discord.HTTPException):
                     pass
             await interaction.followup.send(
-                "❌ Não consegui concluir a criação do contador. Confira as permissões do bot e tente novamente.",
+                embed=embed_erro(
+                    "NÃO FOI POSSÍVEL CRIAR",
+                    "A criação do contador falhou. Confira as permissões Gerenciar canais e tente novamente. "
+                    "Se o canal chegou a ser criado, o bot tentou removê-lo para evitar um contador órfão.",
+                ),
                 ephemeral=True,
             )
             return
 
         await interaction.followup.send(
-            f"✅ Contador criado: {canal.mention}. "
-            f"Ele se atualiza a cada {INTERVALO_ATUALIZACAO_MINUTOS} minutos.",
+            embed=embed_sucesso(
+                "CONTADOR ATIVADO",
+                f"**Canal:** {canal.mention}\n"
+                f"**Tipo:** {self._rotulo(tipo, cargo)}\n"
+                f"**Valor inicial:** {valor:,}\n"
+                f"**Atualização:** a cada {INTERVALO_ATUALIZACAO_MINUTOS} minutos",
+            ),
             ephemeral=True,
         )
 
@@ -220,7 +232,10 @@ class Contadores(commands.Cog):
         config = await get_config(interaction.guild.id)
         if not _contador_registrado(config, canal.id):
             await interaction.response.send_message(
-                "Esse canal não está registrado como contador. Nenhum canal foi apagado.",
+                embed=embed_erro(
+                    "CONTADOR NÃO ENCONTRADO",
+                    "Esse canal não está registrado pelo sistema. Nenhum canal foi apagado.",
+                ),
                 ephemeral=True,
             )
             return
@@ -229,19 +244,28 @@ class Contadores(commands.Cog):
             await canal.delete(reason="Contador removido via /remover-contador")
         except discord.Forbidden:
             await interaction.response.send_message(
-                "Não tenho permissão para apagar esse canal. O contador continua registrado.",
+                embed=embed_erro(
+                    "PERMISSÃO INSUFICIENTE",
+                    "Não tenho permissão para apagar esse canal. O contador continua registrado e não foi removido da configuração.",
+                ),
                 ephemeral=True,
             )
             return
         except discord.HTTPException:
             await interaction.response.send_message(
-                "O Discord não permitiu apagar o canal. O contador continua registrado.",
+                embed=embed_erro(
+                    "FALHA AO REMOVER CANAL",
+                    "O Discord recusou a exclusão. O contador continua registrado na configuração.",
+                ),
                 ephemeral=True,
             )
             return
 
         await remover_contador(interaction.guild.id, canal.id)
-        await interaction.response.send_message("🗑️ Contador removido.", ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed_sucesso("CONTADOR REMOVIDO", f"O canal {discord.utils.escape_markdown(canal.name)} foi removido e a configuração foi atualizada."),
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="contadores",
@@ -269,23 +293,32 @@ class Contadores(commands.Cog):
 
         if not lista:
             await interaction.response.send_message(
-                "Nenhum contador configurado ainda.",
+                embed=embed_info(
+                    "NENHUM CONTADOR ATIVO",
+                    "Este servidor ainda não possui contadores registrados. Use /criar-contador para configurar o primeiro.",
+                ),
                 ephemeral=True,
             )
             return
 
-        linhas = [
-            (
-                f"<#{item['canal_id']}> — "
-                f"tipo `{item['tipo']}`"
-            )
-            for item in lista
-        ]
-
-        await interaction.response.send_message(
-            "\n".join(linhas),
-            ephemeral=True,
+        embed = embed_info(
+            "CONTADORES DO SERVIDOR",
+            f"**Contadores registrados:** {len(lista)}\n"
+            f"**Atualização automática:** a cada {INTERVALO_ATUALIZACAO_MINUTOS} minutos",
         )
+        for item in lista[:25]:
+            canal_id = item.get("canal_id")
+            tipo = item.get("tipo", "desconhecido")
+            canal = interaction.guild.get_channel(canal_id) if canal_id else None
+            embed.add_field(
+                name=(canal.name if canal else f"Canal indisponível • {canal_id}"),
+                value=f"**Canal:** <#{canal_id}>\n**Tipo:** {tipo}",
+                inline=True,
+            )
+        if len(lista) > 25:
+            embed.add_field(name="Lista parcial", value=f"Mais {len(lista) - 25} contador(es) não exibidos nesta página.", inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @tasks.loop(
         minutes=INTERVALO_ATUALIZACAO_MINUTOS
