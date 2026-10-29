@@ -6,6 +6,10 @@ from utils.apresentacao import (
     COR_SUCESSO,
     cor_por_estado,
     criar_embed,
+    embed_aviso,
+    embed_erro,
+    embed_info,
+    embed_sucesso,
 )
 
 
@@ -30,3 +34,20 @@ def test_cores_semanticas():
     assert cor_por_estado(True) == COR_SUCESSO
     assert cor_por_estado(False) == COR_ERRO
     assert cor_por_estado(False, aviso=True) != COR_ERRO
+
+
+def test_respostas_semanticas_usam_cores_consistentes():
+    assert embed_sucesso("OK", "Concluído").color.value == COR_SUCESSO
+    assert embed_erro("Falha", "Não concluído").color.value == COR_ERRO
+    assert embed_aviso("Atenção", "Verifique").color.value != COR_ERRO
+    assert embed_info("Informação", "Detalhes").color.value == COR_PRIMARIA
+
+
+def test_respostas_semanticas_preservam_assinatura_visual():
+    for embed in (
+        embed_sucesso("OK", "Concluído"),
+        embed_erro("Falha", "Não concluído"),
+        embed_aviso("Atenção", "Verifique"),
+        embed_info("Informação", "Detalhes"),
+    ):
+        assert embed.footer.text == "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  •  SISTEMA INTEGRADO"
