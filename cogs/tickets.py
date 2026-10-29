@@ -211,19 +211,19 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
         rodape="NÊMESIS • Suporte oficial",
     )
     embed.add_field(
-        name="◈ ANTES DE ABRIR",
+        name="01 · ABERTURA DO ATENDIMENTO",
         value=(
-            "➜ Escolha a categoria correta.\n"
-            "➜ Explique o caso com clareza e inclua provas, se necessário.\n"
-            "➜ Não abra tickets duplicados nem marque a equipe repetidamente."
+            "➜ Selecione a categoria mais próxima do seu assunto.\n"
+            "➜ Descreva o ocorrido, informe datas/IDs relevantes e anexe provas.\n"
+            "➜ Aguarde a equipe no próprio canal; não abra solicitações duplicadas."
         ),
         inline=False,
     )
     embed.add_field(
-        name="🔒 PRIVACIDADE",
+        name="02 · ACESSO E CONFIDENCIALIDADE",
         value=(
-            "O ticket é privado e visível apenas para você e a equipe autorizada. "
-            "Denúncias e informações sensíveis devem ser tratadas dentro do atendimento."
+            "O canal é privado para o solicitante e a equipe autorizada. "
+            "Compartilhe dados pessoais e denúncias apenas dentro do atendimento; não publique senhas ou códigos de autenticação."
         ),
         inline=False,
     )

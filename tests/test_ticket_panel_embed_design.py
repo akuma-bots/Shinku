@@ -13,10 +13,10 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Selecione abaixo a categoria", embed.description)
         self.assertEqual(
             [field.name for field in embed.fields],
-            ["◈ ANTES DE ABRIR", "🔒 PRIVACIDADE"],
+            ["01 · ABERTURA DO ATENDIMENTO", "02 · ACESSO E CONFIDENCIALIDADE"],
         )
         self.assertEqual(embed.color.value, 0x8B0000)
-        self.assertIn("ticket é privado", embed.fields[1].value)
+        self.assertIn("canal é privado", embed.fields[1].value)
 
 
 if __name__ == "__main__":
