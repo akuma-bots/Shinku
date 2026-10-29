@@ -14,9 +14,11 @@ SEND_DELAY = 1.0
 MAX_RETRIES = 3
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.21"
-RESUMO_PADRAO = "Painéis operacionais e arquivo competitivo com apresentação mais clara e consistente."
+VERSAO_PADRAO = "1.5.22"
+RESUMO_PADRAO = "Proteção administrativa reforçada no AutoMod e auditoria mais clara das ações automáticas."
 NOVIDADES_PADRAO = [
+    "AutoMod interrompe a análise antes de qualquer ação para membros com permissões administrativas ou de moderação, incluindo permissões específicas do servidor.",
+    "Verificação redundante imediatamente antes da exclusão da mensagem; ações canceladas pela proteção ficam registradas no log técnico.",
     "Arquivo de recordes reorganizado com categorias identificáveis, valores formatados e apresentação consistente com a identidade NÊMESIS.",
     "Configuração do canal de recordes agora confirma a alteração em um painel informativo padronizado.",
     "Painel /sistema status agora apresenta latência, tempo ativo, comandos do servidor e estado dos módulos em uma única leitura.",
@@ -34,6 +36,7 @@ NOVIDADES_PADRAO = [
     "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
 ]
 CORRECOES_PADRAO = [
+    "Ampliada a proteção contra exclusões automáticas indevidas para cargos com gerência de canais, cargos, webhooks, auditoria, threads, expulsões, banimentos e timeout.",
     "Formatação numérica do arquivo de recordes ajustada para o padrão brasileiro, com separadores de milhar e decimais corretos.",
     "O sistema de recordes trata falhas de anúncio sem interromper o fluxo de atualização das estatísticas.",
     "Padronizada a apresentação do diagnóstico do sistema para diferenciar estados operacionais, alertas e falhas.",
