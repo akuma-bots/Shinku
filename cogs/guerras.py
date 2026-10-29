@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import re
 import time
 import uuid
@@ -82,7 +83,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     def _embed_regras(self, regras: list) -> discord.Embed:
         linhas = [f"**{i}.** {regra}" for i, regra in enumerate(regras, 1)]
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ REGRAS OFICIAIS DE GUERRA",
             description="\n".join(linhas)[:4000],
             color=COR_NEMESIS,
@@ -165,7 +166,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         dados["guerras"].append(registro)
         await self._salvar_dados_guild(interaction.guild.id, dados)
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RELATÓRIO OFICIAL DE GUERRA",
             description=(
                 f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  "
@@ -312,7 +313,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
                 linha += f" · [prova]({guerra['prova_url']})"
             linhas.append(linha)
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ HISTÓRICO DE GUERRAS",
             description="\n".join(linhas)[:4000],
             color=COR_NEMESIS,
@@ -362,7 +363,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             f"**#{i}. {discord.utils.escape_markdown(item['nome'])}** — {item['vitorias']}V / {item['derrotas']}D / {item['empates']}E · {item['jogos']} confronto(s)"
             for i, item in enumerate(ranking, 1)
         ]
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ DESEMPENHO POR GANGUE",
             description="\n".join(linhas),
             color=COR_NEMESIS,
@@ -405,7 +406,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         }
         dados["guerras"].append(registro)
         await self._salvar_dados_guild(interaction.guild.id, dados)
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA INICIADA",
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA INICIADA",
             description=f"**NÊMESIS**  **0 × 0**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{codigo}**",
             color=COR_NEMESIS, timestamp=discord.utils.utcnow())
         if formato:
@@ -459,7 +460,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         registro["historico_placar"] = historico_placar[-100:]
         await self._salvar_dados_guild(interaction.guild.id, dados)
         nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ PLACAR ATUALIZADO",
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ PLACAR ATUALIZADO",
             description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{registro['id']}**",
             color=COR_NEMESIS, timestamp=discord.utils.utcnow())
         if registro.get("formato"):
@@ -521,7 +522,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             registro["observacoes_finais"] = observacoes.strip()[:800]
         registro["status"], registro["encerrado_em"], registro["encerrado_por_id"] = "finalizada", time.time(), interaction.user.id
         await self._salvar_dados_guild(interaction.guild.id, dados)
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA ENCERRADA",
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA ENCERRADA",
             description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\n**RESULTADO FINAL: {resultado}**\nVencedor: **{discord.utils.escape_markdown(registro['vencedor'])}**\nCódigo: **{registro['id']}**",
             color=COR_NEMESIS if placar_nemesis >= placar_inimiga else 0x555555, timestamp=discord.utils.utcnow())
         if registro.get("formato"):
@@ -583,7 +584,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             pn = guerra.get("placar_nemesis", guerra.get("placar_a", 0))
             pi = guerra.get("placar_inimiga", guerra.get("placar_b", 0))
             linhas.append(f"**{guerra.get('id', 'SEM-ID')}** — NÊMESIS **{pn} × {pi}** **{discord.utils.escape_markdown(nome)}**")
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRAS EM ANDAMENTO", description="\n".join(linhas), color=COR_NEMESIS)
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRAS EM ANDAMENTO", description="\n".join(linhas), color=COR_NEMESIS)
         embed.set_footer(text=f"{len(ativas)} guerra(s) ativa(s)")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -615,7 +616,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         registro["cancelada_por_id"] = interaction.user.id
         await self._salvar_dados_guild(interaction.guild.id, dados)
         nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA CANCELADA",
             description=f"Confronto contra **{discord.utils.escape_markdown(nome)}** cancelado.\nCódigo: **{registro['id']}**\nMotivo: {discord.utils.escape_markdown(motivo)}",
             color=0x777777, timestamp=discord.utils.utcnow(),
