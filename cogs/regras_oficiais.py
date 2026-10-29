@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -244,7 +245,7 @@ class RegrasOficiais(commands.Cog):
         enviados = 0
         try:
             for indice, texto in enumerate(REGRAS, start=1):
-                embed = discord.Embed(
+                embed = criar_embed(
                     description=texto,
                     color=COR,
                 )

@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import datetime
 import logging
@@ -317,7 +318,7 @@ class Eventos(commands.Cog):
         titulo: str,
     ) -> discord.Embed:
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title=titulo,
             description=(
                 evento.description

@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import json
 import logging
 import os
@@ -27,7 +28,7 @@ def carregar_catalogo_codigos() -> dict:
 
 
 def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
-    embed = discord.Embed(
+    embed = criar_embed(
         title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ BEM-VINDO À ORGANIZAÇÃO",
         description=(
             f"Salve, **{discord.utils.escape_markdown(membro.display_name)}**. "
@@ -59,7 +60,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     catalogo = carregar_catalogo_codigos()
     jogo = catalogo.get("jogos", {}).get(chave)
     if not jogo:
-        return discord.Embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=0xB51F32)
+        return criar_embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=0xB51F32)
     linhas = []
     for item in jogo.get("codigos", []):
         codigo = str(item.get("codigo", "")).strip()
@@ -71,7 +72,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     periodo = ""
     if semana.get("inicio") and semana.get("fim"):
         periodo = f"\n**Semana dos códigos:** {semana['inicio']} até {semana['fim']}"
-    embed = discord.Embed(
+    embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CÓDIGOS / {jogo['nome'].upper()}",
         description=(f"{jogo.get('descricao', '')}\n\n**Verificado em:** {catalogo.get('atualizado_em', 'indisponível')}{periodo}\n\n{descricao_codigos}")[:4096],
         color=0xB51F32,

@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import logging
 import random
@@ -298,7 +299,7 @@ class Roblox(commands.Cog):
             return
 
         await interaction.response.defer()
-        embed = discord.Embed(title=f"🎮 Roblox de {alvo.display_name}", color=0x00A2FF)
+        embed = criar_embed(title=f"🎮 Roblox de {alvo.display_name}", color=0x00A2FF)
         embed.add_field(name="Usuário", value=vinculo["roblox_username"], inline=True)
         embed.add_field(name="Perfil", value=f"https://www.roblox.com/users/{vinculo['roblox_id']}/profile", inline=False)
 
@@ -348,7 +349,7 @@ class Roblox(commands.Cog):
         membro = interaction.guild.get_member(int(discord_id))
         nome_membro = membro.mention if membro else f"ID Discord: {discord_id}"
         roblox_id = int(dados["roblox_id"])
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ IDENTIFICAÇÃO ROBLOX",
             description=f"Conta Roblox: {dados['roblox_username']} (https://www.roblox.com/users/{roblox_id}/profile)\nMembro Discord: {nome_membro}",
             color=0xB3132B,
@@ -417,7 +418,7 @@ class Roblox(commands.Cog):
             return
         linhas = [f"**{rank}** → <@&{cargo_id}>" for rank, cargo_id in config["mapeamentos"].items()]
         texto = "\n".join(linhas) if linhas else "Nenhum rank mapeado ainda."
-        embed = discord.Embed(title="🎮 Sincronização de cargos por rank", description=f"Grupo: `{config['grupo_id']}`\n\n{texto}", color=0x00A2FF)
+        embed = criar_embed(title="🎮 Sincronização de cargos por rank", description=f"Grupo: `{config['grupo_id']}`\n\n{texto}", color=0x00A2FF)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="roblox-sincronizar", description="Força a sincronização de cargo por rank (de um membro ou de todo mundo vinculado).")

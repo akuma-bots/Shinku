@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -32,7 +33,7 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
             emoji = POSICAO_EMOJI.get(v["posicao"], "🏅")
             linhas.append(f"{emoji} <@{v['user_id']}> — {int(v['pontos'])} pts (+{v['bonus_xp']} XP de bônus)")
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title=f"🏁 Temporada {resultado['numero_encerrada']} encerrada!",
             description="\n".join(linhas) if linhas else "Ninguém pontuou nessa temporada.",
             color=0xFFD700,
@@ -123,7 +124,7 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
         top3 = await temporadas.top_da_temporada(interaction.guild.id, limite=3)
         linhas = [f"{POSICAO_EMOJI.get(i+1, '🏅')} <@{uid}> — {int(pontos)} pts" for i, (uid, pontos) in enumerate(top3)]
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title=f"🏆 Temporada {estado['numero_atual']}",
             description=(f"Termina em **{dias_restantes}d {horas_restantes}h**\n\n" +
                          ("\n".join(linhas) if linhas else "Ninguém pontuou ainda nessa temporada.")),

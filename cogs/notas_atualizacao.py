@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import logging
 import os
@@ -79,7 +80,7 @@ def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefi
 
 def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str]) -> discord.Embed:
     """Monta um embed com margem de segurança abaixo do limite de 6.000 caracteres."""
-    embed = discord.Embed(
+    embed = criar_embed(
         title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
         description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo)[:700]}",
         color=COLOR,

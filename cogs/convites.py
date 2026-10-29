@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import logging
 from collections import defaultdict
@@ -188,7 +189,7 @@ class ConvitesNemesis(commands.Cog):
             dados, servidor = await self._carregar_dados()
             registro = servidor.get(str(interaction.user.id), {})
             ativos = set(map(str, registro.get("membros", [])))
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — SEUS CONVITES・✦",
                 description=f"Você tem **{len(ativos)}** membro(s) convidado(s) que continuam no servidor.",
                 color=0xB51F32,
@@ -218,7 +219,7 @@ class ConvitesNemesis(commands.Cog):
             linhas = []
             for posicao, (user_id, total) in enumerate([item for item in ranking if item[1] > 0][:10], start=1):
                 linhas.append(f"**{posicao}.** <@{user_id}> — **{total}** membro(s) ativo(s)")
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — RANKING DE CONVITES・✦",
                 description="\n".join(linhas) if linhas else "Ainda não há convidados ativos contabilizados.",
                 color=0xB51F32,

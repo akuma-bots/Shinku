@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import datetime
 import re
@@ -1536,7 +1537,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         except Exception as erro:
             print(f"[AUTOMOD][CONFIG] Não foi possível ler a medida configurada: {erro}")
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="⚠️ AutoMod — Infração detectada",
             description=(
                 f"**Usuário:** "
@@ -1739,7 +1740,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             guild.id, membro.id, "punido", nivel, infracao["motivo"], 0, infracao["tipo"]
         )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="🛡️ AutoMod — Punição automática aplicada",
             description=(
                 f"**Usuário:** <@{membro.id}> ({membro.id})\n"
@@ -1775,7 +1776,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         except (discord.Forbidden, discord.HTTPException):
             pass
 
-        auditoria = discord.Embed(
+        auditoria = criar_embed(
             title="🛡️ Auditoria — AutoMod automático",
             description=(
                 f"**Resultado:** Punição aplicada\n**Membro:** <@{membro.id}> ({membro.id})\n"
@@ -1790,7 +1791,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
     async def aviso_falha_punicao(self, message: discord.Message, infracao: dict, erro: str):
         """Registra uma falha de aplicação para que a equipe possa corrigi-la."""
-        embed = discord.Embed(
+        embed = criar_embed(
             title="⚠️ AutoMod — Punição não aplicada",
             description=(
                 f"**Usuário:** {message.author.mention}\n"
@@ -1918,7 +1919,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         except (discord.Forbidden, discord.HTTPException):
             pass
 
-        log = discord.Embed(
+        log = criar_embed(
             title="🛡️ Auditoria — AutoMod",
             description=(
                 f"**Resultado:** Punido\n**Membro:** <@{alvo_id}> ({alvo_id})\n"
@@ -1950,7 +1951,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         )
         embed.color = discord.Color.green()
         await mensagem.edit(embed=embed, view=None)
-        log = discord.Embed(
+        log = criar_embed(
             title="🛡️ Auditoria — AutoMod",
             description=(
                 f"**Resultado:** Não punido\n**Membro:** <@{alvo_id}> ({alvo_id})\n"
@@ -2262,7 +2263,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 uid = str(r.get("membro_id"))
                 reincidentes[uid] = reincidentes.get(uid, 0) + 1
         repetidos = sum(1 for total in reincidentes.values() if total >= 2)
-        embed = discord.Embed(title="📊 NÊMESIS — Estatísticas da moderação", color=discord.Color.blurple())
+        embed = criar_embed(title="📊 NÊMESIS — Estatísticas da moderação", color=discord.Color.blurple())
         embed.add_field(name="Últimos 7 dias", value=f"Decisões: **{len(ultimos_7)}**", inline=True)
         embed.add_field(name="Últimos 30 dias", value=f"Decisões: **{len(ultimos_30)}**", inline=True)
         embed.add_field(name="Punições / Não punidos", value=f"**{punidos}** / **{nao_punidos}**", inline=True)
@@ -2321,7 +2322,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         ]
         registros.sort(key=lambda item: float(item.get("timestamp", 0)), reverse=True)
         registros = registros[:10]
-        embed = discord.Embed(
+        embed = criar_embed(
             title="📋 Histórico AutoMod",
             description=f"**Membro:** {membro.mention}\n**Decisões registradas:** {len([x for x in decisoes.get(str(interaction.guild.id), []) if int(x.get('membro_id', 0)) == membro.id])}",
             color=discord.Color.blurple(),
@@ -2379,7 +2380,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
             return
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="⚙️ AutoMod — Regras oficiais",
             description=(
                 f"Fonte: <#{CANAL_REGRAS_ID}>\n"
@@ -2478,7 +2479,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             await self.carregar_regras_oficiais()
         )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="⚙️ AutoMod — Status",
             color=discord.Color.green(),
         )

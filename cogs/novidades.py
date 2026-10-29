@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import json
 import logging
@@ -167,7 +168,7 @@ class Novidades(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
+        embed = criar_embed(
             description=(
                 "╭────────────── ◈ ──────────────╮\n"
                 "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  COMUNICADO OFICIAL**\n"
@@ -280,7 +281,7 @@ class Novidades(commands.Cog):
                     str(uid) in processados for uid in destinatarios
                 ):
                     return
-                embed = discord.Embed(
+                embed = criar_embed(
                     description=(
                         "╭────────────── ◈ ──────────────╮\n"
                         "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE ATUALIZAÇÕES**\n"

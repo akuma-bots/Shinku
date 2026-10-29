@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import time
 import uuid
@@ -312,7 +313,7 @@ class BotaoParticipar(discord.ui.View):
                 f"**{len(participantes) - limite}** participantes."
             )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="👥 Participantes",
             description="\n".join(linhas),
             color=COR_SORTEIO,
@@ -450,7 +451,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             "para entrar no sorteio."
         )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="🎁 SORTEIO",
             description=descricao,
             color=COR_SORTEIO,
@@ -678,7 +679,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                     ]
                 )
 
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="👥 Participantes",
                 description="\n".join(
                     linhas
@@ -1187,7 +1188,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 f"{timestamp_discord(sorteio['fim'], 'R')}"
             )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="🎁 Sorteios ativos",
             description="\n\n".join(
                 linhas
@@ -1483,7 +1484,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
 
         if not participantes:
 
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="🎁 SORTEIO ENCERRADO",
                 description=(
                     f"O sorteio de "
@@ -1523,7 +1524,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 "um vencedor."
             )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="🏆 SORTEIO ENCERRADO",
             description=(
                 f"🎁 **Prêmio:**\n"

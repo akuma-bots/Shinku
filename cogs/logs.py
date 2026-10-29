@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import logging
 from datetime import datetime, timezone
 
@@ -93,7 +94,7 @@ class Logs(commands.Cog):
         conta_criada = discord.utils.format_dt(member.created_at, style="R")
         total_membros = member.guild.member_count or 0
         agora = datetime.now(timezone.utc)
-        embed = discord.Embed(
+        embed = criar_embed(
             title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOVA PRESENÇA ・✦",
             description=(
                 "╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
@@ -153,7 +154,7 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(member.guild)
         if not canal:
             return
-        embed = discord.Embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
+        embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
         embed.set_thumbnail(url=member.display_avatar.url)
         await self._enviar_log(canal, embed)
 
@@ -181,7 +182,7 @@ class Logs(commands.Cog):
             "\n\n*Auditoria informativa: o evento de exclusão do Discord não identifica "
             "com segurança quem executou a exclusão. Este listener não apaga mensagens.*"
         )
-        embed = discord.Embed(
+        embed = criar_embed(
             title="AUDITORIA • MENSAGEM EXCLUÍDA",
             description=descricao[:4000],
             color=0xED4245,
@@ -197,7 +198,7 @@ class Logs(commands.Cog):
         anexos_depois = [anexo.url for anexo in depois.attachments]
         if antes.content == depois.content and anexos_antes == anexos_depois:
             return
-        embed = discord.Embed(
+        embed = criar_embed(
             title="Mensagem editada",
             description=(
                 f"**Autor:** {antes.author.mention} ({antes.author.id})\n"
@@ -222,7 +223,7 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(guild)
         if not canal:
             return
-        embed = discord.Embed(description=f"🔨 {user.mention} (`{user}`) foi banido do servidor.", color=0xED4245)
+        embed = criar_embed(description=f"🔨 {user.mention} (`{user}`) foi banido do servidor.", color=0xED4245)
         embed.set_thumbnail(url=user.display_avatar.url)
         await self._enviar_log(canal, embed)
 
@@ -231,7 +232,7 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(guild)
         if not canal:
             return
-        embed = discord.Embed(description=f"⚖️ {user.mention} (`{user}`) foi desbanido do servidor.", color=0x57F287)
+        embed = criar_embed(description=f"⚖️ {user.mention} (`{user}`) foi desbanido do servidor.", color=0x57F287)
         await self._enviar_log(canal, embed)
 
     @commands.Cog.listener()
@@ -241,7 +242,7 @@ class Logs(commands.Cog):
             return
 
         if antes.nick != depois.nick:
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="Apelido alterado",
                 description=(
                     f"**Membro:** {depois.mention} ({depois.id})\n"
@@ -257,7 +258,7 @@ class Logs(commands.Cog):
         ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
         perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
         if ganhos or perdidos:
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="Cargos do membro alterados",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
                 color=0xB3132B,
@@ -281,7 +282,7 @@ class Logs(commands.Cog):
         timeout_antes = getattr(antes, "communication_disabled_until", None)
         timeout_depois = getattr(depois, "communication_disabled_until", None)
         if timeout_antes != timeout_depois:
-            embed = discord.Embed(
+            embed = criar_embed(
                 title="Timeout alterado",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
                 color=0xFEE75C,
@@ -305,14 +306,14 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(channel.guild)
         if not canal:
             return
-        await self._enviar_log(canal, discord.Embed(description=f"📁 Canal criado: **{channel.name}** ({channel.type}).", color=0x57F287))
+        await self._enviar_log(canal, criar_embed(description=f"📁 Canal criado: **{channel.name}** ({channel.type}).", color=0x57F287))
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
         canal = await self._canal_logs(channel.guild)
         if not canal:
             return
-        await self._enviar_log(canal, discord.Embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245))
+        await self._enviar_log(canal, criar_embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245))
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, antes: discord.VoiceState, depois: discord.VoiceState):
@@ -320,11 +321,11 @@ class Logs(commands.Cog):
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            await self._enviar_log(canal, discord.Embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287))
+            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287))
         elif antes.channel is not None and depois.channel is None:
-            await self._enviar_log(canal, discord.Embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245))
+            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245))
         elif antes.channel != depois.channel:
-            await self._enviar_log(canal, discord.Embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C))
+            await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C))
 
 
     @commands.Cog.listener()
@@ -339,7 +340,7 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(guild)
         if not canal:
             return
-        embed = discord.Embed(
+        embed = criar_embed(
             title="Exclusão em massa de mensagens",
             description=f"Foram removidas {len(mensagens)} mensagens em {len(agrupadas)} canal(is).",
             color=0xED4245,
@@ -377,7 +378,7 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(depois.guild)
         if not canal:
             return
-        embed = discord.Embed(
+        embed = criar_embed(
             title="Canal atualizado",
             description=f"Canal: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
             color=0xFEE75C,
@@ -388,7 +389,7 @@ class Logs(commands.Cog):
     async def on_guild_role_create(self, role: discord.Role):
         canal = await self._canal_logs(role.guild)
         if canal:
-            await self._enviar_log(canal, discord.Embed(
+            await self._enviar_log(canal, criar_embed(
                 title="Cargo criado",
                 description=f"Cargo: {role.name} ({role.id})\nCor: {role.color}",
                 color=0x57F287,
@@ -398,7 +399,7 @@ class Logs(commands.Cog):
     async def on_guild_role_delete(self, role: discord.Role):
         canal = await self._canal_logs(role.guild)
         if canal:
-            await self._enviar_log(canal, discord.Embed(
+            await self._enviar_log(canal, criar_embed(
                 title="Cargo excluído",
                 description=f"Cargo: {role.name} ({role.id})",
                 color=0xED4245,
@@ -421,7 +422,7 @@ class Logs(commands.Cog):
             return
         canal = await self._canal_logs(depois.guild)
         if canal:
-            await self._enviar_log(canal, discord.Embed(
+            await self._enviar_log(canal, criar_embed(
                 title="Cargo atualizado",
                 description=f"Cargo: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
                 color=0xFEE75C,

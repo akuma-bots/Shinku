@@ -15,7 +15,7 @@ def test_criar_embed_aplica_padrao_visual():
     assert embed.title == "Teste"
     assert embed.description == "Descrição"
     assert embed.color.value == COR_PRIMARIA
-    assert embed.footer.text == "NÊMESIS • Sistema integrado"
+    assert embed.footer.text == "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  •  SISTEMA INTEGRADO"
 
 
 def test_criar_embed_respeita_cor_rodape_e_timestamp():

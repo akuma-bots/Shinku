@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import hashlib
 import aiohttp
@@ -25,7 +26,7 @@ async def _hash_imagem(url: str):
 
 
 def _embed_revisao(revisao: dict) -> discord.Embed:
-    embed = discord.Embed(
+    embed = criar_embed(
         title=f"📋 Revisão pendente — {revisao['titulo']}",
         description=revisao.get("descricao") or "Sem descrição.",
         color=CORES.get(revisao["tipo"], 0x5865F2),
@@ -58,7 +59,7 @@ STATUS_LABELS = {
 
 def _embed_painel_provas(guild: discord.Guild, status: str, itens: list[dict]) -> discord.Embed:
     label, cor = STATUS_LABELS[status]
-    embed = discord.Embed(
+    embed = criar_embed(
         title=f"✦・NÊMESIS — ACOMPANHAMENTO DE PROVAS",
         description=f"**Filtro:** {label}\n**Registros encontrados:** {len(itens)}",
         color=cor,

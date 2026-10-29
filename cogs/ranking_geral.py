@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import time
 
 import discord
@@ -199,7 +200,7 @@ class RankingGeral(
         )
 
         if not top:
-            return discord.Embed(
+            return criar_embed(
                 title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
                 description=(
                     f"{cabecalho}\n\n"
@@ -224,7 +225,7 @@ class RankingGeral(
                 + f"  ┊  Top 10 **{tempo_texto}**"
             )
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
             description=(
                 f"{cabecalho}\n\n"

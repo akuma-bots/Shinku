@@ -3,6 +3,7 @@
 Requer yt-dlp, PyNaCl e imageio-ffmpeg (FFmpeg empacotado).
 Aceita links e buscas; a reprodução depende da disponibilidade do provedor de áudio.
 """
+from utils.apresentacao import criar_embed
 import asyncio
 import logging
 import random
@@ -210,7 +211,7 @@ class Musica(commands.Cog):
         return f"{horas}:{minutos:02}:{segundos:02}" if horas else f"{minutos}:{segundos:02}"
 
     def _embed_musica(self, titulo: str, descricao: str, cor: int = 0xB91C1C) -> discord.Embed:
-        embed = discord.Embed(title=titulo, description=descricao, color=cor)
+        embed = criar_embed(title=titulo, description=descricao, color=cor)
         embed.set_footer(text="NÊMESIS • Sistema de música")
         return embed
 
