@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import asyncio
 import logging
 
@@ -158,7 +159,7 @@ class CargoAutomatico(commands.Cog):
             return
 
         linhas = [f"<#{canal_id}> → <@&{cargo_id}>" for canal_id, cargo_id in mapa.items()]
-        embed = discord.Embed(
+        embed = criar_embed(
             title="📋 Canais com cargo automático",
             description="\n".join(linhas),
             color=0x5865F2,
