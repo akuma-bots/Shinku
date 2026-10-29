@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -273,7 +274,7 @@ TUTORIAIS = {
 
 def _embed_tutorial(chave: str) -> discord.Embed:
     tutorial = TUTORIAIS[chave]
-    embed = discord.Embed(
+    embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ TUTORIAL / {tutorial['titulo'].upper()}",
         description=tutorial["descricao"],
         color=0xB3132B,
