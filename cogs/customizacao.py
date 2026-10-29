@@ -2,6 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import embed_erro, embed_sucesso
+
 TIPOS_ATIVIDADE = {
     "jogando": discord.ActivityType.playing,
     "assistindo": discord.ActivityType.watching,
@@ -23,12 +25,24 @@ class Customizacao(commands.Cog):
     @app_commands.choices(tipo=[app_commands.Choice(name=t, value=t) for t in TIPOS_ATIVIDADE])
     async def definir_status(self, interaction: discord.Interaction, tipo: str, texto: str):
         if not await self.bot.is_owner(interaction.user):
-            await interaction.response.send_message("Esse comando é restrito ao dono do bot — o status é o mesmo em todos os servidores.", ephemeral=True)
+            await interaction.response.send_message(
+                embed=embed_erro(
+                    "ACESSO RESTRITO",
+                    "Somente o proprietário da aplicação pode alterar o status global do bot.",
+                ),
+                ephemeral=True,
+            )
             return
 
         atividade = discord.Activity(type=TIPOS_ATIVIDADE[tipo], name=texto)
         await self.bot.change_presence(activity=atividade)
-        await interaction.response.send_message(f"✅ Status atualizado para: {tipo} {texto}", ephemeral=True)
+        await interaction.response.send_message(
+            embed=embed_sucesso(
+                "STATUS ATUALIZADO",
+                f"**Atividade:** {tipo.title()}\n**Texto:** {discord.utils.escape_markdown(texto)}",
+            ),
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):
