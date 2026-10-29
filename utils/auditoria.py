@@ -2,6 +2,7 @@ import logging
 
 import discord
 
+from utils.apresentacao import criar_embed
 from utils.guild_config import get_config
 
 
@@ -39,7 +40,7 @@ async def registrar(
             )
             return False
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title=str(titulo or "Registro de auditoria")[:256],
             description=str(descricao or "Sem detalhes.")[:4096],
             color=cor,
