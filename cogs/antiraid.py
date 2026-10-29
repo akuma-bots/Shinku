@@ -4,6 +4,7 @@ import time
 import discord
 from discord.ext import commands
 
+from utils.apresentacao import embed_aviso
 from utils.guild_config import get_config
 
 
@@ -59,14 +60,23 @@ class AntiRaid(commands.Cog):
                 cargo_id = config.get("support_role_id")
                 prefixo = f"<@&{cargo_id}> " if cargo_id else ""
                 await canal.send(
-                    prefixo + texto,
+                    content=prefixo or None,
+                    embed=embed_aviso(
+                        "ALERTA DE SEGURANÇA • ANTI-RAID",
+                        texto.replace("🚨 **Possível raid detectado!** ", "")
+                             .replace("🛡️ **Revisão recomendada:** ", ""),
+                    ),
                     allowed_mentions=discord.AllowedMentions(
                         roles=bool(cargo_id), users=False, everyone=False,
                     ),
                 )
             else:
                 await canal.send(
-                    texto,
+                    embed=embed_aviso(
+                        "ALERTA DE SEGURANÇA • ANTI-RAID",
+                        texto.replace("🚨 **Possível raid detectado!** ", "")
+                             .replace("🛡️ **Revisão recomendada:** ", ""),
+                    ),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
         except (discord.Forbidden, discord.HTTPException):
