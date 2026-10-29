@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import time
 import asyncio
 import logging
@@ -258,7 +259,7 @@ class ProgressaoGangue(commands.Cog):
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 log.error("Canal de progressão %s não encontrado/acessível.", CANAL_PROGRESSAO_ID)
                 return
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PROMOÇÃO DE RANK",
             description=(
                 "╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮\n"
@@ -291,7 +292,7 @@ class ProgressaoGangue(commands.Cog):
                 return
         dados = await self._dados()
         config = dados.setdefault(str(guild.id), {})
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  SISTEMA DE PROGRESSÃO",
             description=(
                 "A sua posição na gangue evolui conforme a participação legítima e a experiência acumulada.\n\n"
@@ -402,7 +403,7 @@ class ProgressaoGangue(commands.Cog):
         proximo = proximo_rank(xp)
         progresso = barra_progresso(xp, rank, proximo)
         destino = f"╭・𝐍̷𝐨.{proximo['no']} — {proximo['nome']} · faltam **{max(0, proximo['xp'] - xp)} XP**" if proximo else "Rank máximo de progressão alcançado."
-        embed = discord.Embed(
+        embed = criar_embed(
             title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PROGRESSO DE {alvo.display_name.upper()}",
             description=(
                 f"**Rank atual:** ╭・𝐍̷𝐨.{rank['no']} — {rank['nome']}\n"
@@ -438,7 +439,7 @@ class ProgressaoGangue(commands.Cog):
             f"{rank_por_xp(int(perfil.get('xp', 0)))['nome']} · **{int(perfil.get('xp', 0)):,} XP**".replace(",", ".")
             for posicao, (uid, perfil) in enumerate(ranking, start=1)
         ]
-        embed = discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING DA GANGUE", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING DA GANGUE", description="\n".join(linhas), color=0xB51F32)
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="gangue-banco", description="Consulta seu saldo de XP transferível da NÊMESIS.")
@@ -449,7 +450,7 @@ class ProgressaoGangue(commands.Cog):
         perfil = await self._perfil(interaction.guild.id, interaction.user.id)
         xp = max(0, int(perfil.get("xp", 0)))
         rank = rank_por_xp(xp)
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  BANCO DE EXPERIÊNCIA",
             description=(
                 f"**Titular:** {interaction.user.mention}\n"
@@ -497,7 +498,7 @@ class ProgressaoGangue(commands.Cog):
             await self._aplicar_cargo_rank(interaction.guild, membro_origem, rank_origem)
         await self._aplicar_cargo_rank(interaction.guild, destinatario, rank_destino)
 
-        embed = discord.Embed(
+        embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  TRANSFERÊNCIA CONCLUÍDA",
             description=(
                 f"**Remetente:** {interaction.user.mention}\n"
@@ -514,7 +515,7 @@ class ProgressaoGangue(commands.Cog):
 
         canal = interaction.guild.get_channel(CANAL_PROGRESSAO_ID)
         if isinstance(canal, discord.TextChannel):
-            registro = discord.Embed(
+            registro = criar_embed(
                 title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  REGISTRO BANCÁRIO",
                 description=(
                     f"**De:** {interaction.user.mention}\n"
@@ -566,7 +567,7 @@ class ProgressaoGangue(commands.Cog):
                 canal_registro = None
 
         if isinstance(canal_registro, discord.TextChannel):
-            registro = discord.Embed(
+            registro = criar_embed(
                 title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  ATIVIDADE REGISTRADA",
                 description=(
                     f"**Membro:** {membro.mention}\n"
