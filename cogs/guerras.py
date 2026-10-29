@@ -406,9 +406,16 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         }
         dados["guerras"].append(registro)
         await self._salvar_dados_guild(interaction.guild.id, dados)
-        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA INICIADA",
-            description=f"**NÊMESIS**  **0 × 0**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{codigo}**",
-            color=COR_NEMESIS, timestamp=discord.utils.utcnow())
+        embed = criar_embed(
+            title="⚔️ GUERRA OFICIAL · CONFRONTO INICIADO",
+            description="**A OPERAÇÃO COMPETITIVA ESTÁ ATIVA**\nO placar será atualizado neste registro até o encerramento oficial.",
+            color=COR_NEMESIS, timestamp=discord.utils.utcnow(), rodape=None,
+        )
+        embed.set_author(name="NÊMESIS  /  COMANDO DE GUERRA")
+        embed.add_field(name="NÊMESIS", value="**0** pontos", inline=True)
+        embed.add_field(name="ADVERSÁRIA", value=f"**{discord.utils.escape_markdown(nome)[:100]}**\n**0** pontos", inline=True)
+        embed.add_field(name="ESTADO", value="🟢 EM ANDAMENTO", inline=True)
+        embed.add_field(name="CÓDIGO OPERACIONAL", value=f"`{codigo}`", inline=True)
         if formato:
             embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(formato.strip()[:100]), inline=True)
         if observacoes:
@@ -460,9 +467,16 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         registro["historico_placar"] = historico_placar[-100:]
         await self._salvar_dados_guild(interaction.guild.id, dados)
         nome = registro.get("gangue_inimiga", registro.get("gangue_b", "Gangue desconhecida"))
-        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ PLACAR ATUALIZADO",
-            description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\nStatus: **EM ANDAMENTO**\nCódigo: **{registro['id']}**",
-            color=COR_NEMESIS, timestamp=discord.utils.utcnow())
+        embed = criar_embed(
+            title="📊 GUERRA OFICIAL · ATUALIZAÇÃO DE PLACAR",
+            description="O registro da guerra foi atualizado. O histórico das alterações continua preservado.",
+            color=COR_NEMESIS, timestamp=discord.utils.utcnow(), rodape=None,
+        )
+        embed.set_author(name="NÊMESIS  /  COMANDO DE GUERRA")
+        embed.add_field(name="NÊMESIS", value=f"**{placar_nemesis}** pontos", inline=True)
+        embed.add_field(name="ADVERSÁRIA", value=f"**{discord.utils.escape_markdown(nome)[:100]}**\n**{placar_inimiga}** pontos", inline=True)
+        embed.add_field(name="ESTADO", value="🟢 EM ANDAMENTO", inline=True)
+        embed.add_field(name="CÓDIGO OPERACIONAL", value=f"`{registro['id']}`", inline=True)
         if registro.get("formato"):
             embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(registro["formato"]), inline=True)
         if registro.get("ultima_observacao"):
@@ -522,9 +536,17 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             registro["observacoes_finais"] = observacoes.strip()[:800]
         registro["status"], registro["encerrado_em"], registro["encerrado_por_id"] = "finalizada", time.time(), interaction.user.id
         await self._salvar_dados_guild(interaction.guild.id, dados)
-        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUERRA ENCERRADA",
-            description=f"**NÊMESIS**  **{placar_nemesis} × {placar_inimiga}**  **{discord.utils.escape_markdown(nome)}**\n\n**RESULTADO FINAL: {resultado}**\nVencedor: **{discord.utils.escape_markdown(registro['vencedor'])}**\nCódigo: **{registro['id']}**",
-            color=COR_NEMESIS if placar_nemesis >= placar_inimiga else 0x555555, timestamp=discord.utils.utcnow())
+        embed = criar_embed(
+            title="🏁 GUERRA OFICIAL · RESULTADO DEFINITIVO",
+            description=f"**RESULTADO FINAL: {resultado}**\nO registro foi encerrado e permanece disponível no histórico competitivo.",
+            color=COR_NEMESIS if placar_nemesis >= placar_inimiga else 0x555555,
+            timestamp=discord.utils.utcnow(), rodape=None,
+        )
+        embed.set_author(name="NÊMESIS  /  ARQUIVO DE CONFRONTOS")
+        embed.add_field(name="NÊMESIS", value=f"**{placar_nemesis}** pontos", inline=True)
+        embed.add_field(name="ADVERSÁRIA", value=f"**{discord.utils.escape_markdown(nome)[:100]}**\n**{placar_inimiga}** pontos", inline=True)
+        embed.add_field(name="VENCEDOR", value=f"**{discord.utils.escape_markdown(registro['vencedor'])[:150]}**", inline=False)
+        embed.add_field(name="CÓDIGO OPERACIONAL", value=f"`{registro['id']}`", inline=True)
         if registro.get("formato"):
             embed.add_field(name="FORMATO", value=discord.utils.escape_markdown(registro["formato"]), inline=True)
         if registro.get("prova_url"):
