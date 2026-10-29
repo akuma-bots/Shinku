@@ -1,8 +1,9 @@
-"""Padrões visuais compartilhados para mensagens e embeds da NÊMESIS.
+"""Sistema visual unificado da NÊMESIS para embeds do Discord.
 
-O construtor compatível mantém os argumentos de discord.Embed e aplica uma
-assinatura visual comum sem interferir em campos, cores semânticas ou ações.
+A camada aplica identidade visual visível a todas as embeds que usam criar_embed,
+sem substituir a informação específica, os campos ou as ações de cada sistema.
 """
+from __future__ import annotations
 
 import discord
 
@@ -11,7 +12,9 @@ COR_SUCESSO = 0x2D9D78
 COR_AVISO = 0xD69E2E
 COR_ERRO = 0xC0392B
 COR_NEUTRA = 0x24252B
-RODAPE_PADRAO = "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  •  SISTEMA INTEGRADO"
+MARCA = "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒"
+AUTOR_PADRAO = "✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE SISTEMAS"
+RODAPE_PADRAO = "◈ NÊMESIS  •  SISTEMAS INTEGRADOS"
 
 
 def criar_embed(
@@ -22,49 +25,58 @@ def criar_embed(
     rodape: str | None = RODAPE_PADRAO,
     **kwargs,
 ) -> discord.Embed:
-    """Cria uma embed Discord com identidade visual padrão da NÊMESIS.
-
-    Aceita os argumentos posicionais e nomeados de discord.Embed para facilitar
-    a adoção gradual em todos os módulos, mantendo compatibilidade com chamadas
-    existentes. O parâmetro cor é um alias em português para color.
-    """
+    """Cria uma embed com cabeçalho, título e assinatura visual da NÊMESIS."""
     if cor is not None:
         kwargs["color"] = cor
     elif "color" not in kwargs and "colour" not in kwargs:
         kwargs["color"] = COR_PRIMARIA
 
-    # Compatibilidade com a API anterior, que aceitava timestamp=True/False.
     if isinstance(kwargs.get("timestamp"), bool):
         kwargs["timestamp"] = discord.utils.utcnow() if kwargs["timestamp"] else None
 
+    # Todos os sistemas recebem timestamp por padrão; chamadas explícitas
+    # ainda podem desligá-lo com timestamp=None.
+    if "timestamp" not in kwargs:
+        kwargs["timestamp"] = discord.utils.utcnow()
+
+    # Um tratamento de título uniforme torna a mudança perceptível, sem duplicar
+    # a moldura em títulos que já usam a identidade NÊMESIS.
+    if title:
+        titulo = title.strip()
+        if not titulo.startswith(("✦・", "✦ ", "◈ ", "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒")):
+            titulo = f"✦・ {titulo} ・✦"
+        title = titulo[:256]
+
     embed = discord.Embed(title=title, description=description, **kwargs)
+
+    # Autor e rodapé criam uma assinatura visual consistente mesmo quando o
+    # sistema define um rodapé próprio.
+    if not embed.author.name:
+        embed.set_author(name=AUTOR_PADRAO)
+
     if rodape and not embed.footer.text:
         embed.set_footer(text=rodape[:2048])
+
     return embed
 
 
 def cor_por_estado(sucesso: bool, *, aviso: bool = False) -> int:
-    """Retorna uma cor semântica consistente para sucesso, aviso ou erro."""
     if sucesso:
         return COR_SUCESSO
     return COR_AVISO if aviso else COR_ERRO
 
 
 def embed_sucesso(titulo: str, descricao: str, **kwargs) -> discord.Embed:
-    """Resposta visual de conclusão, com cor semântica de sucesso."""
     return criar_embed(titulo, descricao, cor=COR_SUCESSO, **kwargs)
 
 
 def embed_erro(titulo: str, descricao: str, **kwargs) -> discord.Embed:
-    """Resposta visual de falha ou operação recusada."""
     return criar_embed(titulo, descricao, cor=COR_ERRO, **kwargs)
 
 
 def embed_aviso(titulo: str, descricao: str, **kwargs) -> discord.Embed:
-    """Resposta visual para alertas que exigem atenção."""
     return criar_embed(titulo, descricao, cor=COR_AVISO, **kwargs)
 
 
 def embed_info(titulo: str, descricao: str, **kwargs) -> discord.Embed:
-    """Resposta visual informativa no padrão primário da NÊMESIS."""
     return criar_embed(titulo, descricao, cor=COR_PRIMARIA, **kwargs)
