@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -100,7 +101,7 @@ class EmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CRIAR
                     sufixo = " — continuação {}/{}".format(indice + 1, len(partes))
                     titulo = "{}{}".format(titulo[:256 - len(sufixo)], sufixo) if titulo else "Continuação {}/{}".format(indice + 1, len(partes))
 
-                embed = discord.Embed(
+                embed = criar_embed(
                     title=titulo or None,
                     description=texto or None,
                     color=self.cor_embed,
@@ -143,7 +144,7 @@ class EditarEmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━
             self.rodape.default = atual.footer.text if atual.footer else ""
 
     async def on_submit(self, interaction: discord.Interaction):
-        embed = discord.Embed(
+        embed = criar_embed(
             title=self.titulo.value or None,
             description=self.descricao.value or None,
             color=_cor_para_int(self.cor.value),
