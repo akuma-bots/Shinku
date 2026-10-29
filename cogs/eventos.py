@@ -319,22 +319,21 @@ class Eventos(commands.Cog):
     ) -> discord.Embed:
 
         embed = criar_embed(
-            title=titulo,
+            title=f"📅 AGENDA NÊMESIS · {titulo.upper()[:120]}",
             description=(
                 evento.description
-                or "Sem descrição."
+                or "Este evento não possui uma descrição adicional."
             ),
             color=0xB51F32,
+            rodape=None,
         )
+        embed.set_author(name="NÊMESIS  /  EVENTOS E CAMPEONATOS")
+        embed.add_field(name="EVENTO", value=f"**{evento.name[:200]}**", inline=False)
+        embed.add_field(name="SITUAÇÃO", value=f"🟢 {str(evento.status).replace('_', ' ').title()}", inline=True)
+        embed.add_field(name="FORMATO", value=str(evento.entity_type).replace('_', ' ').title(), inline=True)
 
         embed.add_field(
-            name="Nome",
-            value=evento.name,
-            inline=False,
-        )
-
-        embed.add_field(
-            name="Início",
+            name="🕒 INÍCIO",
             value=discord.utils.format_dt(
                 evento.start_time,
                 style="F",
@@ -345,7 +344,7 @@ class Eventos(commands.Cog):
         if evento.end_time:
 
             embed.add_field(
-                name="Fim",
+                name="🏁 ENCERRAMENTO",
                 value=discord.utils.format_dt(
                     evento.end_time,
                     style="F",
@@ -356,7 +355,7 @@ class Eventos(commands.Cog):
         if evento.location:
 
             embed.add_field(
-                name="Local",
+                name="📍 LOCAL",
                 value=str(
                     evento.location
                 ),
@@ -369,11 +368,7 @@ class Eventos(commands.Cog):
                 url=evento.cover_image.url
             )
 
-        embed.set_footer(
-            text=(
-                f"ID do evento: {evento.id}"
-            )
-        )
+        embed.set_footer(text=f"EVENTO {evento.id}  •  Consulte o Discord para confirmar presença")
 
         return embed
 
