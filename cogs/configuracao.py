@@ -2,6 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.apresentacao import embed_erro, embed_sucesso
+
 
 TIPOS_ATIVIDADE = {
     "jogando": discord.ActivityType.playing,
@@ -39,7 +41,10 @@ class Customizacao(commands.Cog):
     ):
         if not await self.bot.is_owner(interaction.user):
             await interaction.response.send_message(
-                "Este comando é restrito ao responsável pelo bot da NÊMESIS.",
+                embed=embed_erro(
+                    "ACESSO RESTRITO",
+                    "Este comando é exclusivo do responsável pela aplicação da NÊMESIS.",
+                ),
                 ephemeral=True,
             )
             return
@@ -52,8 +57,10 @@ class Customizacao(commands.Cog):
         await self.bot.change_presence(activity=atividade)
 
         await interaction.response.send_message(
-            f"Status da NÊMESIS atualizado para: "
-            f"**{tipo} — {texto}**",
+            embed=embed_sucesso(
+                "STATUS ATUALIZADO",
+                f"**Atividade:** {tipo.title()}\n**Texto:** {discord.utils.escape_markdown(texto)}",
+            ),
             ephemeral=True,
         )
 
