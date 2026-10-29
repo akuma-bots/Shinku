@@ -48,3 +48,23 @@ def cor_por_estado(sucesso: bool, *, aviso: bool = False) -> int:
     if sucesso:
         return COR_SUCESSO
     return COR_AVISO if aviso else COR_ERRO
+
+
+def embed_sucesso(titulo: str, descricao: str, **kwargs) -> discord.Embed:
+    """Resposta visual de conclusão, com cor semântica de sucesso."""
+    return criar_embed(titulo, descricao, cor=COR_SUCESSO, **kwargs)
+
+
+def embed_erro(titulo: str, descricao: str, **kwargs) -> discord.Embed:
+    """Resposta visual de falha ou operação recusada."""
+    return criar_embed(titulo, descricao, cor=COR_ERRO, **kwargs)
+
+
+def embed_aviso(titulo: str, descricao: str, **kwargs) -> discord.Embed:
+    """Resposta visual para alertas que exigem atenção."""
+    return criar_embed(titulo, descricao, cor=COR_AVISO, **kwargs)
+
+
+def embed_info(titulo: str, descricao: str, **kwargs) -> discord.Embed:
+    """Resposta visual informativa no padrão primário da NÊMESIS."""
+    return criar_embed(titulo, descricao, cor=COR_PRIMARIA, **kwargs)
