@@ -1,3 +1,4 @@
+from utils.apresentacao import criar_embed
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -22,10 +23,10 @@ class PontuacaoPvE(commands.Cog):
     async def _montar_embed(self, guild_id: int) -> discord.Embed:
         top = await pontuacao_pve.obter_ranking(guild_id)
         if not top:
-            return discord.Embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING PvE", description="Ninguém pontuou em PvE ainda.", color=0xB51F32)
+            return criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING PvE", description="Ninguém pontuou em PvE ainda.", color=0xB51F32)
 
         linhas = [f"**#{i+1}** <@{uid}> — {pontos} pts" for i, (uid, pontos) in enumerate(top)]
-        embed = discord.Embed(title="🗡️ Pontuação PvE", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed(title="🗡️ Pontuação PvE", description="\n".join(linhas), color=0xB51F32)
         embed.set_footer(text="NÊMESIS • PONTUAÇÃO PvE • Apenas provas aprovadas • Atualização automática a cada 10 min")
         return embed
 
