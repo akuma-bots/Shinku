@@ -160,15 +160,12 @@ class RankingGeral(
             )
 
 
-    async def _montar_embed(
-        self,
-        guild: discord.Guild,
-    ) -> discord.Embed:
+    async def _montar_embed(self, guild: discord.Guild) -> discord.Embed:
+        """Painel global sazonal com quadro de líderes e estatísticas em cartões."""
         await self._sincronizar_migracao(guild)
         dados = await registrar_tempo_top_global()
         perfis = dados.get("perfis", {})
         pontuados = []
-
         for uid, perfil in perfis.items():
             try:
                 user_id = int(uid)
@@ -190,52 +187,47 @@ class RankingGeral(
         horas = resto // 3600
         numero_temporada = int(estado.get("numero", 1) or 1)
 
-        cabecalho = (
-            "╔══════════════════════════════════════╗\n"
-            "║       𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  TOP GLOBAL       ║\n"
-            "╚══════════════════════════════════════╝\n\n"
-            f"**TEMPORADA #{numero_temporada}**  ━  Reinicia em **{dias}d {horas}h**\n"
-            "A pontuação sazonal define a posição. XP, vitórias, derrotas e tempo no Top 10 aparecem como estatísticas.\n\n"
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        )
-
-        if not top:
-            return criar_embed(
-                title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
-                description=(
-                    f"{cabecalho}\n\n"
-                    "Ainda não há jogadores pontuados nesta temporada.\n"
-                    "Participe das missões e atividades oficiais para entrar na classificação."
-                ),
-                color=0xB51F32,
-            )
-
-        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
-        linhas = []
-        for posicao, (uid, pontos, vitorias, xp, derrotas, tempo_top) in enumerate(top, start=1):
-            minutos = max(0, tempo_top) // 60
-            horas_top, minutos_restantes = divmod(minutos, 60)
-            tempo_texto = f"{horas_top}h {minutos_restantes}min"
-            selo = medalhas.get(posicao, f"**{posicao:02d}.**")
-            linhas.append(
-                f"{selo} <@{uid}>\n"
-                f"┊ **{pontos:,} P.C.**".replace(",", ".")
-                + f"  ┊  **{vitorias} V** / **{derrotas} D**\n"
-                + f"┊ XP **{xp:,}**".replace(",", ".")
-                + f"  ┊  Top 10 **{tempo_texto}**"
-            )
-
         embed = criar_embed(
-            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CLASSIFICAÇÃO COMPETITIVA",
+            title="🏆 RANKING GLOBAL · TEMPORADA COMPETITIVA",
             description=(
-                f"{cabecalho}\n\n"
-                + "\n\n".join(linhas)
-                + "\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                "A pontuação sazonal reinicia a cada 30 dias. O histórico das temporadas concluídas é preservado."
+                "**CLASSIFICAÇÃO OFICIAL NÊMESIS**\n"
+                "A posição é definida pela pontuação sazonal. XP, vitórias, derrotas e permanência no Top 10 "
+                "são métricas complementares; o histórico das temporadas concluídas é preservado."
             ),
             color=0xB51F32,
+            rodape=None,
         )
-        embed.set_footer(text=f"{guild.name}  •  NÊMESIS COMPETITIVO  •  Atualização automática")
+        embed.set_author(name="NÊMESIS  /  LIGA GLOBAL")
+        embed.add_field(name="TEMPORADA", value=f"**#{numero_temporada}**", inline=True)
+        embed.add_field(name="REINÍCIO EM", value=f"**{dias}d {horas}h**", inline=True)
+        embed.add_field(name="CLASSIFICADOS", value=f"**{len(pontuados)}**", inline=True)
+
+        if not top:
+            embed.add_field(
+                name="QUADRO AINDA VAZIO",
+                value="Nenhum jogador possui pontos nesta temporada. Participe das atividades competitivas oficiais para entrar na classificação.",
+                inline=False,
+            )
+        else:
+            medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+            for posicao, (uid, pontos, vitorias, xp, derrotas, tempo_top) in enumerate(top, start=1):
+                minutos = max(0, tempo_top) // 60
+                horas_top, minutos_restantes = divmod(minutos, 60)
+                tempo_texto = f"{horas_top}h {minutos_restantes}min"
+                selo = medalhas.get(posicao, f"#{posicao:02d}")
+                membro = guild.get_member(uid)
+                nome = membro.display_name if membro else f"Jogador {uid}"
+                embed.add_field(
+                    name=f"{selo}  {nome[:70]}  ·  {pontos:,} P.C.".replace(",", ".")[:256],
+                    value=(
+                        f"<@{uid}>\n"
+                        f"**VITÓRIAS** {vitorias}  ·  **DERROTAS** {derrotas}\n"
+                        f"**XP TOTAL** {xp:,}  ·  **TEMPO NO TOP 10** {tempo_texto}"
+                    ).replace(",", ".")[:1024],
+                    inline=False,
+                )
+
+        embed.set_footer(text=f"{guild.name}  •  Temporadas preservadas no histórico  •  Atualização automática")
         return embed
 
     @tasks.loop(
