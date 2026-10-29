@@ -1628,13 +1628,21 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         # ou de moderação concede bypass integral, inclusive permissões efetivas
         # do canal. A mensagem não é apagada e nenhuma punição é aplicada.
         permissoes = membro.guild_permissions
+        flags_bypass = (
+            "administrator", "manage_messages", "manage_guild",
+            "manage_channels", "manage_roles", "manage_webhooks",
+            "view_audit_log", "kick_members", "ban_members",
+            "moderate_members", "manage_threads",
+        )
         if (
             membro.id == guild.owner_id
-            or permissoes.administrator
-            or permissoes.manage_messages
-            or permissoes.manage_guild
+            or any(bool(getattr(permissoes, flag, False)) for flag in flags_bypass)
             or membro_pode_moderar(membro, message.channel)
         ):
+            __import__("logging").getLogger(__name__).info(
+                "AutoMod cancelado pela proteção administrativa (guild=%s, member=%s, message=%s).",
+                guild.id, membro.id, message.id,
+            )
             return
 
         nivel = int(infracao["nivel"])
@@ -1661,9 +1669,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         permissoes_finais = membro.guild_permissions
         if (
             membro.id == guild.owner_id
-            or permissoes_finais.administrator
-            or permissoes_finais.manage_messages
-            or permissoes_finais.manage_guild
+            or any(bool(getattr(permissoes_finais, flag, False)) for flag in flags_bypass)
             or membro_pode_moderar(membro, message.channel)
         ):
             logger = __import__("logging").getLogger(__name__)
@@ -2101,16 +2107,26 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         # Atualiza a referência caso o autor do evento seja Member, evitando que
         # uma cópia desatualizada do cache sobrescreva os cargos do evento.
 
-        # Isenção administrativa executada antes de qualquer histórico/detecção.
-        # Os administradores e responsáveis pela moderação têm bypass integral.
+        # PROTEÇÃO PRIORITÁRIA: cargos administrativos/moderação nunca entram
+        # no pipeline de detecção nem sofrem exclusão/punição automática.
+        # A verificação usa permissões efetivas do servidor e do canal.
         permissoes = membro.guild_permissions
-        if (
+        flags_bypass = (
+            "administrator", "manage_messages", "manage_guild",
+            "manage_channels", "manage_roles", "manage_webhooks",
+            "view_audit_log", "kick_members", "ban_members",
+            "moderate_members", "manage_threads",
+        )
+        isencao = (
             membro.id == message.guild.owner_id
-            or permissoes.administrator
-            or permissoes.manage_messages
-            or permissoes.manage_guild
+            or any(bool(getattr(permissoes, flag, False)) for flag in flags_bypass)
             or membro_pode_moderar(membro, message.channel)
-        ):
+        )
+        if isencao:
+            __import__("logging").getLogger(__name__).debug(
+                "AutoMod bypass: membro privilegiado (guild=%s, member=%s, message=%s).",
+                message.guild.id, membro.id, message.id,
+            )
             return
 
         chave = (
