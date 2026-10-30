@@ -10,13 +10,14 @@ ARQUIVO_TICKETS = "tickets.json"
 
 
 TIPOS_PADRAO = [
-    {"valor": "recrutamento", "label": "Ingresso na NÊMESIS", "emoji": "🩸", "descricao": "Candidate-se à guilda e conheça o processo de recrutamento.", "usa_ia": False},
-    {"valor": "hierarquia_divisoes", "label": "Cargos e Divisões", "emoji": "♟️", "descricao": "Dúvidas sobre hierarquia, equipes, funções e progressão interna.", "usa_ia": False},
-    {"valor": "conflitos_denuncias", "label": "Conduta e Denúncias", "emoji": "⚖️", "descricao": "Reporte conflitos, infrações ou comportamentos inadequados com discrição.", "usa_ia": False},
-    {"valor": "guerras_desafios", "label": "Competitivo e Guerras", "emoji": "⚔️", "descricao": "Trate de desafios, confrontos, guerras de guilda e disputas PvP.", "usa_ia": False},
-    {"valor": "suporte_comunidade", "label": "Suporte Técnico", "emoji": "🛠️", "descricao": "Receba ajuda com o servidor, comandos, bot ou acesso aos sistemas.", "usa_ia": False},
-    {"valor": "aliancas", "label": "Diplomacia e Alianças", "emoji": "🤝", "descricao": "Apresente propostas de parceria, aliança ou cooperação entre guildas.", "usa_ia": False},
-    {"valor": "eventos_atividades", "label": "Eventos e Torneios", "emoji": "🏆", "descricao": "Dúvidas, inscrições e suporte para eventos, campeonatos e atividades.", "usa_ia": False},
+    {"valor": "recrutamento", "label": "Recrutamento e Admissão", "emoji": "✦", "descricao": "Inicie sua candidatura e obtenha informações sobre os critérios e as etapas de admissão à NÊMESIS.", "usa_ia": False},
+    {"valor": "hierarquia_divisoes", "label": "Estrutura e Hierarquia", "emoji": "♟️", "descricao": "Solicite esclarecimentos sobre a estrutura organizacional, atribuições, divisões e progressão hierárquica.", "usa_ia": False},
+    {"valor": "conflitos_denuncias", "label": "Integridade e Conduta", "emoji": "⚖️", "descricao": "Comunique ocorrências, violações de normas ou questões disciplinares para análise da administração.", "usa_ia": False},
+    {"valor": "guerras_desafios", "label": "Operações Competitivas", "emoji": "⚔️", "descricao": "Encaminhe assuntos relacionados a confrontos oficiais, desafios, disputas PvP e guerras entre guildas.", "usa_ia": False},
+    {"valor": "suporte_comunidade", "label": "Assistência Técnica", "emoji": "⚙️", "descricao": "Solicite suporte para questões técnicas relacionadas ao servidor, ao bot, aos comandos e aos sistemas da comunidade.", "usa_ia": False},
+    {"valor": "aliancas", "label": "Relações Institucionais", "emoji": "🤝", "descricao": "Apresente propostas de aliança, parceria ou cooperação institucional entre a NÊMESIS e outras comunidades.", "usa_ia": False},
+    {"valor": "eventos_atividades", "label": "Gestão de Eventos", "emoji": "🏆", "descricao": "Solicite informações e assistência referentes à organização, às inscrições e à participação em eventos e competições oficiais.", "usa_ia": False},
+    {"valor": "sugestoes_projetos", "label": "Premiações e Reconhecimentos", "emoji": "🎖️", "descricao": "Solicite a validação, a atribuição ou o resgate de premiações obtidas em eventos, competições, sorteios e campanhas oficiais.", "usa_ia": False},
 ]
 
 
