@@ -17,6 +17,46 @@ _LOG = logging.getLogger(__name__)
 _ROBLOX_VINCULO_LOCK = asyncio.Lock()
 
 
+
+ROBLOX_GRUPO_ID = 621286796
+ROBLOX_GRUPO_URL = "https://www.roblox.com/pt/communities/621286796/Comunidade-Nik"
+ROBLOX_CANAL_CENTRAL_ID = 1565825670066737202
+ARQUIVO_PAINEL_ROBLOX = "roblox_painel_central.json"
+
+async def _buscar_dados_grupo() -> dict:
+    timeout = aiohttp.ClientTimeout(total=12)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.get(f"https://groups.roblox.com/v1/groups/{ROBLOX_GRUPO_ID}") as resposta:
+            resposta.raise_for_status()
+            dados = await resposta.json()
+    if not isinstance(dados, dict):
+        raise ValueError("A API do grupo Roblox retornou dados inválidos.")
+    return dados
+
+class CentralRobloxView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Acessar comunidade", style=discord.ButtonStyle.link, url=ROBLOX_GRUPO_URL, emoji="🌐"))
+
+    @discord.ui.button(label="Vincular minha conta", style=discord.ButtonStyle.primary, custom_id="nemesis:roblox:vincular", emoji="🔗")
+    async def vincular_conta(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "**Vinculação da conta Roblox**\n1. Execute `/roblox-vincular` e informe seu nome de usuário.\n2. Coloque o código gerado na descrição do perfil Roblox.\n3. Execute `/roblox-confirmar` para validar.\n\nO bot nunca solicita senha, cookie ou credenciais.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Meu perfil Roblox", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:perfil", emoji="👤")
+    async def meu_perfil(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vinculos = await carregar(ARQUIVO_VINCULOS, {})
+        vinculo = (vinculos.get(str(interaction.guild_id), {}) or {}).get(str(interaction.user.id))
+        if not isinstance(vinculo, dict):
+            await interaction.response.send_message("Sua conta ainda não está vinculada. Use o botão de vinculação para começar.", ephemeral=True)
+            return
+        rid = int(vinculo["roblox_id"])
+        embed = criar_embed(title="NÊMESIS • PERFIL ROBLOX", description=f"**Usuário:** {vinculo.get('roblox_username', 'Não informado')}\n**Perfil:** https://www.roblox.com/users/{rid}/profile\n**Comunidade:** [Abrir grupo oficial]({ROBLOX_GRUPO_URL})", color=0xB3132B)
+        embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rid}&width=150&height=150&format=png")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 async def _buscar_usuario_roblox(nome_usuario: str):
     timeout = aiohttp.ClientTimeout(total=15)
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -83,7 +123,7 @@ async def _config_grupo(guild_id: int) -> dict:
     config = todos.get(str(guild_id), {})
     if not isinstance(config, dict):
         config = {}
-    grupo_id = config.get("grupo_id")
+    grupo_id = config.get("grupo_id") or ROBLOX_GRUPO_ID
     try:
         grupo_id = int(grupo_id) if grupo_id not in (None, "") else None
     except (TypeError, ValueError, OverflowError):
@@ -154,6 +194,58 @@ class Roblox(commands.Cog):
 
     def cog_unload(self):
         self.sincronizacao_automatica.cancel()
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Cria ou atualiza um único painel público da comunidade Roblox."""
+        if getattr(self, "_painel_roblox_sync", False):
+            return
+        self._painel_roblox_sync = True
+        try:
+            canal = self.bot.get_channel(ROBLOX_CANAL_CENTRAL_ID)
+            if canal is None:
+                canal = await self.bot.fetch_channel(ROBLOX_CANAL_CENTRAL_ID)
+            if not isinstance(canal, discord.TextChannel):
+                _LOG.error("Canal configurado para a central Roblox não é um canal de texto.")
+                return
+            embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CENTRAL ROBLOX", description="Acesse a comunidade oficial da NÊMESIS no Roblox e conecte sua conta ao Discord.\n\n**Comunidade:** [Comunidade Nik](" + ROBLOX_GRUPO_URL + ")\n**ID do grupo:** `" + str(ROBLOX_GRUPO_ID) + "`\n\n**Vinculação segura**\nA confirmação utiliza um código temporário na descrição do perfil Roblox. O bot nunca solicita senha ou cookie.", color=0xB3132B)
+            try:
+                dados = await _buscar_dados_grupo()
+                nome = str(dados.get("name") or "Comunidade Nik")[:100]
+                membros = dados.get("memberCount")
+                valor = "**" + nome + "**"
+                if isinstance(membros, int):
+                    valor += "\n**" + format(membros, ",") + "** membros
+                embed.add_field(name="GRUPO OFICIAL", value=valor, inline=True)
+                descricao = str(dados.get("description") or "").strip()
+                if descricao:
+                    embed.add_field(name="SOBRE A COMUNIDADE", value=descricao[:900], inline=False)
+            except (aiohttp.ClientError, ValueError, TypeError):
+                _LOG.exception("Falha ao consultar dados públicos do grupo Roblox.")
+                embed.add_field(name="GRUPO OFICIAL", value="[Abrir Comunidade Nik](" + ROBLOX_GRUPO_URL + ")", inline=True)
+            estado = await carregar(ARQUIVO_PAINEL_ROBLOX, {})
+            if not isinstance(estado, dict):
+                estado = {}
+            registro = estado.get(str(canal.guild.id), {})
+            mensagem = None
+            if isinstance(registro, dict) and registro.get("message_id"):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["message_id"]))
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    mensagem = None
+            view = CentralRobloxView()
+            if mensagem:
+                await mensagem.edit(embed=embed, view=view)
+            else:
+                mensagem = await canal.send(embed=embed, view=view)
+            estado[str(canal.guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id}
+            await salvar(ARQUIVO_PAINEL_ROBLOX, estado)
+            self.bot.add_view(CentralRobloxView())
+            _LOG.info("Central Roblox atualizada no canal %s (mensagem %s).", canal.id, mensagem.id)
+        except Exception:
+            _LOG.exception("Falha ao publicar/atualizar a Central Roblox.")
+        finally:
+            self._painel_roblox_sync = False
 
     # ---------------- Verificação de conta ----------------
 
