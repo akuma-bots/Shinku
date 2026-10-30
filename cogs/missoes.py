@@ -464,9 +464,9 @@ class Missoes(commands.Cog):
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
 
     async def _atualizar_painel_missoes(self, guild: discord.Guild) -> None:
-        config = await get_config(guild.id)
-        canal_id = config.get("canal_missoes_missao_id") or CANAIS_PADRAO["canal_missoes_missao_id"]
-        canal = await self._resolver_canal(guild, int(canal_id))
+        # Canal fixo oficial da Central de Missões da NÊMESIS.
+        canal_id = 1563995881315897549
+        canal = await self._resolver_canal(guild, canal_id)
         if canal is None:
             log.warning("Canal atual de missões não encontrado; painel não publicado.")
             return
