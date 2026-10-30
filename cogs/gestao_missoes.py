@@ -52,8 +52,11 @@ async def _estatisticas(guild_id: int, atividade: dict) -> dict:
         if status in resultado:
             resultado[status] += 1
         autor = item.get("autor_id")
+        auxiliar = item.get("auxiliar_id")
         if autor:
             participantes.add(int(autor))
+        if auxiliar:
+            participantes.add(int(auxiliar))
         if status == "aprovada":
             try:
                 xp_liberado += max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
@@ -107,6 +110,16 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
         value=(str(selecionada.get("descricao") or "Sem descrição cadastrada.")[:1000]),
         inline=False,
     )
+    configuracao = [
+        f"**Dificuldade:** {str(selecionada.get('dificuldade') or 'Não definida')[:80]}",
+        f"**Prazo:** {str(selecionada.get('prazo') or 'Não definido')[:100]}",
+        f"**Requisitos:** {str(selecionada.get('requisitos') or 'Não definidos')[:700]}",
+    ]
+    embed.add_field(
+        name="◈ PARÂMETROS DA ATIVIDADE",
+        value="\\n".join(configuracao)[:1024],
+        inline=False,
+    )
     if estatisticas:
         embed.add_field(name="⏳ PENDENTES", value=f"**{estatisticas['pendente']}**", inline=True)
         embed.add_field(name="✓ APROVADAS", value=f"**{estatisticas['aprovada']}**", inline=True)
@@ -117,6 +130,7 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
                 f"**Provas registradas:** {estatisticas['total']}\n"
                 f"**Participantes únicos:** {estatisticas['participantes']}\n"
                 f"**XP aprovado estimado:** {estatisticas['xp_liberado_estimado']:,}".replace(",", ".")
+                + "\\n*Estimativa calculada pela recompensa atual da atividade.*"
             ),
             inline=False,
         )
