@@ -137,6 +137,58 @@ class PainelProvasView(discord.ui.View):
         super().__init__(timeout=300)
         self.add_item(FiltroPainelProvas(cog, guild_id, owner_id, status))
 
+class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
+    motivo = discord.ui.TextInput(
+        label="Motivo da rejeição",
+        placeholder="Explique o que precisa ser corrigido na evidência ou no cumprimento do objetivo.",
+        style=discord.TextStyle.paragraph,
+        min_length=8,
+        max_length=800,
+        required=True,
+    )
+
+    def __init__(self, guild: discord.Guild, revisao_id: str, mensagem: discord.Message, revisor: discord.Member):
+        super().__init__(timeout=300)
+        self.guild = guild
+        self.revisao_id = revisao_id
+        self.mensagem = mensagem
+        self.revisor = revisor
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            motivo = str(self.motivo.value).strip()
+            revisao = await revisoes.rejeitar(self.guild.id, self.revisao_id, self.revisor.id, motivo)
+            if not revisao:
+                await interaction.followup.send("Esta prova já foi processada ou não está mais disponível.", ephemeral=True)
+                return
+            embed = _embed_revisao(revisao)
+            embed.color = 0x9F2035
+            embed.add_field(name="✕ DECISÃO", value="**REJEITADA**", inline=True)
+            embed.add_field(name="◈ RESPONSÁVEL PELA ANÁLISE", value=self.revisor.mention, inline=True)
+            embed.add_field(name="◈ JUSTIFICATIVA", value=motivo[:800], inline=False)
+            await self.mensagem.edit(embed=embed, view=None)
+            await auditoria.registrar(
+                self.guild,
+                "✕ Comprovante rejeitado",
+                f"Atividade: {revisao.get('titulo', '—')}\nTipo: {revisao.get('tipo', '—')}\n"
+                f"Participante: <@{revisao.get('autor_id')}>\nRevisor: {self.revisor.mention}\n"
+                f"Protocolo: {revisao.get('id', '—')}\nMotivo: {motivo}",
+                cor=0x9F2035,
+            )
+            autor = self.guild.get_member(int(revisao.get("autor_id") or 0))
+            if autor:
+                try:
+                    await autor.send(f"Sua prova para {revisao.get('titulo', 'atividade')} foi rejeitada.\nMotivo: {motivo}\nCorrija os pontos indicados e envie uma nova evidência.")
+                except discord.Forbidden:
+                    pass
+            await interaction.followup.send("A prova foi rejeitada. A justificativa foi registrada na auditoria e enviada ao participante.", ephemeral=True)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Falha ao concluir rejeição da revisão %s.", self.revisao_id)
+            await interaction.followup.send("Não foi possível concluir a rejeição. Confira os registros e tente novamente.", ephemeral=True)
+
+
 
 class Revisoes(commands.Cog):
     """Motor de aprovação manual por print. Outros cogs (missões, PvP, PvE)
@@ -254,6 +306,12 @@ class Revisoes(commands.Cog):
             await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
             return
         _, acao, revisao_id = partes
+
+        if acao == "rejeitar":
+            await interaction.response.send_modal(
+                MotivoRejeicaoModal(interaction.guild, revisao_id, interaction.message, interaction.user)
+            )
+            return
 
         # A consulta ao storage pode demorar; confirme a interação antes do I/O.
         await interaction.response.defer(ephemeral=True, thinking=True)
