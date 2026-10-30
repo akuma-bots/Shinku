@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
 
-CORES = {"pvp": 0xED4245, "pve": 0x57F287, "missao": 0xFEE75C}
+CORES = {"pvp": 0x9F2035, "pve": 0x8B6A35, "missao": 0x9F2035, "contribuicao": 0x8B6A35, "especial": 0x754A9E}
 _ABRIR_REVISAO_LOCK = asyncio.Lock()
 
 
@@ -26,20 +26,46 @@ async def _hash_imagem(url: str):
 
 
 def _embed_revisao(revisao: dict) -> discord.Embed:
-    embed = criar_embed(
-        title=f"📋 Revisão pendente — {revisao['titulo']}",
-        description=revisao.get("descricao") or "Sem descrição.",
-        color=CORES.get(revisao["tipo"], 0x5865F2),
-    )
-    embed.add_field(name="Enviado por", value=f"<@{revisao['autor_id']}>", inline=True)
+    tipo = str(revisao.get("tipo") or "missao").lower()
+    autor_id = revisao.get("autor_id")
     auxiliar_id = revisao.get("auxiliar_id")
+    titulo = str(revisao.get("titulo") or "Comprovante de atividade")
+    descricao = str(revisao.get("descricao") or "Sem observações adicionais.")
+    embed = criar_embed(
+        title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE VALIDAÇÃO",
+        description=(
+            f"**◈ COMPROVANTE RECEBIDO**  ·  **{tipo.replace('_', ' ').upper()}**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"**Atividade:** {titulo}\n"
+            f"**Relato do participante:**\n{descricao[:1200]}"
+        ),
+        color=CORES.get(tipo, 0x9F2035),
+    )
+    embed.set_author(name="NÊMESIS  /  AUDITORIA DE OPERAÇÕES")
+    embed.add_field(name="◈ PARTICIPANTE", value=f"<@{autor_id}>" if autor_id else "Não identificado", inline=True)
+    embed.add_field(name="◈ CATEGORIA", value=tipo.replace("_", " ").title(), inline=True)
+    embed.add_field(name="◈ PROTOCOLO", value=f"`{revisao.get('id', '—')}`", inline=True)
+    embed.add_field(name="◈ REFERÊNCIA", value=f"`{revisao.get('referencia_id') or '—'}`", inline=True)
     if auxiliar_id:
-        embed.add_field(name="Auxiliar", value=f"<@{int(auxiliar_id)}>", inline=True)
-    embed.add_field(name="Tipo", value=revisao["tipo"].upper(), inline=True)
+        embed.add_field(name="◈ COLABORADOR", value=f"<@{int(auxiliar_id)}>", inline=True)
+    enviado = revisao.get("timestamp")
+    if isinstance(enviado, (int, float)):
+        embed.add_field(name="◈ RECEBIDO", value=f"<t:{int(enviado)}:F>\n<t:{int(enviado)}:R>", inline=True)
+    if revisao.get("motivo_rejeicao"):
+        embed.add_field(
+            name="◈ MOTIVO DA REJEIÇÃO",
+            value=str(revisao.get("motivo_rejeicao"))[:800],
+            inline=False,
+        )
+    if revisao.get("status") == "pendente":
+        embed.add_field(
+            name="◈ DIRETRIZES DE ANÁLISE",
+            value="Confira a autenticidade, a correspondência com o objetivo e a legibilidade da evidência. A recompensa em XP só será aplicada após aprovação.",
+            inline=False,
+        )
     embed.set_image(url=revisao["print_url"])
-    embed.set_footer(text=f"ID: {revisao['id']}")
+    embed.set_footer(text="NÊMESIS  •  CENTRAL DE VALIDAÇÃO  •  DECISÃO REGISTRADA EM AUDITORIA")
     return embed
-
 
 def _view_revisao(revisao_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
@@ -75,14 +101,18 @@ def _embed_painel_provas(guild: discord.Guild, status: str, itens: list[dict]) -
         enviado = item.get("timestamp")
         data = f"<t:{int(enviado)}:R>" if isinstance(enviado, (int, float)) else "Data indisponível"
         revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "—"
+        motivo = str(item.get("motivo_rejeicao") or "").strip()
+        detalhe = (
+            f"**ID da prova:** `{item.get('id', '—')}`\n"
+            f"**ID da missão/atividade:** `{referencia}`\n"
+            f"**Membro:** {autor} • **Tipo:** {tipo}\n"
+            f"**Enviada:** {data} • **Revisor:** {revisor}"
+        )
+        if status == "rejeitada" and motivo:
+            detalhe += f"\n**Motivo:** {motivo[:500]}"
         embed.add_field(
             name=f"{item.get('titulo', 'Prova sem título')}"[:256],
-            value=(
-                f"**ID da prova:** `{item.get('id', '—')}`\n"
-                f"**ID da missão/atividade:** `{referencia}`\n"
-                f"**Membro:** {autor} • **Tipo:** {tipo}\n"
-                f"**Enviada:** {data} • **Revisor:** {revisor}"
-            )[:1024],
+            value=detalhe[:1024],
             inline=False,
         )
     if len(itens) > 10:
@@ -117,6 +147,58 @@ class PainelProvasView(discord.ui.View):
     def __init__(self, cog: "Revisoes", guild_id: int, owner_id: int, status: str = "pendente"):
         super().__init__(timeout=300)
         self.add_item(FiltroPainelProvas(cog, guild_id, owner_id, status))
+
+class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
+    motivo = discord.ui.TextInput(
+        label="Motivo da rejeição",
+        placeholder="Explique o que precisa ser corrigido na evidência ou no cumprimento do objetivo.",
+        style=discord.TextStyle.paragraph,
+        min_length=8,
+        max_length=800,
+        required=True,
+    )
+
+    def __init__(self, guild: discord.Guild, revisao_id: str, mensagem: discord.Message, revisor: discord.Member):
+        super().__init__(timeout=300)
+        self.guild = guild
+        self.revisao_id = revisao_id
+        self.mensagem = mensagem
+        self.revisor = revisor
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            motivo = str(self.motivo.value).strip()
+            revisao = await revisoes.rejeitar(self.guild.id, self.revisao_id, self.revisor.id, motivo)
+            if not revisao:
+                await interaction.followup.send("Esta prova já foi processada ou não está mais disponível.", ephemeral=True)
+                return
+            embed = _embed_revisao(revisao)
+            embed.color = 0x9F2035
+            embed.add_field(name="✕ DECISÃO", value="**REJEITADA**", inline=True)
+            embed.add_field(name="◈ RESPONSÁVEL PELA ANÁLISE", value=self.revisor.mention, inline=True)
+            embed.add_field(name="◈ JUSTIFICATIVA", value=motivo[:800], inline=False)
+            await self.mensagem.edit(embed=embed, view=None)
+            await auditoria.registrar(
+                self.guild,
+                "✕ Comprovante rejeitado",
+                f"Atividade: {revisao.get('titulo', '—')}\nTipo: {revisao.get('tipo', '—')}\n"
+                f"Participante: <@{revisao.get('autor_id')}>\nRevisor: {self.revisor.mention}\n"
+                f"Protocolo: {revisao.get('id', '—')}\nMotivo: {motivo}",
+                cor=0x9F2035,
+            )
+            autor = self.guild.get_member(int(revisao.get("autor_id") or 0))
+            if autor:
+                try:
+                    await autor.send(f"Sua prova para {revisao.get('titulo', 'atividade')} foi rejeitada.\nMotivo: {motivo}\nCorrija os pontos indicados e envie uma nova evidência.")
+                except discord.Forbidden:
+                    pass
+            await interaction.followup.send("A prova foi rejeitada. A justificativa foi registrada na auditoria e enviada ao participante.", ephemeral=True)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Falha ao concluir rejeição da revisão %s.", self.revisao_id)
+            await interaction.followup.send("Não foi possível concluir a rejeição. Confira os registros e tente novamente.", ephemeral=True)
+
 
 
 class Revisoes(commands.Cog):
@@ -235,6 +317,12 @@ class Revisoes(commands.Cog):
             await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
             return
         _, acao, revisao_id = partes
+
+        if acao == "rejeitar":
+            await interaction.response.send_modal(
+                MotivoRejeicaoModal(interaction.guild, revisao_id, interaction.message, interaction.user)
+            )
+            return
 
         # A consulta ao storage pode demorar; confirme a interação antes do I/O.
         await interaction.response.defer(ephemeral=True, thinking=True)

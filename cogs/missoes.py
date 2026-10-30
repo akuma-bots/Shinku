@@ -324,10 +324,7 @@ class Missoes(commands.Cog):
                 )
                 embed.add_field(
                     name="◈ RECOMPENSA",
-                    value=(
-                        f"**{recompensa:,} P.C.**\n"
-                        f"{recompensa:,} XP"
-                    ).replace(",", "."),
+                    value=f"**{recompensa:,} XP** por aprovação".replace(",", "."),
                     inline=True,
                 )
 
@@ -356,7 +353,7 @@ class Missoes(commands.Cog):
                     embed.add_field(
                         name="◈ CRITÉRIOS DE RECOMPENSA",
                         value=(
-                            f"Responsável sem auxiliar: **{recompensa:,} XP e P.C.** após aprovação.\n"
+                            f"Responsável sem auxiliar: **{recompensa:,} XP** após aprovação.\n"
                             "Com auxiliar opcional: **60%** para o responsável e **40%** para o auxiliar.\n"
                             "A recompensa não é duplicada; a validação da staff continua obrigatória."
                         ).replace(",", "."),
@@ -443,11 +440,11 @@ class Missoes(commands.Cog):
             descricao = str(item.get("descricao") or "Objetivo não detalhado.").strip() or "Objetivo não detalhado."
             identificador = str(item.get("id") or "—")
             embed.add_field(
-                name=f"{tipo.get('emoji', '🎯')} {indice:02d} · {titulo[:54]} · {recompensa:,} P.C.".replace(",", ".")[:256],
+                name=f"{tipo.get('emoji', '🎯')} {indice:02d} · {titulo[:54]} · {recompensa:,} XP".replace(",", ".")[:256],
                 value=(
                     f"{descricao[:100]}\n"
                     f"{estado} · {tipo['nome']}\n"
-                    f"**Recompensa:** `{recompensa:,}` P.C.\n"
+                    f"**Recompensa:** `{recompensa:,} XP`\n"
                     f"**ID:** `{identificador[:24]}`"
                 ).replace(",", ".")[:1024],
                 inline=False,
@@ -506,7 +503,7 @@ class Missoes(commands.Cog):
         embed = criar_embed(
             f"🏆 RANKING {nome_jogo.upper()} · CIRCUITO COMPETITIVO",
             f"**JOGO SELECIONADO** · {nome_jogo}\n**QUADRO OFICIAL DE CLASSIFICAÇÃO**\n"
-            "A posição é definida pelos Pontos de Contribuição (P.C.) registrados após validação. "
+            "A classificação considera o XP obtido em missões aprovadas. "
             "As métricas adicionais ajudam a comparar desempenho, consistência e participação.",
             cor=0x9F2035, rodape=None,
         )
@@ -526,9 +523,9 @@ class Missoes(commands.Cog):
                 horas, minutos = divmod(resto, 60)
                 tempo = f"{dias}d {horas}h" if dias else f"{horas}h {minutos}min"
                 selo = medalhas.get(posicao, f"#{posicao:02d}")
-                embed.description += f"\n\n{selo} <@{uid}> · **{pontos:,} P.C.**".replace(",", ".")
+                embed.description += f"\n\n{selo} <@{uid}> · **{pontos:,} XP**".replace(",", ".")
                 embed.add_field(
-                    name=f"{selo}  {nome[:70]}  ·  {pontos:,} P.C.".replace(",", ".")[:256],
+                    name=f"{selo}  {nome[:70]}  ·  {pontos:,} XP".replace(",", ".")[:256],
                     value=(
                         f"<@{uid}>\n"
                         f"**V / E / D**  `{stats.get('vitorias', 0)} / {stats.get('empates', 0)} / {stats.get('derrotas', 0)}`  ·  "
@@ -743,7 +740,7 @@ class Missoes(commands.Cog):
                     "evento_perfil": evento_perfil,
                 })
 
-        # Registra XP e pontuação na progressão interna com chave idempotente por membro.
+        # Registra XP na progressão interna com chave idempotente por membro.
         progressao = self.bot.get_cog("ProgressaoGangue")
         tipo_progressao = str(atividade.get("tipo", "missao")).lower()
         if tipo_progressao not in {"missao", "contribuicao", "especial"}:
@@ -760,13 +757,13 @@ class Missoes(commands.Cog):
 
             jogo_slug = str(atividade.get("jogo") or "").strip().lower()
             if jogo_slug and resultado["aplicada"] and quantidade > 0:
-                membro_pontuacao = guild.get_member(usuario_id)
+                membro_ranking = guild.get_member(usuario_id)
                 try:
                     await ranking_missoes_jogos.registrar_pontos(
                         guild_id=guild.id,
                         jogo=jogo_slug,
                         user_id=usuario_id,
-                        nome=membro_pontuacao.display_name if membro_pontuacao else "",
+                        nome=membro_ranking.display_name if membro_ranking else "",
                         pontos=quantidade,
                         evento_id=f"missao:{revisao_id}:{usuario_id}",
                     )
@@ -819,7 +816,7 @@ class Missoes(commands.Cog):
 
             if resultado["aplicada"]:
                 mensagens.append(
-                    f"<@{usuario_id}> recebeu **+{quantidade} XP** e **+{quantidade} de pontuação**"
+                    f"<@{usuario_id}> recebeu **+{quantidade} XP**"
                 )
             else:
                 mensagens.append(
@@ -1039,7 +1036,7 @@ class Missoes(commands.Cog):
         ja_enviada = any(
             int(item.get("autor_id", 0) or 0) == interaction.user.id
             and str(item.get("referencia_id", "")) == str(atividade["id"])
-            and item.get("tipo") == "missao"
+            and item.get("tipo") == tipo
             for item in pendentes
         )
         if ja_enviada:
@@ -1080,7 +1077,7 @@ class Missoes(commands.Cog):
             await revisoes_cog.abrir_revisao(
                 guild,
                 canal,
-                tipo="missao",
+                tipo=tipo,
                 autor_id=interaction.user.id,
                 referencia_id=str(atividade["id"]),
                 print_url=url,
@@ -1089,10 +1086,10 @@ class Missoes(commands.Cog):
                     f"Prova enviada por {interaction.user.mention}. "
                     f"ID da missão: `{atividade['id']}`. "
                     + (
-                        f"Recompensa total de {recompensa} XP/pontuação: 60% para o responsável e 40% para o auxiliar "
+                        f"Recompensa total: {recompensa} XP, dividida em 60% para o responsável e 40% para o auxiliar "
                         f"<@{auxiliar_id}> após aprovação."
                         if auxiliar_id
-                        else f"Recompensa após aprovação: +{recompensa} de pontuação e +{recompensa} XP."
+                        else f"Recompensa após aprovação: +{recompensa} XP."
                     )
                 ),
                 auxiliar_id=auxiliar_id,

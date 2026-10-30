@@ -56,6 +56,18 @@ async def criar_pendencia(
     descricao: str = None,
     auxiliar_id: int = None,
 ) -> dict:
+    tipo = str(tipo or "").strip().lower()
+    if tipo not in {"pvp", "pve", "missao", "contribuicao", "especial"}:
+        raise ValueError("Tipo de revisão inválido.")
+    if not str(referencia_id or "").strip():
+        raise ValueError("A revisão precisa de uma referência válida.")
+    if not str(print_url or "").strip():
+        raise ValueError("A revisão precisa de uma evidência válida.")
+    if not str(titulo or "").strip():
+        raise ValueError("A revisão precisa de um título.")
+    if auxiliar_id and int(auxiliar_id) == int(autor_id):
+        raise ValueError("O participante não pode ser o próprio auxiliar.")
+
     async with _REVISOES_LOCK:
 
         lista = await listar(guild_id)
@@ -252,6 +264,10 @@ async def rejeitar(
     revisor_id: int,
     motivo: str = None,
 ):
+    motivo = str(motivo or "").strip()
+    if len(motivo) < 8:
+        raise ValueError("Informe um motivo de rejeição com pelo menos 8 caracteres.")
+    motivo = motivo[:800]
     async with _REVISOES_LOCK:
 
         lista = await listar(guild_id)

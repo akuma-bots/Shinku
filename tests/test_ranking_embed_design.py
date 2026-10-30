@@ -42,7 +42,7 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("RANKING SHIGAKU", embed.title)
         self.assertIn("JOGO SELECIONADO", embed.description)
         self.assertIn("🥇 <@123>", embed.description)
-        self.assertIn("385 P.C.", embed.description)
+        self.assertIn("385 XP", embed.description)
         self.assertTrue(any("K/D" in field.value and "2/1" in field.value for field in embed.fields))
         self.assertTrue(any("Tenente" in field.value for field in embed.fields))
         self.assertIn("PÁGINA:shigaku", embed.footer.text)
