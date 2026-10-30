@@ -2,9 +2,12 @@ import time
 import io
 import asyncio
 import logging
+import re
 import unicodedata
+from urllib.parse import urlparse
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands
 from utils.apresentacao import criar_embed
 from utils.storage import carregar_config
 from utils.guild_config import get_config, set_config
@@ -38,6 +41,7 @@ CUSTOM_ID_SELECT = "ticket:abrir_select"
 TICKET_PAINEL_CANAL_ID = 1563995881655509057  # ticket-available no servidor atual
 
 TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO ・✦"
+COR_TICKET = 0x9F1239
 DESCRICAO_PADRAO = (
     "Precisa de ajuda? Selecione abaixo a categoria que melhor representa "
     "sua solicitação para abrir um atendimento privado com a equipe NÊMESIS."
@@ -195,26 +199,28 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
 
 
 async def _montar_embed_painel(guild_id: int) -> discord.Embed:
-    """Central de tickets em formato de catálogo, com cartões por categoria."""
     config = await get_config(guild_id)
-    descricao = config.get("ticket_painel_descricao") or DESCRICAO_PADRAO
     tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        "**CENTRAL DE OPERAÇÕES · NÊMESIS**\n"
-        + descricao + "\n\nCada categoria abaixo direciona sua solicitação para o fluxo correto. Selecione o assunto no menu para iniciar o atendimento.",
-        cor=0x9F1239,
-        rodape="NÊMESIS  •  CENTRAL DE ATENDIMENTO  •  SISTEMA DE TICKETS",
+        "**CENTRAL DE ATENDIMENTO  /  NÊMESIS**\n"
+        + (config.get("ticket_painel_descricao") or DESCRICAO_PADRAO)
+        + "\n\nSelecione uma área para abrir um canal reservado e encaminhar sua solicitação à equipe responsável.",
+        cor=COR_TICKET,
+        rodape="NÊMESIS  •  CENTRAL DE OPERAÇÕES  •  ATENDIMENTO PRIVADO",
+        timestamp=True,
     )
-    embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  SUPORTE E OPERAÇÕES")
+    embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CUSTOMER OPERATIONS")
+    embed.add_field(name="◈  CATÁLOGO DE ATENDIMENTO", value="Escolha o assunto mais próximo da sua necessidade:", inline=False)
     for indice, tipo in enumerate(tipos[:8], start=1):
-        emoji = tipo.get("emoji") or "◈"
-        nome = str(tipo.get("label") or "Atendimento")[:90]
-        detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:220]
-        fluxo = "Automático + equipe" if tipo.get("usa_ia") else "Equipe responsável"
-        embed.add_field(name=f"{emoji}  {indice:02d}  /  {nome}", value=f"{detalhe}\n**Fluxo:** {fluxo}", inline=False)
-    embed.add_field(name="🔒  PRIVACIDADE E SEGURANÇA", value="O ticket cria um canal visível apenas para você e a equipe autorizada. Nunca envie senhas, tokens ou códigos de autenticação.", inline=False)
-    embed.add_field(name="COMO FUNCIONA", value="01 — Escolha uma categoria no menu.\n02 — O canal privado será criado automaticamente.\n03 — Explique o caso e acompanhe a resposta da equipe.\n04 — Ao terminar, encerre pelo botão disponível.", inline=False)
+        emoji = str(tipo.get("emoji") or "◈")
+        nome = str(tipo.get("label") or "Atendimento")[:80]
+        detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:180]
+        fluxo = "AUTOATENDIMENTO + EQUIPE" if tipo.get("usa_ia") else "EQUIPE ESPECIALIZADA"
+        embed.add_field(name=f"{emoji}  {indice:02d}  /  {nome}", value=f"{detalhe} — {fluxo}", inline=True)
+    embed.add_field(name="▰  COMO FUNCIONA", value="**01**  Selecione uma categoria no menu.\n**02**  Um canal privado será criado para você.\n**03**  Descreva a solicitação e envie evidências, se necessário.\n**04**  Acompanhe o atendimento e encerre quando estiver resolvido.", inline=False)
+    embed.add_field(name="♜  PRIVACIDADE E SEGURANÇA", value="O canal é restrito ao solicitante e à equipe autorizada. A NÊMESIS nunca solicita senhas, tokens ou códigos de autenticação.", inline=False)
+    embed.add_field(name="⏱️  ATENDIMENTO", value="A equipe responderá assim que houver um responsável disponível. Evite abrir solicitações duplicadas.", inline=False)
     if config.get("ticket_painel_banner_url"):
         embed.set_image(url=config["ticket_painel_banner_url"])
     if config.get("ticket_painel_thumbnail_url"):
@@ -419,6 +425,46 @@ class AvaliacaoTicketView(discord.ui.View):
             await interaction.response.send_modal(FeedbackTicketModal(self.guild_id, self.ticket_id, self.owner_id, self.atendente_id, nota))
         return callback
 
+class AdicionarParticipanteModal(discord.ui.Modal, title="Adicionar participante ao ticket"):
+    usuario = discord.ui.TextInput(label="ID ou menção do membro", placeholder="ID do Discord ou @membro", required=True, max_length=40)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        canal, guild = interaction.channel, interaction.guild
+        if not guild or not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message("Use esta ação dentro de um ticket.", ephemeral=True)
+            return
+        registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
+        if not registro or registro.get("status") != "aberto":
+            await interaction.response.send_message("Este ticket não está ativo.", ephemeral=True)
+            return
+        config = await get_config(guild.id)
+        role_id = config.get("support_role_id")
+        role = guild.get_role(int(role_id)) if role_id else None
+        staff = isinstance(interaction.user, discord.Member) and (
+            interaction.user.guild_permissions.manage_channels or
+            (role and any(r != guild.default_role and r.position >= role.position for r in interaction.user.roles))
+        )
+        if str(interaction.user.id) != str(registro.get("usuario_id")) and not staff:
+            await interaction.response.send_message("Somente o solicitante ou a equipe pode adicionar participantes.", ephemeral=True)
+            return
+        alvo_id = re.sub(r"\D", "", str(self.usuario.value))
+        try:
+            alvo = guild.get_member(int(alvo_id)) or await guild.fetch_member(int(alvo_id))
+        except (ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message("Não encontrei esse membro neste servidor.", ephemeral=True)
+            return
+        if alvo.bot or alvo.id == int(registro.get("usuario_id") or 0):
+            await interaction.response.send_message("Esse membro não pode ser adicionado.", ephemeral=True)
+            return
+        try:
+            await canal.set_permissions(alvo, view_channel=True, send_messages=True, read_message_history=True, reason=f"Participante adicionado por {interaction.user}")
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message("Não consegui conceder acesso. Verifique as permissões do bot.", ephemeral=True)
+            return
+        embed = criar_embed("♧  PARTICIPANTE ADICIONADO", f"{alvo.mention} recebeu acesso ao atendimento.", cor=COR_TICKET, rodape="NÊMESIS  •  CONTROLE DE ACESSO")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions(users=True))
+
+
 class FecharTicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -571,6 +617,57 @@ class FecharTicketView(discord.ui.View):
             f"✅ Você agora é responsável por {canal.mention}. "
             "A equipe comum não pode intervir; a administração continua com acesso.",
             ephemeral=True,
+        )
+
+    @discord.ui.button(
+        label="Adicionar participante",
+        emoji="👥",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ticket:adicionar_participante",
+        row=1,
+    )
+    async def adicionar_participante(self, interaction: discord.Interaction, button: discord.ui.Button):
+        canal = interaction.channel
+        if not isinstance(canal, discord.TextChannel) or not tickets.parse_topic(canal.topic):
+            await interaction.response.send_message("Use este recurso dentro de um ticket.", ephemeral=True)
+            return
+        await interaction.response.send_modal(AdicionarParticipanteModal())
+
+    @discord.ui.button(
+        label="Solicitar equipe",
+        emoji="🔔",
+        style=discord.ButtonStyle.primary,
+        custom_id="ticket:solicitar_equipe",
+        row=1,
+    )
+    async def solicitar_equipe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        canal, guild = interaction.channel, interaction.guild
+        if not guild or not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message("Use este recurso dentro de um ticket.", ephemeral=True)
+            return
+        registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
+        if not registro or registro.get("status") != "aberto":
+            await interaction.response.send_message("Este ticket não está aberto.", ephemeral=True)
+            return
+        config = await get_config(guild.id)
+        role_id = config.get("support_role_id")
+        role = guild.get_role(int(role_id)) if role_id else None
+        staff = isinstance(interaction.user, discord.Member) and (
+            interaction.user.guild_permissions.manage_channels or
+            (role and any(r != guild.default_role and r.position >= role.position for r in interaction.user.roles))
+        )
+        if str(interaction.user.id) != str(registro.get("usuario_id")) and not staff:
+            await interaction.response.send_message("Somente o solicitante ou a equipe pode solicitar atendimento.", ephemeral=True)
+            return
+        if canal.id in CANAIS_ESCALADOS:
+            await interaction.response.send_message("A equipe já foi notificada neste atendimento.", ephemeral=True)
+            return
+        CANAIS_ESCALADOS.add(canal.id)
+        embed = criar_embed("🔔  EQUIPE NOTIFICADA", "Sua solicitação foi encaminhada à equipe. Aguarde o retorno neste canal.", cor=COR_TICKET, rodape="NÊMESIS  •  ESCALONAMENTO")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        await canal.send(
+            f"{role.mention if role else 'Equipe de suporte'} — atendimento solicitado em {canal.mention}.",
+            allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
         )
 
     @discord.ui.button(
@@ -793,6 +890,8 @@ class Tickets(commands.Cog):
         embed.add_field(name="PRÓXIMAS ETAPAS", value="01 — Descreva o que aconteceu e o resultado esperado.\n02 — Envie capturas, links ou IDs que ajudem na análise.\n03 — Aguarde a equipe; o responsável será identificado no atendimento.\n04 — Use Fechar Ticket somente quando o caso estiver resolvido.", inline=False)
         embed.add_field(name="PROTEÇÃO DE DADOS", value="Não compartilhe senhas, tokens, códigos de autenticação ou informações de acesso.", inline=False)
         embed.set_thumbnail(url=user.display_avatar.url)
+        if config.get("ticket_painel_banner_url"):
+            embed.set_image(url=config["ticket_painel_banner_url"])
 
         try:
             mensagem = await canal.send(
@@ -1141,6 +1240,78 @@ class Tickets(commands.Cog):
                 "Este assunto precisa da revisão de um atendente humano.",
             )
 
+    @app_commands.command(name="ticket-painel-configurar", description="Personaliza banner, ícone e textos da central de tickets.")
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.describe(banner_url="URL HTTPS do banner horizontal", icone_url="URL HTTPS do ícone da central", titulo="Título do painel", descricao="Texto de apresentação")
+    async def ticket_painel_configurar(self, interaction: discord.Interaction, banner_url: str | None = None, icone_url: str | None = None, titulo: str | None = None, descricao: str | None = None):
+        if not interaction.guild:
+            await interaction.response.send_message("Este comando só funciona em um servidor.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        updates = {}
+        for key, value in (("ticket_painel_banner_url", banner_url), ("ticket_painel_thumbnail_url", icone_url)):
+            if value is not None:
+                parsed = urlparse(value)
+                if parsed.scheme != "https" or not parsed.netloc:
+                    await interaction.followup.send("As imagens precisam usar uma URL HTTPS válida.", ephemeral=True)
+                    return
+                updates[key] = value
+        if titulo is not None:
+            updates["ticket_painel_titulo"] = titulo[:240]
+        if descricao is not None:
+            updates["ticket_painel_descricao"] = descricao[:1500]
+        if not updates:
+            await interaction.followup.send("Informe ao menos um campo para atualizar.", ephemeral=True)
+            return
+        await set_config(interaction.guild.id, **updates)
+        canal = interaction.guild.get_channel(TICKET_PAINEL_CANAL_ID)
+        if not isinstance(canal, discord.TextChannel):
+            await interaction.followup.send("O canal ticket-available não foi encontrado ou está inacessível.", ephemeral=True)
+            return
+        config = await get_config(interaction.guild.id)
+        mensagem = None
+        if config.get("ticket_painel_mensagem_id"):
+            try:
+                mensagem = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                mensagem = None
+        embed, view = await _montar_embed_painel(interaction.guild.id), await _montar_select(interaction.guild.id)
+        if mensagem:
+            await mensagem.edit(embed=embed, view=view)
+        else:
+            mensagem = await canal.send(embed=embed, view=view)
+            try:
+                await mensagem.pin(reason="Central de tickets NÊMESIS")
+            except (discord.Forbidden, discord.HTTPException):
+                pass
+        await set_config(interaction.guild.id, ticket_painel_canal_id=canal.id, ticket_painel_mensagem_id=mensagem.id)
+        await interaction.followup.send(f"Central atualizada: {mensagem.jump_url}", ephemeral=True)
+
+    @app_commands.command(name="ticket-categoria-visual", description="Altera o nome, ícone e descrição de uma categoria.")
+    @app_commands.default_permissions(manage_guild=True)
+    async def ticket_categoria_visual(self, interaction: discord.Interaction, categoria: str, emoji: str, descricao: str, nome: str | None = None):
+        if not interaction.guild:
+            await interaction.response.send_message("Este comando só funciona em um servidor.", ephemeral=True)
+            return
+        tipos = await tickets.get_tipos(interaction.guild.id)
+        tipo = next((item for item in tipos if item.get("valor") == categoria), None)
+        if not tipo:
+            await interaction.response.send_message("Categoria não encontrada. Informe o valor interno.", ephemeral=True)
+            return
+        tipo["emoji"], tipo["descricao"] = emoji[:64], descricao[:100]
+        if nome:
+            tipo["label"] = nome[:100]
+        await tickets.set_tipos(interaction.guild.id, tipos)
+        config = await get_config(interaction.guild.id)
+        canal = interaction.guild.get_channel(TICKET_PAINEL_CANAL_ID)
+        if isinstance(canal, discord.TextChannel) and config.get("ticket_painel_mensagem_id"):
+            try:
+                msg = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
+                await msg.edit(embed=await _montar_embed_painel(interaction.guild.id), view=await _montar_select(interaction.guild.id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+        await interaction.response.send_message(f"Categoria {tipo['label']} atualizada e sincronizada.", ephemeral=True)
+
     @tasks.loop(seconds=300)
     async def verificar_painel_permanente(self):
         for guild in self.bot.guilds:
@@ -1160,7 +1331,7 @@ class Tickets(commands.Cog):
                     )
                     config = await get_config(guild.id)
 
-                canal_id = TICKET_PAINEL_CANAL_ID
+                canal_id = int(config.get("ticket_painel_canal_id") or TICKET_PAINEL_CANAL_ID)
                 mensagem_id = config.get("ticket_painel_mensagem_id")
                 canal = guild.get_channel(int(canal_id))
                 if not isinstance(canal, discord.TextChannel):
