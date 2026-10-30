@@ -226,8 +226,19 @@ class ModalFormulario(discord.ui.Modal):
                 ephemeral=True,
             )
             return
+        # Impede candidaturas duplicadas enquanto uma análise anterior estiver pendente.
+        pendentes = await formularios.listar_respostas(
+            guild.id, formulario_id=self.formulario["id"], status="pendente"
+        )
+        if any(int(item.get("autor_id", 0)) == interaction.user.id for item in pendentes):
+            await interaction.response.send_message(
+                "Você já possui uma candidatura pendente para este formulário. Aguarde a avaliação da equipe.",
+                ephemeral=True,
+            )
+            return
+
         # A publicação no canal e as DMs podem levar mais que o prazo inicial
-        # da interação; defer evita que o Discord mostre "Falha na interação".
+        # da interação; defer evita que o Discord mostre falha na interação.
         await interaction.response.defer(ephemeral=True, thinking=True)
         resposta = await formularios.criar_resposta(
             guild.id,
@@ -241,7 +252,18 @@ class ModalFormulario(discord.ui.Modal):
         if cog is not None:
             await cog.notificar_cargos(guild, self.formulario, resposta)
         await interaction.followup.send(
-            "✅ Sua candidatura foi enviada!",
+            embed=criar_embed(
+                "✦・ INSCRIÇÃO RECEBIDA ・✦",
+                (
+                    "Sua candidatura foi protocolada com sucesso e encaminhada à comissão responsável.\n\n"
+                    f"**PROTOCOLO**　{resposta['id']}\n"
+                    "**SITUAÇÃO**　🟠 Em análise\n\n"
+                    "Você receberá uma mensagem privada quando houver uma decisão. "
+                    "Evite enviar outra candidatura enquanto esta estiver pendente."
+                ),
+                cor=0x9F1239,
+                rodape="N̷ÊMESIS  •  CENTRAL DE RECRUTAMENTO",
+            ),
             ephemeral=True,
         )
 
