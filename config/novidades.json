@@ -1,8 +1,8 @@
 {
-  "release_id": "git-41a9b10582c0",
-  "tipo": "Melhorias dos sistemas",
-  "titulo": "refactor(missoes): remover cartões antigos e manter painel único",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• refactor(missoes): remover cartões antigos e manter painel único\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
-  "commit": "41a9b10582c0a7532880f7d584fddad42e129e9c",
-  "gerado_em": "2026-10-30T05:48:32.161047+00:00"
+  "release_id": "git-c425fbda9c0d",
+  "tipo": "Correções",
+  "titulo": "fix(missoes): definir canal fixo da central",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• fix(missoes): definir canal fixo da central\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "commit": "c425fbda9c0d29131f5664ba562f69e3d1345362",
+  "gerado_em": "2026-10-30T06:02:12.347374+00:00"
 }
