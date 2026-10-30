@@ -677,6 +677,10 @@ class Missoes(commands.Cog):
                             mensagens.append(await canal.fetch_message(mensagem_id))
                         except discord.NotFound:
                             continue
+                    # Não compacta páginas faltantes: isso deslocaria embeds e
+                    # poderia atualizar a missão errada. Recria o conjunto inteiro.
+                    if len(mensagens) != len(ids_antigos):
+                        mensagens = []
 
                 ids_novos = []
                 if mensagens:
@@ -711,13 +715,15 @@ class Missoes(commands.Cog):
 
                 await salvar_mensagem_discord(guild.id, missao_id, canal.id, ids_novos)
 
-                if not mesmo_canal and canal_antigo_id and ids_antigos:
-                    canal_antigo = await self._resolver_canal(guild, int(canal_antigo_id))
-                    if canal_antigo is not None:
+                if canal_antigo_id and ids_antigos:
+                    canal_limpeza = canal if mesmo_canal else await self._resolver_canal(guild, int(canal_antigo_id))
+                    if canal_limpeza is not None:
                         for mensagem_id in ids_antigos:
+                            if mesmo_canal and mensagem_id in ids_novos:
+                                continue
                             try:
-                                antiga = await canal_antigo.fetch_message(mensagem_id)
-                                await antiga.delete(reason="Missão movida para sua categoria oficial NÊMESIS")
+                                antiga = await canal_limpeza.fetch_message(mensagem_id)
+                                await antiga.delete(reason="Substituição do cartão pela sincronização oficial NÊMESIS")
                             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                                 log.warning("Não foi possível limpar cartão antigo da missão %s (%s).", missao_id, mensagem_id)
 
