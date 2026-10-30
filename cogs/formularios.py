@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 from utils.storage import carregar, salvar
 
 from utils import formularios
@@ -116,52 +116,42 @@ def _perguntas_flat(formulario: dict) -> list:
     ]
 
 
-def _embeds_painel(formulario: dict) -> list[discord.Embed]:
-    """Monta todas as partes da descrição sem descartar texto acima do limite do Discord."""
-    titulo = str(formulario.get("titulo_painel") or formulario.get("nome") or "Formulário")[:256]
-    descricao = str(
-        formulario.get("descricao_painel")
-        or "Leia as informações e envie sua candidatura pelo botão abaixo."
-    ).strip() or "Leia as informações e envie sua candidatura pelo botão abaixo."
-
-    # O Discord limita a descrição de cada embed a 4.096 caracteres.
-    # Dividimos em blocos menores e publicamos cada parte em uma mensagem própria.
-    limite = 3800
-    partes = []
-    restante = descricao
-    while restante:
-        if len(restante) <= limite:
-            partes.append(restante)
-            break
-        corte = restante.rfind("\n", 0, limite)
-        if corte < limite // 2:
-            corte = restante.rfind(" ", 0, limite)
-        if corte < limite // 2:
-            corte = limite
-        elif corte < limite:
-            # Inclui o separador no bloco anterior para preservar o texto original.
-            corte += 1
-        partes.append(restante[:corte])
-        restante = restante[corte:]
-
-    if not partes:
-        partes = ["Leia as informações e envie sua candidatura pelo botão abaixo."]
-
-    embeds = []
-    for indice, parte in enumerate(partes, start=1):
-        titulo_parte = titulo if indice == 1 else f"{titulo[:230]} (continuação {indice}/{len(partes)})"
-        embed = criar_embed(titulo_parte, parte, rodape=f"NÊMESIS • CENTRAL DE FORMULÁRIOS • {indice}/{len(partes)}")
-        if indice == 1 and formulario.get("banner_url"):
-            embed.set_image(url=str(formulario["banner_url"]))
-        embeds.append(embed)
-    return embeds
+def _embeds_painel(formulario: dict, guild: discord.Guild | None = None, bot: discord.Client | None = None) -> list[discord.Embed]:
+    """Painel institucional, com identidade do servidor e instruções objetivas."""
+    titulo = str(formulario.get("titulo_painel") or formulario.get("nome") or "Formulário")[:220]
+    descricao = str(formulario.get("descricao_painel") or "").strip()
+    perguntas = _perguntas_flat(formulario)
+    total_etapas = len(_paginas_modal(formulario))
+    estado = "🟢 RECEBENDO CANDIDATURAS" if formulario.get("ativo") is not False else "⚫ INSCRIÇÕES ENCERRADAS"
+    texto = (
+        "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\n"
+        "　　　 **CENTRAL DE CANDIDATURAS**\n"
+        "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\n\n"
+        f"{descricao or 'Leia as orientações e preencha todas as etapas com atenção.'}\n\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        "**PROTOCOLO DE INSCRIÇÃO**\n"
+        "① Selecione **Iniciar inscrição**.\n"
+        "② Responda às etapas com informações verdadeiras e completas.\n"
+        "③ Revise suas respostas antes de concluir.\n"
+        "④ Aguarde o retorno da equipe responsável por mensagem privada.\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+    )
+    embed = criar_embed(f"✦・ {titulo} ・✦", texto[:4096], cor=0x9F1239, rodape=f"N̷ÊMESIS  •  PROCESSO SELETIVO  •  {estado}")
+    embed.set_author(name="N̷ÊMESIS  /  DEPARTAMENTO DE RECRUTAMENTO")
+    embed.add_field(name="SITUAÇÃO", value=estado, inline=True)
+    embed.add_field(name="ETAPAS", value=f"{total_etapas:02d}", inline=True)
+    embed.add_field(name="QUESTÕES", value=f"{len(perguntas):02d}", inline=True)
+    if formulario.get("banner_url"):
+        embed.set_image(url=str(formulario["banner_url"]))
+    aplicar_identidade_servidor(embed, guild, bot, banner=not bool(formulario.get("banner_url")))
+    return [embed]
 
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     ativo = formulario.get("ativo") is not False
     tem_perguntas = bool(_perguntas_flat(formulario))
     view.add_item(discord.ui.Button(
-        label="Preencher formulário", style=discord.ButtonStyle.primary, emoji="📝",
+        label="Iniciar inscrição", style=discord.ButtonStyle.primary, emoji="✦",
         custom_id=f"{PREFIXO_ABRIR}{formulario.get('id', '')}",
         disabled=(not ativo or not tem_perguntas),
     ))
@@ -256,26 +246,31 @@ class ModalFormulario(discord.ui.Modal):
         )
 
 
-def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild) -> list[discord.Embed]:
-    """Divide candidaturas longas para respeitar o limite de 25 campos por embed."""
-    titulo_base = f"📥 Nova candidatura — {formulario.get('nome') or 'Formulário'}"
+def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild, bot: discord.Client | None = None) -> list[discord.Embed]:
+    """Apresenta a candidatura como dossiê de avaliação, respeitando limites do Discord."""
+    titulo = f"DOSSIÊ DE CANDIDATURA  /  {formulario.get('nome') or 'FORMULÁRIO'}"
     perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
     respostas = resposta.get("respostas") or []
     pares = list(zip(perguntas, respostas))
-
-    # Cada embed recebe o campo do candidato e até 24 respostas (limite total: 25).
-    blocos = [pares[i:i + 24] for i in range(0, len(pares), 24)] or [[]]
+    blocos = [pares[i:i + 20] for i in range(0, len(pares), 20)] or [[]]
     embeds = []
     for indice, bloco in enumerate(blocos, start=1):
-        titulo = titulo_base if len(blocos) == 1 else f"{titulo_base[:220]} ({indice}/{len(blocos)})"
-        embed = criar_embed(titulo[:256], rodape=f"NÊMESIS • ID {resposta['id']} • {guild.name}")
-        embed.add_field(name="Candidato", value=f"<@{resposta['autor_id']}>", inline=False)
-        for pergunta, resp in bloco:
-            embed.add_field(
-                name=str(pergunta or "Pergunta")[:256],
-                value=str(resp if resp is not None else "—")[:1024] or "—",
-                inline=False,
-            )
+        embed = criar_embed(
+            f"✦・ {titulo[:210]} ・✦",
+            "╭────────────── ◈ ──────────────╮\n"
+            "　　　 **ANÁLISE RESTRITA**\n"
+            "╰────────────── ◈ ──────────────╯\n\n"
+            f"**CANDIDATO**\n<@{resposta['autor_id']}>  •  {str(resposta.get('nome') or 'Membro')[:70]}\n"
+            f"**PROTOCOLO**　{resposta['id']}\n"
+            "**SITUAÇÃO**　🟠 AGUARDANDO AVALIAÇÃO\n"
+            f"**DOCUMENTO**　{indice:02d}/{len(blocos):02d}",
+            cor=0x9F1239, rodape=f"N̷ÊMESIS  •  ACESSO RESTRITO  •  {guild.name}",
+        )
+        embed.set_author(name="N̷ÊMESIS  /  COMISSÃO AVALIADORA")
+        for numero, (pergunta, resp) in enumerate(bloco, start=(indice - 1) * 20 + 1):
+            valor = str(resp if resp is not None else "—").strip() or "—"
+            embed.add_field(name=f"〔 {numero:02d} 〕 {str(pergunta or 'Questão')[:220]}", value=valor[:1024], inline=False)
+        aplicar_identidade_servidor(embed, guild, bot, banner=False)
         embeds.append(embed)
     return embeds
 
@@ -313,46 +308,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 logging.exception("Não foi possível carregar o estado dos painéis automáticos.")
                 return
 
-            # Remove painéis antigos e mantém apenas o registro de Staff.
-            for chave_removida in [chave for chave in list(estado) if chave != "staff"]:
-                registro_antigo = estado.pop(chave_removida, None)
-                if not registro_antigo or not registro_antigo.get("mensagem_id"):
-                    continue
-                try:
-                    canal_antigo = guild.get_channel(int(registro_antigo.get("canal_id", 0)))
-                    if canal_antigo is None:
-                        canal_antigo = await guild.fetch_channel(int(registro_antigo["canal_id"]))
-                    mensagem_antiga = await canal_antigo.fetch_message(int(registro_antigo["mensagem_id"]))
-                    await mensagem_antiga.delete()
-                    logging.info("Painel automático removido (tipo=%s, mensagem=%s).", chave_removida, registro_antigo["mensagem_id"])
-                except discord.NotFound:
-                    logging.info("Painel automático antigo já não existia (tipo=%s).", chave_removida)
-                except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
-                    logging.exception("Não foi possível remover painel antigo (tipo=%s).", chave_removida)
-
-            # Remove os formulários e respostas antigos, preservando o formulário e candidaturas de Staff.
-            formularios_existentes = await formularios.listar_formularios(guild.id)
-            ids_removidos = {
-                item.get("id") for item in formularios_existentes
-                if item.get("nome") != NOME_FORMULARIO_STAFF
-            }
-            for item in formularios_existentes:
-                if item.get("nome") != NOME_FORMULARIO_STAFF:
-                    await formularios.remover_formulario(guild.id, item.get("id", ""))
-
-            if ids_removidos:
-                arquivo_respostas = await carregar("formularios_respostas.json", {})
-                if isinstance(arquivo_respostas, dict):
-                    respostas_guild = arquivo_respostas.get(str(guild.id), [])
-                    if isinstance(respostas_guild, list):
-                        arquivo_respostas[str(guild.id)] = [
-                            resposta for resposta in respostas_guild
-                            if not isinstance(resposta, dict)
-                            or resposta.get("formulario_id") not in ids_removidos
-                        ]
-                        await salvar("formularios_respostas.json", arquivo_respostas)
-
-            await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
+            # Preserva formulários, candidaturas e painéis criados pelos administradores.
+            # A inicialização não deve apagar dados existentes.
+            estado = estado if isinstance(estado, dict) else {}
 
             for definicao in FORMULARIOS_AUTOMATICOS:
                 chave = definicao["chave"]
@@ -396,7 +354,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                         except discord.NotFound:
                             mensagem_existente = None
 
-                    embeds = _embeds_painel(formulario)
+                    embeds = _embeds_painel(formulario, guild, self.bot)
                     view = _view_painel(formulario)
                     if mensagem_existente is not None:
                         # Mantém os painéis atualizados sem criar duplicatas em reconexões.
@@ -424,7 +382,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
 
-        embeds = _embeds_resposta(formulario, resposta, guild)
+        embeds = _embeds_resposta(formulario, resposta, guild, self.bot)
         view = _view_resposta(resposta["id"])
 
         # Publica todas as partes da candidatura; os botões ficam na primeira.
