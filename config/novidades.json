@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-135941",
+  "release_id": "20261030-140001",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Reestrutura painéis de formulários e preserva cadastros e candidaturas existentes",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Reestrutura painéis de formulários e preserva cadastros e candidaturas existentes\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Registra justificativa e auditoria das decisões de candidaturas",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Registra justificativa e auditoria das decisões de candidaturas\n\n**Áreas envolvidas:** mecanismos internos e infraestrutura.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "13:59",
+  "hora_atualizacao": "14:00",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T13:59:41.635014-03:00"
+  "gerado_em": "2026-10-30T14:00:01.501865-03:00"
 }
