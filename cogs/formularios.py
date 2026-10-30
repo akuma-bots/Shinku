@@ -326,6 +326,133 @@ def _view_resposta(resposta_id: str) -> discord.ui.View:
     return view
 
 
+
+class SeletorFormularioCentral(discord.ui.Select):
+    def __init__(self, central):
+        self.central = central
+        opcoes = [
+            discord.SelectOption(
+                label=str(item.get("nome") or "Formulário")[:100],
+                value=str(item.get("id", "")),
+                description=(
+                    f"{len(_perguntas_flat(item))} pergunta(s) • "
+                    f"{'Arquivado' if item.get('arquivado') else 'Ativo' if item.get('ativo', True) else 'Pausado'}"
+                )[:100],
+                default=str(item.get("id", "")) == str(central.formulario_id),
+            )
+            for item in central.lista[:25] if item.get("id")
+        ]
+        super().__init__(placeholder="Selecione um formulário", min_values=1, max_values=1, options=opcoes)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.central.usuario_id:
+            await interaction.response.send_message("Esta central pertence a outra pessoa.", ephemeral=True)
+            return
+        self.central.formulario_id = self.values[0]
+        await self.central.atualizar(interaction)
+
+
+class SeletorAcaoFormulario(discord.ui.Select):
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Escolha uma ação para o formulário",
+            min_values=1, max_values=1,
+            options=[
+                discord.SelectOption(label="Publicar painel neste canal", value="publicar"),
+                discord.SelectOption(label="Pausar inscrições", value="pausar"),
+                discord.SelectOption(label="Reativar inscrições", value="reativar"),
+                discord.SelectOption(label="Arquivar formulário", value="arquivar"),
+            ],
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        central = self.central
+        if interaction.user.id != central.usuario_id:
+            await interaction.response.send_message("Esta central pertence a outra pessoa.", ephemeral=True)
+            return
+        if interaction.guild is None or not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Você precisa de permissão de Administrador.", ephemeral=True)
+            return
+        formulario = await formularios.get_formulario(interaction.guild.id, central.formulario_id)
+        if not formulario:
+            await interaction.response.send_message("O formulário selecionado não existe mais.", ephemeral=True)
+            return
+        acao = self.values[0]
+        if acao == "publicar":
+            if not _perguntas_flat(formulario):
+                await interaction.response.send_message("Adicione perguntas antes de publicar.", ephemeral=True)
+                return
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            try:
+                embeds = _embeds_painel(formulario, interaction.guild, central.cog.bot)
+                view = _view_painel(formulario)
+                for indice, embed in enumerate(embeds):
+                    await interaction.channel.send(embed=embed, view=view if indice == 0 else None)
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Falha ao publicar formulário pela central: %s", formulario.get("id"))
+                await interaction.followup.send("Não consegui publicar. Verifique as permissões do bot neste canal.", ephemeral=True)
+                return
+            await interaction.followup.send(f"Painel de **{formulario.get('nome')}** publicado.", ephemeral=True)
+            return
+        if acao == "pausar":
+            await formularios.atualizar_formulario(interaction.guild.id, central.formulario_id, ativo=False)
+        elif acao == "reativar":
+            await formularios.reativar_formulario(interaction.guild.id, central.formulario_id)
+        elif acao == "arquivar":
+            await formularios.remover_formulario(interaction.guild.id, central.formulario_id)
+        await central.atualizar(interaction, mensagem=f"Ação aplicada: **{acao.upper()}**.")
+
+
+class CentralFormulariosView(discord.ui.View):
+    def __init__(self, cog, guild_id: int, usuario_id: int, lista: list, formulario_id: str | None = None):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.guild_id = guild_id
+        self.usuario_id = usuario_id
+        self.lista = lista
+        self.formulario_id = formulario_id or (str(lista[0].get("id")) if lista else None)
+        self._montar_seletores()
+
+    def _montar_seletores(self):
+        self.clear_items()
+        if self.lista:
+            self.add_item(SeletorFormularioCentral(self))
+            self.add_item(SeletorAcaoFormulario(self))
+
+    def montar_embed(self, mensagem: str | None = None):
+        formulario = next((item for item in self.lista if str(item.get("id")) == str(self.formulario_id)), None)
+        if not formulario:
+            return criar_embed("✦・ CENTRAL DE FORMULÁRIOS ・✦", "Nenhum formulário disponível.", cor=0x9F1239)
+        status = "ARQUIVADO" if formulario.get("arquivado") else "ATIVO" if formulario.get("ativo", True) else "PAUSADO"
+        corpo = (
+            f"**FORMULÁRIO**\n{formulario.get('nome', 'Sem nome')}\n\n"
+            f"**SITUAÇÃO**　{status}\n"
+            f"**IDENTIFICADOR**　{formulario.get('id')}\n"
+            f"**ETAPAS**　{len(_paginas_modal(formulario)):02d}\n"
+            f"**PERGUNTAS**　{len(_perguntas_flat(formulario)):02d}\n"
+            f"**CARGOS NOTIFICADOS**　{len(formulario.get('cargos_notificar', [])):02d}"
+        )
+        if mensagem:
+            corpo += f"\n\n{mensagem}"
+        return criar_embed(
+            "✦・ CENTRAL DE FORMULÁRIOS — NÊMESIS ・✦",
+            "╭────────────── ◈ ──────────────╮\n"
+            "　　　 **GESTÃO DE PROCESSOS SELETIVOS**\n"
+            "╰────────────── ◈ ──────────────╯\n\n"
+            + corpo + "\n\nSelecione um formulário ou escolha uma ação nos menus abaixo.",
+            cor=0x9F1239,
+            rodape="N̷ÊMESIS  •  ADMINISTRAÇÃO DE FORMULÁRIOS",
+        )
+
+    async def atualizar(self, interaction: discord.Interaction, mensagem: str | None = None):
+        self.lista = await formularios.listar_formularios(self.guild_id)
+        if not any(str(item.get("id")) == str(self.formulario_id) for item in self.lista):
+            self.formulario_id = str(self.lista[0].get("id")) if self.lista else None
+        self._montar_seletores()
+        await interaction.response.edit_message(embed=self.montar_embed(mensagem), view=self)
+
+
 class Formularios(commands.GroupCog, group_name="formularios", group_description="Gerenciamento dos formulários da NÊMESIS"):
     """Sistema de formulários/candidaturas por páginas: cada formulário tem
     seu painel customizável (título, descrição, banner) e é dividido em
@@ -335,6 +462,20 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+
+    @app_commands.command(name="central", description="Abre a central interativa de administração dos formulários.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def formulario_central(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro da NÊMESIS.", ephemeral=True)
+            return
+        lista = await formularios.listar_formularios(interaction.guild.id)
+        if not lista:
+            await interaction.response.send_message("Ainda não existem formulários cadastrados.", ephemeral=True)
+            return
+        lista.sort(key=lambda item: (bool(item.get("arquivado")), str(item.get("nome", "")).casefold()))
+        view = CentralFormulariosView(self, interaction.guild.id, interaction.user.id, lista)
+        await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
 
     @commands.Cog.listener()
     async def on_ready(self):
