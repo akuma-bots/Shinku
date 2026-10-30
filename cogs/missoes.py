@@ -103,9 +103,11 @@ class CategoriaMissoesSelect(discord.ui.Select):
             return
         categoria = self.values[0]
         embed = await self.cog._montar_painel_missoes(interaction.guild, "todos", categoria, pagina=0)
+        match = re.search(r"PAGINA:(\d+)/(\d+)", embed.footer.text or "")
+        total = int(match.group(2)) if match else 1
         await interaction.response.edit_message(
             embed=embed,
-            view=NavegacaoMissoesView(self.cog, categoria=categoria, pagina=0),
+            view=NavegacaoMissoesView(self.cog, categoria=categoria, pagina=0, total_paginas=total),
         )
 
 
@@ -663,16 +665,19 @@ class Missoes(commands.Cog):
                 log.warning("Não foi possível buscar o painel de missões: %s", erro)
                 return
         embed = await self._montar_painel_missoes(guild, "todos", "missao")
+        match = re.search(r"PAGINA:(\d+)/(\d+)", embed.footer.text or "")
+        total_paginas = int(match.group(2)) if match else 1
+        view = NavegacaoMissoesView(self, categoria="missao", pagina=0, total_paginas=total_paginas)
         try:
             if mensagem is None:
-                mensagem = await canal.send(embed=embed, view=NavegacaoMissoesView(self))
+                mensagem = await canal.send(embed=embed, view=view)
                 await ranking_missoes_jogos.salvar_painel(guild.id, "missoes", mensagem.id)
                 try:
                     await mensagem.pin(reason="Painel de navegação de missões NÊMESIS")
                 except discord.HTTPException:
                     pass
             else:
-                await mensagem.edit(embed=embed, view=NavegacaoMissoesView(self))
+                await mensagem.edit(embed=embed, view=view)
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Não foi possível atualizar o painel de missões.")
 
