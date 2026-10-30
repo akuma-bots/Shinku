@@ -390,7 +390,7 @@ class CentralMissoesView(discord.ui.View):
             )
         )
 
-    @discord.ui.button(label="Arquivar / reativar", style=discord.ButtonStyle.secondary, emoji="◈", row=2)
+    @discord.ui.button(label="Arquivar / reativar", style=discord.ButtonStyle.secondary, emoji="♻️", row=2)
     async def alternar_estado(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
