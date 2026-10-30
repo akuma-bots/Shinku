@@ -109,20 +109,15 @@ async def remover_formulario(
         guild_id
     )
 
-    nova_lista = [
-        formulario
-        for formulario in lista
-        if formulario.get("id") != formulario_id
-    ]
-
-    if len(nova_lista) == len(lista):
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
         return False
 
-    await _salvar_formularios_guild(
-        guild_id,
-        nova_lista,
-    )
-
+    # Arquivamento lógico: preserva candidaturas e auditoria vinculadas.
+    alvo["ativo"] = False
+    alvo["arquivado"] = True
+    alvo["atualizado_em"] = time.time()
+    await _salvar_formularios_guild(guild_id, lista)
     return True
 
 
@@ -149,6 +144,32 @@ def perguntas_flat(
     return achatado
 
 
+async def reativar_formulario(guild_id: int, formulario_id: str) -> bool:
+    lista = await listar_formularios(guild_id)
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
+        return False
+    alvo["ativo"] = True
+    alvo["arquivado"] = False
+    alvo["atualizado_em"] = time.time()
+    await _salvar_formularios_guild(guild_id, lista)
+    return True
+
+
+async def atualizar_formulario(guild_id: int, formulario_id: str, **alteracoes) -> dict | None:
+    campos = {"nome", "titulo_painel", "descricao_painel", "banner_url", "ativo"}
+    lista = await listar_formularios(guild_id)
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
+        return None
+    for campo, valor in alteracoes.items():
+        if campo in campos and valor is not None:
+            alvo[campo] = valor
+    alvo["atualizado_em"] = time.time()
+    await _salvar_formularios_guild(guild_id, lista)
+    return alvo
+
+
 async def adicionar_pagina(
     guild_id: int,
     formulario_id: str,
@@ -171,14 +192,30 @@ async def adicionar_pagina(
     if not alvo:
         return None
 
-    alvo.setdefault(
-        "paginas",
-        [],
-    )
-
-    alvo["paginas"].append(
-        perguntas[:5]
-    )
+    alvo.setdefault("paginas", [])
+    perguntas_validas = []
+    for pergunta in perguntas[:5]:
+        if isinstance(pergunta, dict):
+            texto = str(pergunta.get("texto") or pergunta.get("pergunta") or "").strip()
+            if not texto:
+                continue
+            item = dict(pergunta)
+            item["texto"] = texto[:256]
+            item["obrigatoria"] = bool(item.get("obrigatoria", True))
+            tipo = str(item.get("tipo") or "texto").lower()
+            item["tipo"] = tipo if tipo in {"texto", "paragrafo", "escolha"} else "texto"
+            if item["tipo"] == "escolha":
+                item["opcoes"] = [str(op).strip()[:100] for op in item.get("opcoes", []) if str(op).strip()][:25]
+                if len(item["opcoes"]) < 2:
+                    item["tipo"] = "texto"
+            perguntas_validas.append(item)
+        else:
+            texto = str(pergunta).strip()
+            if texto:
+                perguntas_validas.append({"texto": texto[:256], "tipo": "paragrafo", "obrigatoria": True})
+    if not perguntas_validas:
+        return None
+    alvo["paginas"].append({"titulo": f"Etapa {len(alvo['paginas']) + 1}", "perguntas": perguntas_validas})
 
     alvo["atualizado_em"] = time.time()
 
