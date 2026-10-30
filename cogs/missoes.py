@@ -85,7 +85,7 @@ class NavegacaoMissoesView(discord.ui.View):
         super().__init__(timeout=None)
         self.cog = cog
 
-    @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior")
+    @discord.ui.button(label="Missões anteriores", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior")
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.navegar_painel_missoes(interaction, -1)
 
@@ -93,7 +93,7 @@ class NavegacaoMissoesView(discord.ui.View):
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
 
-    @discord.ui.button(label="Próxima página", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima")
+    @discord.ui.button(label="Próximas missões", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima")
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.navegar_painel_missoes(interaction, 1)
 
@@ -734,6 +734,36 @@ class Missoes(commands.Cog):
 
         return resultado
 
+    async def _limpar_cartoes_individuais_antigos(self, guild: discord.Guild, atividades: list) -> int:
+        """Remove os cartões individuais antigos após a adoção do painel único."""
+        removidas = 0
+        registros_vistos = set()
+        for atividade in atividades:
+            missao_id = str(atividade.get("id") or "")
+            if not missao_id or missao_id in registros_vistos:
+                continue
+            registros_vistos.add(missao_id)
+            registro = await obter_mensagem_discord(guild.id, missao_id)
+            canal_id = registro.get("discord_channel_id")
+            ids = registro.get("discord_message_ids") or []
+            if not ids and registro.get("discord_message_id"):
+                ids = [registro["discord_message_id"]]
+            if not canal_id or not ids:
+                continue
+            canal = await self._resolver_canal(guild, int(canal_id))
+            if canal is None:
+                continue
+            for mensagem_id in ids:
+                try:
+                    mensagem = await canal.fetch_message(int(mensagem_id))
+                    await mensagem.delete(reason="Migração para a central única de missões NÊMESIS")
+                    removidas += 1
+                except discord.NotFound:
+                    continue
+                except (discord.Forbidden, discord.HTTPException):
+                    log.exception("Não foi possível remover o cartão antigo da missão %s.", missao_id)
+        return removidas
+
     async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
         """Sincroniza o catálogo e mantém painéis navegáveis nos canais existentes."""
         if self._sync_lock.locked():
@@ -743,6 +773,7 @@ class Missoes(commands.Cog):
             atividades = await sincronizar_catalogo(guild.id, catalogo)
             resultado = {"publicadas": 0, "atualizadas": 0, "falhas": 0,
                          "registros_catalogo": len(atividades), "painel_atualizado": False}
+            resultado["cartoes_antigos_removidos"] = await self._limpar_cartoes_individuais_antigos(guild, atividades)
             try:
                 await self._atualizar_painel_missoes(guild)
                 resultado["painel_atualizado"] = True
