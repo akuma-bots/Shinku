@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-170939",
+  "release_id": "20261030-173609",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Adiciona central interativa com seletores para formulários",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Adiciona central interativa com seletores para formulários\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Adiciona central da comunidade Roblox da NÊMESIS",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Adiciona central da comunidade Roblox da NÊMESIS\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "17:09",
+  "hora_atualizacao": "17:36",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T17:09:39.104197-03:00"
+  "gerado_em": "2026-10-30T17:36:09.944074-03:00"
 }
