@@ -463,6 +463,48 @@ class Missoes(commands.Cog):
         embed = await self._montar_painel_missoes(interaction.guild, alvo_jogo, alvo_categoria)
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
 
+    async def _limpar_mensagens_missoes_duplicadas(self, guild: discord.Guild) -> int:
+        """Remove mensagens antigas do bot sobre missões no canal central, preservando o painel oficial."""
+        canal = await self._resolver_canal(guild, 1563995881315897549)
+        if canal is None:
+            return 0
+
+        paineis = await ranking_missoes_jogos.obter_paineis(guild.id)
+        painel_id = int(paineis.get("missoes") or 0)
+        bot_id = self.bot.user.id if self.bot.user else 0
+        termos = ("miss", "missão", "missões", "operação", "operações", "catálogo de operações")
+        removidas = 0
+
+        try:
+            async for mensagem in canal.history(limit=1000):
+                if mensagem.id == painel_id or mensagem.author.id != bot_id:
+                    continue
+                if not mensagem.embeds and not mensagem.content:
+                    continue
+
+                partes = [mensagem.content or ""]
+                for embed in mensagem.embeds:
+                    partes.extend([
+                        embed.title or "",
+                        embed.description or "",
+                        embed.author.name if embed.author else "",
+                        embed.footer.text or "",
+                    ])
+                    partes.extend(campo.name + " " + campo.value for campo in embed.fields)
+                texto = " ".join(partes).casefold()
+                if not any(termo in texto for termo in termos):
+                    continue
+                try:
+                    await mensagem.delete(reason="Limpeza de mensagens duplicadas do sistema de missões NÊMESIS")
+                    removidas += 1
+                except discord.NotFound:
+                    continue
+                except (discord.Forbidden, discord.HTTPException):
+                    log.warning("Não foi possível remover a mensagem duplicada de missões %s.", mensagem.id)
+        except (discord.Forbidden, discord.HTTPException):
+            log.exception("Não foi possível consultar o histórico do canal central de missões.")
+        return removidas
+
     async def _atualizar_painel_missoes(self, guild: discord.Guild) -> None:
         # Canal fixo oficial da Central de Missões da NÊMESIS.
         canal_id = 1563995881315897549
@@ -773,14 +815,15 @@ class Missoes(commands.Cog):
             atividades = await sincronizar_catalogo(guild.id, catalogo)
             resultado = {"publicadas": 0, "atualizadas": 0, "falhas": 0,
                          "registros_catalogo": len(atividades), "painel_atualizado": False}
-            resultado["cartoes_antigos_removidos"] = await self._limpar_cartoes_individuais_antigos(guild, atividades)
             try:
                 await self._atualizar_painel_missoes(guild)
                 resultado["painel_atualizado"] = True
                 resultado["atualizadas"] = 1
+                resultado["mensagens_duplicadas_removidas"] = await self._limpar_mensagens_missoes_duplicadas(guild)
+                resultado["cartoes_antigos_removidos"] = await self._limpar_cartoes_individuais_antigos(guild, atividades)
             except Exception:
                 resultado["falhas"] += 1
-                log.exception("Falha ao atualizar o painel único de missões.")
+                log.exception("Falha ao atualizar o painel único ou limpar mensagens antigas de missões.")
             try:
                 await self._atualizar_ranking_jogo(guild, "shigaku")
             except Exception:
