@@ -709,16 +709,8 @@ class Missoes(commands.Cog):
             log.exception("Não foi possível atualizar o painel de ranking.")
     @staticmethod
     def _expandir_catalogo_por_jogo(catalogo: list) -> list:
-        """Replica as missões padrão para Shigaku, Gakuran e Fistborn com IDs únicos."""
-        resultado = []
-        for slug, jogo in ranking_missoes_jogos.JOGOS.items():
-            for definicao in catalogo:
-                missao = dict(definicao)
-                missao["id"] = f"{jogo['prefixo']}-{definicao['id']}"
-                missao["jogo"] = slug
-                missao["canal_config"] = f"jogo:{slug}"
-                resultado.append(missao)
-        return resultado
+        """Compatibilidade histórica: o catálogo agora é único e global."""
+        return [dict(item) for item in catalogo if isinstance(item, dict)]
 
     async def _sincronizar_cartoes_missoes(self, guild: discord.Guild, atividades: list) -> dict:
         """Publica ou edita os cartões individuais, preservando referências existentes."""
