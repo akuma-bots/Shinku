@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from cogs.tickets import _montar_embed_painel
+from cogs.tickets import _montar_embed_painel, FecharTicketView
 
 
 class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
@@ -20,6 +20,15 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("⏱️  ATENDIMENTO", nomes)
         self.assertIn("▰  COMO FUNCIONA", nomes)
         self.assertEqual(embed.color.value, 0x9F1239)
+
+
+    def test_controles_persistentes_incluem_acoes_de_atendimento(self):
+        view = FecharTicketView()
+        ids = {item.custom_id for item in view.children}
+        self.assertIn("ticket:assumir", ids)
+        self.assertIn("fechar_ticket_btn", ids)
+        self.assertIn("ticket:adicionar_participante", ids)
+        self.assertIn("ticket:solicitar_equipe", ids)
 
 
 if __name__ == "__main__":
