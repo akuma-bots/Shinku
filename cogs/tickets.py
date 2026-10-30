@@ -162,26 +162,13 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
 
     # Emojis decorativos (◈, ✦, ◇ etc.) não são aceitos como emojis
     # de SelectOption pelo Discord. Usa apenas emojis Unicode válidos.
-    emojis_validos = {
-        "recrutamento": "⚔️",
-        "hierarquia_divisoes": "🎖️",
-        "conflitos_denuncias": "⚖️",
-        "guerras_desafios": "🎯",
-        "suporte_comunidade": "🛟",
-        "aliancas": "🤝",
-        "eventos_atividades": "🎉",
-        "sugestoes_projetos": "💡",
-    }
+    emojis_validos = {tipo["valor"]: tipo.get("emoji") or "◈" for tipo in tipos}
     options = [
         discord.SelectOption(
             label=str(t.get("label") or "Atendimento")[:100],
             value=str(t.get("valor") or "outro")[:100],
             description=str(t.get("descricao") or "Solicitação de atendimento.")[:100],
-            emoji=(
-                t.get("emoji")
-                if t.get("emoji") in {"⚔️", "🎖️", "⚖️", "🎯", "🛟", "🤝", "🎉", "💡"}
-                else emojis_validos.get(t["valor"])
-            ),
+            emoji=emojis_validos.get(t["valor"], "◈"),
         )
         for t in tipos[:25]
     ]
@@ -1319,7 +1306,7 @@ class Tickets(commands.Cog):
                 config = await get_config(guild.id)
 
                 # Migra o menu padrão sem exigir comandos administrativos.
-                if not config.get("ticket_modelo_v3"):
+                if not config.get("ticket_modelo_v4"):
                     await tickets.set_tipos(
                         guild.id,
                         list(tickets.TIPOS_PADRAO),
@@ -1328,6 +1315,7 @@ class Tickets(commands.Cog):
                         guild.id,
                         ticket_modelo_v2=True,
                         ticket_modelo_v3=True,
+                        ticket_modelo_v4=True,
                     )
                     config = await get_config(guild.id)
 
