@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-170555",
+  "release_id": "20261030-170939",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Corrige emojis inválidos nos seletores e propaga falha de atualização",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Corrige emojis inválidos nos seletores e propaga falha de atualização\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Adiciona central interativa com seletores para formulários",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Adiciona central interativa com seletores para formulários\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "17:05",
+  "hora_atualizacao": "17:09",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T17:05:55.741234-03:00"
+  "gerado_em": "2026-10-30T17:09:39.104197-03:00"
 }
