@@ -172,7 +172,7 @@ def _view_painel(formulario: dict) -> discord.ui.View:
     ativo = formulario.get("ativo") is not False
     tem_perguntas = bool(_perguntas_flat(formulario))
     view.add_item(discord.ui.Button(
-        label="Iniciar inscrição", style=discord.ButtonStyle.primary, emoji="✦",
+        label="Iniciar inscrição", style=discord.ButtonStyle.primary,
         custom_id=f"{PREFIXO_ABRIR}{formulario.get('id', '')}",
         disabled=(not ativo or not tem_perguntas),
     ))
