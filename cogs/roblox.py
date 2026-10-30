@@ -215,7 +215,7 @@ class Roblox(commands.Cog):
                 membros = dados.get("memberCount")
                 valor = "**" + nome + "**"
                 if isinstance(membros, int):
-                    valor += "\n**" + format(membros, ",") + "** membros
+                    valor += "\n**" + format(membros, ",") + "** membros\n"
                 embed.add_field(name="GRUPO OFICIAL", value=valor, inline=True)
                 descricao = str(dados.get("description") or "").strip()
                 if descricao:
