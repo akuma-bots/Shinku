@@ -91,12 +91,25 @@ def gerar(before: str, after: str) -> dict | None:
             areas.append(nome)
 
     # Os assuntos dos commits são a fonte principal; os caminhos apenas contextualizam.
+    rotulos = {
+        "missoes": "Missões", "revisoes": "Análise de provas",
+        "ranking": "Rankings", "parcerias": "Parcerias",
+        "tickets": "Atendimento", "automod": "Moderação automática",
+        "moderacao": "Moderação", "eventos": "Eventos",
+        "perfil": "Perfis", "novidades": "Central de atualizações",
+        "desafios": "Desafios", "guerras": "Guerras",
+    }
     unicos = list(dict.fromkeys(assuntos))
     linhas = []
     for assunto in unicos[:6]:
-        limpo = re.sub(r"\s+", " ", assunto).strip()
+        limpo = re.sub(r"^(feat|fix|refactor|perf|chore|style|test)(\([^)]*\))?!?:\s*", "", assunto, flags=re.I)
+        escopo = re.match(r"^([a-z0-9_-]+):\s*(.+)$", limpo, flags=re.I)
+        if escopo:
+            area, descricao = escopo.groups()
+            limpo = f"{rotulos.get(area.lower(), area.replace('_', ' ').title())}: {descricao}"
+        limpo = re.sub(r"\s+", " ", limpo).strip(" .-")
         if limpo:
-            linhas.append(f"• {limpo[:220]}")
+            linhas.append(f"• {(limpo[0].upper() + limpo[1:])[:220]}")
     if not linhas:
         linhas.append("• Foram aplicadas alterações funcionais nos sistemas do bot.")
 
