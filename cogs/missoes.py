@@ -760,7 +760,7 @@ class Missoes(commands.Cog):
 
             jogo_slug = str(atividade.get("jogo") or "").strip().lower()
             if jogo_slug and resultado["aplicada"] and quantidade > 0:
-                membro_pontuacao = guild.get_member(usuario_id)
+                membro_ranking = guild.get_member(usuario_id)
                 try:
                     await ranking_missoes_jogos.registrar_pontos(
                         guild_id=guild.id,
