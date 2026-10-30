@@ -141,8 +141,7 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
     descricao = discord.ui.TextInput(label="Descrição e objetivo", style=discord.TextStyle.paragraph, max_length=4000, required=True)
     recompensa = discord.ui.TextInput(label="Recompensa em XP", max_length=8, required=True)
     dificuldade = discord.ui.TextInput(label="Dificuldade (opcional)", max_length=30, required=False)
-    requisitos = discord.ui.TextInput(label="Requisitos (opcional)", style=discord.TextStyle.paragraph, max_length=1000, required=False)
-    prazo = discord.ui.TextInput(label="Prazo (opcional)", max_length=100, required=False)
+    requisitos_prazo = discord.ui.TextInput(label="Requisitos e prazo (opcional)", style=discord.TextStyle.paragraph, placeholder="Descreva os requisitos. Para prazo, use uma linha iniciada por Prazo:", max_length=1000, required=False)
 
     def __init__(self, guild_id: int, atividade: dict, owner_id: int):
         super().__init__(timeout=300)
@@ -153,8 +152,10 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
         self.descricao.default = str(atividade.get("descricao") or "")[:4000]
         self.recompensa.default = str(atividade.get("recompensa_xp", atividade.get("pontos", 0)))
         self.dificuldade.default = str(atividade.get("dificuldade") or "")[:30]
-        self.requisitos.default = str(atividade.get("requisitos") or "")[:1000]
-        self.prazo.default = str(atividade.get("prazo") or "")[:100]
+        requisitos = str(atividade.get("requisitos") or "").strip()
+        prazo = str(atividade.get("prazo") or "").strip()
+        combinado = requisitos + (f"\\nPrazo: {prazo}" if prazo else "")
+        self.requisitos_prazo.default = combinado[:1000]
 
     async def on_submit(self, interaction: discord.Interaction):
         if interaction.user.id != self.owner_id or not _administrador(interaction):
@@ -173,14 +174,22 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
             if alvo is None:
                 await interaction.response.send_message("A atividade não existe mais no catálogo.", ephemeral=True)
                 return
+            linhas_config = str(self.requisitos_prazo.value or "").splitlines()
+            prazo = ""
+            requisitos = []
+            for linha in linhas_config:
+                if linha.strip().casefold().startswith("prazo:"):
+                    prazo = linha.split(":", 1)[1].strip()[:100]
+                else:
+                    requisitos.append(linha)
             alvo.update({
                 "titulo": str(self.titulo.value).strip(),
                 "descricao": str(self.descricao.value).strip(),
                 "recompensa_xp": xp,
                 "pontos": xp,
                 "dificuldade": str(self.dificuldade.value or "").strip(),
-                "requisitos": str(self.requisitos.value or "").strip(),
-                "prazo": str(self.prazo.value or "").strip(),
+                "requisitos": "\\n".join(requisitos).strip()[:1000],
+                "prazo": prazo,
                 "atualizado_em": __import__("time").time(),
                 "atualizado_por": interaction.user.id,
             })
