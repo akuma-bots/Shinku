@@ -154,24 +154,44 @@ async def fechar_canal_ticket(
         CANAIS_FECHANDO.discard(canal.id)
 
 
-async def _montar_select(guild_id: int) -> discord.ui.View:
+def _emoji_personalizado(guild: discord.Guild | None, tipo: dict):
+    """Resolve os emblemas TicketEmoji1..8 cadastrados no servidor."""
+    if guild is None:
+        return None
+
+    nomes_por_categoria = {
+        "recrutamento": "TicketEmoji8",
+        "hierarquia_divisoes": "TicketEmoji6",
+        "conflitos_denuncias": "TicketEmoji4",
+        "guerras_desafios": "TicketEmoji2",
+        "suporte_comunidade": "TicketEmoji7",
+        "aliancas": "TicketEmoji5",
+        "eventos_atividades": "TicketEmoji3",
+        "sugestoes_projetos": "TicketEmoji1",
+    }
+    nome = nomes_por_categoria.get(tipo.get("valor"))
+    if not nome:
+        return None
+    return discord.utils.get(guild.emojis, name=nome)
+
+
+async def _montar_select(guild_id: int, guild: discord.Guild | None = None) -> discord.ui.View:
     tipos = await tickets.get_tipos(guild_id)
     if not tipos:
         # O Discord não aceita um select vazio; recupera as categorias padrão.
         tipos = list(tickets.TIPOS_PADRAO)
 
-    # Emojis decorativos (◈, ✦, ◇ etc.) não são aceitos como emojis
-    # de SelectOption pelo Discord. Usa apenas emojis Unicode válidos.
-    emojis_validos = {tipo["valor"]: tipo.get("emoji") or "◈" for tipo in tipos}
-    options = [
-        discord.SelectOption(
-            label=str(t.get("label") or "Atendimento")[:100],
-            value=str(t.get("valor") or "outro")[:100],
-            description=str(t.get("descricao") or "Solicitação de atendimento.")[:100],
-            emoji=emojis_validos.get(t["valor"], "◈"),
+    options = []
+    for tipo in tipos[:25]:
+        emoji = _emoji_personalizado(guild, tipo) or tipo.get("emoji") or "◈"
+        options.append(
+            discord.SelectOption(
+                label=str(tipo.get("label") or "Atendimento")[:100],
+                value=str(tipo.get("valor") or "outro")[:100],
+                description=str(tipo.get("descricao") or "Solicitação de atendimento.")[:100],
+                emoji=emoji,
+            )
         )
-        for t in tipos[:25]
-    ]
 
     select = discord.ui.Select(
         placeholder="◈  Escolha uma categoria para abrir seu ticket",
@@ -185,7 +205,7 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
     return view
 
 
-async def _montar_embed_painel(guild_id: int) -> discord.Embed:
+async def _montar_embed_painel(guild_id: int, guild: discord.Guild | None = None) -> discord.Embed:
     config = await get_config(guild_id)
     tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
     embed = criar_embed(
@@ -200,7 +220,8 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CUSTOMER OPERATIONS")
     embed.add_field(name="◈  CATÁLOGO DE ATENDIMENTO", value="Escolha o assunto mais próximo da sua necessidade:", inline=False)
     for indice, tipo in enumerate(tipos[:8], start=1):
-        emoji = str(tipo.get("emoji") or "◈")
+        emoji_personalizado = _emoji_personalizado(guild, tipo)
+        emoji = str(emoji_personalizado or tipo.get("emoji") or "◈")
         nome = str(tipo.get("label") or "Atendimento")[:80]
         detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:180]
         fluxo = "AUTOATENDIMENTO + EQUIPE" if tipo.get("usa_ia") else "EQUIPE ESPECIALIZADA"
@@ -1262,7 +1283,7 @@ class Tickets(commands.Cog):
                 mensagem = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 mensagem = None
-        embed, view = await _montar_embed_painel(interaction.guild.id), await _montar_select(interaction.guild.id)
+        embed, view = await _montar_embed_painel(interaction.guild.id, interaction.guild), await _montar_select(interaction.guild.id, interaction.guild)
         if mensagem:
             await mensagem.edit(embed=embed, view=view)
         else:
@@ -1294,7 +1315,7 @@ class Tickets(commands.Cog):
         if isinstance(canal, discord.TextChannel) and config.get("ticket_painel_mensagem_id"):
             try:
                 msg = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
-                await msg.edit(embed=await _montar_embed_painel(interaction.guild.id), view=await _montar_select(interaction.guild.id))
+                await msg.edit(embed=await _montar_embed_painel(interaction.guild.id, interaction.guild), view=await _montar_select(interaction.guild.id, interaction.guild))
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 pass
         await interaction.response.send_message(f"Categoria {tipo['label']} atualizada e sincronizada.", ephemeral=True)
@@ -1306,7 +1327,7 @@ class Tickets(commands.Cog):
                 config = await get_config(guild.id)
 
                 # Migra o menu padrão sem exigir comandos administrativos.
-                if not config.get("ticket_modelo_v5"):
+                if not config.get("ticket_modelo_v7"):
                     await tickets.set_tipos(
                         guild.id,
                         list(tickets.TIPOS_PADRAO),
@@ -1317,6 +1338,8 @@ class Tickets(commands.Cog):
                         ticket_modelo_v3=True,
                         ticket_modelo_v4=True,
                         ticket_modelo_v5=True,
+                        ticket_modelo_v6=True,
+                        ticket_modelo_v7=True,
                     )
                     config = await get_config(guild.id)
 
@@ -1326,8 +1349,8 @@ class Tickets(commands.Cog):
                 if not isinstance(canal, discord.TextChannel):
                     continue
 
-                embed = await _montar_embed_painel(guild.id)
-                view = await _montar_select(guild.id)
+                embed = await _montar_embed_painel(guild.id, guild)
+                view = await _montar_select(guild.id, guild)
 
                 if mensagem_id:
                     try:
