@@ -324,10 +324,7 @@ class Missoes(commands.Cog):
                 )
                 embed.add_field(
                     name="◈ RECOMPENSA",
-                    value=(
-                        f"**{recompensa:,} XP**\n"
-                        f"{recompensa:,} XP"
-                    ).replace(",", "."),
+                    value=f"**{recompensa:,} XP** por aprovação".replace(",", "."),
                     inline=True,
                 )
 
