@@ -7,7 +7,7 @@ from discord.ext import commands
 logger = logging.getLogger(__name__)
 
 CANAL_GUIAS_ID = 1563995880833421512
-VERSAO_GUIA = "2026-10-v1"
+VERSAO_GUIA = "2026-10-v2"
 
 # Conteúdo público: instruções operacionais, sem expor rotinas internas ou permissões.
 GUIAS = [
@@ -109,13 +109,6 @@ GUIAS = [
         "A equipe deve avaliar evidências e aplicar medidas proporcionais, registrando a justificativa.",
         "Dúvidas ou contestações devem ser tratadas pela Central de Atendimento."
     ], "Regras oficiais · Central de Atendimento"),
-    ("LOJA, PRÊMIOS E RECONHECIMENTOS", "Como consultar recompensas", [
-        "Leia o catálogo vigente e confira custo, requisitos e disponibilidade.",
-        "Verifique se sua conta atende aos critérios antes de solicitar uma recompensa.",
-        "Siga o fluxo de solicitação indicado no próprio catálogo.",
-        "Guarde a confirmação e não repita uma solicitação enquanto ela estiver em processamento.",
-        "Se houver cobrança incorreta ou entrega pendente, abra um ticket com os detalhes."
-    ], "/help · Central de Atendimento"),
     ("GUERRAS E OPERAÇÕES", "Orientações para atividades entre equipes", [
         "Confirme que a operação foi autorizada pelos responsáveis antes de anunciá-la como oficial.",
         "Defina equipes, formato, regras, horário e critérios de resultado antecipadamente.",
@@ -179,8 +172,16 @@ class GuiasServidor(commands.Cog):
                 if mensagem.author.id != self.bot.user.id:
                     continue
                 for embed in mensagem.embeds:
-                    if embed.footer and embed.footer.text in marcadores:
-                        existentes.add(embed.footer.text)
+                    if embed.footer and embed.footer.text.startswith("NÊMESIS • GUIA OFICIAL •"):
+                        if embed.footer.text in marcadores:
+                            existentes.add(embed.footer.text)
+                        else:
+                            try:
+                                await mensagem.delete()
+                                logger.info("Guia antigo removido para substituir a documentação desatualizada.")
+                            except discord.HTTPException:
+                                logger.exception("Não foi possível remover uma mensagem antiga de guias.")
+                        break
 
             partes = [GUIAS[:8], GUIAS[8:]]
             for indice, guias in enumerate(partes, start=1):
