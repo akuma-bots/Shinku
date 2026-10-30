@@ -35,7 +35,7 @@ FRASES_FECHAR = [
 TEMPO_INATIVIDADE_SEGUNDOS = 10 * 60  # 10 minutos
 
 CUSTOM_ID_SELECT = "ticket:abrir_select"
-TICKET_PAINEL_CANAL_ID = 1545836351596011570
+TICKET_PAINEL_CANAL_ID = 1563995881655509057  # ticket-available no servidor atual
 
 TITULO_PADRAO = "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE ATENDIMENTO ・✦"
 DESCRICAO_PADRAO = (
@@ -195,69 +195,30 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
 
 
 async def _montar_embed_painel(guild_id: int) -> discord.Embed:
+    """Central de tickets em formato de catálogo, com cartões por categoria."""
     config = await get_config(guild_id)
     descricao = config.get("ticket_painel_descricao") or DESCRICAO_PADRAO
-
-    # Migra o texto padrão antigo sem sobrescrever descrições personalizadas.
-    if (
-        descricao.startswith("A Central de Atendimento é o canal oficial para tratar de assuntos da")
-        and "◈ ORIENTAÇÕES ◈" in descricao
-    ):
-        descricao = DESCRICAO_PADRAO
-
+    tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        (
-            "**ATENDIMENTO OFICIAL · NÊMESIS**\n"
-            f"{descricao}\n\n"
-            "Escolha uma categoria no seletor abaixo. O sistema abrirá um canal reservado "
-            "para você e a equipe responsável, com registro do atendimento."
-        ),
+        "**CENTRAL DE OPERAÇÕES · NÊMESIS**\n"
+        + descricao + "\n\nCada categoria abaixo direciona sua solicitação para o fluxo correto. Selecione o assunto no menu para iniciar o atendimento.",
         cor=0x9F1239,
-        rodape="NÊMESIS  •  CENTRAL DE ATENDIMENTO",
+        rodape="NÊMESIS  •  CENTRAL DE ATENDIMENTO  •  SISTEMA DE TICKETS",
     )
     embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  SUPORTE E OPERAÇÕES")
-    embed.add_field(
-        name="01  /  ESCOLHA DO ASSUNTO",
-        value=(
-            "Selecione a categoria que melhor descreve sua necessidade.\n"
-            "A solicitação será encaminhada ao fluxo correspondente."
-        ),
-        inline=True,
-    )
-    embed.add_field(
-        name="02  /  ATENDIMENTO PRIVADO",
-        value=(
-            "Somente você e a equipe autorizada terão acesso ao canal.\n"
-            "Envie contexto, datas, IDs e evidências para agilizar a análise."
-        ),
-        inline=True,
-    )
-    embed.add_field(
-        name="03  /  ACOMPANHAMENTO",
-        value=(
-            "A equipe responderá no próprio ticket. Evite abrir solicitações duplicadas.\n"
-            "Ao concluir, utilize o botão de encerramento e avalie o atendimento."
-        ),
-        inline=False,
-    )
-    embed.add_field(
-        name="SEGURANÇA DA CONTA",
-        value=(
-            "A NÊMESIS nunca precisa da sua senha ou de códigos de autenticação. "
-            "Não compartilhe credenciais, tokens ou dados de acesso."
-        ),
-        inline=False,
-    )
-
-    banner_url = config.get("ticket_painel_banner_url")
-    if banner_url:
-        embed.set_image(url=banner_url)
-
-    thumbnail_url = config.get("ticket_painel_thumbnail_url")
-    if thumbnail_url:
-        embed.set_thumbnail(url=thumbnail_url)
-
+    for indice, tipo in enumerate(tipos[:8], start=1):
+        emoji = tipo.get("emoji") or "◈"
+        nome = str(tipo.get("label") or "Atendimento")[:90]
+        detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:220]
+        fluxo = "Automático + equipe" if tipo.get("usa_ia") else "Equipe responsável"
+        embed.add_field(name=f"{emoji}  {indice:02d}  /  {nome}", value=f"{detalhe}\n**Fluxo:** {fluxo}", inline=False)
+    embed.add_field(name="🔒  PRIVACIDADE E SEGURANÇA", value="O ticket cria um canal visível apenas para você e a equipe autorizada. Nunca envie senhas, tokens ou códigos de autenticação.", inline=False)
+    embed.add_field(name="COMO FUNCIONA", value="01 — Escolha uma categoria no menu.\n02 — O canal privado será criado automaticamente.\n03 — Explique o caso e acompanhe a resposta da equipe.\n04 — Ao terminar, encerre pelo botão disponível.", inline=False)
+    if config.get("ticket_painel_banner_url"):
+        embed.set_image(url=config["ticket_painel_banner_url"])
+    if config.get("ticket_painel_thumbnail_url"):
+        embed.set_thumbnail(url=config["ticket_painel_thumbnail_url"])
     return embed
 
 
@@ -817,23 +778,20 @@ class Tickets(commands.Cog):
             reason=f"Ticket ({tipo['label']}) aberto por {user}",
         )
 
+        descricao_tipo = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")
         embed = criar_embed(
-            f"✦・ NÊMESIS — {tipo['label'].upper()} ・✦",
-            (
-                f"Olá, {user.mention}. Seu atendimento foi iniciado com sucesso.\n\n"
-                "╭──────────── ◈ ATENDIMENTO ◈ ────────────╮\n"
-                "➜ Explique sua solicitação com detalhes.\n"
-                "➜ Envie provas, imagens ou contexto quando necessário.\n"
-                "➜ Aguarde a equipe responsável responder.\n"
-                "➜ Use **Fechar Ticket** quando o atendimento terminar.\n"
-                "╰─────────────────────────────────────────╯"
-            ),
-            rodape="NÊMESIS • Central de atendimento privada",
+            f"◈  ATENDIMENTO · {tipo['label'].upper()[:75]}",
+            f"Olá, {user.mention}. Seu canal privado foi criado.\nA equipe responsável receberá sua solicitação neste espaço.",
+            cor=0x9F1239,
+            rodape="NÊMESIS  •  ATENDIMENTO PRIVADO  •  REGISTRO ATIVO",
             timestamp=True,
         )
-        embed.add_field(name="Categoria", value=tipo["label"][:1024], inline=True)
-        embed.add_field(name="Solicitante", value=f"{user.mention}\n`{user.id}`", inline=True)
-        embed.add_field(name="Status", value="🟢 Aguardando atendimento", inline=True)
+        embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE OPERAÇÕES")
+        embed.add_field(name="PROTOCOLO", value=f"**{tipo['label']}**\n{descricao_tipo[:300]}", inline=False)
+        embed.add_field(name="SOLICITANTE", value=f"{user.mention}\n`{user.id}`", inline=True)
+        embed.add_field(name="SITUAÇÃO", value="🟠  Aguardando responsável", inline=True)
+        embed.add_field(name="PRÓXIMAS ETAPAS", value="01 — Descreva o que aconteceu e o resultado esperado.\n02 — Envie capturas, links ou IDs que ajudem na análise.\n03 — Aguarde a equipe; o responsável será identificado no atendimento.\n04 — Use Fechar Ticket somente quando o caso estiver resolvido.", inline=False)
+        embed.add_field(name="PROTEÇÃO DE DADOS", value="Não compartilhe senhas, tokens, códigos de autenticação ou informações de acesso.", inline=False)
         embed.set_thumbnail(url=user.display_avatar.url)
 
         try:
