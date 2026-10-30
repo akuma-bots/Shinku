@@ -17,7 +17,6 @@ TIPOS_PADRAO = [
     {"valor": "suporte_comunidade", "label": "Suporte Técnico", "emoji": "🛠️", "descricao": "Receba ajuda com o servidor, comandos, bot ou acesso aos sistemas.", "usa_ia": False},
     {"valor": "aliancas", "label": "Diplomacia e Alianças", "emoji": "🤝", "descricao": "Apresente propostas de parceria, aliança ou cooperação entre guildas.", "usa_ia": False},
     {"valor": "eventos_atividades", "label": "Eventos e Torneios", "emoji": "🏆", "descricao": "Dúvidas, inscrições e suporte para eventos, campeonatos e atividades.", "usa_ia": False},
-    {"valor": "sugestoes_projetos", "label": "Ideias e Melhorias", "emoji": "💡", "descricao": "Envie sugestões, melhorias e propostas para a evolução da NÊMESIS.", "usa_ia": False},
 ]
 
 
