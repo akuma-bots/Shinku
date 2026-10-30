@@ -10,7 +10,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 
 ARQUIVO_GUERRAS = "guerras.json"
-COR_NEMESIS = 0xB51F32
+COR_NEMESIS = 0x9F1239
 REGRAS_PADRAO = [
     "Respeitar todos os participantes e a staff.",
     "É proibido usar cheats, exploits ou qualquer vantagem ilegal.",
