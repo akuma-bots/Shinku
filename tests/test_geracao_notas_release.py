@@ -31,8 +31,11 @@ class TestGeracaoNotasRelease(unittest.TestCase):
             MOD.arquivos_alterados = lambda before, after: [("M", "cogs/revisoes.py")]
             release = MOD.gerar("a" * 40, "b" * 40)
             self.assertEqual(release["tipo"], "Correções")
-            self.assertEqual(release["release_id"], "git-bbbbbbbbbbbb")
-            self.assertIn("validação de provas", release["mensagem"])
+            self.assertRegex(release["release_id"], r"^\d{8}-\d{6}$")
+            self.assertRegex(release["data_atualizacao"], r"^\d{2}/\d{2}/\d{4}$")
+            self.assertRegex(release["hora_atualizacao"], r"^\d{2}:\d{2}$")
+            self.assertIn("Validação de provas", release["mensagem"])
+            self.assertNotIn("git-", release["release_id"])
         finally:
             MOD.git = original_git
             MOD.arquivos_alterados = original_arquivos
