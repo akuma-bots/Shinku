@@ -1036,7 +1036,7 @@ class Missoes(commands.Cog):
         ja_enviada = any(
             int(item.get("autor_id", 0) or 0) == interaction.user.id
             and str(item.get("referencia_id", "")) == str(atividade["id"])
-            and item.get("tipo") == "missao"
+            and item.get("tipo") == tipo
             for item in pendentes
         )
         if ja_enviada:
@@ -1077,7 +1077,7 @@ class Missoes(commands.Cog):
             await revisoes_cog.abrir_revisao(
                 guild,
                 canal,
-                tipo="missao",
+                tipo=tipo,
                 autor_id=interaction.user.id,
                 referencia_id=str(atividade["id"]),
                 print_url=url,
