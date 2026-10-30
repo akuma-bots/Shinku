@@ -22,12 +22,32 @@ class PontuacaoPvE(commands.Cog):
 
     async def _montar_embed(self, guild_id: int) -> discord.Embed:
         top = await pontuacao_pve.obter_ranking(guild_id)
+        embed = criar_embed(
+            title="🗡️ LIGA PvE · CLASSIFICAÇÃO OFICIAL",
+            description=(
+                "**DESEMPENHO NAS OPERAÇÕES PvE**\n"
+                "A classificação considera somente pontuações registradas em provas aprovadas. "
+                "O quadro é atualizado automaticamente a cada 10 minutos."
+            ),
+            cor=0x9F1239,
+            rodape="NÊMESIS  •  CIRCUITO PvE",
+        )
         if not top:
-            return criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING PvE", description="Ninguém pontuou em PvE ainda.", color=0xB51F32)
+            embed.add_field(
+                name="QUADRO AGUARDANDO REGISTROS",
+                value="Ainda não há pontuações validadas. Conclua uma operação PvE e envie a prova para análise.",
+                inline=False,
+            )
+            return embed
 
-        linhas = [f"**#{i+1}** <@{uid}> — {pontos} pts" for i, (uid, pontos) in enumerate(top)]
-        embed = criar_embed(title="🗡️ Pontuação PvE", description="\n".join(linhas), color=0xB51F32)
-        embed.set_footer(text="NÊMESIS • PONTUAÇÃO PvE • Apenas provas aprovadas • Atualização automática a cada 10 min")
+        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+        for posicao, (uid, pontos) in enumerate(top[:10], start=1):
+            selo = medalhas.get(posicao, f"#{posicao:02d}")
+            embed.add_field(
+                name=f"{selo}  POSIÇÃO {posicao:02d}",
+                value=f"<@{uid}>\n**{int(pontos):,} pontos**".replace(",", "."),
+                inline=True,
+            )
         return embed
 
     async def _atualizar_painel(self, guild: discord.Guild):

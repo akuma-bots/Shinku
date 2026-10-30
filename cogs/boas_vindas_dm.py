@@ -37,7 +37,7 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
             "entre jogadores. Respeite as regras, acompanhe os anúncios e procure a equipe "
             "pelos canais oficiais quando precisar de suporte."
         ),
-        color=0xB51F32,
+        color=0x9F1239,
     )
     embed.add_field(name="TAG DA GANGUE", value=f"`{TAG_GANGUE}`", inline=True)
     embed.add_field(name="PRIMEIROS PASSOS", value=(
@@ -60,7 +60,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     catalogo = carregar_catalogo_codigos()
     jogo = catalogo.get("jogos", {}).get(chave)
     if not jogo:
-        return criar_embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=0xB51F32)
+        return criar_embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=0x9F1239)
     linhas = []
     for item in jogo.get("codigos", []):
         codigo = str(item.get("codigo", "")).strip()
@@ -75,7 +75,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CÓDIGOS / {jogo['nome'].upper()}",
         description=(f"{jogo.get('descricao', '')}\n\n**Verificado em:** {catalogo.get('atualizado_em', 'indisponível')}{periodo}\n\n{descricao_codigos}")[:4096],
-        color=0xB51F32,
+        color=0x9F1239,
         url=jogo.get("fonte"),
     )
     embed.add_field(name="REQUISITOS E COMO RESGATAR", value=str(jogo.get("requisitos", "Confira os requisitos dentro do jogo."))[:1024], inline=False)

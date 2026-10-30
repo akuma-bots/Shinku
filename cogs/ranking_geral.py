@@ -194,7 +194,7 @@ class RankingGeral(
                 "A posição é definida pela pontuação sazonal. XP, vitórias, derrotas e permanência no Top 10 "
                 "são métricas complementares; o histórico das temporadas concluídas é preservado."
             ),
-            color=0xB51F32,
+            color=0x9F1239,
             rodape=None,
         )
         embed.set_author(name="NÊMESIS  /  LIGA GLOBAL")

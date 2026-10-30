@@ -324,7 +324,7 @@ class Eventos(commands.Cog):
                 evento.description
                 or "Este evento não possui uma descrição adicional."
             ),
-            color=0xB51F32,
+            color=0x9F1239,
             rodape=None,
         )
         embed.set_author(name="NÊMESIS  /  EVENTOS E CAMPEONATOS")

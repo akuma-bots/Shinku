@@ -7,9 +7,9 @@ from discord.ext import commands
 def _cor_para_int(valor: str) -> int:
     valor = (valor or "").strip().lstrip("#")
     try:
-        return int(valor, 16) if valor else 0xB51F32
+        return int(valor, 16) if valor else 0x9F1239
     except ValueError:
-        return 0xB51F32
+        return 0x9F1239
 
 
 def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):

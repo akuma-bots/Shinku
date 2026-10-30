@@ -183,7 +183,7 @@ async def _montar_select(guild_id: int) -> discord.ui.View:
     ]
 
     select = discord.ui.Select(
-        placeholder="Selecione o tipo de atendimento",
+        placeholder="◈  Escolha uma categoria para abrir seu ticket",
         options=options,
         custom_id=CUSTOM_ID_SELECT,
     )
@@ -207,31 +207,56 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
 
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        descricao,
-        rodape="NÊMESIS • Suporte oficial",
+        (
+            "**ATENDIMENTO OFICIAL · NÊMESIS**\n"
+            f"{descricao}\n\n"
+            "Escolha uma categoria no seletor abaixo. O sistema abrirá um canal reservado "
+            "para você e a equipe responsável, com registro do atendimento."
+        ),
+        cor=0x9F1239,
+        rodape="NÊMESIS  •  CENTRAL DE ATENDIMENTO",
+    )
+    embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  SUPORTE E OPERAÇÕES")
+    embed.add_field(
+        name="01  /  ESCOLHA DO ASSUNTO",
+        value=(
+            "Selecione a categoria que melhor descreve sua necessidade.\n"
+            "A solicitação será encaminhada ao fluxo correspondente."
+        ),
+        inline=True,
     )
     embed.add_field(
-        name="01 · ABERTURA DO ATENDIMENTO",
+        name="02  /  ATENDIMENTO PRIVADO",
         value=(
-            "➜ Selecione a categoria mais próxima do seu assunto.\n"
-            "➜ Descreva o ocorrido, informe datas/IDs relevantes e anexe provas.\n"
-            "➜ Aguarde a equipe no próprio canal; não abra solicitações duplicadas."
+            "Somente você e a equipe autorizada terão acesso ao canal.\n"
+            "Envie contexto, datas, IDs e evidências para agilizar a análise."
+        ),
+        inline=True,
+    )
+    embed.add_field(
+        name="03  /  ACOMPANHAMENTO",
+        value=(
+            "A equipe responderá no próprio ticket. Evite abrir solicitações duplicadas.\n"
+            "Ao concluir, utilize o botão de encerramento e avalie o atendimento."
         ),
         inline=False,
     )
     embed.add_field(
-        name="02 · ACESSO E CONFIDENCIALIDADE",
+        name="SEGURANÇA DA CONTA",
         value=(
-            "O canal é privado para o solicitante e a equipe autorizada. "
-            "Compartilhe dados pessoais e denúncias apenas dentro do atendimento; não publique senhas ou códigos de autenticação."
+            "A NÊMESIS nunca precisa da sua senha ou de códigos de autenticação. "
+            "Não compartilhe credenciais, tokens ou dados de acesso."
         ),
         inline=False,
     )
-    embed.color = 0x8B0000
 
     banner_url = config.get("ticket_painel_banner_url")
     if banner_url:
         embed.set_image(url=banner_url)
+
+    thumbnail_url = config.get("ticket_painel_thumbnail_url")
+    if thumbnail_url:
+        embed.set_thumbnail(url=thumbnail_url)
 
     return embed
 

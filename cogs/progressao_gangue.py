@@ -270,7 +270,7 @@ class ProgressaoGangue(commands.Cog):
                 f"**Experiência de gangue:** {xp:,} XP".replace(",", ".")
                 + "\n\nO avanço foi registrado automaticamente pelo sistema da NÊMESIS."
             ),
-            color=0xB51F32,
+            color=0x9F1239,
             timestamp=discord.utils.utcnow(),
         )
         embed.set_thumbnail(url=membro.display_avatar.url)
@@ -293,19 +293,32 @@ class ProgressaoGangue(commands.Cog):
         dados = await self._dados()
         config = dados.setdefault(str(guild.id), {})
         embed = criar_embed(
-            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  SISTEMA DE PROGRESSÃO",
+            title="⚔️ PROGRESSÃO · HIERARQUIA NÊMESIS",
             description=(
-                "A sua posição na gangue evolui conforme a participação legítima e a experiência acumulada.\n\n"
-                "**Como progredir**\n"
-                f"・Participação no servidor: **+{XP_POR_MENSAGEM} XP** por mensagem válida, com intervalo de {COOLDOWN_MENSAGENS}s.\n"
-                "・Missões, contribuições e guerras podem ser registradas pela liderança.\n"
-                "・Ao atingir o requisito, o rank é atualizado e anunciado aqui.\n\n"
-                "**Hierarquia de progressão**\n"
-                + "\n".join(f"╭・𝐍̷𝐨.{r['no']} — **{r['nome']}** · {r['xp']:,} XP".replace(",", ".") for r in RANKS)
-                + "\n╭・𝐍̷𝐨.0 — **Liderança** · atribuição exclusiva da direção"
+                "**SUA EVOLUÇÃO É CONQUISTADA EM ATIVIDADE REAL.**\n"
+                "A progressão registra participação legítima, missões e guerras. "
+                "Ao cumprir os requisitos, o sistema atualiza seu posto e anuncia a promoção."
             ),
-            color=0xB51F32,
+            cor=0x9F1239,
+            rodape=None,
         )
+        embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  SISTEMA DE MÉRITO")
+        embed.add_field(
+            name="01  /  PARTICIPAÇÃO",
+            value=f"**+{XP_POR_MENSAGEM} XP** por mensagem válida\nIntervalo de {COOLDOWN_MENSAGENS}s entre registros",
+            inline=True,
+        )
+        embed.add_field(
+            name="02  /  ATIVIDADES OFICIAIS",
+            value="Missões, contribuições e guerras podem gerar registros de progressão mediante validação da liderança.",
+            inline=True,
+        )
+        hierarquia = "\n".join(
+            f"{r['no']:02d}  **{r['nome']}**  ·  {r['xp']:,} XP".replace(",", ".")
+            for r in RANKS
+        )
+        hierarquia += "\n00  **Liderança**  ·  atribuição exclusiva da direção"
+        embed.add_field(name="03  /  ESCALA DE PATENTES", value=hierarquia[:1024], inline=False)
         embed.set_footer(text="NÊMESIS • PROGRESSÃO OFICIAL • XP de progressão separado do XP competitivo")
         msg_id = config.get("painel_mensagem_id")
         if msg_id:
@@ -404,18 +417,19 @@ class ProgressaoGangue(commands.Cog):
         progresso = barra_progresso(xp, rank, proximo)
         destino = f"╭・𝐍̷𝐨.{proximo['no']} — {proximo['nome']} · faltam **{max(0, proximo['xp'] - xp)} XP**" if proximo else "Rank máximo de progressão alcançado."
         embed = criar_embed(
-            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  PROGRESSO DE {alvo.display_name.upper()}",
+            title=f"📊 DOSSIÊ DE PROGRESSÃO · {alvo.display_name.upper()[:90]}",
             description=(
-                f"**Rank atual:** ╭・𝐍̷𝐨.{rank['no']} — {rank['nome']}\n"
-                f"**Experiência:** {xp:,} XP\n"
-                f"**Progresso:** {progresso}\n"
-                f"**Próximo rank:** {destino}\n\n"
-                f"**Mensagens válidas:** {int(perfil.get('mensagens', 0)):,}\n"
-                f"**Missões registradas:** {int(perfil.get('missoes', 0)):,}\n"
-                f"**Guerras registradas:** {int(perfil.get('guerras', 0)):,}"
+                f"**POSTO ATUAL**\nNº {rank['no']:02d}  **{rank['nome']}**\n"
+                f"**EXPERIÊNCIA ACUMULADA** · {xp:,} XP\n"
+                f"{progresso}\n"
+                f"**PRÓXIMO OBJETIVO** · {destino}"
             ).replace(",", "."),
-            color=0xB51F32,
+            cor=0x9F1239,
+            rodape="NÊMESIS  •  PROGRESSÃO INDIVIDUAL",
         )
+        embed.add_field(name="MENSAGENS VÁLIDAS", value=f"**{int(perfil.get('mensagens', 0)):,}**".replace(",", "."), inline=True)
+        embed.add_field(name="MISSÕES", value=f"**{int(perfil.get('missoes', 0)):,}**".replace(",", "."), inline=True)
+        embed.add_field(name="GUERRAS", value=f"**{int(perfil.get('guerras', 0)):,}**".replace(",", "."), inline=True)
         embed.set_thumbnail(url=alvo.display_avatar.url)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -434,12 +448,24 @@ class ProgressaoGangue(commands.Cog):
         if not ranking:
             await interaction.response.send_message("Ainda não há membros no ranking de progressão.", ephemeral=True)
             return
-        linhas = [
-            f"**#{posicao}** <@{uid}> — ╭・𝐍̷𝐨.{rank_por_xp(int(perfil.get('xp', 0)))['no']} "
-            f"{rank_por_xp(int(perfil.get('xp', 0)))['nome']} · **{int(perfil.get('xp', 0)):,} XP**".replace(",", ".")
-            for posicao, (uid, perfil) in enumerate(ranking, start=1)
-        ]
-        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  RANKING DA GANGUE", description="\n".join(linhas), color=0xB51F32)
+        embed = criar_embed(
+            title="🏆 CLASSIFICAÇÃO · HIERARQUIA NÊMESIS",
+            description="**TOP 10 DE PROGRESSÃO**\nClassificação ordenada por XP acumulado e, em caso de empate, por participação registrada.",
+            cor=0x9F1239,
+            rodape="NÊMESIS  •  QUADRO DE MÉRITO",
+        )
+        medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+        for posicao, (uid, perfil) in enumerate(ranking, start=1):
+            xp = int(perfil.get("xp", 0))
+            rank = rank_por_xp(xp)
+            membro = interaction.guild.get_member(uid)
+            nome = membro.display_name if membro else f"Membro {uid}"
+            selo = medalhas.get(posicao, f"#{posicao:02d}")
+            embed.add_field(
+                name=f"{selo}  {nome[:70]}  ·  {rank['nome']}",
+                value=f"<@{uid}>\n**{xp:,} XP**  ·  **{int(perfil.get('mensagens', 0)):,} mensagens**".replace(",", "."),
+                inline=False,
+            )
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="gangue-banco", description="Consulta seu saldo de XP transferível da NÊMESIS.")
@@ -459,7 +485,7 @@ class ProgressaoGangue(commands.Cog):
                 "Use `/gangue-doar-xp` para transferir XP a outro membro. "
                 "O valor doado sai do seu saldo e entra no saldo do destinatário."
             ).replace(",", "."),
-            color=0xB51F32,
+            color=0x9F1239,
             timestamp=discord.utils.utcnow(),
         )
         embed.set_footer(text="NÊMESIS • BANCO DE XP • Transferências registradas")
@@ -507,7 +533,7 @@ class ProgressaoGangue(commands.Cog):
                 f"**Seu saldo após a transferência:** {int(perfil_origem['xp']):,} XP\n"
                 f"**Saldo do destinatário:** {int(perfil_destino['xp']):,} XP"
             ).replace(",", "."),
-            color=0xB51F32,
+            color=0x9F1239,
             timestamp=discord.utils.utcnow(),
         )
         embed.set_footer(text="NÊMESIS • BANCO DE XP • Operação registrada no histórico")
@@ -578,7 +604,7 @@ class ProgressaoGangue(commands.Cog):
                     f"**Experiência total:** {total_xp:,} XP\n"
                     f"**Rank atual:** ╭・𝐍̷𝐨.{rank_novo['no']} — {rank_novo['nome']}"
                 ).replace(",", "."),
-                color=0xB51F32,
+                color=0x9F1239,
                 timestamp=discord.utils.utcnow(),
             )
             registro.set_thumbnail(url=membro.display_avatar.url)
