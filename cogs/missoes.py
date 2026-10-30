@@ -392,74 +392,75 @@ class Missoes(commands.Cog):
                 return slug
         return padrao
 
-    async def _montar_painel_missoes(self, guild: discord.Guild, jogo: str) -> discord.Embed:
-        """Painel operacional de missões: catálogo, estado e recompensa em leitura rápida."""
+    async def _montar_painel_missoes(
+        self, guild: discord.Guild, jogo: str, categoria: str = "missao"
+    ) -> discord.Embed:
+        """Painel único, organizado por categoria e com navegação paginada."""
         jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
+        categoria = categoria if categoria in TIPOS else "missao"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
+        tipo = TIPOS[categoria]
         dados = await missoes._guild(guild.id)
         atividades = [
             item for item in dados.get("missoes", [])
             if str(item.get("jogo") or "").lower() == jogo
+            and str(item.get("tipo") or "missao").lower() == categoria
         ]
-        atividades.sort(key=lambda item: (
-            {"missao": 0, "contribuicao": 1, "especial": 2}.get(
-                str(item.get("tipo") or "missao").lower(), 9
-            ), str(item.get("id") or ""),
-        ))
-        abertas = sum(1 for item in atividades if item.get("ativa", True) is not False)
-        encerradas = len(atividades) - abertas
-        pagina = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
+        atividades.sort(key=lambda item: str(item.get("id") or ""))
+        abertas = [item for item in atividades if item.get("ativa", True) is not False]
+        encerradas = len(atividades) - len(abertas)
         embed = criar_embed(
-            f"🎯 CENTRAL DE MISSÕES · {nome_jogo.upper()}",
-            f"**CENTRAL DE MISSÕES NÊMESIS** · Jogo selecionado: **{nome_jogo}**\n"
-            "Selecione uma operação ativa no catálogo abaixo. Ao concluir o objetivo, envie a prova pelo comando `/missao-enviar-prova`; "
-            "a recompensa só é liberada após validação da equipe.\n\n"
-            "`01` Consulte o objetivo  ·  `02` Registre a prova  ·  `03` Aguarde a auditoria",
-            cor=0x9F2035, rodape=None,
+            f"{tipo['emoji']} MISSÕES {tipo['plural']} · {nome_jogo.upper()}",
+            "Central oficial de atividades da NÊMESIS. Consulte os objetivos, "
+            "conclua a atividade e envie sua evidência para análise da equipe.\n\n"
+            "**Navegação:** utilize os botões para alternar entre as categorias.",
+            cor=tipo["cor"], rodape=None,
         )
-        embed.set_author(name="NÊMESIS  /  OPERAÇÕES E CONTRIBUIÇÕES")
-        embed.add_field(name="🟢 EM OPERAÇÃO", value=f"**{abertas}**", inline=True)
+        embed.set_author(name="NÊMESIS  /  CENTRAL DE MISSÕES")
+        embed.add_field(name="🟢 DISPONÍVEIS", value=f"**{len(abertas)}**", inline=True)
         embed.add_field(name="⛔ ENCERRADAS", value=f"**{encerradas}**", inline=True)
-        embed.add_field(name="◈ NO CATÁLOGO", value=f"**{len(atividades)}**", inline=True)
+        embed.add_field(name="◈ TOTAL", value=f"**{len(atividades)}**", inline=True)
         if not atividades:
-            embed.add_field(
-                name="◈ CATÁLOGO VAZIO",
-                value="Não há operações cadastradas para este jogo no momento. Consulte a equipe para saber quando novas missões serão publicadas.",
-                inline=False,
-            )
-        for indice, item in enumerate(atividades[:12], start=1):
-            tipo_chave = str(item.get("tipo") or "missao").lower()
-            tipo = TIPOS.get(tipo_chave, TIPOS["missao"])
-            try:
-                recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
-            except (TypeError, ValueError):
-                recompensa = 0
+            embed.add_field(name="◈ NENHUMA MISSÃO CADASTRADA",
+                            value="Não existem atividades nesta categoria para este jogo no momento.",
+                            inline=False)
+        for indice, item in enumerate(atividades[:8], start=1):
+            recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
             ativa = item.get("ativa", True) is not False
-            estado = "🟢 ABERTA" if ativa else "⛔ ENCERRADA"
-            titulo = str(item.get("titulo") or "Operação sem título").strip()
-            descricao = str(item.get("descricao") or "Objetivo não detalhado.").strip() or "Objetivo não detalhado."
+            estado = "🟢 DISPONÍVEL" if ativa else "⛔ ENCERRADA"
+            titulo = str(item.get("titulo") or "Missão sem título").strip()
+            descricao = str(item.get("descricao") or "Objetivo não informado.").strip()
             identificador = str(item.get("id") or "—")
+            dificuldade = str(item.get("dificuldade") or "Não definida")
             embed.add_field(
-                name=f"{tipo.get('emoji', '🎯')} {indice:02d} · {titulo[:54]} · {recompensa:,} XP".replace(",", ".")[:256],
-                value=(
-                    f"{descricao[:100]}\n"
-                    f"{estado} · {tipo['nome']}\n"
-                    f"**Recompensa:** `{recompensa:,} XP`\n"
-                    f"**ID:** `{identificador[:24]}`"
-                ).replace(",", ".")[:1024],
+                name=f"{indice:02d}  ·  {titulo[:70]}",
+                value=(f"{descricao[:220]}\n**Código:** `{identificador[:32]}`  ·  "
+                       f"**Dificuldade:** {dificuldade}\n"
+                       f"**Recompensa:** {recompensa:,} XP  ·  {estado}").replace(",", ".")[:1024],
                 inline=False,
             )
-        if len(atividades) > 12:
-            embed.add_field(name="◈ CATÁLOGO COMPLEMENTAR", value=f"Este painel exibe as primeiras 12 de {len(atividades)} operações. Use os canais oficiais para consultar as demais.", inline=False)
-        embed.set_footer(text=f"PÁGINA:{jogo} • CATÁLOGO {pagina}/{len(ranking_missoes_jogos.JOGOS)}  •  Use os botões para alternar o jogo")
+        if len(atividades) > 8:
+            embed.add_field(name="◈ CATÁLOGO",
+                            value=f"Exibindo 8 de {len(atividades)} missões nesta categoria.",
+                            inline=False)
+        indice_jogo = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
+        indice_categoria = list(TIPOS).index(categoria) + 1
+        embed.set_footer(text=f"CATALOGO:{jogo}:{categoria} • JOGO {indice_jogo}/{len(ranking_missoes_jogos.JOGOS)} • CATEGORIA {indice_categoria}/{len(TIPOS)}")
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
         jogos = list(ranking_missoes_jogos.JOGOS)
-        atual = self._slug_da_mensagem(interaction.message, "PÁGINA", "shigaku")
-        indice = jogos.index(atual) if atual in jogos else 0
-        alvo = jogos[(indice + delta) % len(jogos)]
-        embed = await self._montar_painel_missoes(interaction.guild, alvo)
+        categorias = list(TIPOS)
+        footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
+        partes = footer.split(":")
+        jogo = partes[1] if len(partes) > 1 and partes[1] in jogos else "shigaku"
+        categoria = partes[2].split()[0] if len(partes) > 2 else "missao"
+        if categoria not in categorias:
+            categoria = "missao"
+        paginas = [(j, c) for j in jogos for c in categorias]
+        atual = paginas.index((jogo, categoria))
+        alvo_jogo, alvo_categoria = paginas[(atual + delta) % len(paginas)]
+        embed = await self._montar_painel_missoes(interaction.guild, alvo_jogo, alvo_categoria)
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
 
     async def _atualizar_painel_missoes(self, guild: discord.Guild) -> None:
@@ -740,26 +741,23 @@ class Missoes(commands.Cog):
         async with self._sync_lock:
             catalogo = self._expandir_catalogo_por_jogo(carregar_catalogo())
             atividades = await sincronizar_catalogo(guild.id, catalogo)
-            resultado = await self._sincronizar_cartoes_missoes(guild, atividades)
-            resultado["registros_catalogo"] = len(atividades)
-            resultado["painel_atualizado"] = False
+            resultado = {"publicadas": 0, "atualizadas": 0, "falhas": 0,
+                         "registros_catalogo": len(atividades), "painel_atualizado": False}
             try:
                 await self._atualizar_painel_missoes(guild)
                 resultado["painel_atualizado"] = True
+                resultado["atualizadas"] = 1
             except Exception:
                 resultado["falhas"] += 1
-                log.exception("Falha ao atualizar o painel geral de missões.")
+                log.exception("Falha ao atualizar o painel único de missões.")
             try:
                 await self._atualizar_ranking_jogo(guild, "shigaku")
             except Exception:
                 resultado["falhas"] += 1
                 log.exception("Falha ao atualizar o ranking de missões.")
             log.info(
-                "Sincronização de missões concluída: %s registros, %s cartões publicados, "
-                "%s cartões atualizados, %s falhas; painel geral: %s.",
-                resultado["registros_catalogo"], resultado["publicadas"],
-                resultado["atualizadas"], resultado["falhas"],
-                resultado["painel_atualizado"],
+                "Central única sincronizada: %s missões no catálogo; painel atualizado=%s; falhas=%s.",
+                resultado["registros_catalogo"], resultado["painel_atualizado"], resultado["falhas"],
             )
             return resultado
     @app_commands.command(
