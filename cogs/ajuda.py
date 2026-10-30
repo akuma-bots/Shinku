@@ -17,7 +17,6 @@ SISTEMAS = {
     "Recordes": ("🏅", "Recordes"),
     "Temporadas": ("🏁", "Temporadas"),
     "Gangues": ("🏴", "Gangues"),
-    "Loja": ("🛒", "Loja"),
     "Tickets": ("🎫", "Tickets"),
     "Formularios": ("📝", "Formulários"),
     "Revisoes": ("📋", "Revisão de Provas"),
