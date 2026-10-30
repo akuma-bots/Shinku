@@ -516,7 +516,7 @@ class Missoes(commands.Cog):
         """Percorre páginas da categoria atual sem misturar departamentos."""
         footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
         categoria_match = re.search(r"CATEGORIA:([a-z_]+)", footer)
-        pagina_match = re.search(r"PAGINA:(\\d+)/(\\d+)", footer)
+        pagina_match = re.search(r"PAGINA:(\d+)/(\d+)", footer)
         categoria = categoria_match.group(1) if categoria_match else "missao"
         if categoria not in TIPOS:
             categoria = "missao"
