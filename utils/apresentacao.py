@@ -110,11 +110,15 @@ def aplicar_identidade_servidor(
 
     if avatar_bot:
         autor = embed.author
-        embed.set_author(
-            name=autor.name or "N̷ÊMESIS  •  CENTRAL DE SISTEMAS",
-            url=autor.url or discord.Embed.Empty,
-            icon_url=avatar_bot,
-        )
+        # discord.py atual não expõe discord.Embed.Empty. O argumento url é
+        # opcional; omiti-lo quando não existe evita falha em runtime.
+        autor_kwargs = {
+            "name": autor.name or "N̷ÊMESIS  •  CENTRAL DE SISTEMAS",
+            "icon_url": avatar_bot,
+        }
+        if autor.url:
+            autor_kwargs["url"] = autor.url
+        embed.set_author(**autor_kwargs)
 
     banner_servidor = getattr(guild, "banner", None)
     if banner and banner_servidor:
