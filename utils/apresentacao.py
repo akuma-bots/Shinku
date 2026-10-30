@@ -94,7 +94,8 @@ def aplicar_identidade_servidor(
     if guild is None:
         return embed
 
-    icone_servidor = guild.icon.url if guild.icon else None
+    icone = getattr(guild, "icon", None)
+    icone_servidor = icone.url if icone else None
     avatar_bot = None
     usuario_bot = getattr(bot, "user", None) if bot else None
     if usuario_bot:
@@ -115,7 +116,8 @@ def aplicar_identidade_servidor(
             icon_url=avatar_bot,
         )
 
-    if banner and guild.banner:
-        embed.set_image(url=guild.banner.url)
+    banner_servidor = getattr(guild, "banner", None)
+    if banner and banner_servidor:
+        embed.set_image(url=banner_servidor.url)
 
     return embed
