@@ -117,34 +117,55 @@ def _perguntas_flat(formulario: dict) -> list:
 
 
 def _embeds_painel(formulario: dict, guild: discord.Guild | None = None, bot: discord.Client | None = None) -> list[discord.Embed]:
-    """Painel institucional, com identidade do servidor e instruções objetivas."""
+    """Painel institucional dividido automaticamente dentro dos limites do Discord."""
     titulo = str(formulario.get("titulo_painel") or formulario.get("nome") or "Formulário")[:220]
-    descricao = str(formulario.get("descricao_painel") or "").strip()
+    descricao = str(formulario.get("descricao_painel") or "").strip() or "Leia as orientações e preencha todas as etapas com atenção."
+    limite = 3000
+    partes = []
+    restante = descricao
+    while restante:
+        if len(restante) <= limite:
+            partes.append(restante)
+            break
+        corte = restante.rfind("\n", 0, limite)
+        if corte < limite // 2:
+            corte = restante.rfind(" ", 0, limite)
+        if corte < limite // 2:
+            corte = limite
+        partes.append(restante[:corte])
+        restante = restante[corte:].lstrip()
+    if not partes:
+        partes = [descricao]
     perguntas = _perguntas_flat(formulario)
     total_etapas = len(_paginas_modal(formulario))
     estado = "🟢 RECEBENDO CANDIDATURAS" if formulario.get("ativo") is not False else "⚫ INSCRIÇÕES ENCERRADAS"
-    texto = (
-        "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\n"
-        "　　　 **CENTRAL DE CANDIDATURAS**\n"
-        "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\n\n"
-        f"{descricao or 'Leia as orientações e preencha todas as etapas com atenção.'}\n\n"
-        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-        "**PROTOCOLO DE INSCRIÇÃO**\n"
-        "① Selecione **Iniciar inscrição**.\n"
-        "② Responda às etapas com informações verdadeiras e completas.\n"
-        "③ Revise suas respostas antes de concluir.\n"
-        "④ Aguarde o retorno da equipe responsável por mensagem privada.\n"
-        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
-    )
-    embed = criar_embed(f"✦・ {titulo} ・✦", texto[:4096], cor=0x9F1239, rodape=f"N̷ÊMESIS  •  PROCESSO SELETIVO  •  {estado}")
-    embed.set_author(name="N̷ÊMESIS  /  DEPARTAMENTO DE RECRUTAMENTO")
-    embed.add_field(name="SITUAÇÃO", value=estado, inline=True)
-    embed.add_field(name="ETAPAS", value=f"{total_etapas:02d}", inline=True)
-    embed.add_field(name="QUESTÕES", value=f"{len(perguntas):02d}", inline=True)
-    if formulario.get("banner_url"):
-        embed.set_image(url=str(formulario["banner_url"]))
-    aplicar_identidade_servidor(embed, guild, bot, banner=not bool(formulario.get("banner_url")))
-    return [embed]
+    embeds = []
+    for indice, parte in enumerate(partes, start=1):
+        texto = (
+            "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\n"
+            "　　　 **CENTRAL DE CANDIDATURAS**\n"
+            "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\n\n"
+            f"{parte}\n\n"
+            "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+            "**PROTOCOLO DE INSCRIÇÃO**\n"
+            "① Selecione **Iniciar inscrição**.\n"
+            "② Responda com informações verdadeiras e completas.\n"
+            "③ Conclua todas as etapas e aguarde a avaliação.\n"
+            "④ O retorno será enviado por mensagem privada.\n"
+            "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬"
+        )
+        sufixo = f" • {indice}/{len(partes)}" if len(partes) > 1 else ""
+        embed = criar_embed(f"✦・ {titulo} ・✦{sufixo}", texto[:4096], cor=0x9F1239, rodape=f"N̷ÊMESIS  •  PROCESSO SELETIVO  •  {estado}")
+        embed.set_author(name="N̷ÊMESIS  /  DEPARTAMENTO DE RECRUTAMENTO")
+        if indice == 1:
+            embed.add_field(name="SITUAÇÃO", value=estado, inline=True)
+            embed.add_field(name="ETAPAS", value=f"{total_etapas:02d}", inline=True)
+            embed.add_field(name="QUESTÕES", value=f"{len(perguntas):02d}", inline=True)
+            if formulario.get("banner_url"):
+                embed.set_image(url=str(formulario["banner_url"]))
+        aplicar_identidade_servidor(embed, guild, bot, banner=(indice == 1 and not bool(formulario.get("banner_url"))))
+        embeds.append(embed)
+    return embeds
 
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
