@@ -325,7 +325,7 @@ class Missoes(commands.Cog):
                 embed.add_field(
                     name="◈ RECOMPENSA",
                     value=(
-                        f"**{recompensa:,} P.C.**\n"
+                        f"**{recompensa:,} XP**\n"
                         f"{recompensa:,} XP"
                     ).replace(",", "."),
                     inline=True,
@@ -766,7 +766,7 @@ class Missoes(commands.Cog):
                         guild_id=guild.id,
                         jogo=jogo_slug,
                         user_id=usuario_id,
-                        nome=membro_ranking.display_name if membro_pontuacao else "",
+                        nome=membro_ranking.display_name if membro_ranking else "",
                         pontos=quantidade,
                         evento_id=f"missao:{revisao_id}:{usuario_id}",
                     )
