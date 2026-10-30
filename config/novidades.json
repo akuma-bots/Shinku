@@ -1,6 +1,6 @@
 {
-  "release_id": "2026-10-13-tutoriais-perfil-roblox-v1",
-  "tipo": "Sistemas novos",
-  "titulo": "Tutoriais e perfil com Roblox",
-  "mensagem": "A NÊMESIS recebeu uma central interativa de tutoriais para missões, PvP, guerras, revisão de provas, moderação, sorteios, eventos, formulários, tickets e outros sistemas. Agora o perfil do Discord também exibe a conta Roblox verificada, facilitando a identificação dos membros. Use /tutorial para abrir os guias, /roblox-vincular para verificar sua conta e /roblox-identificar para localizar um membro pelo nome Roblox já vinculado."
+  "release_id": "2026-10-30-central-atendimento-carmesim-v1",
+  "tipo": "Melhorias de sistema",
+  "titulo": "Central de atendimento reformulada",
+  "mensagem": "A central de tickets da NÊMESIS recebeu uma reformulação visual com identidade Carmesim e oito categorias renovadas, cada uma com descrição e emblema próprio. Os atendimentos agora contam com opções para adicionar participantes e solicitar a equipe de suporte. A equipe autorizada também pode personalizar o painel e a apresentação visual das categorias. O histórico, os registros e o fluxo de atendimento foram preservados."
 }
