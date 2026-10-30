@@ -6,10 +6,12 @@ import json
 import os
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+FUSO = ZoneInfo("America/Sao_Paulo")
 MANIFEST = ROOT / "config" / "novidades.json"
 IGNORAR = (
     ".github/",
@@ -109,15 +111,17 @@ def gerar(before: str, after: str) -> dict | None:
         "A disponibilidade das funções depende da conclusão do deploy do bot."
     )
 
-    titulo = unicos[0] if len(unicos) == 1 else "Atualização geral dos sistemas"
-    titulo = re.sub(r"\s+", " ", titulo).strip()[:180]
+    titulo = unicos[0] if len(unicos) == 1 else "Novidades e melhorias nos sistemas"
+    agora = datetime.now(FUSO)
     return {
-        "release_id": f"git-{after[:12]}",
+        "release_id": agora.strftime("%Y%m%d-%H%M%S"),
         "tipo": tipo,
-        "titulo": titulo or "Atualização da NÊMESIS",
+        "titulo": titulo[:180] or "Atualização da NÊMESIS",
         "mensagem": mensagem[:3400],
-        "commit": after,
-        "gerado_em": datetime.now(timezone.utc).isoformat(),
+        "data_atualizacao": agora.strftime("%d/%m/%Y"),
+        "hora_atualizacao": agora.strftime("%H:%M"),
+        "fuso_horario": "Horário de Brasília (BRT)",
+        "gerado_em": agora.isoformat(),
     }
 
 
@@ -144,7 +148,7 @@ def main() -> int:
         json.dumps(release, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"Notas geradas: {release['release_id']} — {release['titulo']}")
+    print(f"Notas geradas: {release['data_atualizacao']} às {release['hora_atualizacao']} — {release['titulo']}")
     return 0
 
 
