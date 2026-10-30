@@ -34,7 +34,7 @@ class TestGeracaoNotasRelease(unittest.TestCase):
             self.assertRegex(release["release_id"], r"^\d{8}-\d{6}$")
             self.assertRegex(release["data_atualizacao"], r"^\d{2}/\d{2}/\d{4}$")
             self.assertRegex(release["hora_atualizacao"], r"^\d{2}:\d{2}$")
-            self.assertIn("Validação de provas", release["mensagem"])
+            self.assertIn("validação de provas", release["mensagem"])
             self.assertNotIn("git-", release["release_id"])
         finally:
             MOD.git = original_git
