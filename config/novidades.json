@@ -1,8 +1,8 @@
 {
-  "release_id": "git-b94d61f20cc9",
-  "tipo": "Correções",
-  "titulo": "fix(missoes): preservar ordem e limpar cartões substituídos",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• fix(missoes): preservar ordem e limpar cartões substituídos\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
-  "commit": "b94d61f20cc9c8f5e3f0da71d041c43ebf330dcb",
-  "gerado_em": "2026-10-30T05:44:00.864512+00:00"
+  "release_id": "git-369796d62729",
+  "tipo": "Melhorias dos sistemas",
+  "titulo": "feat(missoes): centralizar catálogo em embed paginada por categoria",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• feat(missoes): centralizar catálogo em embed paginada por categoria\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "commit": "369796d627298115e4c9690ba69afd5a7c305889",
+  "gerado_em": "2026-10-30T05:48:21.746788+00:00"
 }
