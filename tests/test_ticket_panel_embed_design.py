@@ -14,7 +14,7 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         nomes = [field.name for field in embed.fields]
         self.assertEqual(len(nomes), 12)
         self.assertIn("✦  01  /  Recrutamento e Admissão", nomes)
-        self.assertIn("🎖️  02  /  Hierarquia e Divisões", nomes)
+        self.assertIn("♟️  02  /  Estrutura e Hierarquia", nomes)
         self.assertIn("♜  PRIVACIDADE E SEGURANÇA", nomes)
         self.assertIn("◈  CATÁLOGO DE ATENDIMENTO", nomes)
         self.assertIn("⏱️  ATENDIMENTO", nomes)
