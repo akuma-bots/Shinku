@@ -160,19 +160,21 @@ def _emoji_personalizado(guild: discord.Guild | None, tipo: dict):
         return None
 
     nomes_por_categoria = {
-        "recrutamento": "TicketEmoji8",
-        "hierarquia_divisoes": "TicketEmoji6",
-        "conflitos_denuncias": "TicketEmoji4",
-        "guerras_desafios": "TicketEmoji2",
-        "suporte_comunidade": "TicketEmoji7",
-        "aliancas": "TicketEmoji5",
-        "eventos_atividades": "TicketEmoji3",
-        "sugestoes_projetos": "TicketEmoji1",
+        "recrutamento": ("emoji_8", "TicketEmoji8"),
+        "hierarquia_divisoes": ("emoji_7", "TicketEmoji6"),
+        "conflitos_denuncias": ("emoji_6", "TicketEmoji4"),
+        "guerras_desafios": ("emoji_5", "TicketEmoji2"),
+        "suporte_comunidade": ("emoji_4", "TicketEmoji7"),
+        "aliancas": ("emoji_3", "TicketEmoji5"),
+        "eventos_atividades": ("emoji_2", "TicketEmoji3"),
+        "sugestoes_projetos": ("emoji_1", "TicketEmoji1"),
     }
-    nome = nomes_por_categoria.get(tipo.get("valor"))
-    if not nome:
-        return None
-    return discord.utils.get(guild.emojis, name=nome)
+    nomes = nomes_por_categoria.get(tipo.get("valor"), ())
+    for nome in nomes:
+        emoji = discord.utils.get(guild.emojis, name=nome)
+        if emoji is not None:
+            return emoji
+    return None
 
 
 async def _montar_select(guild_id: int, guild: discord.Guild | None = None) -> discord.ui.View:
