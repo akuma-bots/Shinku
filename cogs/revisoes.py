@@ -51,11 +51,18 @@ def _embed_revisao(revisao: dict) -> discord.Embed:
     enviado = revisao.get("timestamp")
     if isinstance(enviado, (int, float)):
         embed.add_field(name="◈ RECEBIDO", value=f"<t:{int(enviado)}:F>\n<t:{int(enviado)}:R>", inline=True)
-    embed.add_field(
-        name="◈ DIRETRIZES DE ANÁLISE",
-        value="Confira a autenticidade, a correspondência com o objetivo e a legibilidade da evidência. A recompensa em XP só será aplicada após aprovação.",
-        inline=False,
-    )
+    if revisao.get("motivo_rejeicao"):
+        embed.add_field(
+            name="◈ MOTIVO DA REJEIÇÃO",
+            value=str(revisao.get("motivo_rejeicao"))[:800],
+            inline=False,
+        )
+    if revisao.get("status") == "pendente":
+        embed.add_field(
+            name="◈ DIRETRIZES DE ANÁLISE",
+            value="Confira a autenticidade, a correspondência com o objetivo e a legibilidade da evidência. A recompensa em XP só será aplicada após aprovação.",
+            inline=False,
+        )
     embed.set_image(url=revisao["print_url"])
     embed.set_footer(text="NÊMESIS  •  CENTRAL DE VALIDAÇÃO  •  DECISÃO REGISTRADA EM AUDITORIA")
     return embed
@@ -94,14 +101,18 @@ def _embed_painel_provas(guild: discord.Guild, status: str, itens: list[dict]) -
         enviado = item.get("timestamp")
         data = f"<t:{int(enviado)}:R>" if isinstance(enviado, (int, float)) else "Data indisponível"
         revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "—"
+        motivo = str(item.get("motivo_rejeicao") or "").strip()
+        detalhe = (
+            f"**ID da prova:** `{item.get('id', '—')}`\n"
+            f"**ID da missão/atividade:** `{referencia}`\n"
+            f"**Membro:** {autor} • **Tipo:** {tipo}\n"
+            f"**Enviada:** {data} • **Revisor:** {revisor}"
+        )
+        if status == "rejeitada" and motivo:
+            detalhe += f"\n**Motivo:** {motivo[:500]}"
         embed.add_field(
             name=f"{item.get('titulo', 'Prova sem título')}"[:256],
-            value=(
-                f"**ID da prova:** `{item.get('id', '—')}`\n"
-                f"**ID da missão/atividade:** `{referencia}`\n"
-                f"**Membro:** {autor} • **Tipo:** {tipo}\n"
-                f"**Enviada:** {data} • **Revisor:** {revisor}"
-            )[:1024],
+            value=detalhe[:1024],
             inline=False,
         )
     if len(itens) > 10:
