@@ -1,0 +1,48 @@
+name: Gerar notas automáticas da NÊMESIS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "config/novidades.json"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nemesis-release-notes-main
+  cancel-in-progress: false
+
+jobs:
+  gerar-notas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout completo do repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Gerar manifesto de atualização
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: python scripts/gerar_notas_release.py
+
+      - name: Publicar manifesto no repositório
+        run: |
+          if git diff --quiet -- config/novidades.json; then
+            echo "Nenhuma nota nova para publicar."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add config/novidades.json
+          git commit -m "chore(releases): publicar notas automáticas da NÊMESIS"
+          git push
