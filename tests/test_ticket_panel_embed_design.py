@@ -12,11 +12,13 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CENTRAL DE ATENDIMENTO", embed.title)
         self.assertIn("Selecione abaixo a categoria", embed.description)
         nomes = [field.name for field in embed.fields]
-        self.assertEqual(len(nomes), 10)
+        self.assertEqual(len(nomes), 12)
         self.assertIn("⚔️  01  /  Recrutamento NÊMESIS", nomes)
         self.assertIn("🎖️  02  /  Hierarquia e Divisões", nomes)
-        self.assertIn("🔒  PRIVACIDADE E SEGURANÇA", nomes)
-        self.assertIn("COMO FUNCIONA", nomes)
+        self.assertIn("♜  PRIVACIDADE E SEGURANÇA", nomes)
+        self.assertIn("◈  CATÁLOGO DE ATENDIMENTO", nomes)
+        self.assertIn("⏱️  ATENDIMENTO", nomes)
+        self.assertIn("▰  COMO FUNCIONA", nomes)
         self.assertEqual(embed.color.value, 0x9F1239)
 
 
