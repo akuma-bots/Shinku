@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-033423",
+  "release_id": "20261030-033826",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Eleva identidade visual da central de missões NÊMESIS",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Eleva identidade visual da central de missões NÊMESIS\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Adiciona identidade visual dinâmica de servidor e bot às embeds",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Adiciona identidade visual dinâmica de servidor e bot às embeds\n\n**Áreas envolvidas:** mecanismos internos e infraestrutura.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "03:34",
+  "hora_atualizacao": "03:38",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T03:34:23.342549-03:00"
+  "gerado_em": "2026-10-30T03:38:26.691883-03:00"
 }
