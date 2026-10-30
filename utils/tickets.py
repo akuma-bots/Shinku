@@ -11,13 +11,13 @@ ARQUIVO_TICKETS = "tickets.json"
 
 TIPOS_PADRAO = [
     {"valor": "recrutamento", "label": "Ingresso na NÊMESIS", "emoji": "🩸", "descricao": "Candidate-se à guilda e conheça o processo de recrutamento.", "usa_ia": False},
-    {"valor": "hierarquia_divisoes", "label": "Cargos e Divisões", "emoji": "♜", "descricao": "Dúvidas sobre hierarquia, equipes, funções e progressão interna.", "usa_ia": False},
+    {"valor": "hierarquia_divisoes", "label": "Cargos e Divisões", "emoji": "♟️", "descricao": "Dúvidas sobre hierarquia, equipes, funções e progressão interna.", "usa_ia": False},
     {"valor": "conflitos_denuncias", "label": "Conduta e Denúncias", "emoji": "⚖️", "descricao": "Reporte conflitos, infrações ou comportamentos inadequados com discrição.", "usa_ia": False},
     {"valor": "guerras_desafios", "label": "Competitivo e Guerras", "emoji": "⚔️", "descricao": "Trate de desafios, confrontos, guerras de guilda e disputas PvP.", "usa_ia": False},
     {"valor": "suporte_comunidade", "label": "Suporte Técnico", "emoji": "🛠️", "descricao": "Receba ajuda com o servidor, comandos, bot ou acesso aos sistemas.", "usa_ia": False},
     {"valor": "aliancas", "label": "Diplomacia e Alianças", "emoji": "🤝", "descricao": "Apresente propostas de parceria, aliança ou cooperação entre guildas.", "usa_ia": False},
     {"valor": "eventos_atividades", "label": "Eventos e Torneios", "emoji": "🏆", "descricao": "Dúvidas, inscrições e suporte para eventos, campeonatos e atividades.", "usa_ia": False},
-    {"valor": "sugestoes_projetos", "label": "Ideias e Melhorias", "emoji": "✦", "descricao": "Envie sugestões, melhorias e propostas para a evolução da NÊMESIS.", "usa_ia": False},
+    {"valor": "sugestoes_projetos", "label": "Ideias e Melhorias", "emoji": "💡", "descricao": "Envie sugestões, melhorias e propostas para a evolução da NÊMESIS.", "usa_ia": False},
 ]
 
 
