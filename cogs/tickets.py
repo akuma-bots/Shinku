@@ -1306,7 +1306,7 @@ class Tickets(commands.Cog):
                 config = await get_config(guild.id)
 
                 # Migra o menu padrão sem exigir comandos administrativos.
-                if not config.get("ticket_modelo_v5"):
+                if not config.get("ticket_modelo_v6"):
                     await tickets.set_tipos(
                         guild.id,
                         list(tickets.TIPOS_PADRAO),
@@ -1317,6 +1317,7 @@ class Tickets(commands.Cog):
                         ticket_modelo_v3=True,
                         ticket_modelo_v4=True,
                         ticket_modelo_v5=True,
+                        ticket_modelo_v6=True,
                     )
                     config = await get_config(guild.id)
 
