@@ -138,7 +138,7 @@ def _embeds_painel(formulario: dict, guild: discord.Guild | None = None, bot: di
         partes = [descricao]
     perguntas = _perguntas_flat(formulario)
     total_etapas = len(_paginas_modal(formulario))
-    estado = "🟢 RECEBENDO CANDIDATURAS" if formulario.get("ativo") is not False else "⚫ INSCRIÇÕES ENCERRADAS"
+    estado = "🟢 RECEBENDO CANDIDATURAS" if formulario.get("ativo") is not False and not formulario.get("arquivado") else "⚫ FORMULÁRIO ARQUIVADO" if formulario.get("arquivado") else "🟠 INSCRIÇÕES PAUSADAS"
     embeds = []
     for indice, parte in enumerate(partes, start=1):
         texto = (
@@ -555,9 +555,11 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             await interaction.response.send_message("Nenhum formulário criado ainda.", ephemeral=True)
             return
         linhas = [
-            f"**{f['nome']}** (ID: `{f['id']}`) — {len(f['paginas'])} página(s), "
-            f"{len(formularios.perguntas_flat(f))} pergunta(s) no total, "
-            f"{len(f['cargos_notificar'])} cargo(s) notificado(s)"
+            f"**{f['nome']}** (ID: `{f['id']}`) — "
+            f"{'ARQUIVADO' if f.get('arquivado') else 'ATIVO' if f.get('ativo', True) else 'PAUSADO'}, "
+            f"{len(f.get('paginas', []))} etapa(s), "
+            f"{len(formularios.perguntas_flat(f))} pergunta(s), "
+            f"{len(f.get('cargos_notificar', []))} cargo(s) notificado(s)"
             for f in lista
         ]
         embed = criar_embed("N̷ÊMESIS ━ CENTRAL DE FORMULÁRIOS", "\n".join(linhas), rodape="NÊMESIS • Administração de formulários")
@@ -571,7 +573,37 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not ok:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
-        await interaction.response.send_message("🗑️ Formulário removido.", ephemeral=True)
+        await interaction.response.send_message(
+            "✦ Formulário arquivado. O painel foi desativado e o histórico de candidaturas foi preservado.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="reativar", description="Reabre um formulário arquivado ou pausado.")
+    @app_commands.describe(formulario_id="ID do formulário")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def formulario_reativar(self, interaction: discord.Interaction, formulario_id: str):
+        formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
+        if not formulario:
+            await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
+            return
+        await formularios.reativar_formulario(interaction.guild.id, formulario_id)
+        await interaction.response.send_message(
+            f"✦ **{formulario.get('nome', 'Formulário')}** reativado. Publique o painel novamente com `/formularios painel`.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="pausar", description="Pausa inscrições sem arquivar o formulário.")
+    @app_commands.describe(formulario_id="ID do formulário")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def formulario_pausar(self, interaction: discord.Interaction, formulario_id: str):
+        formulario = await formularios.atualizar_formulario(interaction.guild.id, formulario_id, ativo=False)
+        if not formulario:
+            await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Inscrições de **{formulario.get('nome', 'Formulário')}** pausadas. O histórico foi preservado.",
+            ephemeral=True,
+        )
 
     @app_commands.command(name="cargo-adicionar", description="Adiciona um cargo que recebe as candidaturas por DM.")
     @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo que vai receber as candidaturas")
@@ -608,7 +640,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             )
             return
 
-        embeds = _embeds_painel(formulario)
+        embeds = _embeds_painel(formulario, interaction.guild, self.bot)
         view = _view_painel(formulario)
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
