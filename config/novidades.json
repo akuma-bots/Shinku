@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-033847",
+  "release_id": "20261030-135941",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Aprimora navegação interativa e identidade visual dos painéis de missões",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Aprimora navegação interativa e identidade visual dos painéis de missões\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Reestrutura painéis de formulários e preserva cadastros e candidaturas existentes",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Reestrutura painéis de formulários e preserva cadastros e candidaturas existentes\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "03:38",
+  "hora_atualizacao": "13:59",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T03:38:47.995670-03:00"
+  "gerado_em": "2026-10-30T13:59:41.635014-03:00"
 }
