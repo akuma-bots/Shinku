@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import discord
@@ -14,6 +15,7 @@ from utils.storage import carregar, salvar
 
 
 logger = logging.getLogger(__name__)
+FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 ARQUIVO_ESTADO = "novidades_automaticas.json"
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
 CONCORRENCIA_ENVIO = 40
@@ -103,11 +105,19 @@ class Novidades(commands.Cog):
         if not release_id or not titulo or not mensagem:
             logger.error("Manifesto de novidades incompleto; release_id, titulo e mensagem são obrigatórios.")
             return None
+        gerado_em = str(release.get("gerado_em", "")).strip()
+        try:
+            instante = datetime.fromisoformat(gerado_em).astimezone(FUSO_HORARIO)
+        except (TypeError, ValueError):
+            instante = datetime.now(FUSO_HORARIO)
         return {
             "release_id": release_id[:100],
             "titulo": titulo[:200],
             "mensagem": mensagem[:3500],
-            "tipo": str(release.get("tipo", "Sistemas novos"))[:100],
+            "tipo": str(release.get("tipo", "Melhorias dos sistemas"))[:100],
+            "data_atualizacao": str(release.get("data_atualizacao") or instante.strftime("%d/%m/%Y"))[:20],
+            "hora_atualizacao": str(release.get("hora_atualizacao") or instante.strftime("%H:%M"))[:10],
+            "fuso_horario": str(release.get("fuso_horario") or "Horário de Brasília (BRT)")[:50],
         }
 
     @app_commands.command(
@@ -306,8 +316,13 @@ class Novidades(commands.Cog):
                     inline=True,
                 )
                 embed.add_field(
-                    name="◈ VERSÃO",
-                    value=f"**{release['release_id'][:100]}**",
+                    name="◈ DATA DA ATUALIZAÇÃO",
+                    value=f"**{release['data_atualizacao']}**",
+                    inline=True,
+                )
+                embed.add_field(
+                    name="◈ HORÁRIO",
+                    value=f"**{release['hora_atualizacao']}**\n{release['fuso_horario']}",
                     inline=True,
                 )
                 embed.add_field(
@@ -316,7 +331,7 @@ class Novidades(commands.Cog):
                     inline=False,
                 )
                 embed.set_footer(
-                    text="NÊMESIS • Atualizações oficiais | Envio destinado a todos os membros"
+                    text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)"
                 )
 
                 houve_falha_storage = False
