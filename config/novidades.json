@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-141558",
+  "release_id": "20261030-165114",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Reformula gestão visual e ciclo de vida dos formulários",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Reformula gestão visual e ciclo de vida dos formulários\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Remove duplicação de missões por jogo no catálogo",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Remove duplicação de missões por jogo no catálogo\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "14:15",
+  "hora_atualizacao": "16:51",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T14:15:58.265403-03:00"
+  "gerado_em": "2026-10-30T16:51:14.890401-03:00"
 }
