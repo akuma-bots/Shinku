@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-033000",
+  "release_id": "20261030-033423",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Corrige painel central de missões e validação de recompensas",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Corrige painel central de missões e validação de recompensas\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Eleva identidade visual da central de missões NÊMESIS",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Eleva identidade visual da central de missões NÊMESIS\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "03:30",
+  "hora_atualizacao": "03:34",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T03:30:00.372532-03:00"
+  "gerado_em": "2026-10-30T03:34:23.342549-03:00"
 }
