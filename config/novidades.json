@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-170123",
+  "release_id": "20261030-170555",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Mantém seletores de páginas sincronizados com o catálogo",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Mantém seletores de páginas sincronizados com o catálogo\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Corrige emojis inválidos nos seletores e propaga falha de atualização",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Corrige emojis inválidos nos seletores e propaga falha de atualização\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "17:01",
+  "hora_atualizacao": "17:05",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T17:01:23.149496-03:00"
+  "gerado_em": "2026-10-30T17:05:55.741234-03:00"
 }
