@@ -425,6 +425,7 @@ async def definir_status_resposta(
     resposta_id: str,
     status: str,
     revisor_id: int,
+    motivo: str | None = None,
 ):
     if status not in {"aprovada", "recusada"}:
         raise ValueError("Status de candidatura inválido.")
@@ -447,6 +448,7 @@ async def definir_status_resposta(
 
         alvo["status"] = status
         alvo["revisor_id"] = revisor_id
+        alvo["motivo_decisao"] = str(motivo or "").strip()[:1000] or None
         alvo["atualizado_em"] = time.time()
 
         await _salvar_respostas_guild(guild_id, lista)
