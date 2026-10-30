@@ -80,3 +80,42 @@ def embed_aviso(titulo: str, descricao: str, **kwargs) -> discord.Embed:
 
 def embed_info(titulo: str, descricao: str, **kwargs) -> discord.Embed:
     return criar_embed(titulo, descricao, cor=COR_PRIMARIA, **kwargs)
+
+
+
+def aplicar_identidade_servidor(
+    embed: discord.Embed,
+    guild: discord.Guild | None,
+    bot: discord.Client | None = None,
+    *,
+    banner: bool = True,
+) -> discord.Embed:
+    """Aplica banner, ícone do servidor e avatar do bot sem exigir assets configurados."""
+    if guild is None:
+        return embed
+
+    icone_servidor = guild.icon.url if guild.icon else None
+    avatar_bot = None
+    usuario_bot = getattr(bot, "user", None) if bot else None
+    if usuario_bot:
+        avatar = getattr(usuario_bot, "display_avatar", None)
+        avatar_bot = avatar.url if avatar else None
+
+    # O ícone do servidor identifica a organização; o avatar do bot assina o painel.
+    if icone_servidor:
+        embed.set_thumbnail(url=icone_servidor)
+    elif avatar_bot:
+        embed.set_thumbnail(url=avatar_bot)
+
+    if avatar_bot:
+        autor = embed.author
+        embed.set_author(
+            name=autor.name or "N̷ÊMESIS  •  CENTRAL DE SISTEMAS",
+            url=autor.url or discord.Embed.Empty,
+            icon_url=avatar_bot,
+        )
+
+    if banner and guild.banner:
+        embed.set_image(url=guild.banner.url)
+
+    return embed
