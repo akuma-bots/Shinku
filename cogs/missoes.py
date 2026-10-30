@@ -766,7 +766,7 @@ class Missoes(commands.Cog):
                         guild_id=guild.id,
                         jogo=jogo_slug,
                         user_id=usuario_id,
-                        nome=membro_pontuacao.display_name if membro_pontuacao else "",
+                        nome=membro_ranking.display_name if membro_pontuacao else "",
                         pontos=quantidade,
                         evento_id=f"missao:{revisao_id}:{usuario_id}",
                     )
