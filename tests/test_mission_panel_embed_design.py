@@ -21,7 +21,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
                 {
                     "id": "SHI-002",
                     "jogo": "shigaku",
-                    "tipo": "especial",
+                    "tipo": "missao",
                     "titulo": "Operação Encerrada",
                     "descricao": "Registro arquivado.",
                     "recompensa_xp": 25,
@@ -74,7 +74,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         guild = SimpleNamespace(id=1563995879981981817)
         with patch("cogs.missoes.missoes._guild", new=AsyncMock(return_value=dados)):
             embed = await cog._montar_painel_missoes(guild, "shigaku")
-        self.assertTrue(any("0 XP" in field.name for field in embed.fields))
+        self.assertTrue(any("0 XP" in field.value for field in embed.fields))
 
         with patch(
             "cogs.missoes.missoes._guild",
