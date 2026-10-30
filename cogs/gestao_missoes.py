@@ -197,11 +197,23 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
         await interaction.response.send_message("Atividade atualizada. O histórico de provas e recompensas foi preservado. Use Atualizar painel para conferir a publicação.", ephemeral=True)
 
 
+def _ordenar_atividades(atividades: list) -> list:
+    return sorted(
+        atividades,
+        key=lambda item: (
+            item.get("tipo", ""),
+            str(item.get("titulo", "")).casefold(),
+            str(item.get("id", "")),
+        ),
+    )
+
+
 class SeletorAtividade(discord.ui.Select):
     def __init__(self, view: "CentralMissoesView", atividades: list, selecionada_id: str = None):
         self.central = view
+        inicio = view.pagina * 25
         opcoes = []
-        for item in atividades[:25]:
+        for item in atividades[inicio:inicio + 25]:
             estado = "Ativa" if item.get("ativa", True) is not False else "Arquivada"
             tipo = TIPOS_LABEL.get(str(item.get("tipo", "missao")), "Atividade")
             nome = f"{item.get('titulo', 'Sem título')} · {estado}"
@@ -211,7 +223,13 @@ class SeletorAtividade(discord.ui.Select):
                 description=f"{tipo} • {_formatar_xp(item.get('recompensa_xp', item.get('pontos', 0)))} XP"[:100],
                 default=str(item.get("id")) == str(selecionada_id),
             ))
-        super().__init__(placeholder="Selecione uma atividade para gerenciar", min_values=1, max_values=1, options=opcoes, disabled=not opcoes)
+        super().__init__(
+            placeholder=f"Atividades · página {view.pagina + 1}",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            disabled=not opcoes,
+        )
 
     async def callback(self, interaction: discord.Interaction):
         if not await self.central.autorizar(interaction):
@@ -221,57 +239,136 @@ class SeletorAtividade(discord.ui.Select):
 
 
 class CentralMissoesView(discord.ui.View):
-    def __init__(self, guild_id: int, owner_id: int, selecionada_id: str = None):
+    def __init__(
+        self,
+        guild_id: int,
+        owner_id: int,
+        selecionada_id: str = None,
+        pagina: int = 0,
+        mensagem_original=None,
+    ):
         super().__init__(timeout=600)
         self.guild_id = guild_id
         self.owner_id = owner_id
         self.selecionada_id = selecionada_id
-        self.add_item(SeletorAtividade(self, [], selecionada_id))
+        self.pagina = max(0, int(pagina))
+        self.mensagem_original = mensagem_original
 
     async def atividades(self) -> list:
         dados = await missoes._guild(self.guild_id)
-        return sorted(
-            dados.get("missoes", []),
-            key=lambda item: (item.get("tipo", ""), str(item.get("titulo", "")).casefold()),
-        )
+        return _ordenar_atividades(dados.get("missoes", []))
 
     async def autorizar(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id or not _administrador(interaction):
-            await interaction.response.send_message("Este painel pertence a outro administrador ou seu acesso expirou.", ephemeral=True)
+            await interaction.response.send_message(
+                "Este painel pertence a outro administrador ou seu acesso expirou.",
+                ephemeral=True,
+            )
             return False
         return True
 
     async def atualizar(self, interaction: discord.Interaction):
         atividades = await self.atividades()
-        selecionada = next((item for item in atividades if str(item.get("id")) == str(self.selecionada_id)), None)
+        paginas = max(1, (len(atividades) + 24) // 25)
+        self.pagina = min(self.pagina, paginas - 1)
+        selecionada = next(
+            (item for item in atividades if str(item.get("id")) == str(self.selecionada_id)),
+            None,
+        )
+        if selecionada:
+            indice = next(
+                (i for i, item in enumerate(atividades) if str(item.get("id")) == str(self.selecionada_id)),
+                0,
+            )
+            self.pagina = indice // 25
         stats = await _estatisticas(self.guild_id, selecionada) if selecionada else None
-        nova = CentralMissoesView(self.guild_id, self.owner_id, self.selecionada_id)
-        nova.clear_items()
+        nova = CentralMissoesView(
+            self.guild_id,
+            self.owner_id,
+            self.selecionada_id,
+            self.pagina,
+            self.mensagem_original or interaction.message,
+        )
         nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
-        await interaction.response.edit_message(embed=_embed_central(atividades, selecionada, stats), view=nova)
+        await interaction.response.edit_message(
+            embed=_embed_central(atividades, selecionada, stats),
+            view=nova,
+        )
 
-    @discord.ui.button(label="Editar atividade", style=discord.ButtonStyle.primary, emoji="✏️", row=1)
+    async def mudar_pagina(self, interaction: discord.Interaction, delta: int):
+        if not await self.autorizar(interaction):
+            return
+        atividades = await self.atividades()
+        paginas = max(1, (len(atividades) + 24) // 25)
+        self.pagina = max(0, min(paginas - 1, self.pagina + delta))
+        selecionada = next(
+            (item for item in atividades if str(item.get("id")) == str(self.selecionada_id)),
+            None,
+        )
+        if selecionada:
+            indice = next(
+                (i for i, item in enumerate(atividades) if str(item.get("id")) == str(self.selecionada_id)),
+                0,
+            )
+            if indice // 25 != self.pagina:
+                self.selecionada_id = None
+                selecionada = None
+        stats = await _estatisticas(self.guild_id, selecionada) if selecionada else None
+        nova = CentralMissoesView(
+            self.guild_id, self.owner_id, self.selecionada_id, self.pagina,
+            self.mensagem_original or interaction.message,
+        )
+        nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
+        await interaction.response.edit_message(
+            embed=_embed_central(atividades, selecionada, stats),
+            view=nova,
+        )
+
+    @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, emoji="◀️", row=1)
+    async def pagina_anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.mudar_pagina(interaction, -1)
+
+    @discord.ui.button(label="Próxima página", style=discord.ButtonStyle.secondary, emoji="▶️", row=1)
+    async def proxima_pagina(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.mudar_pagina(interaction, 1)
+
+    @discord.ui.button(label="Editar atividade", style=discord.ButtonStyle.primary, emoji="✏️", row=2)
     async def editar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
         atividade = await missoes.get(self.guild_id, self.selecionada_id) if self.selecionada_id else None
         if not atividade:
-            await interaction.response.send_message("Selecione uma atividade válida antes de editar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Selecione uma atividade válida antes de editar.", ephemeral=True
+            )
             return
-        await interaction.response.send_modal(EditarMissaoModal(self.guild_id, atividade, self.owner_id))
+        await interaction.response.send_modal(
+            EditarMissaoModal(
+                self.guild_id, atividade, self.owner_id,
+                mensagem_original=interaction.message,
+                pagina=self.pagina,
+            )
+        )
 
-    @discord.ui.button(label="Arquivar / reativar", style=discord.ButtonStyle.secondary, emoji="◈", row=1)
+    @discord.ui.button(label="Arquivar / reativar", style=discord.ButtonStyle.secondary, emoji="◈", row=2)
     async def alternar_estado(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
         if not self.selecionada_id:
-            await interaction.response.send_message("Selecione uma atividade antes de alterar o estado.", ephemeral=True)
+            await interaction.response.send_message(
+                "Selecione uma atividade antes de alterar o estado.", ephemeral=True
+            )
             return
         async with missoes._MISSOES_LOCK:
             dados = await missoes._guild(self.guild_id)
-            alvo = next((item for item in dados["missoes"] if str(item.get("id")) == str(self.selecionada_id)), None)
+            alvo = next(
+                (item for item in dados["missoes"] if str(item.get("id")) == str(self.selecionada_id)),
+                None,
+            )
             if alvo is None:
-                await interaction.response.send_message("A atividade não foi encontrada.", ephemeral=True)
+                await interaction.response.send_message(
+                    "A atividade não foi encontrada.", ephemeral=True
+                )
                 return
             alvo["ativa"] = alvo.get("ativa", True) is False
             alvo["atualizado_em"] = __import__("time").time()
@@ -279,7 +376,7 @@ class CentralMissoesView(discord.ui.View):
             await missoes._salvar_guild(self.guild_id, dados)
         await self.atualizar(interaction)
 
-    @discord.ui.button(label="Atualizar painel", style=discord.ButtonStyle.success, emoji="🔄", row=1)
+    @discord.ui.button(label="Atualizar painel", style=discord.ButtonStyle.success, emoji="🔄", row=2)
     async def atualizar_painel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
