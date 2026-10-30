@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-170101",
+  "release_id": "20261030-170123",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Substitui navegação por botões por seletores de missões e rankings",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Substitui navegação por botões por seletores de missões e rankings\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Mantém seletores de páginas sincronizados com o catálogo",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Mantém seletores de páginas sincronizados com o catálogo\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
   "hora_atualizacao": "17:01",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T17:01:01.417144-03:00"
+  "gerado_em": "2026-10-30T17:01:23.149496-03:00"
 }
