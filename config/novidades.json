@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-031637",
-  "tipo": "Melhorias e alterações",
-  "titulo": "Commands: remover cog legado de pontuacao pve",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Commands: remover cog legado de pontuacao pve\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "release_id": "20261030-033000",
+  "tipo": "Melhorias dos sistemas",
+  "titulo": "Corrige painel central de missões e validação de recompensas",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Corrige painel central de missões e validação de recompensas\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "03:16",
+  "hora_atualizacao": "03:30",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T03:16:37.852814-03:00"
+  "gerado_em": "2026-10-30T03:30:00.372532-03:00"
 }
