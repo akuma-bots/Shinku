@@ -192,7 +192,7 @@ class ConvitesNemesis(commands.Cog):
             embed = criar_embed(
                 title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — SEUS CONVITES・✦",
                 description=f"Você tem **{len(ativos)}** membro(s) convidado(s) que continuam no servidor.",
-                color=0xB51F32,
+                color=0x9F1239,
             )
             embed.set_thumbnail(url=interaction.user.display_avatar.url)
             embed.set_footer(text="Saídas são descontadas; reentradas não geram duplicatas.")
@@ -222,7 +222,7 @@ class ConvitesNemesis(commands.Cog):
             embed = criar_embed(
                 title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — RANKING DE CONVITES・✦",
                 description="\n".join(linhas) if linhas else "Ainda não há convidados ativos contabilizados.",
-                color=0xB51F32,
+                color=0x9F1239,
             )
             embed.set_footer(text="Só contam membros presentes no servidor; sem duplicatas.")
             await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
