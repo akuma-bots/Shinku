@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-031403",
-  "tipo": "Melhorias e modernização",
-  "titulo": "Central de atualizações reformulada",
-  "mensagem": "A central de atualizações da NÊMESIS recebeu uma reformulação para deixar os comunicados mais claros, organizados e profissionais.\n\n• Identificação da atualização por data e horário, em vez de códigos técnicos.\n• Exibição da data e hora no padrão de Brasília (BRT).\n• Títulos e descrições mais claros, com nomes de sistemas compreensíveis.\n• Organização das mudanças por categoria e áreas atualizadas.\n• Manutenção do envio automático aos membros e do controle de entregas.\n\nAs próximas notas seguirão esse novo padrão.",
+  "release_id": "20261030-031637",
+  "tipo": "Melhorias e alterações",
+  "titulo": "Commands: remover cog legado de pontuacao pve",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Commands: remover cog legado de pontuacao pve\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "03:14",
+  "hora_atualizacao": "03:16",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T03:14:03-03:00"
+  "gerado_em": "2026-10-30T03:16:37.852814-03:00"
 }
