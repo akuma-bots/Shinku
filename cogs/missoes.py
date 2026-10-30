@@ -633,6 +633,100 @@ class Missoes(commands.Cog):
                 resultado.append(missao)
         return resultado
 
+    async def _sincronizar_cartoes_missoes(self, guild: discord.Guild, atividades: list) -> dict:
+        """Publica ou edita os cartões individuais, preservando referências existentes."""
+        config = await get_config(guild.id)
+        canais_por_tipo = {
+            "missao": config.get("canal_missoes_missao_id") or CANAIS_PADRAO["canal_missoes_missao_id"],
+            "contribuicao": config.get("canal_missoes_contribuicao_id") or CANAIS_PADRAO["canal_missoes_contribuicao_id"],
+            "especial": config.get("canal_missoes_especial_id") or CANAIS_PADRAO["canal_missoes_especial_id"],
+        }
+        resultado = {"publicadas": 0, "atualizadas": 0, "falhas": 0}
+
+        for atividade in atividades:
+            missao_id = str(atividade.get("id") or "").strip()
+            tipo = str(atividade.get("tipo") or "missao").strip().lower()
+            canal_id = canais_por_tipo.get(tipo)
+            if not missao_id or not canal_id:
+                resultado["falhas"] += 1
+                log.error("Missão sem ID ou canal de destino válido: %r", atividade)
+                continue
+
+            canal = await self._resolver_canal(guild, int(canal_id))
+            if canal is None:
+                resultado["falhas"] += 1
+                log.error("Canal de publicação da missão %s não encontrado: %s", missao_id, canal_id)
+                continue
+
+            embeds = self._montar_embeds(atividade)
+            registro = await obter_mensagem_discord(guild.id, missao_id)
+            ids_antigos = registro.get("discord_message_ids") or []
+            if not ids_antigos and registro.get("discord_message_id"):
+                ids_antigos = [registro["discord_message_id"]]
+            ids_antigos = [int(valor) for valor in ids_antigos if str(valor).isdigit()]
+            canal_antigo_id = registro.get("discord_channel_id")
+
+            try:
+                # Se a categoria/canal mudou, cria e registra o novo cartão antes
+                # de tentar remover o antigo, evitando perda da publicação.
+                mesmo_canal = str(canal_antigo_id or "") == str(canal.id)
+                mensagens = []
+                if mesmo_canal:
+                    for mensagem_id in ids_antigos:
+                        try:
+                            mensagens.append(await canal.fetch_message(mensagem_id))
+                        except discord.NotFound:
+                            continue
+
+                ids_novos = []
+                if mensagens:
+                    for indice, embed in enumerate(embeds):
+                        if indice < len(mensagens):
+                            mensagem = mensagens[indice]
+                            await mensagem.edit(embed=embed, view=EnviarProvaMissaoView(self) if indice == 0 else None)
+                            ids_novos.append(mensagem.id)
+                            resultado["atualizadas"] += 1
+                        else:
+                            mensagem = await canal.send(
+                                embed=embed,
+                                view=EnviarProvaMissaoView(self) if indice == 0 else None,
+                            )
+                            ids_novos.append(mensagem.id)
+                            resultado["publicadas"] += 1
+                    for mensagem_extra in mensagens[len(embeds):]:
+                        try:
+                            await mensagem_extra.delete(reason="Cartão de missão atualizado pela sincronização NÊMESIS")
+                        except (discord.Forbidden, discord.HTTPException):
+                            log.warning("Não foi possível remover página excedente da missão %s.", missao_id)
+                else:
+                    novas = []
+                    for indice, embed in enumerate(embeds):
+                        mensagem = await canal.send(
+                            embed=embed,
+                            view=EnviarProvaMissaoView(self) if indice == 0 else None,
+                        )
+                        novas.append(mensagem)
+                        ids_novos.append(mensagem.id)
+                        resultado["publicadas"] += 1
+
+                await salvar_mensagem_discord(guild.id, missao_id, canal.id, ids_novos)
+
+                if not mesmo_canal and canal_antigo_id and ids_antigos:
+                    canal_antigo = await self._resolver_canal(guild, int(canal_antigo_id))
+                    if canal_antigo is not None:
+                        for mensagem_id in ids_antigos:
+                            try:
+                                antiga = await canal_antigo.fetch_message(mensagem_id)
+                                await antiga.delete(reason="Missão movida para sua categoria oficial NÊMESIS")
+                            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                                log.warning("Não foi possível limpar cartão antigo da missão %s (%s).", missao_id, mensagem_id)
+
+            except (discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+                resultado["falhas"] += 1
+                log.exception("Falha ao sincronizar cartão da missão %s.", missao_id)
+
+        return resultado
+
     async def sincronizar_missoes_discord(self, guild: discord.Guild) -> dict:
         """Sincroniza o catálogo e mantém painéis navegáveis nos canais existentes."""
         if self._sync_lock.locked():
@@ -640,12 +734,26 @@ class Missoes(commands.Cog):
         async with self._sync_lock:
             catalogo = self._expandir_catalogo_por_jogo(carregar_catalogo())
             atividades = await sincronizar_catalogo(guild.id, catalogo)
-            await self._atualizar_painel_missoes(guild)
-            await self._atualizar_ranking_jogo(guild, "shigaku")
-            resultado = {"atualizadas": len(atividades), "publicadas": 0, "falhas": 0}
+            resultado = await self._sincronizar_cartoes_missoes(guild, atividades)
+            resultado["registros_catalogo"] = len(atividades)
+            resultado["painel_atualizado"] = False
+            try:
+                await self._atualizar_painel_missoes(guild)
+                resultado["painel_atualizado"] = True
+            except Exception:
+                resultado["falhas"] += 1
+                log.exception("Falha ao atualizar o painel geral de missões.")
+            try:
+                await self._atualizar_ranking_jogo(guild, "shigaku")
+            except Exception:
+                resultado["falhas"] += 1
+                log.exception("Falha ao atualizar o ranking de missões.")
             log.info(
-                "Catálogo por jogo sincronizado: %s registros; painéis atualizados sem criar canais.",
-                len(atividades),
+                "Sincronização de missões concluída: %s registros, %s cartões publicados, "
+                "%s cartões atualizados, %s falhas; painel geral: %s.",
+                resultado["registros_catalogo"], resultado["publicadas"],
+                resultado["atualizadas"], resultado["falhas"],
+                resultado["painel_atualizado"],
             )
             return resultado
     @app_commands.command(
@@ -668,7 +776,9 @@ class Missoes(commands.Cog):
             "Sincronização concluída. "
             f"Publicadas: **{resultado.get('publicadas', 0)}** · "
             f"Atualizadas: **{resultado.get('atualizadas', 0)}** · "
-            f"Falhas: **{resultado.get('falhas', 0)}**.",
+            f"Falhas: **{resultado.get('falhas', 0)}** · "
+            f"Registros do catálogo: **{resultado.get('registros_catalogo', resultado.get('atualizadas', 0))}** · "
+            f"Painel geral: **{'atualizado' if resultado.get('painel_atualizado') else 'não confirmado'}**.",
             ephemeral=True,
         )
 
