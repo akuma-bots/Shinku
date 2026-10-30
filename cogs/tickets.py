@@ -203,9 +203,9 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
     tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
     embed = criar_embed(
         config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        "**CENTRAL DE ATENDIMENTO  /  NÊMESIS**\\n"
+        "**CENTRAL DE ATENDIMENTO  /  NÊMESIS**\n"
         + (config.get("ticket_painel_descricao") or DESCRICAO_PADRAO)
-        + "\\n\\nSelecione uma área para abrir um canal reservado e encaminhar sua solicitação à equipe responsável.",
+        + "\n\nSelecione uma área para abrir um canal reservado e encaminhar sua solicitação à equipe responsável.",
         cor=COR_TICKET,
         rodape="NÊMESIS  •  CENTRAL DE OPERAÇÕES  •  ATENDIMENTO PRIVADO",
         timestamp=True,
@@ -218,7 +218,7 @@ async def _montar_embed_painel(guild_id: int) -> discord.Embed:
         detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:180]
         fluxo = "AUTOATENDIMENTO + EQUIPE" if tipo.get("usa_ia") else "EQUIPE ESPECIALIZADA"
         embed.add_field(name=f"{emoji}  {indice:02d}  /  {nome}", value=f"{detalhe} — {fluxo}", inline=True)
-    embed.add_field(name="▰  COMO FUNCIONA", value="**01**  Selecione uma categoria no menu.\\n**02**  Um canal privado será criado para você.\\n**03**  Descreva a solicitação e envie evidências, se necessário.\\n**04**  Acompanhe o atendimento e encerre quando estiver resolvido.", inline=False)
+    embed.add_field(name="▰  COMO FUNCIONA", value="**01**  Selecione uma categoria no menu.\n**02**  Um canal privado será criado para você.\n**03**  Descreva a solicitação e envie evidências, se necessário.\n**04**  Acompanhe o atendimento e encerre quando estiver resolvido.", inline=False)
     embed.add_field(name="♜  PRIVACIDADE E SEGURANÇA", value="O canal é restrito ao solicitante e à equipe autorizada. A NÊMESIS nunca solicita senhas, tokens ou códigos de autenticação.", inline=False)
     embed.add_field(name="⏱️  ATENDIMENTO", value="A equipe responderá assim que houver um responsável disponível. Evite abrir solicitações duplicadas.", inline=False)
     if config.get("ticket_painel_banner_url"):
@@ -620,6 +620,57 @@ class FecharTicketView(discord.ui.View):
         )
 
     @discord.ui.button(
+        label="Adicionar participante",
+        emoji="👥",
+        style=discord.ButtonStyle.secondary,
+        custom_id="ticket:adicionar_participante",
+        row=1,
+    )
+    async def adicionar_participante(self, interaction: discord.Interaction, button: discord.ui.Button):
+        canal = interaction.channel
+        if not isinstance(canal, discord.TextChannel) or not tickets.parse_topic(canal.topic):
+            await interaction.response.send_message("Use este recurso dentro de um ticket.", ephemeral=True)
+            return
+        await interaction.response.send_modal(AdicionarParticipanteModal())
+
+    @discord.ui.button(
+        label="Solicitar equipe",
+        emoji="🔔",
+        style=discord.ButtonStyle.primary,
+        custom_id="ticket:solicitar_equipe",
+        row=1,
+    )
+    async def solicitar_equipe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        canal, guild = interaction.channel, interaction.guild
+        if not guild or not isinstance(canal, discord.TextChannel):
+            await interaction.response.send_message("Use este recurso dentro de um ticket.", ephemeral=True)
+            return
+        registro = await tickets.get_ticket_por_canal(guild.id, canal.id)
+        if not registro or registro.get("status") != "aberto":
+            await interaction.response.send_message("Este ticket não está aberto.", ephemeral=True)
+            return
+        config = await get_config(guild.id)
+        role_id = config.get("support_role_id")
+        role = guild.get_role(int(role_id)) if role_id else None
+        staff = isinstance(interaction.user, discord.Member) and (
+            interaction.user.guild_permissions.manage_channels or
+            (role and any(r != guild.default_role and r.position >= role.position for r in interaction.user.roles))
+        )
+        if str(interaction.user.id) != str(registro.get("usuario_id")) and not staff:
+            await interaction.response.send_message("Somente o solicitante ou a equipe pode solicitar atendimento.", ephemeral=True)
+            return
+        if canal.id in CANAIS_ESCALADOS:
+            await interaction.response.send_message("A equipe já foi notificada neste atendimento.", ephemeral=True)
+            return
+        CANAIS_ESCALADOS.add(canal.id)
+        embed = criar_embed("🔔  EQUIPE NOTIFICADA", "Sua solicitação foi encaminhada à equipe. Aguarde o retorno neste canal.", cor=COR_TICKET, rodape="NÊMESIS  •  ESCALONAMENTO")
+        await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        await canal.send(
+            f"{role.mention if role else 'Equipe de suporte'} — atendimento solicitado em {canal.mention}.",
+            allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
+        )
+
+    @discord.ui.button(
         label="🔒 Fechar Ticket",
         style=discord.ButtonStyle.danger,
         custom_id="fechar_ticket_btn",
@@ -839,6 +890,8 @@ class Tickets(commands.Cog):
         embed.add_field(name="PRÓXIMAS ETAPAS", value="01 — Descreva o que aconteceu e o resultado esperado.\n02 — Envie capturas, links ou IDs que ajudem na análise.\n03 — Aguarde a equipe; o responsável será identificado no atendimento.\n04 — Use Fechar Ticket somente quando o caso estiver resolvido.", inline=False)
         embed.add_field(name="PROTEÇÃO DE DADOS", value="Não compartilhe senhas, tokens, códigos de autenticação ou informações de acesso.", inline=False)
         embed.set_thumbnail(url=user.display_avatar.url)
+        if config.get("ticket_painel_banner_url"):
+            embed.set_image(url=config["ticket_painel_banner_url"])
 
         try:
             mensagem = await canal.send(
