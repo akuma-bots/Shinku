@@ -80,16 +80,16 @@ class EnviarProvaMissaoView(discord.ui.View):
 
 
 class CategoriaMissoesSelect(discord.ui.Select):
-    """Seletor persistente para trocar de departamento sem percorrer páginas."""
-    def __init__(self, cog):
+    """Seletor persistente para alternar entre departamentos."""
+    def __init__(self, cog, categoria_atual="missao"):
         self.cog = cog
         opcoes = [
-            discord.SelectOption(label="Missões", value="missao", emoji="🎯", description="Atividades competitivas"),
-            discord.SelectOption(label="Contribuições", value="contribuicao", emoji="✦", description="Mérito e desenvolvimento"),
-            discord.SelectOption(label="Operações especiais", value="especial", emoji="✧", description="Protocolos especiais"),
+            discord.SelectOption(label="Missões", value="missao", emoji="🎯", description="Atividades competitivas", default=categoria_atual == "missao"),
+            discord.SelectOption(label="Contribuições", value="contribuicao", emoji="✦", description="Mérito e desenvolvimento", default=categoria_atual == "contribuicao"),
+            discord.SelectOption(label="Operações especiais", value="especial", emoji="✧", description="Protocolos especiais", default=categoria_atual == "especial"),
         ]
         super().__init__(
-            placeholder="Acessar departamento operacional",
+            placeholder="◈ Selecionar departamento",
             min_values=1,
             max_values=1,
             options=opcoes,
@@ -102,45 +102,113 @@ class CategoriaMissoesSelect(discord.ui.Select):
             await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
             return
         categoria = self.values[0]
-        embed = await self.cog._montar_painel_missoes(
-            interaction.guild, "todos", categoria, pagina=0
+        embed = await self.cog._montar_painel_missoes(interaction.guild, "todos", categoria, pagina=0)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=NavegacaoMissoesView(self.cog, categoria=categoria, pagina=0),
         )
-        await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self.cog))
+
+
+class PaginaMissoesSelect(discord.ui.Select):
+    """Seletor direto de página do catálogo global."""
+    def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
+        self.cog = cog
+        self.categoria = categoria
+        total = max(1, min(int(total_paginas), 25))
+        opcoes = [
+            discord.SelectOption(
+                label=f"Página {numero}",
+                value=str(numero - 1),
+                description=f"Exibir atividades {((numero - 1) * 8) + 1}–{min(numero * 8, total_paginas * 8)}",
+                default=numero - 1 == pagina,
+            )
+            for numero in range(1, total + 1)
+        ]
+        super().__init__(
+            placeholder="◈ Ir para página do catálogo",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id="nemesis:missoes:pagina",
+            row=1,
+            disabled=total == 1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
+            return
+        pagina = int(self.values[0])
+        embed = await self.cog._montar_painel_missoes(
+            interaction.guild, "todos", self.categoria, pagina=pagina
+        )
+        footer = embed.footer.text or ""
+        match = re.search(r"PAGINA:(\d+)/(\d+)", footer)
+        total = int(match.group(2)) if match else 1
+        await interaction.response.edit_message(
+            embed=embed,
+            view=NavegacaoMissoesView(self.cog, categoria=self.categoria, pagina=pagina, total_paginas=total),
+        )
 
 
 class NavegacaoMissoesView(discord.ui.View):
-    """Navegação persistente por departamento, jogo e envio de evidências."""
-    def __init__(self, cog):
+    """Navegação por seletores; mantém apenas a ação de envio de evidência como botão."""
+    def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
         super().__init__(timeout=None)
         self.cog = cog
-        self.add_item(CategoriaMissoesSelect(cog))
+        self.add_item(CategoriaMissoesSelect(cog, categoria))
+        self.add_item(PaginaMissoesSelect(cog, categoria, pagina, total_paginas))
 
-    @discord.ui.button(label="Anterior", emoji="◀", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior", row=1)
-    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cog.navegar_painel_missoes(interaction, -1)
-
-    @discord.ui.button(label="Enviar evidência", emoji="📨", style=discord.ButtonStyle.success, custom_id="nemesis:missoes:provas", row=1)
+    @discord.ui.button(
+        label="Enviar evidência",
+        emoji="📨",
+        style=discord.ButtonStyle.success,
+        custom_id="nemesis:missoes:provas",
+        row=2,
+    )
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
 
-    @discord.ui.button(label="Próximo", emoji="▶", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima", row=1)
-    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cog.navegar_painel_missoes(interaction, 1)
+
+class RankingJogoSelect(discord.ui.Select):
+    """Alternador por menu entre rankings independentes de cada jogo."""
+    def __init__(self, cog, jogo_atual="shigaku"):
+        self.cog = cog
+        jogos = ranking_missoes_jogos.JOGOS
+        opcoes = [
+            discord.SelectOption(
+                label=info["nome"][:100],
+                value=slug,
+                description=f"Ver classificação de {info['nome']}"[:100],
+                default=slug == jogo_atual,
+            )
+            for slug, info in jogos.items()
+        ]
+        super().__init__(
+            placeholder="◈ Selecionar ranking por jogo",
+            min_values=1,
+            max_values=1,
+            options=opcoes[:25],
+            custom_id="nemesis:ranking_jogos:seletor",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
+            return
+        jogo = self.values[0]
+        embed = await self.cog._montar_painel_ranking(interaction.guild, jogo)
+        await interaction.response.edit_message(
+            embed=embed, view=NavegacaoRankingJogosView(self.cog, jogo)
+        )
 
 
 class NavegacaoRankingJogosView(discord.ui.View):
-    """Alternador persistente entre rankings independentes por jogo."""
-    def __init__(self, cog):
+    """Navegação persistente dos rankings por seletor."""
+    def __init__(self, cog, jogo="shigaku"):
         super().__init__(timeout=None)
         self.cog = cog
-
-    @discord.ui.button(label="Ranking anterior", style=discord.ButtonStyle.secondary, custom_id="nemesis:ranking_jogos:anterior")
-    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cog.navegar_painel_ranking(interaction, -1)
-
-    @discord.ui.button(label="Próximo ranking", style=discord.ButtonStyle.primary, custom_id="nemesis:ranking_jogos:proximo")
-    async def proximo(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cog.navegar_painel_ranking(interaction, 1)
+        self.add_item(RankingJogoSelect(cog, jogo))
 
 
 TIPOS = {
@@ -497,8 +565,8 @@ class Missoes(commands.Cog):
                 name="✧ NAVEGAÇÃO DO CATÁLOGO",
                 value=(
                     f"Exibindo **{inicio + 1}–{inicio + len(exibidas)}** de "
-                    f"**{len(atividades)}** atividades. Use **Anterior/Próximo** "
-                    "para percorrer o catálogo completo."
+                    f"**{len(atividades)}** atividades. Utilize o seletor de páginas "
+                    "para acessar diretamente qualquer parte do catálogo."
                 ),
                 inline=False,
             )
@@ -527,7 +595,13 @@ class Missoes(commands.Cog):
         embed = await self._montar_painel_missoes(
             interaction.guild, "todos", categoria, pagina=pagina_alvo
         )
-        await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
+        footer = embed.footer.text or ""
+        match = re.search(r"PAGINA:(\d+)/(\d+)", footer)
+        total = int(match.group(2)) if match else 1
+        await interaction.response.edit_message(
+            embed=embed,
+            view=NavegacaoMissoesView(self, categoria=categoria, pagina=pagina_alvo, total_paginas=total),
+        )
 
     async def _limpar_mensagens_missoes_duplicadas(self, guild: discord.Guild) -> int:
         """Remove mensagens antigas do bot sobre missões no canal central, preservando o painel oficial."""
@@ -618,8 +692,8 @@ class Missoes(commands.Cog):
         embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
         aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
         if not linhas:
-            embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos."
-            embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos.", inline=False)
+            embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Utilize o seletor abaixo para alternar entre jogos."
+            embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. O seletor permite consultar a classificação de cada jogo.", inline=False)
         else:
             estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
                 guild.id, [uid for uid, _, _ in linhas], jogo=jogo
@@ -645,7 +719,7 @@ class Missoes(commands.Cog):
                     ).replace(",", ".")[:1024],
                     inline=False,
                 )
-        embed.set_footer(text=f"PÁGINA:{jogo} • RANKING {pagina}/{len(ranking_missoes_jogos.JOGOS)}  •  Use os botões para alternar entre jogos")
+        embed.set_footer(text=f"PÁGINA:{jogo} • RANKING {pagina}/{len(ranking_missoes_jogos.JOGOS)} • NÊMESIS / SELETOR DE JOGOS")
         return embed
 
     async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
@@ -654,7 +728,7 @@ class Missoes(commands.Cog):
         indice = jogos.index(atual) if atual in jogos else 0
         alvo = jogos[(indice + delta) % len(jogos)]
         embed = await self._montar_painel_ranking(interaction.guild, alvo)
-        await interaction.response.edit_message(embed=embed, view=NavegacaoRankingJogosView(self))
+        await interaction.response.edit_message(embed=embed, view=NavegacaoRankingJogosView(self, alvo))
 
     async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
         """Atualiza o painel único de ranking sem criar canais por jogo."""
