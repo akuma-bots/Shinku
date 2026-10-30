@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
 
-CORES = {"pvp": 0xED4245, "pve": 0x57F287, "missao": 0xFEE75C}
+CORES = {"pvp": 0x9F2035, "pve": 0x8B6A35, "missao": 0x9F2035, "contribuicao": 0x8B6A35, "especial": 0x754A9E}
 _ABRIR_REVISAO_LOCK = asyncio.Lock()
 
 
@@ -26,20 +26,39 @@ async def _hash_imagem(url: str):
 
 
 def _embed_revisao(revisao: dict) -> discord.Embed:
-    embed = criar_embed(
-        title=f"📋 Revisão pendente — {revisao['titulo']}",
-        description=revisao.get("descricao") or "Sem descrição.",
-        color=CORES.get(revisao["tipo"], 0x5865F2),
-    )
-    embed.add_field(name="Enviado por", value=f"<@{revisao['autor_id']}>", inline=True)
+    tipo = str(revisao.get("tipo") or "missao").lower()
+    autor_id = revisao.get("autor_id")
     auxiliar_id = revisao.get("auxiliar_id")
+    titulo = str(revisao.get("titulo") or "Comprovante de atividade")
+    descricao = str(revisao.get("descricao") or "Sem observações adicionais.")
+    embed = criar_embed(
+        title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  CENTRAL DE VALIDAÇÃO",
+        description=(
+            f"**◈ COMPROVANTE RECEBIDO**  ·  **{tipo.replace('_', ' ').upper()}**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"**Atividade:** {titulo}\n"
+            f"**Relato do participante:**\n{descricao[:1200]}"
+        ),
+        color=CORES.get(tipo, 0x9F2035),
+    )
+    embed.set_author(name="NÊMESIS  /  AUDITORIA DE OPERAÇÕES")
+    embed.add_field(name="◈ PARTICIPANTE", value=f"<@{autor_id}>" if autor_id else "Não identificado", inline=True)
+    embed.add_field(name="◈ CATEGORIA", value=tipo.replace("_", " ").title(), inline=True)
+    embed.add_field(name="◈ PROTOCOLO", value=f"`{revisao.get('id', '—')}`", inline=True)
+    embed.add_field(name="◈ REFERÊNCIA", value=f"`{revisao.get('referencia_id') or '—'}`", inline=True)
     if auxiliar_id:
-        embed.add_field(name="Auxiliar", value=f"<@{int(auxiliar_id)}>", inline=True)
-    embed.add_field(name="Tipo", value=revisao["tipo"].upper(), inline=True)
+        embed.add_field(name="◈ COLABORADOR", value=f"<@{int(auxiliar_id)}>", inline=True)
+    enviado = revisao.get("timestamp")
+    if isinstance(enviado, (int, float)):
+        embed.add_field(name="◈ RECEBIDO", value=f"<t:{int(enviado)}:F>\n<t:{int(enviado)}:R>", inline=True)
+    embed.add_field(
+        name="◈ DIRETRIZES DE ANÁLISE",
+        value="Confira a autenticidade, a correspondência com o objetivo e a legibilidade da evidência. A recompensa em XP só será aplicada após aprovação.",
+        inline=False,
+    )
     embed.set_image(url=revisao["print_url"])
-    embed.set_footer(text=f"ID: {revisao['id']}")
+    embed.set_footer(text="NÊMESIS  •  CENTRAL DE VALIDAÇÃO  •  DECISÃO REGISTRADA EM AUDITORIA")
     return embed
-
 
 def _view_revisao(revisao_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
