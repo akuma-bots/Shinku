@@ -509,7 +509,7 @@ class Missoes(commands.Cog):
             return len(embed.title or "") + len(embed.description or "") + len(embed.author.name or "") + len(embed.footer.text or "") + sum(len(field.name) + len(field.value) for field in embed.fields)
         while embed.fields and (tamanho() > 5900 or len(embed.fields) > 25):
             embed.remove_field(len(embed.fields) - 1)
-        aplicar_identidade_servidor(embed, guild, self.bot)
+        aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
@@ -616,7 +616,7 @@ class Missoes(commands.Cog):
             cor=0x9F2035, rodape=None,
         )
         embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
-        aplicar_identidade_servidor(embed, guild, self.bot)
+        aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
         if not linhas:
             embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos."
             embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos.", inline=False)
