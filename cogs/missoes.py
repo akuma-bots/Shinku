@@ -103,9 +103,8 @@ class CategoriaMissoesSelect(discord.ui.Select):
             return
         footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
         partes = footer.split(":")
-        jogo = partes[1] if len(partes) > 1 and partes[1] in ranking_missoes_jogos.JOGOS else "shigaku"
         categoria = self.values[0]
-        embed = await self.cog._montar_painel_missoes(interaction.guild, jogo, categoria)
+        embed = await self.cog._montar_painel_missoes(interaction.guild, "todos", categoria)
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self.cog))
 
 
@@ -424,146 +423,88 @@ class Missoes(commands.Cog):
         return padrao
 
     async def _montar_painel_missoes(
-        self, guild: discord.Guild, jogo: str, categoria: str = "missao"
+        self, guild: discord.Guild, jogo: str = "todos", categoria: str = "missao"
     ) -> discord.Embed:
-        """Monta a central premium de atividades, compacta e dentro dos limites do Discord."""
-        jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
+        """Central global: as atividades são válidas para todos os jogos."""
         categoria = categoria if categoria in TIPOS else "missao"
-        nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
         tipo = TIPOS[categoria]
         dados = await missoes._guild(guild.id)
         atividades = [
             item for item in dados.get("missoes", [])
             if isinstance(item, dict)
-            and str(item.get("jogo") or "").strip().lower() == jogo
             and str(item.get("tipo") or "missao").strip().lower() == categoria
+            and not str(item.get("id") or "").startswith(("SHI-", "GAK-", "FIS-"))
         ]
-        atividades.sort(key=lambda item: str(item.get("id") or ""))
+        atividades.sort(key=lambda item: (item.get("ativa", True) is False, str(item.get("id") or "")))
         abertas = [item for item in atividades if item.get("ativa", True) is not False]
         encerradas = len(atividades) - len(abertas)
-
-        nomes_categoria = {
-            "missao": "MISSÕES",
-            "contribuicao": "CONTRIBUIÇÕES",
-            "especial": "OPERAÇÕES ESPECIAIS",
-        }
-        nome_categoria = nomes_categoria.get(categoria, tipo["plural"].upper())
+        nome_categoria = tipo["plural"].upper()
         embed = criar_embed(
-            "✦・ CENTRAL DE MISSÕES — NÊMESIS ・✦",
+            "✦・ CENTRAL GLOBAL DE MISSÕES — NÊMESIS ・✦",
             (
                 "╭────────────── ◈ ──────────────╮\n"
-                f"                 **{nome_categoria}  /  {nome_jogo.upper()}**\n"
+                f"                 **{nome_categoria}  /  TODOS OS JOGOS**\n"
                 "╰────────────── ◈ ──────────────╯\n\n"
-                f"Um catálogo estratégico de atividades da **NÊMESIS**. "
-                "Selecione uma operação, cumpra seus objetivos e encaminhe "
-                "a evidência para avaliação da equipe.\n\n"
-                "**✧ Protocolo de envio**  /missao-enviar-prova\n"
-                "**✧ Navegação**  Utilize os controles abaixo para explorar "
-                "as categorias disponíveis."
+                "Um catálogo unificado de operações da **NÊMESIS**. "
+                "Todas as atividades são válidas para qualquer jogo compatível com a organização. "
+                "Não existe divisão de missões por título de jogo.\n\n"
+                "**✧ Envio de evidências**  Utilize o botão abaixo e informe o código da atividade.\n"
+                "**✧ Avaliação**  Toda recompensa depende da validação da equipe."
             ),
             cor=tipo["cor"], rodape=None,
         )
-        embed.set_author(name="N̷ÊMESIS  •  DEPARTAMENTO DE OPERAÇÕES")
-        embed.add_field(
-            name="◈  OPERAÇÕES ATIVAS",
-            value=f"**{len(abertas):02d}**\nDisponíveis para execução",
-            inline=True,
-        )
-        embed.add_field(
-            name="◈  ARQUIVADAS",
-            value=f"**{encerradas:02d}**\nOperações encerradas",
-            inline=True,
-        )
-        embed.add_field(
-            name="◈  TOTAL REGISTRADO",
-            value=f"**{len(atividades):02d}**\nRegistros do catálogo",
-            inline=True,
-        )
-
+        embed.set_author(name="N̷ÊMESIS  •  DEPARTAMENTO GLOBAL DE OPERAÇÕES")
+        embed.add_field(name="◈ OPERAÇÕES ATIVAS", value=f"**{len(abertas):02d}**\nDisponíveis para execução", inline=True)
+        embed.add_field(name="◈ ARQUIVADAS", value=f"**{encerradas:02d}**\nMantidas em histórico", inline=True)
+        embed.add_field(name="◈ TOTAL REGISTRADO", value=f"**{len(atividades):02d}**\nTodos os jogos", inline=True)
         if not atividades:
             embed.add_field(
                 name="╭・CATÁLOGO EM PREPARAÇÃO",
-                value=(
-                    "Esta seção ainda não possui operações publicadas. "
-                    "Novas atividades serão disponibilizadas pela administração."
-                ),
+                value="Esta categoria ainda não possui atividades publicadas. Novas operações serão disponibilizadas pela administração.",
                 inline=False,
             )
-
         exibidas = atividades[:20]
         for indice, item in enumerate(exibidas, start=1):
             try:
-                recompensa = max(
-                    0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0)
-                )
+                recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
             except (TypeError, ValueError, OverflowError):
                 recompensa = 0
             ativa = item.get("ativa", True) is not False
-            estado = "✦ EM OPERAÇÃO" if ativa else "◈ ARQUIVADA"
             titulo = str(item.get("titulo") or "Operação sem título").strip()
             descricao = str(item.get("descricao") or "Objetivo não informado.").strip()
             identificador = str(item.get("id") or "—")
             dificuldade = str(item.get("dificuldade") or "Não definida").strip()
             valor = (
                 f"{descricao[:145]}\n\n"
-                f"**IDENTIFICAÇÃO**  {identificador[:32]}\n"
+                f"**IDENTIFICAÇÃO**  `{identificador[:32]}`\n"
                 f"**NÍVEL**  {dificuldade[:36]}\n"
                 f"**RECOMPENSA**  {recompensa:,} XP\n"
-                f"**SITUAÇÃO**  {estado}"
+                f"**SITUAÇÃO**  {'✦ EM OPERAÇÃO' if ativa else '◈ ARQUIVADA'}"
             ).replace(",", ".")[:1024]
-            embed.add_field(
-                name=f"〔 {indice:02d} 〕  {titulo[:58]}"[:256],
-                value=valor or "Informações indisponíveis.",
-                inline=False,
-            )
-
+            embed.add_field(name=f"〔 {indice:02d} 〕  {titulo[:58]}"[:256], value=valor, inline=False)
         if len(atividades) > len(exibidas):
             embed.add_field(
-                name="✧  ARQUIVO COMPLEMENTAR",
-                value=(
-                    f"**{len(exibidas)} de {len(atividades)}** operações nesta visualização. "
-                    "Avance pelo catálogo para consultar os demais registros."
-                ),
+                name="✧ ARQUIVO COMPLEMENTAR",
+                value=f"**{len(exibidas)} de {len(atividades)}** atividades nesta visualização. Consulte a central administrativa para o catálogo completo.",
                 inline=False,
             )
-
-        indice_jogo = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
-        indice_categoria = list(TIPOS).index(categoria) + 1
-        embed.set_footer(
-            text=(
-                f"PÁGINA:{jogo}:{categoria} • NÊMESIS  /  "
-                f"{indice_jogo}/{len(ranking_missoes_jogos.JOGOS)} JOGOS • "
-                f"{indice_categoria}/{len(TIPOS)} CATEGORIAS"
-            )
-        )
-
-        def _tamanho_embed() -> int:
-            return (
-                len(embed.title or "")
-                + len(embed.description or "")
-                + len(embed.author.name or "")
-                + len(embed.footer.text or "")
-                + sum(len(field.name) + len(field.value) for field in embed.fields)
-            )
-
-        while embed.fields and (_tamanho_embed() > 5900 or len(embed.fields) > 25):
+        embed.set_footer(text=f"CATEGORIA:{categoria} • NÊMESIS  /  TODOS OS JOGOS")
+        def tamanho() -> int:
+            return len(embed.title or "") + len(embed.description or "") + len(embed.author.name or "") + len(embed.footer.text or "") + sum(len(field.name) + len(field.value) for field in embed.fields)
+        while embed.fields and (tamanho() > 5900 or len(embed.fields) > 25):
             embed.remove_field(len(embed.fields) - 1)
         aplicar_identidade_servidor(embed, guild, self.bot)
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
-        jogos = list(ranking_missoes_jogos.JOGOS)
         categorias = list(TIPOS)
         footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
-        partes = footer.split(":")
-        jogo = partes[1] if len(partes) > 1 and partes[1] in jogos else "shigaku"
-        categoria = partes[2].split()[0] if len(partes) > 2 else "missao"
-        if categoria not in categorias:
-            categoria = "missao"
-        paginas = [(j, c) for j in jogos for c in categorias]
-        atual = paginas.index((jogo, categoria))
-        alvo_jogo, alvo_categoria = paginas[(atual + delta) % len(paginas)]
-        embed = await self._montar_painel_missoes(interaction.guild, alvo_jogo, alvo_categoria)
+        atual = next((parte.split(":", 1)[1].split()[0] for parte in footer.split("•") if parte.strip().startswith("CATEGORIA:")), "missao")
+        if atual not in categorias:
+            atual = "missao"
+        indice = categorias.index(atual)
+        alvo = categorias[(indice + delta) % len(categorias)]
+        embed = await self._montar_painel_missoes(interaction.guild, "todos", alvo)
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
 
     async def _limpar_mensagens_missoes_duplicadas(self, guild: discord.Guild) -> int:
@@ -625,8 +566,7 @@ class Missoes(commands.Cog):
             except (discord.Forbidden, discord.HTTPException) as erro:
                 log.warning("Não foi possível buscar o painel de missões: %s", erro)
                 return
-        jogo = self._slug_da_mensagem(mensagem, "PÁGINA", "shigaku")
-        embed = await self._montar_painel_missoes(guild, jogo)
+        embed = await self._montar_painel_missoes(guild, "todos", "missao")
         try:
             if mensagem is None:
                 mensagem = await canal.send(embed=embed, view=NavegacaoMissoesView(self))
