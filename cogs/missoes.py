@@ -395,7 +395,7 @@ class Missoes(commands.Cog):
     async def _montar_painel_missoes(
         self, guild: discord.Guild, jogo: str, categoria: str = "missao"
     ) -> discord.Embed:
-        """Monta a central única da categoria, com catálogo compacto e limites do Discord."""
+        """Monta a central premium de atividades, compacta e dentro dos limites do Discord."""
         jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
         categoria = categoria if categoria in TIPOS else "missao"
         nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
@@ -411,32 +411,55 @@ class Missoes(commands.Cog):
         abertas = [item for item in atividades if item.get("ativa", True) is not False]
         encerradas = len(atividades) - len(abertas)
 
+        nomes_categoria = {
+            "missao": "MISSÕES",
+            "contribuicao": "CONTRIBUIÇÕES",
+            "especial": "OPERAÇÕES ESPECIAIS",
+        }
+        nome_categoria = nomes_categoria.get(categoria, tipo["plural"].upper())
         embed = criar_embed(
-            f"✦ CENTRAL DE MISSÕES · {tipo['plural']} · {nome_jogo.upper()}",
+            "✦・ CENTRAL DE MISSÕES — NÊMESIS ・✦",
             (
-                f"Central oficial de atividades da NÊMESIS para **{nome_jogo}**. "
-                "Consulte os objetivos, conclua a atividade e envie sua evidência "
-                "para análise da equipe.\n\n"
-                "**Envio de provas:** utilize /missao-enviar-prova.\n"
-                "**Navegação:** utilize os botões para alternar entre as categorias."
+                "╭────────────── ◈ ──────────────╮\n"
+                f"                 **{nome_categoria}  /  {nome_jogo.upper()}**\n"
+                "╰────────────── ◈ ──────────────╯\n\n"
+                f"Um catálogo estratégico de atividades da **NÊMESIS**. "
+                "Selecione uma operação, cumpra seus objetivos e encaminhe "
+                "a evidência para avaliação da equipe.\n\n"
+                "**✧ Protocolo de envio**  /missao-enviar-prova\n"
+                "**✧ Navegação**  Utilize os controles abaixo para explorar "
+                "as categorias disponíveis."
             ),
             cor=tipo["cor"], rodape=None,
         )
-        embed.set_author(name="NÊMESIS  /  CENTRAL DE MISSÕES")
-        embed.add_field(name="🟢 EM OPERAÇÃO", value=f"**{len(abertas)}**", inline=True)
-        embed.add_field(name="⛔ ENCERRADAS", value=f"**{encerradas}**", inline=True)
-        embed.add_field(name="◈ NO CATÁLOGO", value=f"**{len(atividades)}**", inline=True)
+        embed.set_author(name="N̷ÊMESIS  •  DEPARTAMENTO DE OPERAÇÕES")
+        embed.add_field(
+            name="◈  OPERAÇÕES ATIVAS",
+            value=f"**{len(abertas):02d}**\nDisponíveis para execução",
+            inline=True,
+        )
+        embed.add_field(
+            name="◈  ARQUIVADAS",
+            value=f"**{encerradas:02d}**\nOperações encerradas",
+            inline=True,
+        )
+        embed.add_field(
+            name="◈  TOTAL REGISTRADO",
+            value=f"**{len(atividades):02d}**\nRegistros do catálogo",
+            inline=True,
+        )
 
         if not atividades:
             embed.add_field(
-                name="◈ CATÁLOGO VAZIO",
-                value="Não existem atividades nesta categoria para este jogo no momento.",
+                name="╭・CATÁLOGO EM PREPARAÇÃO",
+                value=(
+                    "Esta seção ainda não possui operações publicadas. "
+                    "Novas atividades serão disponibilizadas pela administração."
+                ),
                 inline=False,
             )
 
-        # Mantém a embed abaixo do limite de 6.000 caracteres e 25 campos.
-        limite_itens = 20
-        exibidas = atividades[:limite_itens]
+        exibidas = atividades[:20]
         for indice, item in enumerate(exibidas, start=1):
             try:
                 recompensa = max(
@@ -445,28 +468,30 @@ class Missoes(commands.Cog):
             except (TypeError, ValueError, OverflowError):
                 recompensa = 0
             ativa = item.get("ativa", True) is not False
-            estado = "🟢 DISPONÍVEL" if ativa else "⛔ ENCERRADA"
-            titulo = str(item.get("titulo") or "Missão sem título").strip()
+            estado = "✦ EM OPERAÇÃO" if ativa else "◈ ARQUIVADA"
+            titulo = str(item.get("titulo") or "Operação sem título").strip()
             descricao = str(item.get("descricao") or "Objetivo não informado.").strip()
             identificador = str(item.get("id") or "—")
             dificuldade = str(item.get("dificuldade") or "Não definida").strip()
             valor = (
-                f"{descricao[:180]}\n**Código:** `{identificador[:32]}` · "
-                f"**Dificuldade:** {dificuldade[:40]}\n"
-                f"**Recompensa:** {recompensa:,} XP · {estado}"
+                f"{descricao[:145]}\n\n"
+                f"**IDENTIFICAÇÃO**  {identificador[:32]}\n"
+                f"**NÍVEL**  {dificuldade[:36]}\n"
+                f"**RECOMPENSA**  {recompensa:,} XP\n"
+                f"**SITUAÇÃO**  {estado}"
             ).replace(",", ".")[:1024]
             embed.add_field(
-                name=f"{indice:02d} · {titulo[:65]}"[:256],
-                value=valor or "Detalhes não informados.",
+                name=f"〔 {indice:02d} 〕  {titulo[:58]}"[:256],
+                value=valor or "Informações indisponíveis.",
                 inline=False,
             )
 
         if len(atividades) > len(exibidas):
             embed.add_field(
-                name="◈ CATÁLOGO COMPLEMENTAR",
+                name="✧  ARQUIVO COMPLEMENTAR",
                 value=(
-                    f"Exibindo {len(exibidas)} de {len(atividades)} atividades. "
-                    "Use a navegação para consultar as demais páginas."
+                    f"**{len(exibidas)} de {len(atividades)}** operações nesta visualização. "
+                    "Avance pelo catálogo para consultar os demais registros."
                 ),
                 inline=False,
             )
@@ -475,19 +500,22 @@ class Missoes(commands.Cog):
         indice_categoria = list(TIPOS).index(categoria) + 1
         embed.set_footer(
             text=(
-                f"PÁGINA:{jogo}:{categoria} • JOGO {indice_jogo}/"
-                f"{len(ranking_missoes_jogos.JOGOS)} • CATEGORIA "
-                f"{indice_categoria}/{len(TIPOS)}"
+                f"PÁGINA:{jogo}:{categoria} • NÊMESIS  /  "
+                f"{indice_jogo}/{len(ranking_missoes_jogos.JOGOS)} JOGOS • "
+                f"{indice_categoria}/{len(TIPOS)} CATEGORIAS"
             )
         )
 
-        # Guarda-corpo para mudanças futuras no texto do catálogo.
-        while embed.fields and (
-            sum(len(embed.title or "") + len(embed.description or "")
-                + len(embed.author.name or "") + len(embed.footer.text or "")
+        def _tamanho_embed() -> int:
+            return (
+                len(embed.title or "")
+                + len(embed.description or "")
+                + len(embed.author.name or "")
+                + len(embed.footer.text or "")
                 + sum(len(field.name) + len(field.value) for field in embed.fields)
-                for _ in (0,)) > 5900
-        ):
+            )
+
+        while embed.fields and (_tamanho_embed() > 5900 or len(embed.fields) > 25):
             embed.remove_field(len(embed.fields) - 1)
         return embed
 
