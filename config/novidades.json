@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-140117",
+  "release_id": "20261030-141535",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Torna identidade visual compatível com objetos de servidor parciais",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Torna identidade visual compatível com objetos de servidor parciais\n\n**Áreas envolvidas:** mecanismos internos e infraestrutura.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Preserva histórico e adiciona ciclo de vida aos formulários",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Preserva histórico e adiciona ciclo de vida aos formulários\n\n**Áreas envolvidas:** mecanismos internos e infraestrutura.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "14:01",
+  "hora_atualizacao": "14:15",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T14:01:17.372757-03:00"
+  "gerado_em": "2026-10-30T14:15:35.181186-03:00"
 }
