@@ -143,11 +143,13 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
     dificuldade = discord.ui.TextInput(label="Dificuldade (opcional)", max_length=30, required=False)
     requisitos_prazo = discord.ui.TextInput(label="Requisitos e prazo (opcional)", style=discord.TextStyle.paragraph, placeholder="Descreva os requisitos. Para prazo, use uma linha iniciada por Prazo:", max_length=1000, required=False)
 
-    def __init__(self, guild_id: int, atividade: dict, owner_id: int):
+    def __init__(self, guild_id: int, atividade: dict, owner_id: int, mensagem_original=None, pagina: int = 0):
         super().__init__(timeout=300)
         self.guild_id = guild_id
         self.atividade_id = str(atividade["id"])
         self.owner_id = owner_id
+        self.mensagem_original = mensagem_original
+        self.pagina = pagina
         self.titulo.default = str(atividade.get("titulo") or "")[:100]
         self.descricao.default = str(atividade.get("descricao") or "")[:4000]
         self.recompensa.default = str(atividade.get("recompensa_xp", atividade.get("pontos", 0)))
@@ -194,7 +196,31 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
                 "atualizado_por": interaction.user.id,
             })
             await missoes._salvar_guild(self.guild_id, dados)
-        await interaction.response.send_message("Atividade atualizada. O histórico de provas e recompensas foi preservado. Use Atualizar painel para conferir a publicação.", ephemeral=True)
+        if self.mensagem_original is not None:
+            atividades = _ordenar_atividades((await missoes._guild(self.guild_id)).get("missoes", []))
+            selecionada = next(
+                (item for item in atividades if str(item.get("id")) == self.atividade_id),
+                None,
+            )
+            stats = await _estatisticas(self.guild_id, selecionada) if selecionada else None
+            paginas = max(1, (len(atividades) + 24) // 25)
+            pagina = min(self.pagina, paginas - 1)
+            nova = CentralMissoesView(
+                self.guild_id, self.owner_id, self.atividade_id, pagina,
+                self.mensagem_original,
+            )
+            nova.add_item(SeletorAtividade(nova, atividades, self.atividade_id))
+            try:
+                await self.mensagem_original.edit(
+                    embed=_embed_central(atividades, selecionada, stats),
+                    view=nova,
+                )
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                log.exception("Não foi possível atualizar automaticamente o painel após editar atividade.")
+        await interaction.response.send_message(
+            "Atividade atualizada. O histórico de provas e recompensas foi preservado.",
+            ephemeral=True,
+        )
 
 
 def _ordenar_atividades(atividades: list) -> list:
@@ -396,15 +422,11 @@ class GestaoMissoes(commands.Cog):
             await interaction.response.send_message("A central é restrita aos administradores autorizados da NÊMESIS.", ephemeral=True)
             return
         atividades = await missoes._guild(interaction.guild.id)
-        lista = sorted(
-            atividades.get("missoes", []),
-            key=lambda item: (item.get("tipo", ""), str(item.get("titulo", "")).casefold()),
-        )
+        lista = _ordenar_atividades(atividades.get("missoes", []))
         if not lista:
             await interaction.response.send_message("O catálogo ainda não possui atividades cadastradas.", ephemeral=True)
             return
         view = CentralMissoesView(interaction.guild.id, interaction.user.id)
-        view.clear_items()
         view.add_item(SeletorAtividade(view, lista))
         await interaction.response.send_message(
             embed=_embed_central(lista),
