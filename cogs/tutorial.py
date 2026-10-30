@@ -127,16 +127,17 @@ TUTORIAIS = {
         "comandos": "/roblox-vincular · /roblox-confirmar · /roblox-perfil · /roblox-identificar · /roblox-desvincular",
     },
     "moderacao": {
-        "titulo": "Moderação e conduta",
-        "descricao": "Orientações para membros e equipe de moderação.",
+        "titulo": "Proteção automática e conduta",
+        "descricao": "Como o AutoMod protege a comunidade e como agir diante de uma infração.",
         "passos": [
             "Aplique as regras de forma consistente e sem favorecimento.",
             "Antes de punir, verifique contexto, evidências e histórico quando disponível.",
             "Registre um motivo claro e proporcional à infração.",
-            "Ações administrativas devem respeitar as permissões e a hierarquia do Discord.",
-            "Em caso de dúvida ou conflito de interesse, encaminhe o caso à liderança.",
+            "O AutoMod aplica automaticamente as medidas configuradas conforme as regras e a gravidade identificada.",
+            "A gestão de punições fica centralizada no AutoMod, sem comandos paralelos de punição manual.",
+            "Em caso de falso positivo, reincidência ou situação excepcional, encaminhe as evidências à liderança para revisão da configuração.",
         ],
-        "comandos": "/help · /ban · /kick · /timeout (equipe autorizada)",
+        "comandos": "AutoMod · /help · /punicoes-historico (consulta autorizada)",
     },
     "sorteios": {
         "titulo": "Sorteios",
