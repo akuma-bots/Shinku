@@ -174,18 +174,6 @@ TUTORIAIS = {
         ],
         "comandos": "/help · painel de atendimento",
     },
-    "loja": {
-        "titulo": "Loja e recompensas",
-        "descricao": "Como consultar e solicitar recompensas disponíveis.",
-        "passos": [
-            "Confira o catálogo, o custo e os requisitos antes de solicitar uma recompensa.",
-            "Verifique seu saldo ou pontuação disponível pelo comando indicado no catálogo.",
-            "Confirme a compra uma única vez e guarde a confirmação.",
-            "Não repita a compra se a resposta demorar; consulte o histórico ou abra um ticket primeiro.",
-            "Recompensas manuais devem ser registradas pela equipe responsável.",
-        ],
-        "comandos": "/help · comandos da loja disponíveis no servidor",
-    },
     "temporadas": {
         "titulo": "Temporadas competitivas",
         "descricao": "Como funciona a classificação por temporada.",
