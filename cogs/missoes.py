@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 
 from utils import missoes
 from utils.catalogo_missoes import (
@@ -79,21 +79,52 @@ class EnviarProvaMissaoView(discord.ui.View):
         await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
 
 
+class CategoriaMissoesSelect(discord.ui.Select):
+    """Seletor persistente para trocar de departamento sem percorrer páginas."""
+    def __init__(self, cog):
+        self.cog = cog
+        opcoes = [
+            discord.SelectOption(label="Missões", value="missao", emoji="🎯", description="Atividades competitivas"),
+            discord.SelectOption(label="Contribuições", value="contribuicao", emoji="✦", description="Mérito e desenvolvimento"),
+            discord.SelectOption(label="Operações especiais", value="especial", emoji="✧", description="Protocolos especiais"),
+        ]
+        super().__init__(
+            placeholder="Acessar departamento operacional",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id="nemesis:missoes:categoria",
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.message is None:
+            await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
+            return
+        footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
+        partes = footer.split(":")
+        jogo = partes[1] if len(partes) > 1 and partes[1] in ranking_missoes_jogos.JOGOS else "shigaku"
+        categoria = self.values[0]
+        embed = await self.cog._montar_painel_missoes(interaction.guild, jogo, categoria)
+        await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self.cog))
+
+
 class NavegacaoMissoesView(discord.ui.View):
-    """Alternador persistente entre as páginas de missões por jogo."""
+    """Navegação persistente por departamento, jogo e envio de evidências."""
     def __init__(self, cog):
         super().__init__(timeout=None)
         self.cog = cog
+        self.add_item(CategoriaMissoesSelect(cog))
 
-    @discord.ui.button(label="Missões anteriores", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior")
+    @discord.ui.button(label="Anterior", emoji="◀", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:anterior", row=1)
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.navegar_painel_missoes(interaction, -1)
 
-    @discord.ui.button(label="Enviar provas", style=discord.ButtonStyle.primary, custom_id="nemesis:missoes:provas")
+    @discord.ui.button(label="Enviar evidência", emoji="📨", style=discord.ButtonStyle.success, custom_id="nemesis:missoes:provas", row=1)
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
 
-    @discord.ui.button(label="Próximas missões", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima")
+    @discord.ui.button(label="Próximo", emoji="▶", style=discord.ButtonStyle.secondary, custom_id="nemesis:missoes:proxima", row=1)
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.navegar_painel_missoes(interaction, 1)
 
@@ -517,6 +548,7 @@ class Missoes(commands.Cog):
 
         while embed.fields and (_tamanho_embed() > 5900 or len(embed.fields) > 25):
             embed.remove_field(len(embed.fields) - 1)
+        aplicar_identidade_servidor(embed, guild, self.bot)
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
@@ -622,6 +654,7 @@ class Missoes(commands.Cog):
             cor=0x9F2035, rodape=None,
         )
         embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
+        aplicar_identidade_servidor(embed, guild, self.bot)
         if not linhas:
             embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos."
             embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. Use os botões abaixo para alternar entre jogos.", inline=False)
