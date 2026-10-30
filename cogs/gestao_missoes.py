@@ -154,7 +154,7 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
         self.dificuldade.default = str(atividade.get("dificuldade") or "")[:30]
         requisitos = str(atividade.get("requisitos") or "").strip()
         prazo = str(atividade.get("prazo") or "").strip()
-        combinado = requisitos + (f"\\nPrazo: {prazo}" if prazo else "")
+        combinado = requisitos + (f"\nPrazo: {prazo}" if prazo else "")
         self.requisitos_prazo.default = combinado[:1000]
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -188,7 +188,7 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
                 "recompensa_xp": xp,
                 "pontos": xp,
                 "dificuldade": str(self.dificuldade.value or "").strip(),
-                "requisitos": "\\n".join(requisitos).strip()[:1000],
+                "requisitos": "\n".join(requisitos).strip()[:1000],
                 "prazo": prazo,
                 "atualizado_em": __import__("time").time(),
                 "atualizado_por": interaction.user.id,
