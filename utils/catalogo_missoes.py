@@ -99,6 +99,22 @@ async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
         })
         atualizadas.append(arquivada)
 
+    # Migra cópias históricas geradas por jogo para arquivo, sem apagar provas,
+    # recompensas aplicadas ou referências de mensagens antigas.
+    ids_catalogo = {str(item["id"]) for item in catalogo}
+    prefixos_legados = ("SHI-", "GAK-", "FIS-")
+    duplicadas_legadas = []
+    for item in guild_data.get("missoes", []):
+        identificador = str(item.get("id") or "")
+        if not identificador.startswith(prefixos_legados):
+            continue
+        sufixo = identificador.split("-", 1)[1] if "-" in identificador else ""
+        if sufixo in ids_catalogo:
+            item["ativa"] = False
+            item["origem"] = "migracao_global"
+            item["arquivada_em"] = __import__("time").time()
+            duplicadas_legadas.append(identificador)
+
     personalizadas = [
         item for item in guild_data.get("missoes", [])
         if str(item.get("id")) not in ids_padrao
