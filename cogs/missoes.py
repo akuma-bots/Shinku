@@ -84,9 +84,9 @@ class CategoriaMissoesSelect(discord.ui.Select):
     def __init__(self, cog, categoria_atual="missao"):
         self.cog = cog
         opcoes = [
-            discord.SelectOption(label="Missões", value="missao", emoji="🎯", description="Atividades competitivas", default=categoria_atual == "missao"),
-            discord.SelectOption(label="Contribuições", value="contribuicao", emoji="✦", description="Mérito e desenvolvimento", default=categoria_atual == "contribuicao"),
-            discord.SelectOption(label="Operações especiais", value="especial", emoji="✧", description="Protocolos especiais", default=categoria_atual == "especial"),
+            discord.SelectOption(label="Missões", value="missao", description="Atividades competitivas", default=categoria_atual == "missao"),
+            discord.SelectOption(label="Contribuições", value="contribuicao", description="Mérito e desenvolvimento", default=categoria_atual == "contribuicao"),
+            discord.SelectOption(label="Operações especiais", value="especial", description="Protocolos especiais", default=categoria_atual == "especial"),
         ]
         super().__init__(
             placeholder="◈ Selecionar departamento",
@@ -680,6 +680,7 @@ class Missoes(commands.Cog):
                 await mensagem.edit(embed=embed, view=view)
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Não foi possível atualizar o painel de missões.")
+            raise
 
     async def _montar_painel_ranking(self, guild: discord.Guild, jogo: str) -> discord.Embed:
         """Classificação competitiva com cartões por jogador e métricas resumidas."""
