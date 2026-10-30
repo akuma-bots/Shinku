@@ -101,10 +101,10 @@ class CategoriaMissoesSelect(discord.ui.Select):
         if interaction.guild is None or interaction.message is None:
             await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
             return
-        footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
-        partes = footer.split(":")
         categoria = self.values[0]
-        embed = await self.cog._montar_painel_missoes(interaction.guild, "todos", categoria)
+        embed = await self.cog._montar_painel_missoes(
+            interaction.guild, "todos", categoria, pagina=0
+        )
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self.cog))
 
 
@@ -423,7 +423,11 @@ class Missoes(commands.Cog):
         return padrao
 
     async def _montar_painel_missoes(
-        self, guild: discord.Guild, jogo: str = "todos", categoria: str = "missao"
+        self,
+        guild: discord.Guild,
+        jogo: str = "todos",
+        categoria: str = "missao",
+        pagina: int = 0,
     ) -> discord.Embed:
         """Central global: as atividades são válidas para todos os jogos."""
         categoria = categoria if categoria in TIPOS else "missao"
@@ -438,6 +442,12 @@ class Missoes(commands.Cog):
         atividades.sort(key=lambda item: (item.get("ativa", True) is False, str(item.get("id") or "")))
         abertas = [item for item in atividades if item.get("ativa", True) is not False]
         encerradas = len(atividades) - len(abertas)
+        # Oito atividades por página mantêm a embed legível e abaixo dos
+        # limites de campos/caracteres do Discord, mesmo com catálogos grandes.
+        itens_por_pagina = 8
+        total_paginas = max(1, (len(atividades) + itens_por_pagina - 1) // itens_por_pagina)
+        pagina = max(0, min(int(pagina), total_paginas - 1))
+        inicio = pagina * itens_por_pagina
         nome_categoria = tipo["plural"].upper()
         embed = criar_embed(
             "✦・ CENTRAL GLOBAL DE MISSÕES — NÊMESIS ・✦",
@@ -463,8 +473,8 @@ class Missoes(commands.Cog):
                 value="Esta categoria ainda não possui atividades publicadas. Novas operações serão disponibilizadas pela administração.",
                 inline=False,
             )
-        exibidas = atividades[:20]
-        for indice, item in enumerate(exibidas, start=1):
+        exibidas = atividades[inicio:inicio + itens_por_pagina]
+        for indice, item in enumerate(exibidas, start=inicio + 1):
             try:
                 recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
             except (TypeError, ValueError, OverflowError):
@@ -484,11 +494,17 @@ class Missoes(commands.Cog):
             embed.add_field(name=f"〔 {indice:02d} 〕  {titulo[:58]}"[:256], value=valor, inline=False)
         if len(atividades) > len(exibidas):
             embed.add_field(
-                name="✧ ARQUIVO COMPLEMENTAR",
-                value=f"**{len(exibidas)} de {len(atividades)}** atividades nesta visualização. Consulte a central administrativa para o catálogo completo.",
+                name="✧ NAVEGAÇÃO DO CATÁLOGO",
+                value=(
+                    f"Exibindo **{inicio + 1}–{inicio + len(exibidas)}** de "
+                    f"**{len(atividades)}** atividades. Use **Anterior/Próximo** "
+                    "para percorrer o catálogo completo."
+                ),
                 inline=False,
             )
-        embed.set_footer(text=f"CATEGORIA:{categoria} • NÊMESIS  /  TODOS OS JOGOS")
+        embed.set_footer(
+            text=f"CATEGORIA:{categoria} • PAGINA:{pagina + 1}/{total_paginas} • NÊMESIS / TODOS OS JOGOS"
+        )
         def tamanho() -> int:
             return len(embed.title or "") + len(embed.description or "") + len(embed.author.name or "") + len(embed.footer.text or "") + sum(len(field.name) + len(field.value) for field in embed.fields)
         while embed.fields and (tamanho() > 5900 or len(embed.fields) > 25):
@@ -497,14 +513,20 @@ class Missoes(commands.Cog):
         return embed
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
-        categorias = list(TIPOS)
+        """Percorre páginas da categoria atual sem misturar departamentos."""
         footer = interaction.message.embeds[0].footer.text if interaction.message.embeds else ""
-        atual = next((parte.split(":", 1)[1].split()[0] for parte in footer.split("•") if parte.strip().startswith("CATEGORIA:")), "missao")
-        if atual not in categorias:
-            atual = "missao"
-        indice = categorias.index(atual)
-        alvo = categorias[(indice + delta) % len(categorias)]
-        embed = await self._montar_painel_missoes(interaction.guild, "todos", alvo)
+        categoria_match = re.search(r"CATEGORIA:([a-z_]+)", footer)
+        pagina_match = re.search(r"PAGINA:(\\d+)/(\\d+)", footer)
+        categoria = categoria_match.group(1) if categoria_match else "missao"
+        if categoria not in TIPOS:
+            categoria = "missao"
+        pagina_atual = int(pagina_match.group(1)) - 1 if pagina_match else 0
+        total_paginas = int(pagina_match.group(2)) if pagina_match else 1
+        total_paginas = max(1, total_paginas)
+        pagina_alvo = (pagina_atual + delta) % total_paginas
+        embed = await self._montar_painel_missoes(
+            interaction.guild, "todos", categoria, pagina=pagina_alvo
+        )
         await interaction.response.edit_message(embed=embed, view=NavegacaoMissoesView(self))
 
     async def _limpar_mensagens_missoes_duplicadas(self, guild: discord.Guild) -> int:
