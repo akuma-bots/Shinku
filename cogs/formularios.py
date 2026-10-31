@@ -179,6 +179,85 @@ def _embeds_painel(formulario: dict, guild: discord.Guild | None = None, bot: di
         embeds.append(embed)
     return embeds
 
+
+def _formularios_disponiveis(lista: list) -> list:
+    return [item for item in lista if isinstance(item, dict) and item.get("id")
+            and item.get("ativo", True) is not False and not item.get("arquivado")
+            and _perguntas_flat(item)]
+
+
+def _embed_central_inscricoes(lista: list, guild: discord.Guild, bot: discord.Client) -> discord.Embed:
+    disponiveis = _formularios_disponiveis(lista)
+    linhas = [
+        f"**{i:02d}.** {item.get('nome', 'Formulário')}  ·  "
+        f"{len(_perguntas_flat(item))} questões  ·  {len(_paginas_modal(item))} etapas"
+        for i, item in enumerate(disponiveis[:25], start=1)
+    ]
+    corpo = "\\n".join(linhas) if linhas else "No momento, não há inscrições abertas."
+    orientacao = ("Selecione no menu abaixo o processo seletivo desejado para iniciar sua inscrição."
+                  if linhas else "Novos processos seletivos serão disponibilizados aqui quando forem ativados.")
+    embed = criar_embed(
+        "✦・ CENTRAL DE INSCRIÇÕES ・✦",
+        "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\\n"
+        "　　　 **N̷ÊMESIS  /  RECRUTAMENTO**\\n"
+        "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\\n\\n"
+        "Acesse os processos seletivos disponíveis em um único lugar. "
+        "Cada formulário possui suas próprias etapas e perguntas.\\n\\n"
+        "**PROCESSOS DISPONÍVEIS**\\n"
+        f"{corpo}\\n\\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\\n"
+        f"{orientacao}\\n"
+        "Responda com atenção e aguarde a avaliação da comissão responsável.\\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
+        cor=0x9F1239,
+        rodape=f"N̷ÊMESIS  •  CENTRAL DE RECRUTAMENTO  •  {len(disponiveis)} inscrição(ões) aberta(s)",
+    )
+    embed.set_author(name="N̷ÊMESIS  /  DEPARTAMENTO DE RECRUTAMENTO")
+    aplicar_identidade_servidor(embed, guild, bot, banner=True)
+    return embed
+
+
+class SeletorInscricaoPublico(discord.ui.Select):
+    def __init__(self, lista: list):
+        disponiveis = _formularios_disponiveis(lista)
+        opcoes = [
+            discord.SelectOption(
+                label=str(item.get("nome") or "Formulário")[:100],
+                value=str(item["id"]),
+                description=f"{len(_perguntas_flat(item))} questões • {len(_paginas_modal(item))} etapas"[:100],
+                emoji="📋",
+            )
+            for item in disponiveis[:25]
+        ]
+        if not opcoes:
+            opcoes = [discord.SelectOption(label="Nenhuma inscrição disponível", value="indisponivel",
+                                           description="Aguarde a abertura de um processo seletivo.")]
+        super().__init__(placeholder="Selecione o formulário que deseja preencher",
+                         min_values=1, max_values=1, options=opcoes,
+                         disabled=not bool(disponiveis),
+                         custom_id="nemesis:formularios:seletor_publico")
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Este seletor só pode ser utilizado dentro do servidor da NÊMESIS.", ephemeral=True)
+            return
+        formulario_id = self.values[0]
+        if formulario_id == "indisponivel":
+            await interaction.response.send_message("Não há inscrições abertas no momento.", ephemeral=True)
+            return
+        formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
+        if (not formulario or formulario.get("ativo", True) is False
+                or formulario.get("arquivado") or not _perguntas_flat(formulario)):
+            await interaction.response.send_message("Este formulário não está mais disponível. Atualize a central e tente novamente.", ephemeral=True)
+            return
+        await interaction.response.send_modal(ModalFormulario(formulario, usuario_id=interaction.user.id))
+
+
+def _view_central_inscricoes(lista: list) -> discord.ui.View:
+    view = discord.ui.View(timeout=None)
+    view.add_item(SeletorInscricaoPublico(lista))
+    return view
+
 def _view_painel(formulario: dict) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     ativo = formulario.get("ativo") is not False
@@ -480,6 +559,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._view_inscricoes_registrada = False
 
     @app_commands.command(name="central", description="Abre a central interativa de administração dos formulários.")
     @app_commands.checks.has_permissions(administrator=True)
@@ -497,90 +577,67 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @commands.Cog.listener()
     async def on_ready(self):
-        """Mantém somente o painel oficial de inscrição para Staff."""
+        """Garante o formulário automático de Staff e mantém uma central pública única."""
         async with _LOCK_PAINÉIS_AUTOMÁTICOS:
             guild = self.bot.get_guild(GUILD_NEMESIS_ID)
             if guild is None:
-                logging.warning("Painéis automáticos: servidor NÊMESIS não está disponível.")
+                logging.warning("Central de inscrições: servidor NÊMESIS não está disponível.")
                 return
-
-            try:
-                estado = await carregar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, {})
-            except Exception:
-                logging.exception("Não foi possível carregar o estado dos painéis automáticos.")
-                return
-
-            # Preserva formulários, candidaturas e painéis criados pelos administradores.
-            # A inicialização não deve apagar dados existentes.
-            estado = estado if isinstance(estado, dict) else {}
-
             for definicao in FORMULARIOS_AUTOMATICOS:
-                chave = definicao["chave"]
                 try:
                     lista = await formularios.listar_formularios(guild.id)
-                    formulario = next(
-                        (item for item in lista if item.get("nome") == definicao["nome"]),
-                        None,
-                    )
+                    formulario = next((item for item in lista if item.get("nome") == definicao["nome"]), None)
                     if formulario is None:
                         formulario = await formularios.criar_formulario(
-                            guild.id,
-                            definicao["nome"],
-                            definicao["titulo"],
-                            definicao["descricao"],
-                            None,
-                            self.bot.user.id if self.bot.user else 0,
+                            guild.id, definicao["nome"], definicao["titulo"],
+                            definicao["descricao"], None, self.bot.user.id if self.bot.user else 0,
                         )
-
                     if not formularios.perguntas_flat(formulario):
                         for perguntas in definicao["paginas"]:
-                            formulario = await formularios.adicionar_pagina(
-                                guild.id, formulario["id"], perguntas
-                            )
+                            formulario = await formularios.adicionar_pagina(guild.id, formulario["id"], perguntas)
                             if formulario is None:
-                                raise RuntimeError(
-                                    f"Não foi possível configurar perguntas para {definicao['nome']}."
-                                )
-
-                    canal = guild.get_channel(definicao["canal_id"])
-                    if canal is None:
-                        canal = await guild.fetch_channel(definicao["canal_id"])
-                    if not callable(getattr(canal, "send", None)):
-                        raise TypeError(f"O canal {definicao['canal_id']} não aceita mensagens.")
-
-                    registro = estado.get(chave, {})
-                    mensagem_existente = None
-                    if registro.get("canal_id") == definicao["canal_id"] and registro.get("mensagem_id"):
-                        try:
-                            mensagem_existente = await canal.fetch_message(int(registro["mensagem_id"]))
-                        except discord.NotFound:
-                            mensagem_existente = None
-
-                    embeds = _embeds_painel(formulario, guild, self.bot)
-                    view = _view_painel(formulario)
-                    if mensagem_existente is not None:
-                        # Mantém os painéis atualizados sem criar duplicatas em reconexões.
-                        await mensagem_existente.edit(embeds=embeds, view=view)
-                        mensagem = mensagem_existente
-                        acao = "atualizado"
-                    else:
-                        mensagem = await canal.send(embeds=embeds, view=view)
-                        acao = "publicado"
-
-                    estado[chave] = {
-                        "canal_id": definicao["canal_id"],
-                        "mensagem_id": mensagem.id,
-                        "formulario_id": formulario["id"],
-                    }
-                    await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
-                    logging.info(
-                        "Painel automático %s: %s (canal=%s, mensagem=%s).",
-                        acao, definicao["nome"], definicao["canal_id"], mensagem.id,
-                    )
-                except (discord.Forbidden, discord.HTTPException, TypeError, ValueError):
-                    logging.exception("Falha ao publicar o painel automático %s.", definicao["nome"])
+                                raise RuntimeError(f"Não foi possível configurar perguntas para {definicao['nome']}.")
                 except Exception:
                     logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
+            try:
+                await self.atualizar_central_inscricoes(guild)
+            except Exception:
+                logging.exception("Não foi possível atualizar a central pública de inscrições.")
+
+    async def atualizar_central_inscricoes(self, guild: discord.Guild):
+        """Cria/atualiza a central única, reaproveitando a mensagem antiga do painel Staff."""
+        canal_id = 1563995880623841338
+        canal = guild.get_channel(canal_id)
+        if canal is None:
+            canal = await guild.fetch_channel(canal_id)
+        if not callable(getattr(canal, "send", None)):
+            raise TypeError(f"O canal {canal_id} não aceita mensagens.")
+        estado = await carregar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, {})
+        estado = estado if isinstance(estado, dict) else {}
+        registro = estado.get("central_inscricoes") or estado.get("staff") or {}
+        mensagem_existente = None
+        if registro.get("canal_id") == canal_id and registro.get("mensagem_id"):
+            try:
+                mensagem_existente = await canal.fetch_message(int(registro["mensagem_id"]))
+            except discord.NotFound:
+                mensagem_existente = None
+        lista = await formularios.listar_formularios(guild.id)
+        embed = _embed_central_inscricoes(lista, guild, self.bot)
+        view = _view_central_inscricoes(lista)
+        if mensagem_existente is not None:
+            mensagem = await mensagem_existente.edit(embed=embed, view=view)
+            acao = "atualizada"
+        else:
+            mensagem = await canal.send(embed=embed, view=view)
+            acao = "publicada"
+        estado.pop("staff", None)
+        estado["central_inscricoes"] = {"canal_id": canal_id, "mensagem_id": mensagem.id, "tipo": "seletor_dinamico"}
+        await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
+        if not getattr(self, "_view_inscricoes_registrada", False):
+            self.bot.add_view(_view_central_inscricoes(lista))
+            self._view_inscricoes_registrada = True
+        logging.info("Central pública de inscrições %s (canal=%s, mensagem=%s, disponíveis=%s).",
+                     acao, canal_id, mensagem.id, len(_formularios_disponiveis(lista)))
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
 
@@ -646,6 +703,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             interaction.guild.id, nome, titulo_painel, descricao_painel,
             banner.url if banner else None, interaction.user.id,
         )
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
             f"✅ Formulário **{nome}** criado (ID: `{formulario['id']}`). "
             f"Agora use `/formularios pagina-adicionar` pra adicionar as perguntas (até 5 por página, "
@@ -668,6 +726,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not formulario:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
             f"✅ Página {len(formulario['paginas'])} adicionada ({len(perguntas)} pergunta(s)). "
             f"Total agora: {len(formulario['paginas'])} página(s).", ephemeral=True,
@@ -732,6 +791,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not ok:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
             "✦ Formulário arquivado. O painel foi desativado e o histórico de candidaturas foi preservado.",
             ephemeral=True,
@@ -746,6 +806,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
             return
         await formularios.reativar_formulario(interaction.guild.id, formulario_id)
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
             f"✦ **{formulario.get('nome', 'Formulário')}** reativado. Publique o painel novamente com `/formularios painel`.",
             ephemeral=True,
@@ -759,6 +820,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not formulario:
             await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
             return
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
             f"Inscrições de **{formulario.get('nome', 'Formulário')}** pausadas. O histórico foi preservado.",
             ephemeral=True,
