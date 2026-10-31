@@ -9,7 +9,9 @@ from pathlib import Path
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+
+from utils.guild_config import lideranca_only, tasks
 
 from utils.storage import carregar, salvar
 from utils.preferencias_notificacoes import listar_inscritos, definir_preferencia
@@ -156,7 +158,7 @@ class Novidades(commands.Cog):
         app_commands.Choice(name="Manutenção", value="Manutenção"),
         app_commands.Choice(name="Aviso importante", value="Aviso importante"),
     ])
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def avisos_enviar(
         self,
         interaction: discord.Interaction,
