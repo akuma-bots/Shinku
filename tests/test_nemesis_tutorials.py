@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from cogs.tutorial import TUTORIAIS, Tutorial, CANAL_TUTORIAIS_ID
-from utils.guia_servidores import CANAIS_GUIA_SERVIDORES
+from utils.guia_servidores import CANAIS_GUIA_SERVIDORES, CARGO_VISITANTES_ID, TAG_ORG_NEMESIS
 
 
 def test_tutorial_catalog_has_core_systems():
@@ -29,3 +29,11 @@ def test_welcome_guide_links_only_known_nemesis_channels():
     assert len(ids) == len(set(ids))
     assert len(CANAIS_GUIA_SERVIDORES) <= 25
     assert all(canal_id > 0 for canal_id in ids)
+
+
+def test_start_tutorial_explains_visitor_role_and_org_tag():
+    texto = " ".join(TUTORIAIS["inicio"]["passos"])
+    assert "Visitantes" in texto
+    assert "NΞM" in texto
+    assert CARGO_VISITANTES_ID == 1563995879990624371
+    assert TAG_ORG_NEMESIS == "NΞM"
