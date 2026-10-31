@@ -39,6 +39,26 @@ def _resumo_progressao(perfil: dict) -> dict:
     }
 
 
+def _posicao_progressao(membros: dict, user_id: int):
+    if not isinstance(membros, dict):
+        return None
+    ordenados = []
+    for uid, dados in membros.items():
+        if not isinstance(dados, dict):
+            continue
+        try:
+            xp = max(0, int(dados.get("xp", 0) or 0))
+            mensagens = max(0, int(dados.get("mensagens", 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            xp, mensagens = 0, 0
+        ordenados.append((str(uid), xp, mensagens))
+    ordenados.sort(key=lambda item: (-item[1], -item[2], item[0]))
+    return next(
+        (posicao for posicao, item in enumerate(ordenados, start=1) if item[0] == str(user_id)),
+        None,
+    )
+
+
 def _resumo_historico_missoes(revisoes: list, user_id: int, limite: int = 5) -> dict:
     registros = [
         item for item in revisoes
@@ -91,6 +111,7 @@ class Perfil(commands.Cog):
             if isinstance(membros_progressao, dict) else {}
         )
         resumo_progressao = _resumo_progressao(perfil_progressao)
+        posicao_progressao = _posicao_progressao(membros_progressao, alvo.id)
         historico_missoes = _resumo_historico_missoes(
             await revisoes_storage.listar(interaction.guild.id), alvo.id
         )
@@ -204,6 +225,11 @@ class Perfil(commands.Cog):
                 + f"\n{resumo_progressao['barra']}\n{destino_org}"
             ),
             inline=False,
+        )
+        embed.add_field(
+            name="◈ POSIÇÃO NA PROGRESSÃO",
+            value=f"**#{posicao_progressao}** no quadro organizacional" if posicao_progressao else "Ainda sem classificação",
+            inline=True,
         )
         embed.add_field(
             name="◈ PARTICIPAÇÃO REGISTRADA",
