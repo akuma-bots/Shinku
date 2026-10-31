@@ -897,6 +897,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             ephemeral=True,
         )
 
+    @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type != discord.InteractionType.component:
             return
