@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils import temporadas
+from utils.guild_config import lideranca_only
 
 POSICAO_EMOJI = {1: "🥇", 2: "🥈", 3: "🥉"}
 
@@ -83,7 +84,7 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
     @app_commands.describe(duracao_dias="Duração de cada temporada em dias", canal="Canal onde o fim da temporada é anunciado",
                             cargo_campeao="Cargo dado ao 1º lugar (opcional)", bonus_ouro="XP de bônus pro 1º lugar",
                             bonus_prata="XP de bônus pro 2º lugar", bonus_bronze="XP de bônus pro 3º lugar")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def temporada_configurar(self, interaction: discord.Interaction, duracao_dias: int = None,
                                     canal: discord.TextChannel = None, cargo_campeao: discord.Role = None,
                                     bonus_ouro: int = None, bonus_prata: int = None, bonus_bronze: int = None):
