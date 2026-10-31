@@ -14,6 +14,7 @@ from discord.ext import commands, tasks
 from utils.storage import carregar, salvar
 from utils.preferencias_notificacoes import listar_inscritos, definir_preferencia
 from cogs.boas_vindas_dm import OptOutView
+from cogs.boas_vindas_dm import DesativarAvisosButton
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,15 @@ def _aplicar_identidade_bot(embed: discord.Embed, guild: discord.Guild, bot: dis
 
 
 
+class NotasDMView(discord.ui.View):
+    """Ações úteis dentro da DM da atualização."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
+        self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
+        self.add_item(DesativarAvisosButton())
+
+
 async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
     """Retorna enviada, permanente ou temporaria; repete falhas transitórias."""
     user_id = getattr(membro, "id", "desconhecido")
@@ -57,7 +67,7 @@ async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed
         try:
             await membro.send(
                 embed=embed,
-                view=OptOutView(),
+                view=NotasDMView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return "enviada"
@@ -314,7 +324,7 @@ class Novidades(commands.Cog):
         )
 
     async def _anunciar_release(self, guild: discord.Guild):
-        """Publica cada release uma única vez no canal de anúncios; nunca dispara DM em massa."""
+        """Envia cada release por DM aos membros inscritos, sem publicar em #Anúncios."""
         async with self._lock:
             if self._processando:
                 return
@@ -329,54 +339,58 @@ class Novidades(commands.Cog):
                 guilds = estados.setdefault("guilds", {})
                 guild_estado = guilds.setdefault(str(guild.id), {})
                 release_estado = guild_estado.setdefault(release["release_id"], {})
-                ja_publicado = bool(release_estado.get("publicado_no_canal"))
+                enviados_ids = set(str(x) for x in release_estado.get("dms_enviadas", []))
+
                 embed = criar_embed(
                     description=(
-                        "╭────────────── ◈ ──────────────╮\n"
-                        "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE ATUALIZAÇÕES**\n"
-                        "╰────────────── ◈ ──────────────╯\n\n"
-                        f"**{release['titulo']}**\n"
-                        f"{release['mensagem']}\n\n"
-                        "━━━━━━━━━━━━━━━━━━━━\n"
-                        "**◈ O QUE VOCÊ PRECISA SABER**\n"
-                        "As atualizações oficiais ficam centralizadas neste canal. Consulte #Sistemas e /help para localizar os recursos."
+                        "╭────────────── ◈ ──────────────╮\\n"
+                        "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  NOTAS DE ATUALIZAÇÃO**\\n"
+                        "╰────────────── ◈ ──────────────╯\\n\\n"
+                        f"**{release['titulo']}**\\n"
+                        f"{release['mensagem']}\\n\\n"
+                        "**◈ INFORMAÇÕES DA ATUALIZAÇÃO**\\n"
+                        "Consulte os botões abaixo para acessar os sistemas e acompanhar as missões."
                     ),
                     color=0xB3132B,
                     timestamp=datetime.now(timezone.utc),
                 )
                 _aplicar_identidade_bot(embed, guild, self.bot)
                 embed.add_field(name="◈ CATEGORIA", value=f"**{release['tipo']}**", inline=True)
-                embed.add_field(name="◈ DATA DA ATUALIZAÇÃO", value=f"**{release['data_atualizacao']}**", inline=True)
-                embed.add_field(name="◈ HORÁRIO", value=f"**{release['hora_atualizacao']}**\n{release['fuso_horario']}", inline=True)
-                embed.add_field(name="◈ ACESSO RÁPIDO", value="**#Sistemas** — biblioteca de tutoriais\n**/help** — central de comandos", inline=False)
+                embed.add_field(name="◈ DATA", value=f"**{release['data_atualizacao']}**", inline=True)
+                embed.add_field(name="◈ HORÁRIO", value=f"**{release['hora_atualizacao']}**\\n{release['fuso_horario']}", inline=True)
                 embed.set_footer(text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)")
-                canal = guild.get_channel(CANAL_ANUNCIOS_ID)
-                if canal is None:
-                    canal = await self.bot.fetch_channel(CANAL_ANUNCIOS_ID)
-                if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
-                    raise ValueError("Canal oficial de anúncios inválido.")
-                if ja_publicado:
-                    mensagem_id = release_estado.get("mensagem_id")
-                    if mensagem_id:
-                        mensagem = await canal.fetch_message(int(mensagem_id))
-                        await mensagem.edit(
-                            embed=embed,
-                            view=AvisosPublicosView(),
-                            allowed_mentions=discord.AllowedMentions.none(),
-                        )
-                        logger.info("Release %s atualizado com layout e controles no canal %s (message=%s).", release["release_id"], canal.id, mensagem.id)
-                    return
 
-                mensagem = await canal.send(embed=embed, view=AvisosPublicosView(), allowed_mentions=discord.AllowedMentions.none())
-                release_estado["publicado_no_canal"] = True
-                release_estado["mensagem_id"] = str(mensagem.id)
-                release_estado["publicado_em"] = datetime.now(timezone.utc).isoformat()
+                membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+                inscritos = await listar_inscritos(guild.id, "notas_atualizacao", [str(m.id) for m in membros])
+                destinatarios = [m for m in membros if str(m.id) in inscritos and str(m.id) not in enviados_ids]
+                enviados = 0
+                falhas = 0
+                for membro in destinatarios:
+                    resultado = await _enviar_dm_com_retry(membro, embed=embed)
+                    if resultado == "enviada":
+                        enviados_ids.add(str(membro.id))
+                        enviados += 1
+                        release_estado["dms_enviadas"] = sorted(enviados_ids)
+                        release_estado["ultima_tentativa_em"] = datetime.now(timezone.utc).isoformat()
+                        guild_estado[release["release_id"]] = release_estado
+                        guilds[str(guild.id)] = guild_estado
+                        await salvar(ARQUIVO_ESTADO, estados)
+                    else:
+                        falhas += 1
+                    await asyncio.sleep(INTERVALO_ENVIO)
+
+                release_estado["total_inscritos"] = len(inscritos)
+                release_estado["ultimo_envio_em"] = datetime.now(timezone.utc).isoformat()
+                release_estado["envio_concluido"] = len(enviados_ids) >= len(inscritos)
                 guild_estado[release["release_id"]] = release_estado
                 guilds[str(guild.id)] = guild_estado
                 await salvar(ARQUIVO_ESTADO, estados)
-                logger.info("Release %s publicado no canal %s (message=%s).", release["release_id"], canal.id, mensagem.id)
+                logger.info(
+                    "Notas enviadas por DM (guild=%s, release=%s, inscritos=%s, enviados_nesta_execucao=%s, falhas=%s, total_acumulado=%s).",
+                    guild.id, release["release_id"], len(inscritos), enviados, falhas, len(enviados_ids),
+                )
             except Exception:
-                logger.exception("Falha ao publicar release automático da NÊMESIS.")
+                logger.exception("Falha ao enviar notas automáticas por DM.")
             finally:
                 self._processando = False
 
