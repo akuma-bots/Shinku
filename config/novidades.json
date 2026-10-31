@@ -1,10 +1,10 @@
 {
-  "release_id": "20261031-121220",
+  "release_id": "20261031-121251",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Add dynamic public form selector for NEMESIS applications",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Add dynamic public form selector for NEMESIS applications\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Refine central selector publishing and lifecycle updates",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Refine central selector publishing and lifecycle updates\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "31/10/2026",
   "hora_atualizacao": "12:12",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-31T12:12:20.526207-03:00"
+  "gerado_em": "2026-10-31T12:12:51.334776-03:00"
 }
