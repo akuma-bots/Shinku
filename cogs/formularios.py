@@ -10,6 +10,7 @@ from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 from utils.storage import carregar, salvar
 
 from utils import formularios
+from utils.guild_config import lideranca_only, membro_tem_lideranca
 
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
@@ -482,7 +483,7 @@ class SeletorAcaoFormulario(discord.ui.Select):
         if interaction.user.id != central.usuario_id:
             await interaction.response.send_message("Esta central pertence a outra pessoa.", ephemeral=True)
             return
-        if interaction.guild is None or not interaction.user.guild_permissions.administrator:
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
             await interaction.response.send_message("Você precisa de permissão de Administrador.", ephemeral=True)
             return
         formulario = await formularios.get_formulario(interaction.guild.id, central.formulario_id)
@@ -574,7 +575,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         self._view_inscricoes_registrada = False
 
     @app_commands.command(name="central", description="Abre a central interativa de administração dos formulários.")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_central(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro da NÊMESIS.", ephemeral=True)
@@ -1001,13 +1002,13 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             autorizado = bool(
                 membro_revisor
                 and (
-                    membro_revisor.guild_permissions.administrator
+                    membro_tem_lideranca(membro_revisor)
                     or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in membro_revisor.roles)
                 )
             )
             if not autorizado:
                 await interaction.response.send_message(
-                    "Você precisa do cargo Instrutor/Aprovador ou da permissão Administrador para revisar formulários.",
+                    "Você precisa do cargo Instrutor/Aprovador ou de um cargo de liderança autorizado para revisar formulários.",
                     ephemeral=True,
                 )
                 return
