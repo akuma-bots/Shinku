@@ -178,6 +178,8 @@ class ProgressaoGangue(commands.Cog):
             perfil["rank_no"] = rank_novo["no"]
             membros[str(user_id)] = perfil
             await self._salvar_dados(dados)
+            if hasattr(self.bot, "dispatch"):
+                self.bot.dispatch("nemesis_conquistas_verificar", guild_id, user_id)
             return dict(perfil), rank_antigo, rank_novo, True
 
     async def _transferir_xp(self, guild_id: int, origem_id: int, destino_id: int, quantidade: int) -> tuple[dict, dict]:
