@@ -6,7 +6,7 @@ from discord.ext import commands
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 
 from utils import desafios
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
 
 XP_VITORIA_PVP = 50
@@ -201,7 +201,7 @@ class Desafios(commands.Cog):
     # ---------------- Configuração ----------------
     @app_commands.command(name="desafio-canais", description="Define os canais de desafios e lutas.")
     @app_commands.describe(canal_desafios="Onde os desafios são anunciados", canal_lutas="Onde as lutas aceitas são anunciadas")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def desafio_canais(self, interaction: discord.Interaction,
                               canal_desafios: discord.TextChannel, canal_lutas: discord.TextChannel):
         await set_config(interaction.guild.id, canal_desafios_id=canal_desafios.id, canal_lutas_id=canal_lutas.id)
