@@ -72,6 +72,18 @@ FORMULARIOS_AUTOMATICOS = [
             "Qual é sua disponibilidade semanal para ajudar no servidor?",
             "Você já teve experiência com moderação ou organização? Explique.",
             "Como agiria se dois membros começassem uma discussão séria?"
+        ], [
+            "Quais são seus principais pontos fortes para atuar na equipe?",
+            "Em quais áreas da NÊMESIS você acredita que poderia contribuir melhor?",
+            "Como reagiria se um membro desrespeitasse uma regra mesmo após ser alertado?",
+            "O que faria se um amigo próximo cometesse uma infração?",
+            "Como lidaria com uma situação em que não soubesse qual decisão tomar?"
+        ], [
+            "Como você organiza seu tempo para cumprir responsabilidades?",
+            "O que faria ao perceber um problema importante enquanto nenhum líder está online?",
+            "Como receberia uma crítica da liderança sobre seu trabalho?",
+            "Na sua opinião, o que caracteriza uma postura imparcial dentro da Staff?",
+            "Existe algo mais sobre sua experiência ou disponibilidade que queira acrescentar?"
         ]],
     },
 ]
