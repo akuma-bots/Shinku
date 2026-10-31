@@ -202,12 +202,22 @@ class ModalFormulario(discord.ui.Modal):
             texto = _texto_pergunta(pergunta)
             obrigatoria = pergunta.get("obrigatoria", True) if isinstance(pergunta, dict) else True
             opcoes = pergunta.get("opcoes") or [] if isinstance(pergunta, dict) else []
-            placeholder = None
+            # O Discord limita o rótulo de cada campo a 45 caracteres.
+            # Usamos um rótulo curto e reservamos o placeholder para exibir
+            # o enunciado da questão, evitando cortar perguntas longas no modal.
+            rotulo = f"Questão {len(self.inputs) + 1:02d} • Resposta"
+            placeholder = texto[:100] or "Digite sua resposta..."
             if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha" and opcoes:
-                placeholder = ("Escolha uma opção: " + " | ".join(str(opcao) for opcao in opcoes))[:100]
-            campo = discord.ui.TextInput(label=texto[:45], style=discord.TextStyle.paragraph,
-                                          required=bool(obrigatoria), max_length=1000,
-                                          placeholder=placeholder)
+                opcoes_texto = " | ".join(str(opcao) for opcao in opcoes)
+                prefixo = f"{texto[:55]} • Opções: "
+                placeholder = (prefixo + opcoes_texto)[:100]
+            campo = discord.ui.TextInput(
+                label=rotulo,
+                style=discord.TextStyle.paragraph,
+                required=bool(obrigatoria),
+                max_length=1000,
+                placeholder=placeholder,
+            )
             self.inputs.append(campo)
             self.add_item(campo)
 
