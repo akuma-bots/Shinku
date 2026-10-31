@@ -99,28 +99,30 @@ def gerar(before: str, after: str) -> dict | None:
         "perfil": "Perfis", "novidades": "Central de atualizações",
         "desafios": "Desafios", "guerras": "Guerras",
     }
+    # Notas públicas nunca devem reproduzir assuntos de commits em inglês.
+    # Traduções explícitas preservam detalhes; assuntos desconhecidos recebem
+    # uma descrição funcional em português baseada nas áreas realmente alteradas.
+    traducoes = {
+        "fix multi-step form continuation interaction listener":
+            "Formulários: corrigida a continuidade entre as etapas de inscrição.",
+        "improve update announcements with bot branding":
+            "Central de atualizações: identidade visual do bot aplicada aos comunicados.",
+        "write current update notes in brazilian portuguese":
+            "Central de atualizações: notas padronizadas em português do Brasil.",
+        "fix application delivery channel and migrate staff form questions":
+            "Formulários: corrigido o canal de recebimento e ampliado o questionário de recrutamento.",
+        "add regression tests for staff questions and submission channel":
+            "Formulários: adicionados testes para as perguntas e o canal de recebimento.",
+    }
     unicos = list(dict.fromkeys(assuntos))
     linhas = []
     for assunto in unicos[:6]:
-        cabecalho = re.match(r"^(?:feat|fix|refactor|perf|chore|style|test)(?:\(([^)]*)\))?!?:\s*(.+)$", assunto, flags=re.I)
-        if cabecalho:
-            area, descricao = cabecalho.groups()
-            if area:
-                limpo = f"{rotulos.get(area.lower(), area.replace('_', ' ').title())}: {descricao}"
-            else:
-                limpo = descricao
-        else:
-            limpo = assunto
-            escopo = re.match(r"^([a-z0-9_-]+):\s*(.+)$", limpo, flags=re.I)
-            if escopo:
-                area, descricao = escopo.groups()
-                limpo = f"{rotulos.get(area.lower(), area.replace('_', ' ').title())}: {descricao}"
-        limpo = re.sub(r"\s+", " ", limpo).strip(" .-")
+        limpo = traducoes.get(assunto.casefold().strip())
         if limpo:
-            linhas.append(f"• {(limpo[0].upper() + limpo[1:])[:220]}")
+            linhas.append(f"• {limpo[:220]}")
     if not linhas:
-        linhas.append("• Foram aplicadas alterações funcionais nos sistemas do bot.")
-
+        descricao_areas = ", ".join(areas) if areas else "sistemas internos"
+        linhas.append(f"• Foram aplicadas melhorias em {descricao_areas}.")
     mensagem = (
         "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n"
         + "\n".join(linhas)
