@@ -49,6 +49,13 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 - O tutorial de missões foi atualizado para refletir o novo fluxo.
 - A navegação identifica a categoria pelo painel atual, inclusive após reinicializações do Shinku.
 
+### Central de Validação de Provas — 2026-10-31
+- Painel administrativo privado com indicadores gerais de pendências, aprovações e recusas.
+- Filtros combináveis por situação e categoria (Missões, Contribuições, Operações especiais, PvP e PvE).
+- Paginação de oito registros por página, com atualização manual e navegação.
+- Cada registro exibe protocolo, referência, participante, auxiliar, categoria, data e revisor; recusas exibem a justificativa.
+- O painel e seus controles verificam o administrador que abriu a sessão; as decisões continuam protegidas pela validação administrativa e pelo estado pendente no armazenamento.
+
 ## Observações de implantação
 - Alterações mescladas precisam de deploy bem-sucedido no Render.
 - Após o deploy, validar os logs de inicialização e os painéis no Discord.
