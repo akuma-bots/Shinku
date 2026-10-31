@@ -67,8 +67,8 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 ## 2026-10-31 — Conquistas, medalhas e recompensas
 
 ### Entregue no código
-- Novo catálogo com 15 conquistas de progressão, participação, operações e combate.
-- Critérios verificáveis por XP organizacional, mensagens válidas, missões aprovadas, vitórias, MVPs e recorde de sequência.
+- Novo catálogo com 18 conquistas de progressão, participação, operações, guerras e combate.
+- Critérios verificáveis por XP organizacional, mensagens válidas, missões aprovadas (incluindo auxiliares), guerras registradas, vitórias, MVPs e recorde de sequência.
 - Ledger persistente por servidor e membro, com timestamp de desbloqueio e estado individual da recompensa.
 - Recompensas em XP organizacional entregues com chave idempotente; uma mesma conquista não credita XP duas vezes.
 - Verificação automática após XP de participação, recompensas de missões e resultados PvP aprovados.
