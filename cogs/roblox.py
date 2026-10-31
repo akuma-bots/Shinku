@@ -3,6 +3,7 @@ import asyncio
 import logging
 import random
 import string
+from datetime import datetime, timezone
 import aiohttp
 import discord
 from discord import app_commands
@@ -22,6 +23,7 @@ ROBLOX_GRUPO_ID = 621286796
 ROBLOX_GRUPO_URL = "https://www.roblox.com/pt/communities/621286796/Comunidade-Nik"
 ROBLOX_CANAL_CENTRAL_ID = 1565825670066737202
 ARQUIVO_PAINEL_ROBLOX = "roblox_painel_central.json"
+ARQUIVO_HISTORICO_ROBLOX = "roblox_historico.json"
 
 async def _buscar_dados_grupo() -> dict:
     timeout = aiohttp.ClientTimeout(total=12)
@@ -599,6 +601,35 @@ class Roblox(commands.Cog):
                 atualizados += 1
         await interaction.followup.send(f"✅ Sincronização concluída pra {atualizados} membro(s) vinculado(s).", ephemeral=True)
 
+    @app_commands.command(name="roblox-historico", description="Consulta as últimas alterações de participação e rank no grupo Roblox.")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def roblox_historico(self, interaction: discord.Interaction):
+        historico = await carregar(ARQUIVO_HISTORICO_ROBLOX, {})
+        eventos = historico.get(str(interaction.guild.id), []) if isinstance(historico, dict) else []
+        if not isinstance(eventos, list) or not eventos:
+            await interaction.response.send_message("Ainda não há alterações registradas. O histórico começa a ser preenchido nas verificações automáticas.", ephemeral=True)
+            return
+        linhas = []
+        for evento in reversed(eventos[-12:]):
+            if not isinstance(evento, dict):
+                continue
+            tipo = str(evento.get("tipo", "atualização")).replace("_", " ").title()
+            nome = discord.utils.escape_markdown(str(evento.get("roblox_username") or "Conta Roblox"))
+            discord_id = evento.get("discord_id")
+            membro = f"<@{discord_id}>" if str(discord_id or "").isdigit() else "Membro não identificado"
+            anterior = evento.get("rank_anterior") or "—"
+            atual = evento.get("rank_atual") or "—"
+            quando = str(evento.get("quando") or "")
+            try:
+                data = datetime.fromisoformat(quando)
+                timestamp = int(data.timestamp())
+                data_texto = f"<t:{timestamp}:R>"
+            except (TypeError, ValueError, OverflowError):
+                data_texto = "data indisponível"
+            linhas.append(f"**{tipo}** · {nome}\n{membro} · `{anterior}` → `{atual}`\n{data_texto}")
+        embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ HISTÓRICO ROBLOX", description="\n\n".join(linhas)[:3900] or "Nenhum evento válido encontrado.", color=0xB3132B)
+        embed.set_footer(text="Últimas 12 alterações • Verificação automática a cada 30 minutos")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     @tasks.loop(minutes=30)
     async def sincronizacao_automatica(self):
         import logging
@@ -628,7 +659,45 @@ class Roblox(commands.Cog):
                         membro = guild.get_member(int(discord_id))
                         if not membro or not isinstance(vinculo, dict) or not vinculo.get("roblox_id"):
                             continue
-                        await sincronizar_cargo_membro(guild, membro, vinculo["roblox_id"])
+                        roblox_id = int(vinculo["roblox_id"])
+                        rank_atual = await _buscar_rank_no_grupo(roblox_id, config["grupo_id"])
+                        historico = await carregar(ARQUIVO_HISTORICO_ROBLOX, {})
+                        if not isinstance(historico, dict):
+                            historico = {}
+                        eventos = historico.get(str(guild.id), [])
+                        if not isinstance(eventos, list):
+                            eventos = []
+                        estado_anterior = next((
+                            item for item in reversed(eventos)
+                            if isinstance(item, dict)
+                            and str(item.get("discord_id")) == str(discord_id)
+                            and item.get("tipo") in {"entrada", "saida", "alteracao_rank", "verificacao_inicial"}
+                        ), None)
+                        rank_anterior = estado_anterior.get("rank_atual") if estado_anterior else None
+                        tipo_evento = None
+                        if estado_anterior is None:
+                            tipo_evento = "verificacao_inicial"
+                        elif rank_anterior is None and rank_atual is not None:
+                            tipo_evento = "entrada"
+                        elif rank_anterior is not None and rank_atual is None:
+                            tipo_evento = "saida"
+                        elif rank_anterior != rank_atual:
+                            tipo_evento = "alteracao_rank"
+                        if tipo_evento:
+                            eventos.append({
+                                "tipo": tipo_evento,
+                                "discord_id": int(discord_id),
+                                "roblox_id": roblox_id,
+                                "roblox_username": str(vinculo.get("roblox_username") or ""),
+                                "rank_anterior": rank_anterior,
+                                "rank_atual": rank_atual,
+                                "quando": datetime.now(timezone.utc).isoformat(),
+                            })
+                            historico[str(guild.id)] = eventos[-200:]
+                            await salvar(ARQUIVO_HISTORICO_ROBLOX, historico)
+                        resultado = await sincronizar_cargo_membro(guild, membro, roblox_id)
+                        if resultado.startswith("Erro ao consultar"):
+                            logger.warning("Consulta de rank falhou (guild=%s, user=%s): %s", guild.id, discord_id, resultado)
                     except Exception:
                         logger.exception(
                             "Falha ao sincronizar cargo Roblox (guild=%s, user=%s).",
