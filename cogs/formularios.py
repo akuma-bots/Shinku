@@ -456,7 +456,7 @@ class SeletorAcaoFormulario(discord.ui.Select):
             placeholder="Escolha uma ação para o formulário",
             min_values=1, max_values=1,
             options=[
-                discord.SelectOption(label="Publicar painel neste canal", value="publicar"),
+                discord.SelectOption(label="Atualizar central pública", value="publicar"),
                 discord.SelectOption(label="Pausar inscrições", value="pausar"),
                 discord.SelectOption(label="Reativar inscrições", value="reativar"),
                 discord.SelectOption(label="Arquivar formulário", value="arquivar"),
@@ -807,7 +807,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         await formularios.reativar_formulario(interaction.guild.id, formulario_id)
         await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(
-            f"✦ **{formulario.get('nome', 'Formulário')}** reativado. Publique o painel novamente com `/formularios painel`.",
+            f"✦ **{formulario.get('nome', 'Formulário')}** reativado e já está disponível no seletor de inscrições.",
             ephemeral=True,
         )
 
