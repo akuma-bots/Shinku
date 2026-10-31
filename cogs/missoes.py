@@ -16,7 +16,7 @@ from utils.catalogo_missoes import (
     salvar_mensagem_discord,
     obter_mensagem_discord,
 )
-from utils.guild_config import get_config
+from utils.guild_config import get_config, lideranca_only
 from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
@@ -1111,7 +1111,7 @@ class Missoes(commands.Cog):
         name="missoes-sincronizar",
         description="Publica ou atualiza as missões padrão nos canais oficiais.",
     )
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def missoes_sincronizar(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         if interaction.guild is None:
