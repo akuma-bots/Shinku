@@ -95,7 +95,7 @@ def gerar(before: str, after: str) -> dict | None:
         tipo = "Melhorias e alterações"
     elif re.search(r"\b(fix|bug|corrig|hotfix|patch)\b", textos):
         tipo = "Correções"
-    elif any(s.startswith("A") for s in status):
+    elif re.search(r"\b(feat|feature)\b", textos) or any(s.startswith("A") for s in status):
         tipo = "Sistemas novos e melhorias"
     else:
         tipo = "Melhorias dos sistemas"
@@ -158,6 +158,7 @@ def gerar(before: str, after: str) -> dict | None:
     agora = datetime.now(FUSO)
     return {
         "release_id": agora.strftime("%Y%m%d-%H%M%S"),
+        "habilitada": True,
         "tipo": tipo,
         "titulo": titulo[:180] or "Atualização da NÊMESIS",
         "mensagem": mensagem[:3400],
