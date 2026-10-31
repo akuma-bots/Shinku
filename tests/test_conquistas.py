@@ -21,6 +21,7 @@ class TestConquistas(unittest.TestCase):
             "vitorias": 1,
             "mvps": "inválido",
             "maior_sequencia": -1,
+            "guerras": 5,
         })
         ids = {item["id"] for item in obtidas}
         self.assertIn("primeiro_passo", ids)
@@ -29,6 +30,9 @@ class TestConquistas(unittest.TestCase):
         self.assertIn("primeira_vitoria", ids)
         self.assertNotIn("operador", ids)
         self.assertNotIn("primeiro_mvp", ids)
+        self.assertIn("primeira_guerra", ids)
+        self.assertIn("veterano_de_guerra", ids)
+        self.assertNotIn("lenda_de_guerra", ids)
 
     def test_montagem_estatisticas_conta_apenas_missoes_aprovadas_do_membro(self):
         stats = montar_estatisticas(
@@ -37,6 +41,7 @@ class TestConquistas(unittest.TestCase):
             [
                 {"autor_id": 10, "tipo": "missao", "status": "aprovada"},
                 {"autor_id": "10", "tipo": "especial", "status": "aprovada"},
+                {"autor_id": 30, "auxiliar_id": 10, "tipo": "contribuicao", "status": "aprovada"},
                 {"autor_id": 10, "tipo": "pvp", "status": "aprovada"},
                 {"autor_id": 10, "tipo": "missao", "status": "pendente"},
                 {"autor_id": 20, "tipo": "missao", "status": "aprovada"},
@@ -47,7 +52,7 @@ class TestConquistas(unittest.TestCase):
         self.assertEqual(stats, {
             "xp": 800,
             "mensagens": 20,
-            "missoes": 2,
+            "missoes": 3,
             "guerras": 2,
             "vitorias": 4,
             "mvps": 1,
