@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.guild_config import lideranca_only, membro_tem_lideranca
+
 GUILD_NEMESIS_ID = 1563995879981981817
 CANAL_REGRAS_ID = 1563995880833421508
 COR = 0xB3132B
@@ -201,7 +203,7 @@ class RegrasOficiais(commands.Cog):
         description="Publica o Código de Conduta oficial da NÊMESIS no canal de regras."
     )
     @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
+    @lideranca_only()
     async def regras_publicar(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None or guild.id != GUILD_NEMESIS_ID:
@@ -210,7 +212,7 @@ class RegrasOficiais(commands.Cog):
                 ephemeral=True,
             )
             return
-        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
+        if not isinstance(interaction.user, discord.Member) or not membro_tem_lideranca(interaction.user):
             await interaction.response.send_message(
                 "Somente administradores do servidor podem publicar o Código de Conduta.",
                 ephemeral=True,
