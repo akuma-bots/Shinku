@@ -8,7 +8,9 @@ import logging
 
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+
+from utils.guild_config import lideranca_only, tasks
 
 from utils.storage import carregar, salvar
 
@@ -770,9 +772,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         app_commands.Choice(name="Cargo Discord", value="cargo"),
         app_commands.Choice(name="Manual (descrito no prêmio)", value="manual"),
     ])
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def sorteio_criar(
         self,
         interaction: discord.Interaction,
@@ -1072,9 +1072,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
     @app_commands.describe(
         id="ID do sorteio.",
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def sorteio_encerrar(
         self,
         interaction: discord.Interaction,
