@@ -662,7 +662,7 @@ class Missoes(commands.Cog):
         aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
         return embed
 
-    def _embed_selecao_prova(self, categoria: str, pagina: int, total_paginas: int, atividades: list) -> discord.Embed:
+    def _embed_selecao_prova(self, categoria: str, pagina: int, total_paginas: int, atividades: list, guild: discord.Guild = None) -> discord.Embed:
         tipo = TIPOS.get(categoria, TIPOS["missao"])
         embed = criar_embed(
             "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ ENVIO DE EVIDÊNCIAS",
@@ -694,7 +694,7 @@ class Missoes(commands.Cog):
                 linhas.append(f"*+ {len(atividades[inicio:inicio + 25]) - 8} opções nesta página; consulte o seletor.*")
             embed.add_field(name="◈ SELEÇÃO", value="\n".join(linhas)[:1024], inline=False)
         embed.set_footer(text="NÊMESIS • CENTRAL DE OPERAÇÕES • Evidências sujeitas à validação")
-        return embed
+        return aplicar_identidade_servidor(embed, guild, self.bot, banner=False)
 
     async def abrir_seletor_prova(self, interaction: discord.Interaction, categoria: str = "missao"):
         if interaction.guild is None:
@@ -712,7 +712,7 @@ class Missoes(commands.Cog):
         atividades.sort(key=lambda item: (str(item.get("titulo") or "").casefold(), str(item.get("id") or "")))
         total_paginas = max(1, (len(atividades) + 24) // 25)
         await interaction.response.send_message(
-            embed=self._embed_selecao_prova(categoria, 0, total_paginas, atividades),
+            embed=self._embed_selecao_prova(categoria, 0, total_paginas, atividades, interaction.guild),
             view=SeletorMissaoProvaView(self, interaction.user.id, categoria, atividades),
             ephemeral=True,
         )
