@@ -48,9 +48,9 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("TODOS OS JOGOS", embed.description)
         self.assertIn("Envio de evidências", embed.description)
         fields = {field.name: field.value for field in embed.fields}
-        self.assertEqual(fields["🟢 EM OPERAÇÃO"], "**1**")
-        self.assertEqual(fields["⛔ ENCERRADAS"], "**1**")
-        self.assertEqual(fields["◈ TOTAL REGISTRADO"], "**3**\nTodos os jogos")
+        self.assertEqual(fields["◈ OPERAÇÕES ATIVAS"], "**02**\nDisponíveis para execução")
+        self.assertEqual(fields["◈ ARQUIVADAS"], "**01**\nMantidas em histórico")
+        self.assertEqual(fields["◈ TOTAL REGISTRADO"], "**03**\nTodos os jogos")
         self.assertTrue(any("Operação de Reconhecimento" in name for name in fields))
         self.assertTrue(any("Operação Encerrada" in name for name in fields))
         self.assertTrue(any("Outro jogo" in name for name in fields))
@@ -81,7 +81,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             new=AsyncMock(return_value={"missoes": []}),
         ):
             vazio = await cog._montar_painel_missoes(guild, "shigaku")
-        self.assertIn("CATÁLOGO VAZIO", " ".join(field.name for field in vazio.fields))
+        self.assertIn("CATÁLOGO EM PREPARAÇÃO", " ".join(field.name for field in vazio.fields))
 
     async def test_painel_respeita_limite_de_caracteres_do_embed(self):
         atividades = [
