@@ -74,7 +74,7 @@ def commits_relevantes(assuntos: list[str]) -> list[str]:
         r"|^fix!(?:\([^)]*\))?:"
         r"|^hotfix(?:\([^)]*\))?:"
         r"|^perf!(?:\([^)]*\))?:"
-        r"^\[release\]",
+        r"|^\[release\]",
         re.IGNORECASE,
     )
     return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
