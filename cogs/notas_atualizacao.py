@@ -1,255 +1,90 @@
-from utils.apresentacao import criar_embed
-import asyncio
-import logging
+import json
 import os
-from datetime import datetime, timezone
+from pathlib import Path
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from cogs.boas_vindas_dm import DesativarAvisosButton
-from utils.preferencias_notificacoes import listar_inscritos
-
-log = logging.getLogger(__name__)
 GUILD_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
-COLOR = 0xB3132B
-SEND_DELAY = 1.0
-MAX_RETRIES = 3
-CANAL_SISTEMAS_URL = "https://discord.com/channels/1563995879981981817/1563995880833421512"
-CANAL_MISSOES_URL = "https://discord.com/channels/1563995879981981817/1563995881315897549"
-
-# Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
-VERSAO_PADRAO = "1.5.22"
-RESUMO_PADRAO = "Proteção administrativa reforçada no AutoMod e auditoria mais clara das ações automáticas."
-NOVIDADES_PADRAO = [
-    "AutoMod interrompe a análise antes de qualquer ação para membros com permissões administrativas ou de moderação, incluindo permissões específicas do servidor.",
-    "Verificação redundante imediatamente antes da exclusão da mensagem; ações canceladas pela proteção ficam registradas no log técnico.",
-    "Arquivo de recordes reorganizado com categorias identificáveis, valores formatados e apresentação consistente com a identidade NÊMESIS.",
-    "Configuração do canal de recordes agora confirma a alteração em um painel informativo padronizado.",
-    "Painel /sistema status agora apresenta latência, tempo ativo, comandos do servidor e estado dos módulos em uma única leitura.",
-    "Diagnóstico de armazenamento apresenta resultados com identidade visual consistente e instruções mais claras para cada cenário.",
-    "Tutorial de perfil orienta quais informações enviar ao suporte para facilitar a investigação de divergências.",
-    "AutoMod com verificação final de isenção administrativa imediatamente antes de excluir uma mensagem.",
-    "Registro técnico quando uma ação automática é interrompida pela proteção administrativa.",
-    "Sistema de notas reorganizado para destacar somente novidades, recursos e melhorias percebidas pelos membros.",
-    "Atualizações apresentadas em linguagem clara, com foco no que mudou e no benefício para a comunidade.",
-    "Identidade visual da NÊMESIS mantida em preto e vermelho, com títulos e seções mais consistentes.",
-    "Sistema de avaliação de tickets aprimorado, com apresentação organizada da nota, comentário e responsável pelo atendimento.",
-    "Experiência de entrada de novos integrantes redesenhada com orientações iniciais e informações essenciais.",
-    "Ranking de convites aprimorado para exibir os integrantes convidados que ainda permanecem no servidor.",
-    "Progressão competitiva organizada em 12 patentes, com requisitos graduais de experiência.",
-    "Central de ajuda aprimorada para facilitar a localização de comandos e subcomandos.",
-]
-CORRECOES_PADRAO = [
-    "Ampliada a proteção contra exclusões automáticas indevidas para cargos com gerência de canais, cargos, webhooks, auditoria, threads, expulsões, banimentos e timeout.",
-    "Formatação numérica do arquivo de recordes ajustada para o padrão brasileiro, com separadores de milhar e decimais corretos.",
-    "O sistema de recordes trata falhas de anúncio sem interromper o fluxo de atualização das estatísticas.",
-    "Padronizada a apresentação do diagnóstico do sistema para diferenciar estados operacionais, alertas e falhas.",
-    "Reforçada a barreira de segurança para reduzir exclusões automáticas indevidas em contas com permissões administrativas.",
-    "Corrigida a apresentação das notas para reduzir repetições e evitar excesso de informações técnicas.",
-    "Corrigido o limite de conteúdo dos embeds para prevenir falhas ao exibir atualizações extensas.",
-    "Aprimorado o tratamento de falhas no envio para que problemas de entrega não interrompam todo o processo.",
-    "Corrigida a exibição do ranking de convites para evitar erros ao limitar os resultados.",
-    "Melhorada a consistência visual e textual entre as seções das notas de atualização.",
-]
-
-
-def _chunks(lines: list[str], prefix: str, limit: int = 950) -> list[str]:
-    chunks: list[str] = []
-    current = ""
-    for raw in lines:
-        safe = discord.utils.escape_markdown(raw.strip())
-        if not safe:
-            continue
-        line = f"{prefix} {safe}"
-        if len(line) > limit:
-            line = line[: limit - 3] + "..."
-        candidate = f"{current}\n{line}" if current else line
-        if len(candidate) > limit:
-            if current:
-                chunks.append(current)
-            current = line
-        else:
-            current = candidate
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefixo: str):
-    for index, bloco in enumerate(_chunks(linhas, prefixo)):
-        nome = titulo if index == 0 else f"{titulo} • continuação {index + 1}"
-        embed.add_field(name=nome[:256], value=bloco or "—", inline=False)
-
-
-def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str], guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
-    """Monta um embed com margem de segurança abaixo do limite de 6.000 caracteres."""
-    embed = criar_embed(
-        title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
-        description=f"⟡・ **{discord.utils.escape_markdown(versao)}**\\n{discord.utils.escape_markdown(resumo)[:700]}",
-        color=COLOR,
-        timestamp=datetime.now(timezone.utc),
-    )
-    _adicionar_secao(embed, "✦ NOVIDADES RECENTES", novidades[:8], "➜")
-    if correcoes:
-        _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", correcoes[:5], "✓")
-    embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
-    if guild is not None and bot is not None:
-        usuario = getattr(bot, "user", None)
-        avatar = getattr(getattr(usuario, "display_avatar", None), "url", None)
-        banner_bot = getattr(getattr(usuario, "banner", None), "url", None)
-        banner_servidor = getattr(getattr(guild, "banner", None), "url", None)
-        if avatar:
-            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 • COMUNICADO OFICIAL", icon_url=avatar)
-            embed.set_thumbnail(url=avatar)
-        if banner_bot or banner_servidor:
-            embed.set_image(url=banner_bot or banner_servidor)
-    while len(embed) > 5700 and embed.fields:
-        embed.remove_field(len(embed.fields) - 1)
-    if len(embed) > 5900:
-        embed.description = (embed.description or "")[:500]
-    return embed
-
-class NotasDMView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
-        self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
-        self.add_item(DesativarAvisosButton())
-
-
-async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
-    for tentativa in range(1, MAX_RETRIES + 1):
-        try:
-            await member.send(embed=embed, view=NotasDMView(), allowed_mentions=discord.AllowedMentions.none())
-            return "enviada"
-        except (discord.Forbidden, discord.NotFound):
-            return "bloqueada"
-        except discord.HTTPException as erro:
-            if erro.status and 400 <= erro.status < 500 and erro.status != 429:
-                return "bloqueada"
-            if tentativa == MAX_RETRIES:
-                log.warning("Falha ao enviar nota (guild=%s, member=%s).", member.guild.id, member.id, exc_info=True)
-                return "falha"
-            espera = min(2 ** (tentativa - 1), 8)
-            retry_after = getattr(erro, "retry_after", None)
-            if isinstance(retry_after, (int, float)):
-                espera = max(espera, min(float(retry_after), 30))
-            await asyncio.sleep(espera)
-        except (asyncio.TimeoutError, OSError, discord.ConnectionClosed):
-            if tentativa == MAX_RETRIES:
-                log.warning("Falha de conexão ao enviar nota (guild=%s, member=%s).", member.guild.id, member.id, exc_info=True)
-                return "falha"
-            await asyncio.sleep(min(2 ** (tentativa - 1), 8))
-    return "falha"
-
-
-class NotasPublicasView(discord.ui.View):
-    """Ações úteis anexadas às notas públicas, incluindo cancelamento de DMs."""
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(discord.ui.Button(
-            label="Ver sistemas",
-            style=discord.ButtonStyle.link,
-            emoji="📚",
-            url=CANAL_SISTEMAS_URL,
-        ))
-        self.add_item(discord.ui.Button(
-            label="Ver missões",
-            style=discord.ButtonStyle.link,
-            emoji="⚔️",
-            url=CANAL_MISSOES_URL,
-        ))
-        self.add_item(DesativarAvisosButton())
-
-
-class ConfirmarEnvioNotas(discord.ui.View):
-    def __init__(self, cog: "NotasAtualizacao", guild_id: int, autor_id: int):
-        super().__init__(timeout=300)
-        self.cog = cog
-        self.guild_id = guild_id
-        self.autor_id = autor_id
-
-    @discord.ui.button(label="Enviar notas por DM", style=discord.ButtonStyle.danger, emoji="✉️")
-    async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("O envio de notas por DM está temporariamente pausado para corrigir duplicações. Nenhuma mensagem foi enviada.", ephemeral=True)
-        return
-        if interaction.user.id != self.autor_id:
-            await interaction.response.send_message("Somente quem preparou esta nota pode publicar.", ephemeral=True)
-            return
-        if interaction.guild_id != self.guild_id or not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Apenas um administrador da NÊMESIS pode confirmar a publicação.", ephemeral=True)
-            return
-        if self.guild_id in self.cog._sending:
-            await interaction.response.send_message("Já existe uma publicação de notas em andamento.", ephemeral=True)
-            return
-
-        self.cog._sending.add(self.guild_id)
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(content="Envio confirmado. Preparando as DMs dos membros inscritos…", view=self)
-        try:
-            guild = interaction.guild
-            embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, guild, self.cog.bot)
-            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-            inscritos = await listar_inscritos(guild.id, "notas_atualizacao", [str(m.id) for m in membros])
-            destinatarios = [m for m in membros if str(m.id) in inscritos]
-            enviados = 0
-            falhas = 0
-            for membro in destinatarios:
-                resultado = await _enviar_nota(membro, embed)
-                if resultado == "enviada":
-                    enviados += 1
-                else:
-                    falhas += 1
-                await asyncio.sleep(SEND_DELAY)
-            log.info("Notas enviadas por DM (guild=%s, versao=%s, inscritos=%s, enviados=%s, falhas=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, len(destinatarios), enviados, falhas, interaction.user.id)
-            await interaction.edit_original_response(content=f"**Envio das notas concluído.**\n• Membros inscritos: **{len(destinatarios)}**\n• DMs enviadas: **{enviados}**\n• Falhas de entrega: **{falhas}**\nAs notas não foram publicadas em #Anúncios.", view=self)
-        except (discord.HTTPException, OSError):
-            log.exception("Falha ao enviar as notas por DM.")
-            await interaction.edit_original_response(content="Não foi possível concluir o envio das notas por DM. Consulte os logs do bot.", view=self)
-        finally:
-            self.cog._sending.discard(self.guild_id)
-
-    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖")
-    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.autor_id:
-            await interaction.response.send_message("Somente quem preparou esta nota pode cancelar.", ephemeral=True)
-            return
-        for item in self.children:
-            item.disabled = True
-        await interaction.response.edit_message(content="Publicação cancelada. Nenhuma mensagem foi enviada.", view=self)
-        self.stop()
+CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
 
 
 class NotasAtualizacao(commands.Cog):
-    """Prepara um modelo oficial pronto e envia após confirmação explícita."""
+    """Consulta somente leitura da release automática; não envia DMs."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._sending: set[int] = set()
 
-    @app_commands.command(name="notas-atualizacao", description="Abrir as notas prontas da última atualização da NÊMESIS.")
+    @app_commands.command(
+        name="notas-atualizacao",
+        description="Consultar a nota de atualização programada da NÊMESIS.",
+    )
     @app_commands.guild_only()
     @app_commands.default_permissions(administrator=True)
     async def notas_atualizacao(self, interaction: discord.Interaction):
         if interaction.guild_id != GUILD_ID or interaction.guild is None:
-            await interaction.response.send_message("Comando exclusivo da NÊMESIS.", ephemeral=True)
+            await interaction.response.send_message(
+                "Comando exclusivo da NÊMESIS.", ephemeral=True
+            )
             return
-        if not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Somente administradores podem usar este comando.", ephemeral=True)
-            return
-        if interaction.guild_id in self._sending:
-            await interaction.response.send_message("Já existe um envio de notas em andamento. Aguarde a conclusão.", ephemeral=True)
+        if (
+            not isinstance(interaction.user, discord.Member)
+            or not interaction.user.guild_permissions.administrator
+        ):
+            await interaction.response.send_message(
+                "Somente administradores podem consultar este painel.",
+                ephemeral=True,
+            )
             return
 
-        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, interaction.guild, self.bot)
-        view = ConfirmarEnvioNotas(self, interaction.guild_id, interaction.user.id)
+        try:
+            release = json.loads(CAMINHO_RELEASE.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            await interaction.response.send_message(
+                "Não foi possível carregar a nota configurada. Nenhuma DM foi enviada.",
+                ephemeral=True,
+            )
+            return
+
+        if not isinstance(release, dict):
+            await interaction.response.send_message(
+                "O manifesto de atualização está inválido. Nenhuma DM foi enviada.",
+                ephemeral=True,
+            )
+            return
+
+        titulo = str(release.get("titulo") or "Atualização da NÊMESIS")[:200]
+        mensagem = str(release.get("mensagem") or "Sem descrição.")[:3500]
+        data = str(release.get("data_atualizacao") or "Não informada")[:30]
+        hora = str(release.get("hora_atualizacao") or "Não informado")[:20]
+        tipo = str(release.get("tipo") or "Atualização")[:100]
+        release_id = str(release.get("release_id") or "Não informado")[:100]
+
+        embed = discord.Embed(
+            title=f"✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — {titulo} ・✦",
+            description=mensagem,
+            color=0xB3132B,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name="◈ CATEGORIA", value=tipo, inline=True)
+        embed.add_field(name="◈ DATA", value=data, inline=True)
+        embed.add_field(name="◈ HORÁRIO", value=hora, inline=True)
+        embed.set_footer(text=f"NÊMESIS • Release {release_id}")
+
+        usuario = self.bot.user
+        avatar = getattr(getattr(usuario, "display_avatar", None), "url", None)
+        banner = getattr(getattr(usuario, "banner", None), "url", None)
+        banner_servidor = getattr(getattr(interaction.guild, "banner", None), "url", None)
+        if avatar:
+            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 • NOTAS OFICIAIS", icon_url=avatar)
+            embed.set_thumbnail(url=avatar)
+        if banner or banner_servidor:
+            embed.set_image(url=banner or banner_servidor)
+
         await interaction.response.send_message(
-            "Modelo da atualização pronto. Revise a nota abaixo. Ao confirmar, ela será enviada por DM aos membros inscritos nas notas de atualização.",
+            "Prévia somente leitura da próxima nota automática. Este comando não dispara mensagens; o envio é controlado exclusivamente pelo sistema automático.",
             embed=embed,
-            view=view,
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
