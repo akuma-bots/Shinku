@@ -42,6 +42,13 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 
 **Estado:** a PR #55 ainda deve ser confirmada como mesclada e implantada antes de anunciar essas mudanças como disponíveis no servidor.
 
+### Atualização do fluxo de participação — 2026-10-31
+- O botão de envio abre um seletor privado de atividades ativas, separado por categoria.
+- Catálogos com mais de 25 atividades recebem paginação no seletor.
+- O formulário de evidência deixa de exigir que o membro copie e digite o código da missão.
+- O tutorial de missões foi atualizado para refletir o novo fluxo.
+- A navegação identifica a categoria pelo painel atual, inclusive após reinicializações do Shinku.
+
 ## Observações de implantação
 - Alterações mescladas precisam de deploy bem-sucedido no Render.
 - Após o deploy, validar os logs de inicialização e os painéis no Discord.
