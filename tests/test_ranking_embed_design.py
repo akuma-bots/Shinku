@@ -59,7 +59,7 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
             embed = await cog._montar_painel_ranking(guild, "shigaku")
 
         self.assertIn("Ainda não há jogadores classificados", embed.description)
-        self.assertIn("Use os botões abaixo", embed.description)
+        self.assertIn("Utilize o seletor abaixo", embed.description)
 
 
 if __name__ == "__main__":
