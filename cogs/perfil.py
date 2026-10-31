@@ -6,8 +6,53 @@ from utils.apresentacao import criar_embed
 from utils.storage import carregar
 from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_patente, kdr, ARQUIVO_PERFIS
 from utils.competitivo_sync import ARQUIVO_COMPETITIVO
+from cogs.progressao_gangue import ARQUIVO as ARQUIVO_PROGRESSAO, rank_por_xp, proximo_rank, barra_progresso
+from utils import revisoes as revisoes_storage
+
 
 ARQUIVO_VINCULOS_ROBLOX = "roblox_vinculos.json"
+
+
+def _resumo_progressao(perfil: dict) -> dict:
+    perfil = perfil if isinstance(perfil, dict) else {}
+    try:
+        xp = max(0, int(perfil.get("xp", 0) or 0))
+    except (TypeError, ValueError, OverflowError):
+        xp = 0
+    rank = rank_por_xp(xp)
+    proximo = proximo_rank(xp)
+    return {
+        "xp": xp,
+        "rank": rank,
+        "proximo": proximo,
+        "barra": barra_progresso(xp, rank, proximo),
+        "faltam": max(0, int(proximo["xp"]) - xp) if proximo else 0,
+        "mensagens": max(0, int(perfil.get("mensagens", 0) or 0)),
+        "missoes": max(0, int(perfil.get("missoes", 0) or 0)),
+        "guerras": max(0, int(perfil.get("guerras", 0) or 0)),
+    }
+
+
+def _resumo_historico_missoes(revisoes: list, user_id: int, limite: int = 5) -> dict:
+    registros = [
+        item for item in revisoes
+        if isinstance(item, dict)
+        and str(item.get("autor_id")) == str(user_id)
+        and item.get("status") in {"aprovada", "rejeitada", "pendente"}
+    ]
+    registros.sort(
+        key=lambda item: float(
+            item.get("aprovado_em") or item.get("rejeitada_em")
+            or item.get("atualizado_em") or item.get("timestamp") or 0
+        ),
+        reverse=True,
+    )
+    return {
+        "aprovadas": sum(item.get("status") == "aprovada" for item in registros),
+        "rejeitadas": sum(item.get("status") == "rejeitada" for item in registros),
+        "pendentes": sum(item.get("status") == "pendente" for item in registros),
+        "recentes": registros[:max(0, int(limite))],
+    }
 
 
 class Perfil(commands.Cog):
@@ -30,6 +75,19 @@ class Perfil(commands.Cog):
             return
 
         p = await get_perfil(interaction.guild.id, alvo.id)
+        dados_progressao = await carregar(ARQUIVO_PROGRESSAO, {})
+        membros_progressao = (
+            dados_progressao.get(str(interaction.guild.id), {}).get("membros", {})
+            if isinstance(dados_progressao, dict) else {}
+        )
+        perfil_progressao = (
+            membros_progressao.get(str(alvo.id), {})
+            if isinstance(membros_progressao, dict) else {}
+        )
+        resumo_progressao = _resumo_progressao(perfil_progressao)
+        historico_missoes = _resumo_historico_missoes(
+            await revisoes_storage.listar(interaction.guild.id), alvo.id
+        )
         patentes = await get_patentes(interaction.guild.id)
         vinculos_roblox = await carregar(ARQUIVO_VINCULOS_ROBLOX, {})
         vinculo_roblox = (
@@ -126,6 +184,30 @@ class Perfil(commands.Cog):
             value=f"**{p['xp']:,} XP**\\n{barra_xp}\\n{texto_progresso}".replace(",", "."),
             inline=False,
         )
+        rank_org = resumo_progressao["rank"]
+        proximo_org = resumo_progressao["proximo"]
+        destino_org = (
+            f"Próximo posto: **{proximo_org['nome']}** · faltam **{resumo_progressao['faltam']:,} XP**".replace(",", ".")
+            if proximo_org else "**Posto máximo alcançado**"
+        )
+        embed.add_field(
+            name="◈ PROGRESSÃO ORGANIZACIONAL",
+            value=(
+                f"**Nº {rank_org['no']:02d} · {rank_org['nome']}**\\n"
+                f"**{resumo_progressao['xp']:,} XP de progressão**".replace(",", ".")
+                + f"\\n{resumo_progressao['barra']}\\n{destino_org}"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="◈ PARTICIPAÇÃO REGISTRADA",
+            value=(
+                f"**{resumo_progressao['mensagens']:,}** mensagens válidas\\n"
+                f"**{resumo_progressao['missoes']:,}** missões\\n"
+                f"**{resumo_progressao['guerras']:,}** guerras"
+            ).replace(",", "."),
+            inline=True,
+        )
         embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
         embed.add_field(name="◈ P.C. DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
         embed.add_field(name="◈ TEMPORADA", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
@@ -148,6 +230,33 @@ class Perfil(commands.Cog):
             embed.add_field(
                 name="◈ CONTA ROBLOX",
                 value="Não vinculada · use /roblox-vincular para verificar sua conta.",
+                inline=False,
+            )
+        embed.add_field(
+            name="◈ HISTÓRICO DE MISSÕES",
+            value=(
+                f"**{historico_missoes['aprovadas']}** aprovadas · "
+                f"**{historico_missoes['rejeitadas']}** recusadas · "
+                f"**{historico_missoes['pendentes']}** pendentes"
+            ),
+            inline=True,
+        )
+        recentes = historico_missoes["recentes"]
+        if recentes:
+            linhas_historico = []
+            for registro in recentes:
+                status = {
+                    "aprovada": "✓ Aprovada",
+                    "rejeitada": "✕ Recusada",
+                    "pendente": "◷ Em análise",
+                }[registro["status"]]
+                titulo = str(registro.get("titulo") or "Atividade")[:55]
+                linhas_historico.append(
+                    f"**{status}** · {titulo} · `{str(registro.get('id') or '—')[:12]}`"
+                )
+            embed.add_field(
+                name="◈ ATIVIDADES RECENTES",
+                value="\\n".join(linhas_historico)[:1024],
                 inline=False,
             )
         embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
