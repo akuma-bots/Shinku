@@ -647,7 +647,7 @@ class Roblox(commands.Cog):
         for guild in self.bot.guilds:
             try:
                 config = await _config_grupo(guild.id)
-                if not config["grupo_id"] or not config["mapeamentos"]:
+                if not config["grupo_id"]:
                     continue
                 guild_vinculos = vinculos.get(str(guild.id), {})
                 if not isinstance(guild_vinculos, dict):
