@@ -165,7 +165,7 @@ class Conquistas(commands.Cog):
             registro = desbloqueadas.get(conquista["id"])
             valor = estatisticas.get(conquista["campo"], 0)
             if registro:
-                status = " <a:>" if False else "✓ DESBLOQUEADA"
+                status = "✓ DESBLOQUEADA"
                 data = int(registro.get("desbloqueada_em", 0) or 0)
                 detalhe = f"**{status}**"
                 if data:
