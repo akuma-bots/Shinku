@@ -92,8 +92,7 @@ class AvisosPublicosView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
         self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
-        from cogs.boas_vindas_dm import DesativarAvisosButton
-        self.add_item(DesativarAvisosButton())
+        self.add_item(AlternarAvisosButton())
 
 
 class Novidades(commands.Cog):
