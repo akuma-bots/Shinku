@@ -8,7 +8,7 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 
 - **Atendimento:** tickets privados, categorias de solicitação, fechamento e registro.
 - **Moderação e segurança:** regras, avisos, punições e registros administrativos.
-- **Missões:** missões, contribuições e missões especiais, com provas e aprovação da staff.
+- **Missões:** catálogo unificado de missões, contribuições e operações especiais; seleção de atividade por menu, envio de evidências, revisão manual e recompensas em XP com proteção contra duplicidade.
 - **PvP:** desafios entre membros, apostas de XP, envio de resultados e revisão.
 - **Guerras:** registro de resultados, guerras em andamento, atualização de placar, regras, cancelamento e histórico.
 - **Progressão da gangue:** XP de participação, ranks, cargos configuráveis e recompensas.
