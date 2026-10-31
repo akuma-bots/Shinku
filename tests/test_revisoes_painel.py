@@ -58,7 +58,7 @@ class TestPainelProvas(unittest.TestCase):
         itens = _filtrar_provas(self.registros, "pendente", "todos")[:8]
         itens[0]["auxiliar_id"] = 9876
         embed = _embed_painel_provas(
-            Mock(),
+            None,
             "pendente",
             itens,
             "todos",
