@@ -9,6 +9,7 @@ from utils.guild_config import (
     get_config,
     adicionar_contador,
     remover_contador,
+    lideranca_only,
 )
 
 TIPOS_VALIDOS = [
@@ -131,9 +132,7 @@ class Contadores(commands.Cog):
             for tipo in TIPOS_VALIDOS
         ]
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def criar_contador(
         self,
         interaction: discord.Interaction,
@@ -220,9 +219,7 @@ class Contadores(commands.Cog):
     @app_commands.describe(
         canal="O canal de voz do contador"
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def remover_contador_cmd(
         self,
         interaction: discord.Interaction,
@@ -274,9 +271,7 @@ class Contadores(commands.Cog):
             "neste servidor."
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def contadores(
         self,
         interaction: discord.Interaction,
