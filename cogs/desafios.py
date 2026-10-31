@@ -211,7 +211,7 @@ class Desafios(commands.Cog):
 
     @app_commands.command(name="desafio-cooldown", description="Define o tempo mínimo entre desafios da mesma dupla de jogadores.")
     @app_commands.describe(minutos="Minutos de espera entre desafios da mesma dupla")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def desafio_cooldown(self, interaction: discord.Interaction, minutos: int):
         await set_config(interaction.guild.id, desafio_cooldown_minutos=minutos)
         await interaction.response.send_message(f"✅ Cooldown definido em {minutos} minuto(s).", ephemeral=True)
