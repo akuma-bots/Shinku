@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM
+from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM, CARGO_VISITANTES_ID
+from utils.guia_servidores import TAG_ORG_NEMESIS, NOME_CARGO_VISITANTES
 
 
 def test_welcome_codes_catalog_has_all_games_and_requirements():
@@ -16,7 +17,13 @@ def test_welcome_codes_catalog_has_all_games_and_requirements():
 
 def test_welcome_uses_nemesis_tag_and_invite():
     assert TAG_GANGUE == "NΞM"
+    assert TAG_ORG_NEMESIS == "NΞM"
     assert CONVITE_NEMESIS.startswith("https://discord.gg/")
+
+
+def test_welcome_uses_official_visitor_role():
+    assert CARGO_VISITANTES_ID == 1563995879990624371
+    assert NOME_CARGO_VISITANTES == "Visitantes"
 
 
 def test_codes_catalog_is_valid_json():
