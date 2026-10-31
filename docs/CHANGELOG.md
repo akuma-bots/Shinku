@@ -62,3 +62,21 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 - Alterações mescladas precisam de deploy bem-sucedido no Render.
 - Após o deploy, validar os logs de inicialização e os painéis no Discord.
 - Não publicar como ativo nenhum recurso marcado como em desenvolvimento ou sem confirmação de deploy.
+
+
+## 2026-10-31 — Conquistas, medalhas e recompensas
+
+### Entregue no código
+- Novo catálogo com 15 conquistas de progressão, participação, operações e combate.
+- Critérios verificáveis por XP organizacional, mensagens válidas, missões aprovadas, vitórias, MVPs e recorde de sequência.
+- Ledger persistente por servidor e membro, com timestamp de desbloqueio e estado individual da recompensa.
+- Recompensas em XP organizacional entregues com chave idempotente; uma mesma conquista não credita XP duas vezes.
+- Verificação automática após XP de participação, recompensas de missões e resultados PvP aprovados.
+- Anúncio agrupado no canal de conquistas 1563995881508831339.
+- Novo comando /conquistas com progresso individual e exibição das metas; o /perfil passa a apresentar as conquistas já desbloqueadas.
+- Testes para critérios, dados inválidos, contagem de missões aprovadas e idempotência de desbloqueios/recompensas.
+
+### Observações
+- As recompensas são XP organizacional e reconhecimento visual; não concedem permissões administrativas nem alteram a hierarquia de liderança.
+- O sistema não apaga nem substitui medalhas competitivas antigas.
+- Ativação no Discord depende do deploy e da inicialização do Shinku.
