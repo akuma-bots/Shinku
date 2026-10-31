@@ -329,8 +329,7 @@ class Novidades(commands.Cog):
                 guilds = estados.setdefault("guilds", {})
                 guild_estado = guilds.setdefault(str(guild.id), {})
                 release_estado = guild_estado.setdefault(release["release_id"], {})
-                if release_estado.get("publicado_no_canal"):
-                    return
+                ja_publicado = bool(release_estado.get("publicado_no_canal"))
                 embed = criar_embed(
                     description=(
                         "╭────────────── ◈ ──────────────╮\n"
@@ -356,6 +355,18 @@ class Novidades(commands.Cog):
                     canal = await self.bot.fetch_channel(CANAL_ANUNCIOS_ID)
                 if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
                     raise ValueError("Canal oficial de anúncios inválido.")
+                if ja_publicado:
+                    mensagem_id = release_estado.get("mensagem_id")
+                    if mensagem_id:
+                        mensagem = await canal.fetch_message(int(mensagem_id))
+                        await mensagem.edit(
+                            embed=embed,
+                            view=AvisosPublicosView(),
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
+                        logger.info("Release %s atualizado com layout e controles no canal %s (message=%s).", release["release_id"], canal.id, mensagem.id)
+                    return
+
                 mensagem = await canal.send(embed=embed, view=AvisosPublicosView(), allowed_mentions=discord.AllowedMentions.none())
                 release_estado["publicado_no_canal"] = True
                 release_estado["mensagem_id"] = str(mensagem.id)
