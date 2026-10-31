@@ -586,6 +586,87 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         view = CentralFormulariosView(self, interaction.guild.id, interaction.user.id, lista)
         await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
 
+    @app_commands.command(
+        name="limpar-pendentes",
+        description="Recusa todas as candidaturas Staff que ainda aguardam avaliação.",
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def limpar_pendentes(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Use este comando dentro do servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        lista = await formularios.listar_formularios(interaction.guild.id)
+        formulario = next(
+            (item for item in lista if item.get("nome") == NOME_FORMULARIO_STAFF),
+            None,
+        )
+        if formulario is None:
+            await interaction.followup.send(
+                "Não encontrei o formulário de inscrição para Staff.",
+                ephemeral=True,
+            )
+            return
+
+        pendentes = await formularios.recusar_respostas_pendentes(
+            interaction.guild.id,
+            interaction.user.id,
+            formulario_id=formulario["id"],
+            motivo="Candidatura encerrada durante a limpeza administrativa das pendências antigas.",
+        )
+        if not pendentes:
+            await interaction.followup.send(
+                "Não há candidaturas pendentes neste formulário. Nenhum registro foi alterado.",
+                ephemeral=True,
+            )
+            return
+
+        notificadas = 0
+        falhas_dm = 0
+        avisados = set()
+        for resposta in pendentes:
+            autor_id = int(resposta.get("autor_id", 0) or 0)
+            if not autor_id or autor_id in avisados:
+                continue
+            avisados.add(autor_id)
+            membro = interaction.guild.get_member(autor_id)
+            if membro is None:
+                try:
+                    membro = await interaction.guild.fetch_member(autor_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    membro = None
+            if membro is None:
+                continue
+            try:
+                await membro.send(
+                    "Sua candidatura para **Inscrição para Staff** na NÊMESIS foi encerrada "
+                    "durante uma limpeza administrativa de pendências antigas. "
+                    "Esta ação não representa uma avaliação individual das suas respostas."
+                )
+                notificadas += 1
+            except (discord.Forbidden, discord.HTTPException):
+                falhas_dm += 1
+
+        await interaction.followup.send(
+            embed=criar_embed(
+                "✦・ LIMPEZA DE PENDÊNCIAS CONCLUÍDA ・✦",
+                (
+                    f"**Candidaturas recusadas:** {len(pendentes)}\\n"
+                    f"**Candidatos notificados:** {notificadas}\\n"
+                    f"**Falhas de mensagem privada:** {falhas_dm}\\n\\n"
+                    "Os registros foram preservados no histórico com o status **RECUSADA**. "
+                    "Nenhuma candidatura ou resposta foi apagada."
+                ),
+                cor=0x9F1239,
+                rodape="NÊMESIS • AUDITORIA DE FORMULÁRIOS",
+            ),
+            ephemeral=True,
+        )
+
     @commands.Cog.listener()
     async def on_ready(self):
         """Garante o formulário automático de Staff e mantém uma central pública única."""
