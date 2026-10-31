@@ -8,6 +8,25 @@ from cogs.logs import Logs
 from cogs.novidades import _enviar_dm_com_retry
 
 
+class TestRegistroDeNotas(unittest.TestCase):
+    def test_notas_tem_apenas_um_gatilho_de_execucao(self):
+        from pathlib import Path
+        import ast
+
+        caminho = Path(__file__).resolve().parents[1] / "cogs" / "novidades.py"
+        arvore = ast.parse(caminho.read_text(encoding="utf-8"))
+        classe = next(
+            node for node in arvore.body
+            if isinstance(node, ast.ClassDef) and node.name == "Novidades"
+        )
+        metodos = {
+            node.name for node in classe.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        self.assertNotIn("on_ready", metodos)
+        self.assertIn("_retry_releases", metodos)
+
+
 class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
     async def test_dm_nao_repete_erro_http_ambiguo(self):
         membro = Mock()
