@@ -67,12 +67,28 @@ def assunto_commits(before: str, after: str) -> list[str]:
         return []
 
 
+def commits_relevantes(assuntos: list[str]) -> list[str]:
+    """Somente commits explicitamente classificados como entrega importante."""
+    padrao = re.compile(
+        r"^(?:feat|feature|security|release)(?:\\([^)]*\\))?:"
+        r"|^fix!(?:\\([^)]*\\))?:"
+        r"|^hotfix(?:\\([^)]*\\))?:"
+        r"|^perf!(?:\\([^)]*\\))?:"
+        r"|^\\[release\\]",
+        re.IGNORECASE,
+    )
+    return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
+
+
 def gerar(before: str, after: str) -> dict | None:
     alteracoes = arquivos_alterados(before, after)
     if not alteracoes:
         return None
 
-    assuntos = assunto_commits(before, after)
+    assuntos = commits_relevantes(assunto_commits(before, after))
+    if not assuntos:
+        return None
+
     textos = " ".join(assuntos).lower()
     status = [s for s, _ in alteracoes]
     if any(s.startswith("D") for s in status):
@@ -104,6 +120,8 @@ def gerar(before: str, after: str) -> dict | None:
     # uma descrição funcional em português baseada nas áreas realmente alteradas.
     traducoes = {
         "fix: corrige validação de provas":
+            "validação de provas: corrigido o fluxo de análise e registro dos comprovantes.",
+        "fix!: corrige validação de provas":
             "validação de provas: corrigido o fluxo de análise e registro dos comprovantes.",
         "fix multi-step form continuation interaction listener":
             "Formulários: corrigida a continuidade entre as etapas de inscrição.",
