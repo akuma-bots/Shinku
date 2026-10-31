@@ -11,7 +11,7 @@ class TestSegurancaRoblox(unittest.IsolatedAsyncioTestCase):
         with patch.object(roblox, "carregar", new=AsyncMock(return_value=[])):
             config = await roblox._config_grupo(123)
 
-        self.assertIsNone(config["grupo_id"])
+        self.assertEqual(config["grupo_id"], 621286796)
         self.assertEqual(config["mapeamentos"], {})
 
     async def test_config_filtra_mapeamentos_invalidos(self):
