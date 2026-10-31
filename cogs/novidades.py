@@ -8,15 +8,13 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import discord
-from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils.guild_config import lideranca_only
 
 from utils.storage import carregar, salvar
-from utils.preferencias_notificacoes import listar_inscritos, definir_preferencia
-from cogs.boas_vindas_dm import OptOutView
-from cogs.boas_vindas_dm import DesativarAvisosButton
+from utils.preferencias_notificacoes import listar_inscritos
+from cogs.boas_vindas_dm import AlternarAvisosButton
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +57,7 @@ class NotasDMView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
         self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
-        self.add_item(DesativarAvisosButton())
+        self.add_item(AlternarAvisosButton())
 
 
 async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
@@ -141,163 +139,6 @@ class Novidades(commands.Cog):
             "hora_atualizacao": str(release.get("hora_atualizacao") or instante.strftime("%H:%M"))[:10],
             "fuso_horario": str(release.get("fuso_horario") or "Horário de Brasília (BRT)")[:50],
         }
-
-    @app_commands.command(
-        name="avisos-enviar",
-        description="Envia um comunicado privado aos membros inscritos para receber DMs.",
-    )
-    @app_commands.describe(
-        tipo="Categoria do comunicado",
-        titulo="Título mostrado na mensagem",
-        mensagem="Texto do comunicado (máximo de 3000 caracteres)",
-    )
-    @app_commands.choices(tipo=[
-        app_commands.Choice(name="Novidades da NÊMESIS", value="Novidades"),
-        app_commands.Choice(name="Sistemas novos", value="Sistemas novos"),
-        app_commands.Choice(name="Eventos", value="Eventos"),
-        app_commands.Choice(name="Manutenção", value="Manutenção"),
-        app_commands.Choice(name="Aviso importante", value="Aviso importante"),
-    ])
-    @lideranca_only()
-    async def avisos_enviar(
-        self,
-        interaction: discord.Interaction,
-        tipo: app_commands.Choice[str],
-        titulo: str,
-        mensagem: str,
-    ):
-        await interaction.response.send_message("O envio de comunicados por DM está temporariamente pausado para corrigir duplicações. Nenhuma mensagem foi enviada.", ephemeral=True)
-        return
-        guild = interaction.guild
-        if guild is None:
-            await interaction.response.send_message(
-                "Este comando só pode ser usado no servidor da NÊMESIS.",
-                ephemeral=True,
-            )
-            return
-
-        titulo = titulo.strip()
-        mensagem = mensagem.strip()
-        if not titulo or len(titulo) > 200:
-            await interaction.response.send_message(
-                "O título precisa ter entre 1 e 200 caracteres.",
-                ephemeral=True,
-            )
-            return
-        if not mensagem or len(mensagem) > 3000:
-            await interaction.response.send_message(
-                "A mensagem precisa ter entre 1 e 3000 caracteres.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            membros_servidor = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-            inscritos = await listar_inscritos(guild.id, "avisos_comunidade", [str(m.id) for m in membros_servidor])
-            membros = [m for m in membros_servidor if str(m.id) in inscritos]
-        except discord.HTTPException:
-            logger.exception("Não foi possível obter a lista completa de membros para aviso privado.")
-            await interaction.followup.send(
-                "Não consegui carregar todos os membros. Nenhum comunicado foi enviado; tente novamente.",
-                ephemeral=True,
-            )
-            return
-
-        embed = criar_embed(
-            description=(
-                "╭────────────── ◈ ──────────────╮\n"
-                "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  COMUNICADO OFICIAL**\n"
-                "╰────────────── ◈ ──────────────╯\n\n"
-                f"**{titulo}**\n"
-                f"{mensagem}\n\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
-                "Este comunicado oficial é enviado a todos os membros humanos da NÊMESIS."
-            ),
-            color=0xB3132B,
-            timestamp=datetime.now(timezone.utc),
-        )
-        embed.add_field(name="◈ CATEGORIA", value=f"**{tipo.value}**", inline=True)
-        embed.add_field(name="◈ ENVIADO POR", value=interaction.user.mention, inline=True)
-        embed.set_footer(text="NÊMESIS • Comunicados oficiais")
-        _aplicar_identidade_bot(embed, guild, self.bot)
-
-        async def processar_envio_em_segundo_plano():
-            enviados = 0
-            falhas = 0
-            permanentes = 0
-            semaforo = asyncio.Semaphore(CONCORRENCIA_ENVIO)
-
-            async def enviar_para_membro(membro: discord.Member) -> tuple[int, str]:
-                async with semaforo:
-                    resultado = await _enviar_dm_com_retry(membro, embed=embed)
-                    return membro.id, resultado
-
-            tarefas = [asyncio.create_task(enviar_para_membro(membro)) for membro in membros]
-            total = len(tarefas)
-            for concluido, tarefa in enumerate(asyncio.as_completed(tarefas), start=1):
-                user_id, resultado = await tarefa
-                if resultado == "enviada":
-                    enviados += 1
-                else:
-                    falhas += 1
-                    if resultado == "permanente":
-                        permanentes += 1
-                    logger.info(
-                        "Comunicado manual não entregue (guild=%s, user=%s, resultado=%s).",
-                        guild.id, user_id, resultado,
-                    )
-
-                if concluido % 25 == 0 and concluido < total:
-                    try:
-                        await interaction.edit_original_response(
-                            content=(
-                                f"**Enviando comunicado: {titulo}**\n"
-                                f"Progresso: **{concluido}/{total}** membros processados.\n"
-                                f"DMs enviadas: **{enviados}** · Falhas: **{falhas}**"
-                            )
-                        )
-                    except discord.HTTPException:
-                        logger.debug("Não foi possível atualizar a mensagem de progresso do aviso.")
-
-            logger.info(
-                "Comunicado privado finalizado (guild=%s, titulo=%s, destinatarios=%s, enviados=%s, falhas=%s).",
-                guild.id, titulo, len(membros), enviados, falhas,
-            )
-            try:
-                await interaction.followup.send(
-                    f"**Comunicado finalizado: {titulo}**\n"
-                    f"• Membros humanos encontrados: **{len(membros)}**\n"
-                    f"• DMs enviadas: **{enviados}**\n"
-                    f"• Falhas totais: **{falhas}** (permanentes: {permanentes}; temporárias: {falhas - permanentes})\n"
-                    f"• Falhas temporárias receberam até {TENTATIVAS_DM} tentativas automáticas.",
-                    ephemeral=True,
-                )
-            except discord.HTTPException:
-                logger.exception("Não foi possível publicar o resumo do comunicado.")
-
-        asyncio.create_task(processar_envio_em_segundo_plano())
-        await interaction.followup.send(
-            f"**Disparo iniciado: {titulo}**\n"
-            f"Destinatários: **{len(membros)}** membros humanos.\n"
-            "O envio continuará em segundo plano; o Discord ainda pode aplicar limites de entrega.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(name="avisos-privados", description="Ative ou desative os comunicados privados da NÊMESIS.")
-    @app_commands.describe(receber="Ative para receber avisos por DM ou desative para parar.")
-    @app_commands.guild_only()
-    async def avisos_privados(self, interaction: discord.Interaction, receber: bool):
-        if interaction.guild_id != GUILD_ID or interaction.guild is None:
-            await interaction.response.send_message("Comando exclusivo da NÊMESIS.", ephemeral=True)
-            return
-        await definir_preferencia(interaction.guild_id, interaction.user.id, "avisos_comunidade", receber)
-        await definir_preferencia(interaction.guild_id, interaction.user.id, "notas_atualizacao", receber)
-        estado = "ativados" if receber else "desativados"
-        await interaction.response.send_message(
-            "Avisos privados " + estado + ". Os comunicados também continuam disponíveis nos canais do servidor.",
-            ephemeral=True,
-        )
 
     async def _anunciar_release(self, guild: discord.Guild):
         """Entrega uma release uma única vez por membro, com trava persistente antes da DM."""
