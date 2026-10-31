@@ -3,6 +3,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.guild_config import lideranca_only
+
 
 def _cor_para_int(valor: str) -> int:
     valor = (valor or "").strip().lstrip("#")
@@ -181,7 +183,7 @@ class Embeds(commands.Cog):
         botao2_texto="Texto do segundo botão de link (opcional)",
         botao2_url="URL do segundo botão (obrigatória se usar o texto)",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def criar_embed(
         self,
         interaction: discord.Interaction,
@@ -226,7 +228,7 @@ class Embeds(commands.Cog):
 
     @app_commands.command(name="editar-embed", description="Edita uma embed já enviada pelo bot.")
     @app_commands.describe(canal="Canal onde a mensagem está", id_mensagem="ID da mensagem com a embed")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def editar_embed(self, interaction: discord.Interaction, canal: discord.TextChannel, id_mensagem: str):
         try:
             mensagem = await canal.fetch_message(int(id_mensagem))
