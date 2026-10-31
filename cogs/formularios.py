@@ -740,7 +740,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
     @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
                             titulo_painel="Título mostrado no painel", descricao_painel="Descrição mostrada no painel",
                             banner="Imagem de banner do painel (opcional)")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_criar(self, interaction: discord.Interaction, nome: str, titulo_painel: str,
                                 descricao_painel: str, banner: discord.Attachment = None):
         formulario = await formularios.criar_formulario(
