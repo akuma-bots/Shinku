@@ -14,7 +14,7 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Progressão da gangue:** XP de participação, ranks, cargos configuráveis e recompensas.
 - **Perfil e competitivo:** XP, patentes, vitórias, derrotas, KDR, P.C., temporadas e rankings; o perfil também exibe a conta Roblox verificada.
 - **Roblox:** vínculo por código de verificação, consulta de perfil, identificação de membros pelo nome Roblox e sincronização opcional de cargos por rank.
-- **Boas-vindas por DM:** mensagem automática de entrada com a tag `NΞM`, convite do servidor, guia interativo com botões para os canais essenciais e menu de códigos de Shigaku, Gakuran e Fistborn.
+- **Integração de novos membros:** mensagem pública e DM de boas-vindas preservam a TAG oficial `NΞM`, apresentam o cargo automático `Visitantes`, mostram os primeiros passos e oferecem botões para os canais essenciais. A DM também mantém o menu de códigos dos jogos.
 - **Central de códigos:** comando `/codigos` para abrir a lista interativa de Shigaku, Gakuran e Fistborn a qualquer momento, com recompensas, requisitos, período de referência e fontes.
 - **Tutoriais:** biblioteca interativa no canal `#Sistemas`, com seletor de guias por sistema, consulta privada e navegação entre assuntos.
 - **Novidades por DM:** releases oficiais enviados automaticamente a todos os membros humanos do servidor, sem inscrição prévia, com registro persistente para evitar repetição em reinicializações.
@@ -104,6 +104,7 @@ O workflow é uma primeira barreira de qualidade; não substitui testes funciona
 ## Tutoriais e avisos automáticos
 
 - A central pública de tutoriais é mantida automaticamente no canal `#Sistemas`; o seletor abre cada guia em uma consulta privada. Não existe comando de tutorial.
+- O guia **Começando na NÊMESIS** explica a TAG `NΞM`, o cargo automático `Visitantes`, os canais essenciais, a progressão e o fluxo de atendimento.
 - As novidades oficiais e os comunicados manuais são enviados por DM a todos os membros humanos, sem opção de inscrição ou cancelamento. A equipe autorizada usa `/avisos-enviar` para publicar um comunicado para todos. Membros com DMs bloqueadas podem não receber a mensagem; o bot registra essas falhas.
 - Ao publicar uma nova versão com novidades para anunciar, atualize `config/novidades.json`: altere `release_id` para um identificador novo e revise `titulo`, `tipo` e `mensagem`. O bot registra os usuários processados no armazenamento compartilhado para não reenviar a mesma versão após reiniciar.
 - Para vincular o Roblox, o membro usa `/roblox-vincular`, adiciona temporariamente o código à descrição do perfil Roblox e confirma com `/roblox-confirmar`. A mesma conta Roblox não pode ser vinculada a dois membros diferentes.
