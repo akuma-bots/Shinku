@@ -194,8 +194,9 @@ class Novidades(commands.Cog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            inscritos = await listar_inscritos(guild.id, "avisos_comunidade")
-            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot and str(m.id) in inscritos]
+            membros_servidor = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+            inscritos = await listar_inscritos(guild.id, "avisos_comunidade", [str(m.id) for m in membros_servidor])
+            membros = [m for m in membros_servidor if str(m.id) in inscritos]
         except discord.HTTPException:
             logger.exception("Não foi possível obter a lista completa de membros para aviso privado.")
             await interaction.followup.send(
