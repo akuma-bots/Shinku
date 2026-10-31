@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import get_config
+from utils.guild_config import get_config, lideranca_only
 
 ARQUIVO_GUERRAS = "guerras.json"
 COR_NEMESIS = 0x9F1239
@@ -103,7 +103,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         formato="Formato disputado, por exemplo 5v5 MD3 (opcional)",
         observacoes="Observações oficiais sobre o confronto (opcional)",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_registrar(
         self,
         interaction: discord.Interaction,
@@ -240,7 +240,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         regra_7="Sétima regra (opcional)",
         regra_8="Oitava regra (opcional)",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_regras_definir(
         self,
         interaction: discord.Interaction,
@@ -373,7 +373,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     @app_commands.command(name="iniciar", description="Abre uma guerra e permite acompanhar o placar até o encerramento.")
     @app_commands.describe(gangue_inimiga="Nome da gangue adversária", formato="Formato combinado", observacoes="Observações iniciais")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_iniciar(self, interaction: discord.Interaction, gangue_inimiga: str, formato: str = None, observacoes: str = None):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -433,7 +433,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     @app_commands.command(name="placar", description="Atualiza o placar de uma guerra em andamento.")
     @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar atual da NÊMESIS", placar_inimiga="Placar atual da gangue adversária", observacoes="Observação opcional")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_placar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], observacoes: str = None):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -505,7 +505,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     @app_commands.command(name="encerrar", description="Encerra uma guerra ativa e publica o resultado definitivo.")
     @app_commands.describe(codigo="Código da guerra ativa", placar_nemesis="Placar final da NÊMESIS", placar_inimiga="Placar final da gangue adversária", prova_url="Link da prova (opcional)", observacoes="Observações finais (opcional)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_encerrar(self, interaction: discord.Interaction, codigo: str, placar_nemesis: app_commands.Range[int, 0, 9999], placar_inimiga: app_commands.Range[int, 0, 9999], prova_url: str = None, observacoes: str = None):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -613,7 +613,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
 
     @app_commands.command(name="cancelar", description="Cancela uma guerra ativa sem apagar o registro do histórico.")
     @app_commands.describe(codigo="Código da guerra ativa", motivo="Motivo do cancelamento")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_cancelar(self, interaction: discord.Interaction, codigo: str, motivo: str):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -673,7 +673,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         description="Remove do histórico um registro de guerra incorreto (staff).",
     )
     @app_commands.describe(codigo="Código exibido no registro oficial")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def guerra_remover(self, interaction: discord.Interaction, codigo: str):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
