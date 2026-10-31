@@ -285,6 +285,7 @@ class Novidades(commands.Cog):
         )
 
     async def _anunciar_release(self, guild: discord.Guild):
+        """Publica cada release uma única vez no canal de anúncios; nunca dispara DM em massa."""
         async with self._lock:
             if self._processando:
                 return
@@ -293,30 +294,13 @@ class Novidades(commands.Cog):
                 release = self._ler_release()
                 if release is None:
                     return
-
-                # Releases oficiais do bot são obrigatórios: não dependem de opt-in.
-                # Buscar a lista completa evita limitar o envio aos membros em cache.
-                membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-                destinatarios = [str(m.id) for m in membros]
-                if not destinatarios:
-                    logger.info("Nenhum membro humano encontrado para o release %s.", release["release_id"])
-                    return
-
                 estados = await carregar(ARQUIVO_ESTADO, {"guilds": {}})
                 if not isinstance(estados, dict):
                     estados = {"guilds": {}}
-                estados.setdefault("guilds", {})
-                guild_estado = estados["guilds"].setdefault(str(guild.id), {})
-                release_estado = guild_estado.setdefault(release["release_id"], {
-                    "processados": [],
-                    "concluido": False,
-                })
-                processados = set(str(uid) for uid in release_estado.get("processados", []))
-                # Um release concluído pela versão antiga pode ter sido enviado apenas
-                # aos inscritos. Só encerrar quando todos os destinatários atuais constarem.
-                if release_estado.get("concluido") and all(
-                    str(uid) in processados for uid in destinatarios
-                ):
+                guilds = estados.setdefault("guilds", {})
+                guild_estado = guilds.setdefault(str(guild.id), {})
+                release_estado = guild_estado.setdefault(release["release_id"], {})
+                if release_estado.get("publicado_no_canal"):
                     return
                 embed = criar_embed(
                     description=(
@@ -327,92 +311,32 @@ class Novidades(commands.Cog):
                         f"{release['mensagem']}\n\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "**◈ O QUE VOCÊ PRECISA SABER**\n"
-                        "Esta mensagem resume as novidades publicadas para a comunidade. "
-                        "Consulte #Sistemas para acessar os tutoriais e /help para localizar os comandos."
+                        "As atualizações oficiais ficam centralizadas neste canal. Consulte #Sistemas e /help para localizar os recursos."
                     ),
                     color=0xB3132B,
                     timestamp=datetime.now(timezone.utc),
                 )
                 _aplicar_identidade_bot(embed, guild, self.bot)
-                embed.add_field(
-                    name="◈ CATEGORIA",
-                    value=f"**{release['tipo']}**",
-                    inline=True,
-                )
-                embed.add_field(
-                    name="◈ DATA DA ATUALIZAÇÃO",
-                    value=f"**{release['data_atualizacao']}**",
-                    inline=True,
-                )
-                embed.add_field(
-                    name="◈ HORÁRIO",
-                    value=f"**{release['hora_atualizacao']}**\n{release['fuso_horario']}",
-                    inline=True,
-                )
-                embed.add_field(
-                    name="◈ ACESSO RÁPIDO",
-                    value="**#Sistemas** — biblioteca de tutoriais\n**/help** — central de comandos\n",
-                    inline=False,
-                )
-                embed.set_footer(
-                    text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)"
-                )
-
-                houve_falha_storage = False
-                for user_id in destinatarios:
-                    uid = str(user_id)
-                    if uid in processados:
-                        continue
-
-                    terminal = False
-                    try:
-                        membro = guild.get_member(int(uid))
-                        if membro is None:
-                            membro = await guild.fetch_member(int(uid))
-                        resultado = await _enviar_dm_com_retry(membro, embed=embed)
-                        terminal = resultado in {"enviada", "permanente"}
-                        if resultado == "permanente":
-                            logger.info(
-                                "DM do release indisponível para user=%s; não será repetida para este release.",
-                                uid,
-                            )
-                        elif resultado == "temporaria":
-                            logger.warning(
-                                "DM do release permanece pendente para user=%s; será tentada em nova inicialização.",
-                                uid,
-                            )
-                    except discord.NotFound:
-                        logger.info("Membro %s não está mais no servidor.", uid)
-                        terminal = True
-                    except (discord.HTTPException, ValueError, TypeError):
-                        logger.exception("Falha ao localizar/entregar novidade ao usuário %s.", uid)
-                    except Exception:
-                        logger.exception("Erro inesperado ao entregar novidade ao usuário %s.", uid)
-
-                    # Só registrar como processado quando entregue ou quando não é
-                    # possível entregar permanentemente. Falhas transitórias ficam pendentes.
-                    if terminal:
-                        processados.add(uid)
-                        release_estado["processados"] = sorted(processados)
-                        guild_estado[release["release_id"]] = release_estado
-                        estados["guilds"][str(guild.id)] = guild_estado
-                        try:
-                            await salvar(ARQUIVO_ESTADO, estados)
-                        except Exception:
-                            houve_falha_storage = True
-                            logger.exception("Falha ao persistir checkpoint do release %s.", release["release_id"])
-                            break
-                    await asyncio.sleep(INTERVALO_ENVIO)
-
-                if not houve_falha_storage and all(str(uid) in processados for uid in destinatarios):
-                    release_estado["concluido"] = True
-                    release_estado["concluido_em"] = datetime.now(timezone.utc).isoformat()
-                    guild_estado[release["release_id"]] = release_estado
-                    estados["guilds"][str(guild.id)] = guild_estado
-                    await salvar(ARQUIVO_ESTADO, estados)
-                    logger.info("Entrega do release %s processada para todos os membros humanos.", release["release_id"])
+                embed.add_field(name="◈ CATEGORIA", value=f"**{release['tipo']}**", inline=True)
+                embed.add_field(name="◈ DATA DA ATUALIZAÇÃO", value=f"**{release['data_atualizacao']}**", inline=True)
+                embed.add_field(name="◈ HORÁRIO", value=f"**{release['hora_atualizacao']}**\n{release['fuso_horario']}", inline=True)
+                embed.add_field(name="◈ ACESSO RÁPIDO", value="**#Sistemas** — biblioteca de tutoriais\n**/help** — central de comandos", inline=False)
+                embed.set_footer(text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)")
+                canal = guild.get_channel(CANAL_ANUNCIOS_ID)
+                if canal is None:
+                    canal = await self.bot.fetch_channel(CANAL_ANUNCIOS_ID)
+                if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
+                    raise ValueError("Canal oficial de anúncios inválido.")
+                mensagem = await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                release_estado["publicado_no_canal"] = True
+                release_estado["mensagem_id"] = str(mensagem.id)
+                release_estado["publicado_em"] = datetime.now(timezone.utc).isoformat()
+                guild_estado[release["release_id"]] = release_estado
+                guilds[str(guild.id)] = guild_estado
+                await salvar(ARQUIVO_ESTADO, estados)
+                logger.info("Release %s publicado no canal %s (message=%s).", release["release_id"], canal.id, mensagem.id)
             except Exception:
-                logger.exception("Falha ao processar release automático da NÊMESIS.")
+                logger.exception("Falha ao publicar release automático da NÊMESIS.")
             finally:
                 self._processando = False
 
