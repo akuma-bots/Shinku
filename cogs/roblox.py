@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 import aiohttp
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
+
+from utils.guild_config import lideranca_only, tasks
 from utils.storage import carregar, salvar
 
 ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {roblox_id, roblox_username} } }
@@ -516,7 +518,7 @@ class Roblox(commands.Cog):
 
     @app_commands.command(name="roblox-configurar-grupo", description="Define qual grupo Roblox da gangue o bot vai usar pra sincronizar cargos.")
     @app_commands.describe(grupo_id="ID numérico do grupo Roblox (aparece na URL do grupo)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def roblox_configurar_grupo(self, interaction: discord.Interaction, grupo_id: str):
         if not grupo_id.isdigit():
             await interaction.response.send_message("O ID do grupo precisa ser só números.", ephemeral=True)
@@ -533,7 +535,7 @@ class Roblox(commands.Cog):
 
     @app_commands.command(name="roblox-mapear-cargo", description="Liga um rank do grupo Roblox a um cargo do Discord.")
     @app_commands.describe(rank_roblox="Nome EXATO do rank no grupo Roblox (ex: 'Oficial')", cargo_discord="Cargo do Discord correspondente")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def roblox_mapear_cargo(self, interaction: discord.Interaction, rank_roblox: str, cargo_discord: discord.Role):
         if cargo_discord >= interaction.guild.me.top_role:
             await interaction.response.send_message(
@@ -555,7 +557,7 @@ class Roblox(commands.Cog):
 
     @app_commands.command(name="roblox-remover-mapeamento", description="Remove a ligação de um rank do Roblox com cargo do Discord.")
     @app_commands.describe(rank_roblox="Nome exato do rank, como aparece em /roblox-mapeamentos")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def roblox_remover_mapeamento(self, interaction: discord.Interaction, rank_roblox: str):
         todos = await carregar(ARQUIVO_GRUPO, {})
         atual = todos.get(str(interaction.guild.id), {"grupo_id": None, "mapeamentos": {}})
@@ -579,7 +581,7 @@ class Roblox(commands.Cog):
 
     @app_commands.command(name="roblox-sincronizar", description="Força a sincronização de cargo por rank (de um membro ou de todo mundo vinculado).")
     @app_commands.describe(membro="(Opcional) só esse membro — sem isso, sincroniza todo mundo vinculado")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def roblox_sincronizar(self, interaction: discord.Interaction, membro: discord.Member = None):
         await interaction.response.defer(ephemeral=True)
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
@@ -603,7 +605,7 @@ class Roblox(commands.Cog):
         await interaction.followup.send(f"✅ Sincronização concluída pra {atualizados} membro(s) vinculado(s).", ephemeral=True)
 
     @app_commands.command(name="roblox-historico", description="Consulta as últimas alterações de participação e rank no grupo Roblox.")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def roblox_historico(self, interaction: discord.Interaction):
         historico = await carregar(ARQUIVO_HISTORICO_ROBLOX, {})
         eventos = historico.get(str(interaction.guild.id), []) if isinstance(historico, dict) else []
