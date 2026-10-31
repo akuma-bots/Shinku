@@ -4,6 +4,8 @@ import os
 import discord
 from discord.ext import commands
 
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
+
 logger = logging.getLogger(__name__)
 
 CANAL_GUIAS_ID = 1563995880833421512
@@ -118,11 +120,12 @@ GUIAS = [
     ], "/help · Central de Atendimento"),
 ]
 
-def _criar_embed(titulo: str, descricao: str, passos: list[str], comandos: str, numero: int) -> discord.Embed:
-    embed = discord.Embed(
+def _criar_embed(titulo: str, descricao: str, passos: list[str], comandos: str, numero: int, guild: discord.Guild, bot: commands.Bot) -> discord.Embed:
+    embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ {titulo}",
         description=descricao,
-        color=0xB3132B,
+        color=0x780D22,
+        rodape=None,
     )
     embed.add_field(
         name="◈ PASSO A PASSO",
@@ -131,7 +134,7 @@ def _criar_embed(titulo: str, descricao: str, passos: list[str], comandos: str, 
     )
     embed.add_field(name="◈ ACESSO RÁPIDO", value=comandos, inline=False)
     embed.set_footer(text=f"NÊMESIS • GUIA OFICIAL • {VERSAO_GUIA} • TUTORIAL {numero:02d}")
-    return embed
+    return aplicar_identidade_servidor(embed, guild, bot)
 
 class GuiasServidor(commands.Cog):
     """Publica e mantém os guias oficiais no canal de tutoriais."""
@@ -189,7 +192,7 @@ class GuiasServidor(commands.Cog):
                 if marcador in existentes:
                     continue
                 embeds = [
-                    _criar_embed(titulo, descricao, passos, comandos, (indice - 1) * 8 + posicao)
+                    _criar_embed(titulo, descricao, passos, comandos, (indice - 1) * 8 + posicao, canal.guild, self.bot)
                     for posicao, (titulo, descricao, passos, comandos) in enumerate(guias, start=1)
                 ]
                 embeds[0].set_footer(text=marcador)
