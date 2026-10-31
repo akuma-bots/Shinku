@@ -129,59 +129,40 @@ class ConfirmarEnvioNotas(discord.ui.View):
         self.guild_id = guild_id
         self.autor_id = autor_id
 
-    @discord.ui.button(label="Enviar atualização por DM", style=discord.ButtonStyle.danger, emoji="📨")
+    @discord.ui.button(label="Publicar no canal de anúncios", style=discord.ButtonStyle.danger, emoji="📢")
     async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.autor_id:
-            await interaction.response.send_message("Somente quem preparou esta nota pode confirmar o envio.", ephemeral=True)
+            await interaction.response.send_message("Somente quem preparou esta nota pode publicar.", ephemeral=True)
             return
         if interaction.guild_id != self.guild_id or not isinstance(interaction.user, discord.Member) or not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Apenas um administrador da NÊMESIS pode confirmar o envio.", ephemeral=True)
+            await interaction.response.send_message("Apenas um administrador da NÊMESIS pode confirmar a publicação.", ephemeral=True)
             return
         if self.guild_id in self.cog._sending:
-            await interaction.response.send_message("Já existe um envio de notas em andamento.", ephemeral=True)
+            await interaction.response.send_message("Já existe uma publicação de notas em andamento.", ephemeral=True)
             return
 
         self.cog._sending.add(self.guild_id)
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content="Envio confirmado. Preparando a lista de membros…", view=self)
+        await interaction.response.edit_message(content="Publicação confirmada. Enviando as notas ao canal oficial…", view=self)
         try:
             guild = interaction.guild
-            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-        except discord.HTTPException:
-            self.cog._sending.discard(self.guild_id)
-            log.exception("Falha ao carregar membros para envio das notas.")
-            await interaction.followup.send("Não consegui carregar todos os membros. Nenhuma nota foi enviada.", ephemeral=True)
-            return
-
-        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
-        entregues = bloqueadas = falhas = 0
-        try:
-            total = len(membros)
-            for index, member in enumerate(membros, start=1):
-                resultado = await _enviar_nota(member, embed)
-                if resultado == "enviada":
-                    entregues += 1
-                elif resultado == "bloqueada":
-                    bloqueadas += 1
-                else:
-                    falhas += 1
-                if index % 25 == 0 and index < total:
-                    try:
-                        await interaction.edit_original_response(content=f"**Enviando notas {VERSAO_PADRAO}**\nProcessados: **{index}/{total}** · Entregues: **{entregues}** · Bloqueadas: **{bloqueadas}** · Falhas: **{falhas}**", view=self)
-                    except discord.HTTPException:
-                        log.debug("Não foi possível atualizar o progresso do envio.")
-                await asyncio.sleep(SEND_DELAY)
+            canal = guild.get_channel(1564076387797569577)
+            if canal is None:
+                canal = await self.cog.bot.fetch_channel(1564076387797569577)
+            if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
+                raise ValueError("Canal oficial de anúncios inválido.")
+            embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
+            embed.set_footer(text="NÊMESIS • Notas oficiais de atualização • Consulte os canais para acompanhar novidades")
+            mensagem = await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        except (discord.HTTPException, ValueError):
+            log.exception("Falha ao publicar as notas no canal oficial.")
+            await interaction.edit_original_response(content="Não foi possível publicar as notas. Nenhuma DM foi enviada.", view=self)
+        else:
+            log.info("Notas publicadas (guild=%s, versao=%s, canal=%s, mensagem=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, canal.id, mensagem.id, interaction.user.id)
+            await interaction.edit_original_response(content=f"**Notas publicadas com sucesso.**\nCanal: <#{canal.id}>\nMensagem ID: {mensagem.id}\nNenhuma DM foi enviada aos membros.", view=self)
         finally:
             self.cog._sending.discard(self.guild_id)
-
-        log.info("Notas concluídas (guild=%s, versao=%s, total=%s, entregues=%s, bloqueadas=%s, falhas=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, len(membros), entregues, bloqueadas, falhas, interaction.user.id)
-        await interaction.edit_original_response(
-            content=f"**Notas processadas — {VERSAO_PADRAO}**\n"
-            f"• Membros humanos: **{len(membros)}**\n• Entregues: **{entregues}**\n"
-            f"• DMs bloqueadas/indisponíveis: **{bloqueadas}**\n• Falhas após tentativas: **{falhas}**",
-            view=self,
-        )
 
     @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="✖")
     async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -190,7 +171,7 @@ class ConfirmarEnvioNotas(discord.ui.View):
             return
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content="Envio cancelado. Nenhuma DM foi enviada.", view=self)
+        await interaction.response.edit_message(content="Publicação cancelada. Nenhuma mensagem foi enviada.", view=self)
         self.stop()
 
 
@@ -218,7 +199,7 @@ class NotasAtualizacao(commands.Cog):
         embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
         view = ConfirmarEnvioNotas(self, interaction.guild_id, interaction.user.id)
         await interaction.response.send_message(
-            "Modelo da atualização pronto. Revise a nota abaixo e clique em **Enviar atualização por DM** para enviar a todos os membros humanos. Nenhuma DM será enviada antes da confirmação.",
+            "Modelo da atualização pronto. Revise a nota abaixo e publique no canal oficial de anúncios. Os membros não receberão DMs em massa.",
             embed=embed,
             view=view,
             ephemeral=True,
