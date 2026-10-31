@@ -2498,9 +2498,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             "Verifica o estado do AutoMod."
         ),
     )
-    @app_commands.default_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def automod_status(
         self,
         interaction: discord.Interaction,
