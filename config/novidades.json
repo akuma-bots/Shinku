@@ -1,6 +1,6 @@
 {
   "release_id": "20261031-195947",
-  "habilitada": true,
+  "habilitada": false,
   "tipo": "Sistemas novos e melhorias",
   "titulo": "Foram aplicadas melhorias em sistemas e comandos.",
   "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Foram aplicadas melhorias em sistemas e comandos.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
