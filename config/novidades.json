@@ -1,8 +1,8 @@
 {
   "release_id": "20261031-123426",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Improve update announcements with bot branding",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Improve update announcements with bot branding\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Identidade visual dos comunicados de atualização",
+  "mensagem": "O sistema de notas de atualização da NÊMESIS recebeu melhorias visuais e de apresentação.\n\n**O que mudou**\n• Os comunicados passam a exibir o avatar do próprio bot na assinatura e na miniatura.\n• O banner do perfil do bot é exibido como imagem principal; quando não houver um banner próprio, será utilizado o banner do servidor.\n• O texto dos comunicados foi ajustado para português do Brasil, com linguagem mais clara e padronizada.\n• A identidade visual foi aplicada tanto às notas automáticas quanto aos comunicados enviados manualmente.\n\n**Disponibilidade**\nAs alterações foram integradas ao repositório e serão aplicadas após a conclusão do deploy.",
   "data_atualizacao": "31/10/2026",
   "hora_atualizacao": "12:34",
   "fuso_horario": "Horário de Brasília (BRT)",
