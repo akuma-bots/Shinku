@@ -1,6 +1,6 @@
 import unittest
 
-from cogs.perfil import _resumo_historico_missoes, _resumo_progressao
+from cogs.perfil import _posicao_progressao, _resumo_historico_missoes, _resumo_progressao
 
 
 class TestPerfilIntegrado(unittest.TestCase):
@@ -49,6 +49,18 @@ class TestPerfilIntegrado(unittest.TestCase):
         self.assertEqual(resumo["rejeitadas"], 1)
         self.assertEqual(resumo["pendentes"], 1)
         self.assertEqual([item["id"] for item in resumo["recentes"]], ["b", "d"])
+
+    def test_posicao_progressao_ordena_por_xp_e_participacao(self):
+        membros = {
+            "10": {"xp": 100, "mensagens": 8},
+            "20": {"xp": 200, "mensagens": 1},
+            "30": {"xp": 100, "mensagens": 12},
+        }
+
+        self.assertEqual(_posicao_progressao(membros, 20), 1)
+        self.assertEqual(_posicao_progressao(membros, 30), 2)
+        self.assertEqual(_posicao_progressao(membros, 10), 3)
+        self.assertIsNone(_posicao_progressao(membros, 99))
 
     def test_historico_vazio_nao_cria_registros(self):
         resumo = _resumo_historico_missoes([], 10)
