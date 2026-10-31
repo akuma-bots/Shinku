@@ -180,6 +180,7 @@ class BoasVindasDM(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    bot.add_view(OptOutView())
     await bot.add_cog(BoasVindasDM(bot))        await interaction.response.send_message(
             "🔕 **Avisos privados desativados.** Você continuará vendo os comunicados nos canais da NÊMESIS. Se mudar de ideia, use /avisos-privados.",
             ephemeral=True,
