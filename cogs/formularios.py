@@ -19,6 +19,7 @@ SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
 LIMITE_SESSOES_FORMULARIO = 5000
 CANAL_PAINEIS_FORMULARIOS = 1545835428530360401
+CANAL_RECEBIMENTO_CANDIDATURAS = 1563995882540498996
 
 
 def _limpar_sessoes_formularios(agora: float | None = None) -> None:
@@ -84,6 +85,12 @@ FORMULARIOS_AUTOMATICOS = [
             "Como receberia uma crítica da liderança sobre seu trabalho?",
             "Na sua opinião, o que caracteriza uma postura imparcial dentro da Staff?",
             "Existe algo mais sobre sua experiência ou disponibilidade que queira acrescentar?"
+        ], [
+            "Como você priorizaria tarefas quando várias demandas chegassem ao mesmo tempo?",
+            "O que faria se percebesse que outro membro da equipe está abusando das permissões?",
+            "Como manteria a confidencialidade de informações internas e denúncias?",
+            "Que iniciativa concreta você proporia para melhorar a experiência dos membros?",
+            "Por que a liderança deveria confiar a você responsabilidades dentro da NÊMESIS?"
         ]],
     },
 ]
@@ -367,13 +374,19 @@ class ModalFormulario(discord.ui.Modal):
             or interaction.user.display_name,
         )
         cog = interaction.client.get_cog("Formularios")
+        canal_recebido = False
         if cog is not None:
-            await cog.notificar_cargos(guild, self.formulario, resposta)
+            canal_recebido = await cog.notificar_cargos(guild, self.formulario, resposta)
+        mensagem_envio = (
+            "Sua candidatura foi protocolada e publicada no canal da comissão responsável."
+            if canal_recebido else
+            "Sua candidatura foi salva, mas a publicação no canal da comissão falhou. A equipe técnica precisa verificar as permissões do bot."
+        )
         await interaction.followup.send(
             embed=criar_embed(
                 "✦・ INSCRIÇÃO RECEBIDA ・✦",
                 (
-                    "Sua candidatura foi protocolada com sucesso e encaminhada à comissão responsável.\n\n"
+                    f"{mensagem_envio}\n\n"
                     f"**PROTOCOLO**　{resposta['id']}\n"
                     "**SITUAÇÃO**　🟠 Em análise\n\n"
                     "Você receberá uma mensagem privada quando houver uma decisão. "
@@ -590,11 +603,21 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                             guild.id, definicao["nome"], definicao["titulo"],
                             definicao["descricao"], None, self.bot.user.id if self.bot.user else 0,
                         )
-                    if not formularios.perguntas_flat(formulario):
-                        for perguntas in definicao["paginas"]:
-                            formulario = await formularios.adicionar_pagina(guild.id, formulario["id"], perguntas)
-                            if formulario is None:
-                                raise RuntimeError(f"Não foi possível configurar perguntas para {definicao['nome']}.")
+                    # Migração incremental: formulários antigos podem já ter 5 perguntas.
+                    # Acrescenta somente as perguntas novas da definição, sem duplicar nem apagar respostas.
+                    existentes = set(formularios.perguntas_flat(formulario))
+                    faltantes = []
+                    for pagina_definida in definicao["paginas"]:
+                        for pergunta in pagina_definida:
+                            if pergunta not in existentes:
+                                faltantes.append(pergunta)
+                                existentes.add(pergunta)
+                    for inicio in range(0, len(faltantes), 5):
+                        formulario = await formularios.adicionar_pagina(
+                            guild.id, formulario["id"], faltantes[inicio:inicio + 5]
+                        )
+                        if formulario is None:
+                            raise RuntimeError(f"Não foi possível atualizar as perguntas de {definicao['nome']}.")
                 except Exception:
                     logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
             try:
@@ -637,34 +660,33 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         logging.info("Central pública de inscrições %s (canal=%s, mensagem=%s, disponíveis=%s).",
                      acao, canal_id, mensagem.id, len(_formularios_disponiveis(lista)))
 
-    async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict):
-
+    async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict) -> bool:
+        """Publica o dossiê no canal oficial e notifica os cargos responsáveis por DM."""
         embeds = _embeds_resposta(formulario, resposta, guild, self.bot)
         view = _view_resposta(resposta["id"])
+        canal_enviado = False
 
-        # Publica todas as partes da candidatura; os botões ficam na primeira.
-        canal_candidaturas = guild.get_channel(1545835428530360401)
+        canal_candidaturas = guild.get_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
         if canal_candidaturas is None:
             try:
-                canal_candidaturas = await guild.fetch_channel(1545835428530360401)
+                canal_candidaturas = await guild.fetch_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logging.exception("Canal de recebimento de candidaturas %s não encontrado ou inacessível.", CANAL_RECEBIMENTO_CANDIDATURAS)
                 canal_candidaturas = None
-        if canal_candidaturas is not None:
-            for indice, embed in enumerate(embeds):
-                try:
-                    await canal_candidaturas.send(
-                        embed=embed,
-                        view=view if indice == 0 else None,
-                    )
-                except (discord.Forbidden, discord.HTTPException):
-                    logging.exception("Falha ao publicar candidatura %s no canal.", resposta.get("id"))
-                    break
 
-        # Instrutores/aprovadores recebem todas as candidaturas por DM.
+        if canal_candidaturas is not None and callable(getattr(canal_candidaturas, "send", None)):
+            try:
+                for indice, embed in enumerate(embeds):
+                    await canal_candidaturas.send(embed=embed, view=view if indice == 0 else None)
+                canal_enviado = True
+            except (discord.Forbidden, discord.HTTPException):
+                logging.exception("Falha ao publicar candidatura %s no canal %s.", resposta.get("id"), CANAL_RECEBIMENTO_CANDIDATURAS)
+        else:
+            logging.error("O destino %s não é um canal de texto enviável.", CANAL_RECEBIMENTO_CANDIDATURAS)
+
         cargos_notificar = list(formulario.get("cargos_notificar", []))
         if CARGO_INSTRUTOR_FORMULARIO_ID not in cargos_notificar:
             cargos_notificar.append(CARGO_INSTRUTOR_FORMULARIO_ID)
-
         notificados = set()
         for cargo_id in cargos_notificar:
             try:
@@ -680,15 +702,13 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 notificados.add(membro.id)
                 for indice, embed in enumerate(embeds):
                     try:
-                        await membro.send(
-                            embed=embed,
-                            view=view if indice == 0 else None,
-                        )
+                        await membro.send(embed=embed, view=view if indice == 0 else None)
                     except discord.Forbidden:
-                        break  # DM fechada — a pessoa simplesmente não recebe
-                    except discord.HTTPException:
-                        logging.exception("Falha ao enviar candidatura %s por DM.", resposta.get("id"))
                         break
+                    except discord.HTTPException:
+                        logging.exception("Falha ao enviar candidatura %s por DM ao membro %s.", resposta.get("id"), membro.id)
+                        break
+        return canal_enviado
 
     @app_commands.command(name="criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
     @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
