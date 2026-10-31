@@ -10,6 +10,7 @@ from utils.guild_config import (
     get_config,
     definir_canal_cargo_automatico,
     remover_canal_cargo_automatico,
+    lideranca_only,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -119,7 +120,7 @@ class CargoAutomatico(commands.Cog):
         description="Define um canal onde postar qualquer mensagem dá um cargo automático.",
     )
     @app_commands.describe(canal="Canal que vai dar o cargo", cargo="Cargo que a pessoa recebe ao postar ali")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def definir_canal_cargo(self, interaction: discord.Interaction, canal: discord.TextChannel, cargo: discord.Role):
         if not _cargo_atribuivel(interaction.guild, cargo):
             await interaction.response.send_message(
@@ -141,7 +142,7 @@ class CargoAutomatico(commands.Cog):
         description="Remove o cargo automático de um canal.",
     )
     @app_commands.describe(canal="Canal que vai deixar de dar cargo automático")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def remover_canal_cargo(self, interaction: discord.Interaction, canal: discord.TextChannel):
         await remover_canal_cargo_automatico(interaction.guild.id, canal.id)
         await interaction.response.send_message(f"🔒 {canal.mention} não dá mais cargo automático.", ephemeral=True)
@@ -150,7 +151,7 @@ class CargoAutomatico(commands.Cog):
         name="canais-cargo-automatico",
         description="Lista os canais que dão cargo automático neste servidor.",
     )
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def canais_cargo_automatico(self, interaction: discord.Interaction):
         config = await get_config(interaction.guild.id)
         mapa = config["canais_cargo_automatico"]
