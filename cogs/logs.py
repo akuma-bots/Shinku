@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 from utils.guild_config import get_config
-from utils.guia_servidores import GuiaServidoresView
+from utils.guia_servidores import (
+    GuiaServidoresView,
+    CARGO_VISITANTES_ID,
+    NOME_CARGO_VISITANTES,
+    TAG_ORG_NEMESIS,
+)
 from utils.storage import carregar
 
 
@@ -102,8 +107,8 @@ class Logs(commands.Cog):
                 "     **UMA NOVA JORNADA COMEÇA**\n"
                 "╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯\n\n"
                 f"⟡・Seja bem-vindo(a), {member.mention}.\n"
-                "Você acaba de entrar na **NÊMESIS** — um espaço de competição, evolução "
-                "e união para quem leva os jogos a sério. Explore, participe e conquiste seu lugar."
+                "Você acaba de entrar na **NÊMESIS** — uma organização de competição, evolução "
+                "e comunidade. Explore os canais oficiais, conheça as divisões e participe das atividades."
             ),
             color=0xB3132B,
             timestamp=agora,
@@ -115,6 +120,11 @@ class Logs(commands.Cog):
             name="◈  IDENTIFICAÇÃO",
             value=f"**Integrante:** {member.mention}\n**Registro:** `{member.id}`\n**Efetivo atual:** `{total_membros:,}`",
             inline=False,
+        )
+        embed.add_field(
+            name="◈  IDENTIDADE DA ORGANIZAÇÃO",
+            value=f"**TAG DA ORG:** `{TAG_ORG_NEMESIS}`\n**Cargo inicial:** <@&{CARGO_VISITANTES_ID}> — {NOME_CARGO_VISITANTES}",
+            inline=True,
         )
         embed.add_field(
             name="◈  RECRUTAMENTO",
@@ -130,19 +140,20 @@ class Logs(commands.Cog):
         embed.add_field(
             name="╭・SEU PRIMEIRO PASSO",
             value=(
-                "➜ **Leia as regras:** comece pelo canal oficial de conduta.\n"
-                "➜ **Explore a organização:** use os botões abaixo para abrir as áreas essenciais.\n"
-                "➜ **Aprenda os sistemas:** consulte a biblioteca de tutoriais em #Sistemas.\n"
-                "➜ **Participe:** acompanhe missões, eventos e sua progressão."
+                "01. **Leia as regras:** conheça as normas antes de participar.\n"
+                "02. **Entenda a estrutura:** visite Como funciona e Divisões.\n"
+                "03. **Aprenda os sistemas:** abra #Sistemas e selecione um tutorial.\n"
+                "04. **Entre em atividade:** acompanhe missões, eventos e progressão.\n"
+                "05. **Precisa de ajuda?** acesse Atendimento pelos botões abaixo."
             ),
             inline=False,
         )
         embed.add_field(
             name="✦  SEU PRÓXIMO CAPÍTULO COMEÇA AGORA",
-            value="A NÊMESIS reconhece atitude, consistência e espírito competitivo. **Mostre do que você é capaz.**",
+            value="A TAG oficial da organização é **NΞM**. A NÊMESIS reconhece atitude, consistência e espírito competitivo. **Mostre do que você é capaz.**",
             inline=False,
         )
-        embed.set_footer(text="NÊMESIS • Sistema oficial de integração")
+        embed.set_footer(text="NÊMESIS • TAG DA ORG: NΞM • Sistema oficial de integração")
         enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
         if enviado:
             logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
