@@ -29,13 +29,7 @@ from utils.perfis import (
 log = logging.getLogger(__name__)
 
 
-class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar provas da missão"):
-    missao_id = discord.ui.TextInput(
-        label="ID da missão",
-        placeholder="Ex.: SHI-NM001",
-        required=True,
-        max_length=50,
-    )
+class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar evidência da atividade"):
     imagem_url = discord.ui.TextInput(
         label="Link da imagem da prova (Discord)",
         placeholder="Envie a imagem no Discord e cole o link da imagem",
@@ -49,17 +43,95 @@ class EnviarProvaMissaoModal(discord.ui.Modal, title="Enviar provas da missão")
         max_length=30,
     )
 
-    def __init__(self, cog):
+    def __init__(self, cog, missao_id: str):
         super().__init__(timeout=300)
         self.cog = cog
+        self.missao_id_selecionada = str(missao_id)
 
     async def on_submit(self, interaction: discord.Interaction):
         await self.cog.receber_prova_modal(
             interaction,
-            str(self.missao_id.value),
+            self.missao_id_selecionada,
             str(self.imagem_url.value),
             str(self.auxiliar.value or ""),
         )
+
+
+class SeletorMissaoProva(discord.ui.Select):
+    def __init__(self, view: "SeletorMissaoProvaView"):
+        self.pai = view
+        inicio = view.pagina * 25
+        opcoes = []
+        for atividade in view.atividades[inicio:inicio + 25]:
+            codigo = str(atividade.get("id") or "").strip()
+            if not codigo:
+                continue
+            titulo = str(atividade.get("titulo") or "Atividade sem título").strip()
+            try:
+                xp = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
+            except (TypeError, ValueError, OverflowError):
+                xp = 0
+            opcoes.append(discord.SelectOption(
+                label=titulo[:100],
+                value=codigo[:100],
+                description=f"{codigo} • Recompensa: {xp:,} XP".replace(",", ".")[:100],
+            ))
+        super().__init__(
+            placeholder="◈ Selecione a atividade que deseja comprovar",
+            min_values=1,
+            max_values=1,
+            options=opcoes or [discord.SelectOption(label="Nenhuma atividade disponível", value="indisponivel")],
+            disabled=not opcoes,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.pai.owner_id:
+            await interaction.response.send_message("Esta seleção pertence a outro integrante.", ephemeral=True)
+            return
+        codigo = self.values[0]
+        if codigo == "indisponivel":
+            await interaction.response.send_message("Não há atividades disponíveis nesta categoria.", ephemeral=True)
+            return
+        await interaction.response.send_modal(EnviarProvaMissaoModal(self.pai.cog, codigo))
+
+
+class SeletorMissaoProvaView(discord.ui.View):
+    def __init__(self, cog, owner_id: int, categoria: str, atividades: list, pagina: int = 0):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.categoria = categoria if categoria in TIPOS else "missao"
+        self.atividades = atividades
+        self.total_paginas = max(1, (len(atividades) + 24) // 25)
+        self.pagina = max(0, min(pagina, self.total_paginas - 1))
+        self.add_item(SeletorMissaoProva(self))
+        self.pagina_anterior.disabled = self.pagina == 0
+        self.proxima_pagina.disabled = self.pagina >= self.total_paginas - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message("Esta seleção pertence a outro integrante.", ephemeral=True)
+            return False
+        return True
+
+    async def _mudar_pagina(self, interaction: discord.Interaction, delta: int):
+        self.pagina = max(0, min(self.total_paginas - 1, self.pagina + delta))
+        nova = SeletorMissaoProvaView(
+            self.cog, self.owner_id, self.categoria, self.atividades, self.pagina
+        )
+        await interaction.response.edit_message(
+            embed=self.cog._embed_selecao_prova(self.categoria, self.pagina, self.total_paginas, self.atividades),
+            view=nova,
+        )
+
+    @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, emoji="◀️", row=1)
+    async def pagina_anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._mudar_pagina(interaction, -1)
+
+    @discord.ui.button(label="Próxima página", style=discord.ButtonStyle.secondary, emoji="▶️", row=1)
+    async def proxima_pagina(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._mudar_pagina(interaction, 1)
 
 
 class EnviarProvaMissaoView(discord.ui.View):
@@ -76,7 +148,7 @@ class EnviarProvaMissaoView(discord.ui.View):
         custom_id="nemesis:missao:enviar_provas",
     )
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
+        await self.cog.abrir_seletor_prova(interaction, "missao")
 
 
 class CategoriaMissoesSelect(discord.ui.Select):
@@ -169,7 +241,7 @@ class NavegacaoMissoesView(discord.ui.View):
         row=2,
     )
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(EnviarProvaMissaoModal(self.cog))
+        await self.cog.abrir_seletor_prova(interaction, self.categoria)
 
 
 class RankingJogoSelect(discord.ui.Select):
@@ -520,7 +592,7 @@ class Missoes(commands.Cog):
         inicio = pagina * itens_por_pagina
         nome_categoria = tipo["plural"].upper()
         embed = criar_embed(
-            "✦・ CENTRAL GLOBAL DE MISSÕES — NÊMESIS ・✦",
+            "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE OPERAÇÕES ・✦",
             (
                 "╭────────────── ◈ ──────────────╮\n"
                 f"                 **{nome_categoria}  /  TODOS OS JOGOS**\n"
@@ -528,8 +600,9 @@ class Missoes(commands.Cog):
                 "Um catálogo unificado de operações da **NÊMESIS**. "
                 "Todas as atividades são válidas para qualquer jogo compatível com a organização. "
                 "Não existe divisão de missões por título de jogo.\n\n"
-                "**✧ Envio de evidências**  Utilize o botão abaixo e informe o código da atividade.\n"
-                "**✧ Avaliação**  Toda recompensa depende da validação da equipe."
+                "**✧ Envio de evidências**  Selecione uma atividade no menu, envie a imagem e informe um auxiliar, se houver.\n"
+                "**✧ Progressão**  As recompensas são concedidas exclusivamente em XP após aprovação.\n"
+                "**✧ Integridade**  Uma prova pendente por membro e atividade; envios repetidos são bloqueados."
             ),
             cor=tipo["cor"], rodape=None,
         )
@@ -581,6 +654,59 @@ class Missoes(commands.Cog):
             embed.remove_field(len(embed.fields) - 1)
         aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
         return embed
+
+    def _embed_selecao_prova(self, categoria: str, pagina: int, total_paginas: int, atividades: list) -> discord.Embed:
+        tipo = TIPOS.get(categoria, TIPOS["missao"])
+        embed = criar_embed(
+            "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ ENVIO DE EVIDÊNCIAS",
+            (
+                f"⟡・Selecione a atividade da categoria **{tipo['plural']}** que deseja comprovar.\n\n"
+                "Após a seleção, informe o link da imagem hospedada no Discord. "
+                "A equipe analisará a evidência antes de liberar o XP."
+            ),
+            cor=tipo["cor"],
+            rodape=None,
+        )
+        inicio = pagina * 25
+        embed.add_field(name="◈ ATIVIDADES DISPONÍVEIS", value=f"**{len(atividades)}** atividades ativas", inline=True)
+        embed.add_field(name="◈ PÁGINA", value=f"**{pagina + 1}/{total_paginas}**", inline=True)
+        embed.add_field(name="◈ RECOMPENSA", value="XP após aprovação", inline=True)
+        if not atividades:
+            embed.add_field(name="CATÁLOGO VAZIO", value="Não existem atividades ativas nesta categoria no momento.", inline=False)
+        else:
+            linhas = []
+            for item in atividades[inicio:inicio + 25]:
+                codigo = str(item.get("id") or "—")
+                titulo = str(item.get("titulo") or "Atividade sem título")
+                try:
+                    xp = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
+                except (TypeError, ValueError, OverflowError):
+                    xp = 0
+                linhas.append(f"• **{titulo[:70]}** — {codigo} · **{xp:,} XP**".replace(",", "."))
+            embed.add_field(name="◈ SELEÇÃO", value="\n".join(linhas)[:1024], inline=False)
+        embed.set_footer(text="NÊMESIS • CENTRAL DE OPERAÇÕES • Evidências sujeitas à validação")
+        return embed
+
+    async def abrir_seletor_prova(self, interaction: discord.Interaction, categoria: str = "missao"):
+        if interaction.guild is None:
+            await interaction.response.send_message("Este recurso só pode ser utilizado no servidor da NÊMESIS.", ephemeral=True)
+            return
+        categoria = categoria if categoria in TIPOS else "missao"
+        dados = await missoes._guild(interaction.guild.id)
+        atividades = [
+            item for item in dados.get("missoes", [])
+            if isinstance(item, dict)
+            and str(item.get("tipo") or "missao").lower() == categoria
+            and item.get("ativa", True) is not False
+            and str(item.get("id") or "").strip()
+        ]
+        atividades.sort(key=lambda item: (str(item.get("titulo") or "").casefold(), str(item.get("id") or "")))
+        total_paginas = max(1, (len(atividades) + 24) // 25)
+        await interaction.response.send_message(
+            embed=self._embed_selecao_prova(categoria, 0, total_paginas, atividades),
+            view=SeletorMissaoProvaView(self, interaction.user.id, categoria, atividades),
+            ephemeral=True,
+        )
 
     async def navegar_painel_missoes(self, interaction: discord.Interaction, delta: int) -> None:
         """Percorre páginas da categoria atual sem misturar departamentos."""
