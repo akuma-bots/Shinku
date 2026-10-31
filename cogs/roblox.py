@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 import asyncio
 import logging
 import random
@@ -266,6 +266,7 @@ class Roblox(commands.Cog):
                 _LOG.error("Canal configurado para a central Roblox não é um canal de texto.")
                 return
             embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CENTRAL ROBLOX", description="Acesse a comunidade oficial da NÊMESIS no Roblox e conecte sua conta ao Discord.\n\n**Comunidade:** [Comunidade Nik](" + ROBLOX_GRUPO_URL + ")\n**ID do grupo:** `" + str(ROBLOX_GRUPO_ID) + "`\n\n**Vinculação segura**\nA confirmação utiliza um código temporário na descrição do perfil Roblox. O bot nunca solicita senha ou cookie.", color=0xB3132B)
+            aplicar_identidade_servidor(embed, canal.guild, self.bot)
             try:
                 dados = await _buscar_dados_grupo()
                 nome = str(dados.get("name") or "Comunidade Nik")[:100]
