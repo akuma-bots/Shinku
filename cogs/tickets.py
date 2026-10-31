@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from utils.apresentacao import criar_embed
 from utils.storage import carregar_config
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 from utils import tickets
 
 
@@ -1251,7 +1251,7 @@ class Tickets(commands.Cog):
             )
 
     @app_commands.command(name="ticket-painel-configurar", description="Personaliza banner, ícone e textos da central de tickets.")
-    @app_commands.default_permissions(manage_guild=True)
+    @lideranca_only()
     @app_commands.describe(banner_url="URL HTTPS do banner horizontal", icone_url="URL HTTPS do ícone da central", titulo="Título do painel", descricao="Texto de apresentação")
     async def ticket_painel_configurar(self, interaction: discord.Interaction, banner_url: str | None = None, icone_url: str | None = None, titulo: str | None = None, descricao: str | None = None):
         if not interaction.guild:
@@ -1298,7 +1298,7 @@ class Tickets(commands.Cog):
         await interaction.followup.send(f"Central atualizada: {mensagem.jump_url}", ephemeral=True)
 
     @app_commands.command(name="ticket-categoria-visual", description="Altera o nome, ícone e descrição de uma categoria.")
-    @app_commands.default_permissions(manage_guild=True)
+    @lideranca_only()
     async def ticket_categoria_visual(self, interaction: discord.Interaction, categoria: str, emoji: str, descricao: str, nome: str | None = None):
         if not interaction.guild:
             await interaction.response.send_message("Este comando só funciona em um servidor.", ephemeral=True)
