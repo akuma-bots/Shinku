@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from utils import recordes
 from utils.apresentacao import COR_PRIMARIA, criar_embed
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 
 _LOG = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class Recordes(commands.Cog):
         description="Define o canal oficial para anúncios de novos recordes.",
     )
     @app_commands.describe(canal="Canal de texto que receberá os anúncios")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def recordes_canal(
         self,
         interaction: discord.Interaction,
