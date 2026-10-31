@@ -2345,7 +2345,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
     @app_commands.command(name="historico", description="Consulta o histórico recente de decisões de moderação de um membro.")
     @app_commands.describe(membro="Membro cujo histórico será consultado")
-    @app_commands.default_permissions(manage_guild=True)
+    @lideranca_only()
     async def automod_historico(self, interaction: discord.Interaction, membro: discord.Member):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
@@ -2465,9 +2465,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             "pelo AutoMod."
         ),
     )
-    @app_commands.default_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def automod_atualizar(
         self,
         interaction: discord.Interaction,
