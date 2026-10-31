@@ -90,7 +90,7 @@ FORMULARIOS_AUTOMATICOS = [
 
 
 def _paginas_modal(formulario: dict) -> list:
-    """Divide cada etapa do site em blocos de até cinco perguntas (limite do Discord)."""
+    """Divide as páginas em blocos de até cinco perguntas (limite dos modais do Discord)."""
     resultado = []
     for indice, pagina in enumerate(formulario.get("paginas") or [], start=1):
         if isinstance(pagina, dict):
@@ -738,6 +738,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not ok:
             await interaction.response.send_message("Não achei essa página nesse formulário.", ephemeral=True)
             return
+        await self.atualizar_central_inscricoes(interaction.guild)
         await interaction.response.send_message(f"🗑️ Página {numero_pagina} removida.", ephemeral=True)
 
     @app_commands.command(name="paginas-listar", description="Lista as páginas e perguntas de um formulário.")
