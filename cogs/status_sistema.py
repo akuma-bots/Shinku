@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
-from utils.storage import USANDO_UPSTASH, verificar_conexao_storage
+from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
 
 
 class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
@@ -31,10 +31,25 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         uptime = max(0, int(time.monotonic() - self._inicio))
         horas, resto = divmod(uptime, 3600)
         minutos, segundos = divmod(resto, 60)
-        estado_ok = self.bot.is_ready() and not falhas
+        armazenamento_ok = False
+        armazenamento_estado = "Não configurado"
+        if UPSTASH_CONFIG_INCOMPLETA:
+            armazenamento_estado = "Configuração incompleta"
+        elif USANDO_UPSTASH:
+            try:
+                await asyncio.wait_for(verificar_conexao_storage(), timeout=8)
+                armazenamento_ok = True
+                armazenamento_estado = "Upstash • Conectado"
+            except Exception as erro:
+                armazenamento_estado = f"Upstash • Falha ({type(erro).__name__})"
+                logging.warning("Status do sistema: armazenamento indisponível.", exc_info=True)
+        else:
+            armazenamento_estado = "Local • Persistência limitada"
+
+        estado_ok = self.bot.is_ready() and not falhas and armazenamento_ok
         embed = criar_embed(
             "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE SISTEMA ・✦",
-            "Visão operacional do bot e dos módulos carregados.",
+            "Diagnóstico operacional da conexão, armazenamento e módulos carregados.",
             cor=COR_SUCESSO if estado_ok else COR_AVISO if self.bot.is_ready() else COR_ERRO,
             rodape="NÊMESIS • Diagnóstico administrativo",
             timestamp=True,
@@ -42,7 +57,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         embed.add_field(name="◈ CONEXÃO DISCORD", value="🟢 Online" if self.bot.is_ready() else "🔴 Inicializando", inline=True)
         embed.add_field(name="◈ LATÊNCIA", value=f"{latencia_ms} ms" if latencia_ms is not None else "Indisponível", inline=True)
         embed.add_field(name="◈ TEMPO ATIVO", value=f"{horas}h {minutos}m {segundos}s", inline=True)
-        embed.add_field(name="◈ ARMAZENAMENTO", value="Upstash" if USANDO_UPSTASH else "Local", inline=True)
+        embed.add_field(name="◈ ARMAZENAMENTO", value=armazenamento_estado, inline=False)
         embed.add_field(name="◈ MÓDULOS ATIVOS", value=str(len(self.bot.cogs)), inline=True)
         embed.add_field(name="◈ COMANDOS DO SERVIDOR", value=str(len(comandos)), inline=True)
         if falhas:
