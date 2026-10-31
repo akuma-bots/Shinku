@@ -166,7 +166,7 @@ class BoasVindasView(discord.ui.View):
         super().__init__(timeout=900)
         adicionar_botoes_guia(self)
         self.add_item(SeletorBoasVindas(autor_id, selecionado))
-        self.add_item(DesativarAvisosButton())
+        self.add_item(AlternarAvisosButton())
 
 
 class BoasVindasDM(commands.Cog):
