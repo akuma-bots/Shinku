@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 from utils.guild_config import get_config
+from utils.guia_servidores import GuiaServidoresView
 from utils.storage import carregar
 
 
@@ -42,14 +43,14 @@ class Logs(commands.Cog):
             logger.exception("Não foi possível resolver o canal de logs (guild=%s).", guild.id)
             return None
 
-    async def _enviar_log(self, canal, embed: discord.Embed):
+    async def _enviar_log(self, canal, embed: discord.Embed, view: discord.ui.View | None = None):
         """Falhas no canal de auditoria não podem derrubar listeners do bot."""
         try:
             if embed.timestamp is None:
                 embed.timestamp = datetime.now(timezone.utc)
             if not embed.footer.text:
                 embed.set_footer(text="NÊMESIS • Registro de auditoria")
-            await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await canal.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
             return True
         except discord.Forbidden:
             logger.warning("Sem permissão para publicar log (channel=%s).", getattr(canal, "id", "desconhecido"))
@@ -129,9 +130,10 @@ class Logs(commands.Cog):
         embed.add_field(
             name="╭・SEU PRIMEIRO PASSO",
             value=(
-                "➜ **Consulte as orientações:** use `/tutorial`.\n"
-                "➜ **Conheça a estrutura:** explore os canais e cargos disponíveis.\n"
-                "➜ **Faça parte da ação:** participe das atividades e construa sua trajetória."
+                "➜ **Leia as regras:** comece pelo canal oficial de conduta.\n"
+                "➜ **Explore a organização:** use os botões abaixo para abrir as áreas essenciais.\n"
+                "➜ **Aprenda os sistemas:** consulte a biblioteca de tutoriais em #Sistemas.\n"
+                "➜ **Participe:** acompanhe missões, eventos e sua progressão."
             ),
             inline=False,
         )
@@ -141,7 +143,7 @@ class Logs(commands.Cog):
             inline=False,
         )
         embed.set_footer(text="NÊMESIS • Sistema oficial de integração")
-        enviado = await self._enviar_log(canal, embed)
+        enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
         if enviado:
             logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
                         member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
