@@ -207,9 +207,6 @@ class ModalFormulario(discord.ui.Modal):
             # o enunciado da questão, evitando cortar perguntas longas no modal.
             rotulo = f"Questão {len(self.inputs) + 1:02d} • Resposta"
             placeholder = texto[:100] or "Digite sua resposta..."
-            if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha" and opcoes:
-                # O enunciado tem prioridade visual; as opções continuam
-                # registradas no formulário e não devem substituir a pergunta.
             campo = discord.ui.TextInput(
                 label=rotulo,
                 style=discord.TextStyle.paragraph,
