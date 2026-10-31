@@ -104,7 +104,7 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
         await interaction.response.send_message("✅ Configuração de temporada atualizada.", ephemeral=True)
 
     @app_commands.command(name="temporada-encerrar-agora", description="Encerra a temporada atual agora, sem esperar o prazo.")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def temporada_encerrar_agora(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         resultado = await temporadas.encerrar_temporada(interaction.guild.id)
