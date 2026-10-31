@@ -192,6 +192,8 @@ class Novidades(commands.Cog):
         titulo: str,
         mensagem: str,
     ):
+        await interaction.response.send_message("O envio de comunicados por DM está temporariamente pausado para corrigir duplicações. Nenhuma mensagem foi enviada.", ephemeral=True)
+        return
         guild = interaction.guild
         if guild is None:
             await interaction.response.send_message(
@@ -325,6 +327,8 @@ class Novidades(commands.Cog):
 
     async def _anunciar_release(self, guild: discord.Guild):
         """Envia cada release por DM aos membros inscritos, sem publicar em #Anúncios."""
+        logger.warning("Envio automático de notas pausado temporariamente para conter duplicações.")
+        return
         async with self._lock:
             if self._processando:
                 return
