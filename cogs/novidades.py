@@ -12,7 +12,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils.storage import carregar, salvar
-from utils.preferencias_notificacoes import listar_inscritos
+from utils.preferencias_notificacoes import listar_inscritos, definir_preferencia
 from cogs.boas_vindas_dm import OptOutView
 
 
@@ -282,6 +282,21 @@ class Novidades(commands.Cog):
             f"**Disparo iniciado: {titulo}**\n"
             f"Destinatários: **{len(membros)}** membros humanos.\n"
             "O envio continuará em segundo plano; o Discord ainda pode aplicar limites de entrega.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="avisos-privados", description="Ative ou desative os comunicados privados da NÊMESIS.")
+    @app_commands.describe(receber="Ative para receber avisos por DM ou desative para parar.")
+    @app_commands.guild_only()
+    async def avisos_privados(self, interaction: discord.Interaction, receber: bool):
+        if interaction.guild_id != GUILD_ID or interaction.guild is None:
+            await interaction.response.send_message("Comando exclusivo da NÊMESIS.", ephemeral=True)
+            return
+        await definir_preferencia(interaction.guild_id, interaction.user.id, "avisos_comunidade", receber)
+        await definir_preferencia(interaction.guild_id, interaction.user.id, "notas_atualizacao", receber)
+        estado = "ativados" if receber else "desativados"
+        await interaction.response.send_message(
+            "Avisos privados " + estado + ". Os comunicados também continuam disponíveis nos canais do servidor.",
             ephemeral=True,
         )
 
