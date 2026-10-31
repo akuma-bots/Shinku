@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 
 from utils.punicoes import historico_punicoes, registrar_punicao
 from utils.storage import carregar, salvar
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 
 
 CANAL_REGRAS_ID = 1563995880833421508
@@ -2279,7 +2279,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
     # ========================================================
 
     @app_commands.command(name="estatisticas", description="Mostra as estatísticas de moderação da NÊMESIS.")
-    @app_commands.default_permissions(manage_guild=True)
+    @lideranca_only()
     async def automod_estatisticas(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
@@ -2319,7 +2319,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         app_commands.Choice(name="Banimento temporário", value="ban_temp"),
         app_commands.Choice(name="Banimento permanente", value="ban_permanente"),
     ])
-    @app_commands.default_permissions(administrator=True)
+    @lideranca_only()
     async def automod_configurar_nivel(self, interaction: discord.Interaction, nivel: app_commands.Range[int, 1, 5], medida: app_commands.Choice[str], duracao: app_commands.Range[int, 0, 8760] = 0):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
@@ -2391,9 +2391,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             "pelo AutoMod."
         ),
     )
-    @app_commands.default_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def automod_regras(
         self,
         interaction: discord.Interaction,
