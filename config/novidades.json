@@ -1,10 +1,10 @@
 {
-  "release_id": "20261031-003840",
+  "release_id": "20261031-004708",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Improve Roblox group membership verification and panel",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Improve Roblox group membership verification and panel\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Add Roblox membership and rank change history",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Add Roblox membership and rank change history\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "31/10/2026",
-  "hora_atualizacao": "00:38",
+  "hora_atualizacao": "00:47",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-31T00:38:40.269259-03:00"
+  "gerado_em": "2026-10-31T00:47:08.316442-03:00"
 }
