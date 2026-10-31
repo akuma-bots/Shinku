@@ -103,6 +103,8 @@ def gerar(before: str, after: str) -> dict | None:
     # Traduções explícitas preservam detalhes; assuntos desconhecidos recebem
     # uma descrição funcional em português baseada nas áreas realmente alteradas.
     traducoes = {
+        "fix: corrige validação de provas":
+            "Validação de provas: corrigido o fluxo de análise e registro dos comprovantes.",
         "fix multi-step form continuation interaction listener":
             "Formulários: corrigida a continuidade entre as etapas de inscrição.",
         "improve update announcements with bot branding":
