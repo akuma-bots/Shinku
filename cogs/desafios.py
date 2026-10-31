@@ -141,6 +141,16 @@ class Desafios(commands.Cog):
             desafio_id=str(desafio["id"]),
         )
         await desafios.definir_status(guild.id, desafio["id"], "concluido")
+        self.bot.dispatch(
+            "nemesis_conquistas_verificar",
+            guild.id,
+            int(desafio["vencedor_id"]),
+        )
+        self.bot.dispatch(
+            "nemesis_conquistas_verificar",
+            guild.id,
+            int(desafio["perdedor_id"]),
+        )
 
         texto = f"🏆 <@{desafio['vencedor_id']}> venceu! +{XP_VITORIA_PVP} XP, +1 vitória. <@{desafio['perdedor_id']}> +1 derrota."
         if desafio["aposta_xp"] > 0:
