@@ -70,11 +70,11 @@ def assunto_commits(before: str, after: str) -> list[str]:
 def commits_relevantes(assuntos: list[str]) -> list[str]:
     """Somente commits explicitamente classificados como entrega importante."""
     padrao = re.compile(
-        r"^(?:feat|feature|security|release)(?:\\([^)]*\\))?:"
-        r"|^fix!(?:\\([^)]*\\))?:"
-        r"|^hotfix(?:\\([^)]*\\))?:"
-        r"|^perf!(?:\\([^)]*\\))?:"
-        r"|^\\[release\\]",
+        r"^(?:feat|feature|security|release)(?:\([^)]*\))?:"
+        r"|^fix!(?:\([^)]*\))?:"
+        r"|^hotfix(?:\([^)]*\))?:"
+        r"|^perf!(?:\([^)]*\))?:"
+        r"^\[release\]",
         re.IGNORECASE,
     )
     return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
