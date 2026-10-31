@@ -1,4 +1,5 @@
 from utils.apresentacao import criar_embed
+from utils.guia_servidores import adicionar_botoes_guia
 import json
 import logging
 import os
@@ -41,11 +42,12 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
     )
     embed.add_field(name="TAG DA GANGUE", value=f"`{TAG_GANGUE}`", inline=True)
     embed.add_field(name="PRIMEIROS PASSOS", value=(
-        "1. Entre no servidor pelo convite abaixo.\n"
-        "2. Leia as regras e veja os canais de orientação.\n"
-        "3. Use `/tutorial` no servidor para aprender os sistemas, comandos, missões, provas e atendimento.\n"
-        "4. Use `/help` para consultar os comandos disponíveis."
+        "1. Leia as regras e os comunicados oficiais.\n"
+        "2. Use os botões de navegação abaixo para conhecer as áreas da organização.\n"
+        "3. Abra #Sistemas para consultar a biblioteca de tutoriais.\n"
+        "4. Use /help para localizar os comandos liberados ao seu cargo."
     ), inline=False)
+    embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="Os botões abaixo levam diretamente aos canais essenciais para compreender a comunidade, as divisões, a progressão e os sistemas da NÊMESIS.", inline=False)
     embed.add_field(name="CONVITE DO SERVIDOR", value=f"[Entrar na NÊMESIS]({CONVITE_NEMESIS})", inline=False)
     embed.add_field(name="CÓDIGOS DOS JOGOS", value=(
         "Use o menu abaixo para abrir as abas de Shigaku, Gakuran ou Fistborn. "
@@ -100,7 +102,7 @@ class SeletorBoasVindas(discord.ui.Select):
             discord.SelectOption(label="Gakuran", value="gakuran", description="Códigos, requisitos e resgate", default=selecionado == "gakuran"),
             discord.SelectOption(label="Fistborn", value="fistborn", description="Códigos, requisitos e resgate", default=selecionado == "fistborn"),
         ]
-        super().__init__(placeholder="Selecione uma aba", options=opcoes, min_values=1, max_values=1)
+        super().__init__(placeholder="Consulte também os códigos dos jogos", options=opcoes, min_values=1, max_values=1, row=4)
 
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.autor_id:
@@ -115,6 +117,7 @@ class SeletorBoasVindas(discord.ui.Select):
 class BoasVindasView(discord.ui.View):
     def __init__(self, autor_id: int, selecionado: str = "inicio"):
         super().__init__(timeout=900)
+        adicionar_botoes_guia(self)
         self.add_item(SeletorBoasVindas(autor_id, selecionado))
 
 
