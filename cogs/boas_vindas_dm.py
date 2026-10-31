@@ -1,5 +1,10 @@
 from utils.apresentacao import criar_embed
-from utils.guia_servidores import adicionar_botoes_guia
+from utils.guia_servidores import (
+    adicionar_botoes_guia,
+    CARGO_VISITANTES_ID,
+    NOME_CARGO_VISITANTES,
+    TAG_ORG_NEMESIS,
+)
 import json
 import logging
 import os
@@ -12,7 +17,7 @@ from discord.ext import commands
 logger = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
 CONVITE_NEMESIS = "https://discord.gg/WsfjRQPhAg"
-TAG_GANGUE = "NΞM"
+TAG_GANGUE = TAG_ORG_NEMESIS
 CAMINHO_CODIGOS = Path(__file__).resolve().parent.parent / "config" / "codigos_jogos.json"
 
 
@@ -40,21 +45,23 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
         ),
         color=0x9F1239,
     )
-    embed.add_field(name="TAG DA GANGUE", value=f"`{TAG_GANGUE}`", inline=True)
+    embed.add_field(name="TAG DA ORG", value=f"`{TAG_GANGUE}`", inline=True)
+    embed.add_field(name="CARGO DE ENTRADA", value=f"<@&{CARGO_VISITANTES_ID}> (`{NOME_CARGO_VISITANTES}`) é atribuído automaticamente quando você entra.", inline=True)
     embed.add_field(name="PRIMEIROS PASSOS", value=(
-        "1. Leia as regras e os comunicados oficiais.\n"
-        "2. Use os botões de navegação abaixo para conhecer as áreas da organização.\n"
-        "3. Abra #Sistemas para consultar a biblioteca de tutoriais.\n"
-        "4. Use /help para localizar os comandos liberados ao seu cargo."
+        "01. Leia as regras e os comunicados oficiais.\n"
+        "02. Ao entrar, você recebe automaticamente o cargo Visitantes.\n"
+        "03. Explore os canais pelos botões de navegação abaixo.\n"
+        "04. Abra #Sistemas e consulte o guia Começando na NÊMESIS.\n"
+        "05. Use /help para localizar os comandos liberados ao seu cargo."
     ), inline=False)
-    embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="Os botões abaixo levam diretamente aos canais essenciais para compreender a comunidade, as divisões, a progressão e os sistemas da NÊMESIS.", inline=False)
+    embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="Os botões abaixo levam diretamente às áreas essenciais. Comece por Regras, Como funciona, Divisões e Sistemas; depois explore missões, progressão e atividades.", inline=False)
     embed.add_field(name="CONVITE DO SERVIDOR", value=f"[Entrar na NÊMESIS]({CONVITE_NEMESIS})", inline=False)
     embed.add_field(name="CÓDIGOS DOS JOGOS", value=(
         "Use o menu abaixo para abrir as abas de Shigaku, Gakuran ou Fistborn. "
         "Os códigos podem expirar sem aviso; consulte a fonte indicada em cada aba."
     ), inline=False)
     embed.set_thumbnail(url=membro.display_avatar.url)
-    embed.set_footer(text="NÊMESIS • Tag NΞM • Mensagem automática de boas-vindas")
+    embed.set_footer(text="NÊMESIS • TAG DA ORG: NΞM • Integração oficial")
     return embed
 
 
