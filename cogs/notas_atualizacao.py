@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.boas_vindas_dm import DesativarAvisosButton
+from utils.preferencias_notificacoes import listar_inscritos
 
 log = logging.getLogger(__name__)
 GUILD_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
@@ -110,10 +111,18 @@ def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list
         embed.description = (embed.description or "")[:500]
     return embed
 
+class NotasDMView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
+        self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
+        self.add_item(DesativarAvisosButton())
+
+
 async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
     for tentativa in range(1, MAX_RETRIES + 1):
         try:
-            await member.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await member.send(embed=embed, view=NotasDMView(), allowed_mentions=discord.AllowedMentions.none())
             return "enviada"
         except (discord.Forbidden, discord.NotFound):
             return "bloqueada"
@@ -162,7 +171,7 @@ class ConfirmarEnvioNotas(discord.ui.View):
         self.guild_id = guild_id
         self.autor_id = autor_id
 
-    @discord.ui.button(label="Publicar no canal de anúncios", style=discord.ButtonStyle.danger, emoji="📢")
+    @discord.ui.button(label="Enviar notas por DM", style=discord.ButtonStyle.danger, emoji="✉️")
     async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.autor_id:
             await interaction.response.send_message("Somente quem preparou esta nota pode publicar.", ephemeral=True)
@@ -177,23 +186,27 @@ class ConfirmarEnvioNotas(discord.ui.View):
         self.cog._sending.add(self.guild_id)
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content="Publicação confirmada. Enviando as notas ao canal oficial…", view=self)
+        await interaction.response.edit_message(content="Envio confirmado. Preparando as DMs dos membros inscritos…", view=self)
         try:
             guild = interaction.guild
-            canal = guild.get_channel(1564076387797569577)
-            if canal is None:
-                canal = await self.cog.bot.fetch_channel(1564076387797569577)
-            if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
-                raise ValueError("Canal oficial de anúncios inválido.")
             embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, guild, self.cog.bot)
-            embed.set_footer(text="NÊMESIS • Notas oficiais de atualização • Consulte os canais para acompanhar novidades")
-            mensagem = await canal.send(embed=embed, view=NotasPublicasView(), allowed_mentions=discord.AllowedMentions.none())
-        except (discord.HTTPException, ValueError):
-            log.exception("Falha ao publicar as notas no canal oficial.")
-            await interaction.edit_original_response(content="Não foi possível publicar as notas. Nenhuma DM foi enviada.", view=self)
-        else:
-            log.info("Notas publicadas (guild=%s, versao=%s, canal=%s, mensagem=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, canal.id, mensagem.id, interaction.user.id)
-            await interaction.edit_original_response(content=f"**Notas publicadas com sucesso.**\nCanal: <#{canal.id}>\nMensagem ID: {mensagem.id}\nNenhuma DM foi enviada aos membros.", view=self)
+            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+            inscritos = await listar_inscritos(guild.id, "notas_atualizacao", [str(m.id) for m in membros])
+            destinatarios = [m for m in membros if str(m.id) in inscritos]
+            enviados = 0
+            falhas = 0
+            for membro in destinatarios:
+                resultado = await _enviar_nota(membro, embed)
+                if resultado == "enviada":
+                    enviados += 1
+                else:
+                    falhas += 1
+                await asyncio.sleep(SEND_DELAY)
+            log.info("Notas enviadas por DM (guild=%s, versao=%s, inscritos=%s, enviados=%s, falhas=%s, autor=%s).", self.guild_id, VERSAO_PADRAO, len(destinatarios), enviados, falhas, interaction.user.id)
+            await interaction.edit_original_response(content=f"**Envio das notas concluído.**\n• Membros inscritos: **{len(destinatarios)}**\n• DMs enviadas: **{enviados}**\n• Falhas de entrega: **{falhas}**\nAs notas não foram publicadas em #Anúncios.", view=self)
+        except (discord.HTTPException, OSError):
+            log.exception("Falha ao enviar as notas por DM.")
+            await interaction.edit_original_response(content="Não foi possível concluir o envio das notas por DM. Consulte os logs do bot.", view=self)
         finally:
             self.cog._sending.discard(self.guild_id)
 
@@ -232,7 +245,7 @@ class NotasAtualizacao(commands.Cog):
         embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, interaction.guild, self.bot)
         view = ConfirmarEnvioNotas(self, interaction.guild_id, interaction.user.id)
         await interaction.response.send_message(
-            "Modelo da atualização pronto. Revise a nota abaixo e publique no canal oficial de anúncios. Os membros não receberão DMs em massa.",
+            "Modelo da atualização pronto. Revise a nota abaixo. Ao confirmar, ela será enviada por DM aos membros inscritos nas notas de atualização.",
             embed=embed,
             view=view,
             ephemeral=True,
