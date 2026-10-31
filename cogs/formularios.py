@@ -762,7 +762,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         pergunta1="1ª pergunta desta página", pergunta2="2ª pergunta (opcional)",
         pergunta3="3ª pergunta (opcional)", pergunta4="4ª pergunta (opcional)", pergunta5="5ª pergunta (opcional)",
     )
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_pagina_adicionar(self, interaction: discord.Interaction, formulario_id: str,
                                            pergunta1: str, pergunta2: str = None, pergunta3: str = None,
                                            pergunta4: str = None, pergunta5: str = None):
@@ -780,7 +780,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="pagina-remover", description="Remove uma página de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário", numero_pagina="Número da página (1, 2, 3...) — veja em /formularios paginas-listar")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_pagina_remover(self, interaction: discord.Interaction, formulario_id: str, numero_pagina: int):
         ok = await formularios.remover_pagina(interaction.guild.id, formulario_id, numero_pagina - 1)
         if not ok:
@@ -792,7 +792,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="paginas-listar", description="Lista as páginas e perguntas de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_paginas_listar(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
         if not formulario:
@@ -814,7 +814,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="listar", description="Lista os formulários configurados.")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_listar(self, interaction: discord.Interaction):
         lista = await formularios.listar_formularios(interaction.guild.id)
         if not lista:
@@ -833,7 +833,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="remover", description="Remove um formulário.")
     @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_remover(self, interaction: discord.Interaction, formulario_id: str):
         ok = await formularios.remover_formulario(interaction.guild.id, formulario_id)
         if not ok:
@@ -848,7 +848,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="reativar", description="Reabre um formulário arquivado ou pausado.")
     @app_commands.describe(formulario_id="ID do formulário")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_reativar(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
         if not formulario:
@@ -864,7 +864,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="pausar", description="Pausa inscrições sem arquivar o formulário.")
     @app_commands.describe(formulario_id="ID do formulário")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_pausar(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.atualizar_formulario(interaction.guild.id, formulario_id, ativo=False)
         if not formulario:
@@ -879,7 +879,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="cargo-adicionar", description="Adiciona um cargo que recebe as candidaturas por DM.")
     @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo que vai receber as candidaturas")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_cargo_adicionar(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
         ok = await formularios.adicionar_cargo_notificar(interaction.guild.id, formulario_id, cargo.id)
         if not ok:
@@ -889,7 +889,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="cargo-remover", description="Remove um cargo da lista de notificação de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo a remover")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_cargo_remover(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
         ok = await formularios.remover_cargo_notificar(interaction.guild.id, formulario_id, cargo.id)
         if not ok:
@@ -899,7 +899,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
     @app_commands.command(name="painel", description="Atualiza a central pública com os formulários disponíveis.")
     @app_commands.describe(formulario_id="ID do formulário que deseja disponibilizar")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def formulario_painel(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
         if not formulario:
