@@ -1,7 +1,17 @@
-from utils.apresentacao import criar_embed
+import logging
+import os
+
 import discord
-from discord import app_commands
 from discord.ext import commands
+
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
+from utils.storage import carregar, salvar
+
+logger = logging.getLogger(__name__)
+GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
+CANAL_TUTORIAIS_ID = 1563995880833421512
+ARQUIVO_CENTRAL_TUTORIAIS = "central_tutoriais.json"
+MARCADOR_CENTRAL_TUTORIAIS = "NÊMESIS • CENTRAL DE TUTORIAIS • V3"
 
 
 TUTORIAIS = {
@@ -49,10 +59,10 @@ TUTORIAIS = {
             "Confira no canal oficial quais ações são aceitas como contribuição.",
             "Leia a quantidade de pontos, limites e requisitos antes de participar.",
             "Guarde a prova e envie pelo fluxo oficial quando a atividade exigir validação.",
-            "Aguarde a aprovação antes de considerar os P.C. confirmados.",
+            "Aguarde a aprovação antes de considerar o XP confirmado.",
             "Não repita envios para tentar multiplicar pontos; em caso de divergência, abra um ticket.",
         ],
-        "comandos": "/tutorial · /perfil · /painel-provas (staff)",
+        "comandos": "Central de Tutoriais no canal #Sistemas · /perfil · /painel-provas (staff)",
     },
     "especiais": {
         "titulo": "Missões especiais",
@@ -74,7 +84,7 @@ TUTORIAIS = {
             "Use os comandos de desafio disponíveis em /help para registrar o confronto.",
             "Guarde uma prova legível do resultado e envie-a pelo fluxo oficial.",
             "Se houver divergência, solicite revisão em vez de criar registros duplicados.",
-            "Confira vitórias, derrotas e P.C. no perfil depois da confirmação.",
+            "Confira XP, vitórias e derrotas no perfil depois da confirmação.",
         ],
         "comandos": "/help · /perfil · /painel-provas (staff)",
     },
@@ -103,12 +113,12 @@ TUTORIAIS = {
         "comandos": "/painel-provas · /help",
     },
     "perfil": {
-        "titulo": "Perfil, XP e P.C.",
+        "titulo": "Perfil, XP e estatísticas",
         "descricao": "Como acompanhar seu desenvolvimento dentro da gangue.",
         "passos": [
             "Use /perfil para consultar patente, XP, vitórias, derrotas, sequência e medalhas.",
             "Use os rankings disponíveis em /help para comparar resultados.",
-            "P.C. representa Pontos de Contribuição da temporada competitiva.",
+            "O XP e as estatísticas exibidas seguem os critérios oficiais de cada sistema.",
             "O registro é salvo pelo bot; se houver divergência, abra um ticket com a prova e os detalhes do registro.",
             "Inclua o nome do sistema, o valor esperado e o momento aproximado da ocorrência para facilitar a conferência.",
         ],
@@ -161,7 +171,7 @@ TUTORIAIS = {
             "Defina regras de cooperação, comunicação, eventos e resolução de conflitos antes de anunciar a aliança.",
             "Não fale em nome da NÊMESIS nem prometa apoio sem autorização da liderança.",
         ],
-        "comandos": "/tutorial · formulário oficial de aliança",
+        "comandos": "Central de Tutoriais no canal #Sistemas · formulário oficial de aliança",
     },
     "gangues": {
         "titulo": "Organização da gangue",
@@ -180,7 +190,7 @@ TUTORIAIS = {
         "descricao": "Como funciona a classificação por temporada.",
         "passos": [
             "Acompanhe o número da temporada e as datas publicadas pela staff.",
-            "Consulte seu P.C. e posição pelo /perfil e pelos rankings disponíveis.",
+            "Consulte sua posição e seus resultados pelo /perfil e pelos rankings disponíveis.",
             "Só resultados válidos e aprovados devem contar para a classificação.",
             "No encerramento, a equipe publica o resultado e eventuais recompensas.",
             "Se houver divergência no resultado, envie o ID do registro em um ticket.",
@@ -261,65 +271,317 @@ TUTORIAIS = {
 }
 
 
-def _embed_tutorial(chave: str) -> discord.Embed:
-    tutorial = TUTORIAIS[chave]
+def _embed_indice(guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
     embed = criar_embed(
-        title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ TUTORIAL / {tutorial['titulo'].upper()}",
-        description=tutorial["descricao"],
+        title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE TUTORIAIS ・✦",
+        description=(
+            "⟡・**Conhecimento, organização e evolução.**\n"
+            "Esta é a biblioteca oficial de orientação da NÊMESIS. Cada guia explica o funcionamento "
+            "de um sistema, os procedimentos corretos e os canais que você deve consultar.\n\n"
+            "**Selecione um assunto no menu abaixo** para abrir o passo a passo completo. "
+            "A consulta é privada: sua navegação não altera o painel público."
+        ),
         color=0xB3132B,
     )
     embed.add_field(
-        name="Como funciona",
-        value="\n".join(f"**{i}.** {passo}" for i, passo in enumerate(tutorial["passos"], 1)),
+        name="◈ COMO UTILIZAR",
+        value=(
+            "➜ Escolha o sistema no seletor.\n"
+            "➜ Leia os requisitos e siga a sequência indicada.\n"
+            "➜ Use os canais oficiais para executar cada procedimento.\n"
+            "➜ Em caso de divergência, procure a Central de Atendimento."
+        ),
         inline=False,
     )
-    embed.add_field(name="Comandos e atalhos", value=tutorial["comandos"][:1024], inline=False)
-    embed.set_footer(text="NÊMESIS • Tutorial interativo | Use o menu para trocar de assunto")
+    itens = list(TUTORIAIS.items())
+    metade = (len(itens) + 1) // 2
+    for titulo, grupo in (
+        ("◈ GUIAS — OPERAÇÃO E COMUNIDADE", itens[:metade]),
+        ("◈ GUIAS — COMPETITIVO E ORGANIZAÇÃO", itens[metade:]),
+    ):
+        linhas = [
+            f"**{dados['titulo']}** — {dados['descricao']}"
+            for _, dados in grupo
+        ]
+        embed.add_field(name=titulo, value="\n".join(linhas)[:1024] or "Em preparação.", inline=True)
+    embed.add_field(
+        name="◈ ACESSO AO CONHECIMENTO",
+        value=(
+            "O painel permanece disponível em #Sistemas. "
+            "A central de comandos /help continua sendo a referência para localizar comandos "
+            "liberados ao seu cargo."
+        ),
+        inline=False,
+    )
+    embed.set_footer(text=MARCADOR_CENTRAL_TUTORIAIS)
+    if guild is not None:
+        aplicar_identidade_servidor(embed, guild, bot)
     return embed
 
 
-class SeletorTutorial(discord.ui.Select):
-    def __init__(self, autor_id: int, selecionado: str = "inicio"):
+def _embed_tutorial(chave: str, guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
+    tutorial = TUTORIAIS[chave]
+    embed = criar_embed(
+        title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUIA / {tutorial['titulo'].upper()}",
+        description=f"⟡・{tutorial['descricao']}\n\nSiga as orientações abaixo e utilize somente os fluxos oficiais.",
+        color=0xB3132B,
+    )
+    blocos = []
+    atual = []
+    tamanho = 0
+    for numero, passo in enumerate(tutorial["passos"], 1):
+        linha = f"**{numero:02d}.** {passo}"
+        if atual and tamanho + len(linha) + 1 > 1000:
+            blocos.append("\n".join(atual))
+            atual = []
+            tamanho = 0
+        atual.append(linha)
+        tamanho += len(linha) + 1
+    if atual:
+        blocos.append("\n".join(atual))
+    for indice, bloco in enumerate(blocos, 1):
+        nome = "◈ PASSO A PASSO" if indice == 1 else f"◈ CONTINUAÇÃO {indice:02d}"
+        embed.add_field(name=nome, value=bloco, inline=False)
+    embed.add_field(
+        name="◈ COMANDOS E ATALHOS",
+        value=str(tutorial.get("comandos") or "Consulte os canais oficiais e a central /help.")[:1024],
+        inline=False,
+    )
+    embed.set_footer(text="NÊMESIS • Biblioteca oficial • Consulte o menu para trocar de guia")
+    if guild is not None:
+        aplicar_identidade_servidor(embed, guild, bot)
+    return embed
+
+
+class SeletorTutorialPublico(discord.ui.Select):
+    def __init__(self):
+        opcoes = [
+            discord.SelectOption(
+                label=dados["titulo"][:100],
+                value=chave,
+                description=dados["descricao"][:100],
+            )
+            for chave, dados in TUTORIAIS.items()
+        ]
+        super().__init__(
+            placeholder="Selecione um tutorial para consultar",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id="nemesis:tutoriais:publico",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        chave = self.values[0]
+        await interaction.response.send_message(
+            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
+            view=TutorialDetalheView(interaction.user.id, chave),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class TutorialPainelView(discord.ui.View):
+    """View persistente do painel público de tutoriais."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(SeletorTutorialPublico())
+
+
+class SeletorTutorialDetalhe(discord.ui.Select):
+    def __init__(self, autor_id: int, selecionado: str):
         self.autor_id = autor_id
         opcoes = [
             discord.SelectOption(
-                label=conteudo["titulo"][:100],
+                label=dados["titulo"][:100],
                 value=chave,
-                description=conteudo["descricao"][:100],
+                description=dados["descricao"][:100],
                 default=chave == selecionado,
             )
-            for chave, conteudo in TUTORIAIS.items()
+            for chave, dados in TUTORIAIS.items()
         ]
-        super().__init__(placeholder="Escolha um sistema para aprender", options=opcoes, min_values=1, max_values=1)
+        super().__init__(
+            placeholder="Trocar de tutorial",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id=f"nemesis:tutoriais:detalhe:{autor_id}",
+            row=0,
+        )
 
     async def callback(self, interaction: discord.Interaction):
         if interaction.user.id != self.autor_id:
-            await interaction.response.send_message("Este tutorial foi aberto por outro membro. Use /tutorial para abrir o seu.", ephemeral=True)
+            await interaction.response.send_message(
+                "Este guia foi aberto por outra pessoa. Selecione um assunto no painel público de #Sistemas.",
+                ephemeral=True,
+            )
             return
         chave = self.values[0]
-        view = TutorialView(self.autor_id, chave)
-        await interaction.response.edit_message(embed=_embed_tutorial(chave), view=view)
+        await interaction.response.edit_message(
+            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
+            view=TutorialDetalheView(self.autor_id, chave),
+        )
 
 
-class TutorialView(discord.ui.View):
-    def __init__(self, autor_id: int, selecionado: str = "inicio"):
-        super().__init__(timeout=300)
-        self.add_item(SeletorTutorial(autor_id, selecionado))
+class TutorialDetalheView(discord.ui.View):
+    def __init__(self, autor_id: int, selecionado: str):
+        super().__init__(timeout=900)
+        self.autor_id = autor_id
+        self.add_item(SeletorTutorialDetalhe(autor_id, selecionado))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message(
+                "Este guia foi aberto por outra pessoa. Abra sua própria consulta pelo painel #Sistemas.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Voltar ao índice", style=discord.ButtonStyle.secondary, emoji="📚", row=1)
+    async def voltar_indice(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            embed=_embed_indice(interaction.guild, interaction.client),
+            view=TutorialDetalheIndiceView(self.autor_id),
+        )
+
+
+class TutorialDetalheIndiceView(discord.ui.View):
+    def __init__(self, autor_id: int):
+        super().__init__(timeout=900)
+        self.autor_id = autor_id
+        opcoes = [
+            discord.SelectOption(
+                label=dados["titulo"][:100],
+                value=chave,
+                description=dados["descricao"][:100],
+            )
+            for chave, dados in TUTORIAIS.items()
+        ]
+        seletor = discord.ui.Select(
+            placeholder="Selecione outro tutorial",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id=f"nemesis:tutoriais:indice:{autor_id}",
+            row=0,
+        )
+        seletor.callback = self._selecionar
+        self.add_item(seletor)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message("Esta consulta pertence a outra pessoa.", ephemeral=True)
+            return False
+        return True
+
+    async def _selecionar(self, interaction: discord.Interaction):
+        chave = self.children[0].values[0]
+        await interaction.response.edit_message(
+            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
+            view=TutorialDetalheView(self.autor_id, chave),
+        )
 
 
 class Tutorial(commands.Cog):
-    """Central interativa de orientação dos sistemas da NÊMESIS."""
+    """Mantém a central pública e persistente de tutoriais da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._publicando = False
+        self._view_registrada = False
 
-    @app_commands.command(name="tutorial", description="Abre os tutoriais de missões, guerras, moderação e outros sistemas.")
-    async def tutorial(self, interaction: discord.Interaction):
-        await interaction.response.send_message(
-            embed=_embed_tutorial("inicio"),
-            view=TutorialView(interaction.user.id),
-            ephemeral=True,
-        )
+    async def cog_load(self):
+        if not self._view_registrada:
+            self.bot.add_view(TutorialPainelView())
+            self._view_registrada = True
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._publicando:
+            return
+        self._publicando = True
+        try:
+            guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+            if guild is None:
+                logger.warning("Servidor da NÊMESIS ainda não está disponível para publicar a central de tutoriais.")
+                return
+            canal = guild.get_channel(CANAL_TUTORIAIS_ID)
+            if canal is None:
+                canal = await self.bot.fetch_channel(CANAL_TUTORIAIS_ID)
+            if not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID:
+                logger.error("Canal de tutoriais inválido; esperado o canal #Sistemas da NÊMESIS.")
+                return
+            permissoes = canal.permissions_for(guild.me)
+            if not (permissoes.view_channel and permissoes.send_messages and permissoes.embed_links and permissoes.read_message_history):
+                logger.error("Sem permissões para manter a central de tutoriais no canal #Sistemas.")
+                return
+
+            estado = await carregar(
+                ARQUIVO_CENTRAL_TUTORIAIS,
+                {"guild_id": GUILD_NEMESIS_ID, "message_id": None},
+            )
+            mensagem = None
+            message_id = estado.get("message_id") if isinstance(estado, dict) else None
+            if message_id:
+                try:
+                    mensagem = await canal.fetch_message(int(message_id))
+                except discord.NotFound:
+                    mensagem = None
+                except (discord.Forbidden, discord.HTTPException):
+                    logger.exception("Não foi possível recuperar a mensagem salva da central de tutoriais.")
+                    return
+
+            async for antiga in canal.history(limit=200):
+                if antiga.author.id != self.bot.user.id:
+                    continue
+                if mensagem is not None and antiga.id == mensagem.id:
+                    continue
+                legado = any(
+                    embed.footer and embed.footer.text.startswith("NÊMESIS • GUIA OFICIAL •")
+                    for embed in antiga.embeds
+                )
+                if legado:
+                    try:
+                        await antiga.delete()
+                        logger.info("Guia antigo removido do canal #Sistemas (message=%s).", antiga.id)
+                    except discord.HTTPException:
+                        logger.exception("Não foi possível remover um guia antigo (message=%s).", antiga.id)
+                if mensagem is None and any(
+                    embed.footer and embed.footer.text == MARCADOR_CENTRAL_TUTORIAIS
+                    for embed in antiga.embeds
+                ):
+                    mensagem = antiga
+
+            embed = _embed_indice(guild, self.bot)
+            if mensagem is None:
+                mensagem = await canal.send(
+                    embed=embed,
+                    view=TutorialPainelView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                logger.info("Central pública de tutoriais publicada em #Sistemas (message=%s).", mensagem.id)
+            else:
+                await mensagem.edit(
+                    embed=embed,
+                    view=TutorialPainelView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                logger.info("Central pública de tutoriais atualizada em #Sistemas (message=%s).", mensagem.id)
+
+            await salvar(
+                ARQUIVO_CENTRAL_TUTORIAIS,
+                {"guild_id": GUILD_NEMESIS_ID, "message_id": mensagem.id},
+            )
+        except discord.Forbidden:
+            logger.exception("O bot não tem permissão para publicar a central de tutoriais.")
+        except discord.HTTPException:
+            logger.exception("Falha de API ao manter a central de tutoriais.")
+        except Exception:
+            logger.exception("Erro inesperado ao manter a central de tutoriais.")
+        finally:
+            self._publicando = False
 
 
 async def setup(bot: commands.Bot):
