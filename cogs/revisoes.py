@@ -580,9 +580,34 @@ class Revisoes(commands.Cog):
             await auditoria.registrar(
                 interaction.guild, "📋 Revisão aprovada",
                 f"Tipo: **{revisao['tipo']}**\nAutor: <@{revisao['autor_id']}>\n"
-                f"Aprovado por: {interaction.user.mention}\nID: `{revisao['id']}`",
+                f"Aprovado por: {interaction.user.mention}\nID: `{revisao['id']}`\n"
+                f"Resultado: {resultado_texto or 'Aprovação registrada.'}",
                 cor=0x57F287,
             )
+
+            destinatarios = {
+                int(membro_id)
+                for membro_id in (revisao.get("autor_id"), revisao.get("auxiliar_id"))
+                if membro_id
+            }
+            for membro_id in destinatarios:
+                membro = interaction.guild.get_member(membro_id)
+                if membro is None:
+                    try:
+                        membro = await interaction.guild.fetch_member(membro_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        continue
+                try:
+                    await membro.send(
+                        f"✅ Sua evidência para **{revisao.get('titulo', 'atividade')}** foi aprovada pela equipe da NÊMESIS.\n"
+                        f"Protocolo: `{revisao.get('id', '—')}`\n"
+                        f"{resultado_texto or 'A validação foi concluída.'}"
+                    )
+                except discord.Forbidden:
+                    pass
+                except discord.HTTPException:
+                    log = __import__("logging").getLogger(__name__)
+                    log.exception("Falha ao notificar o membro %s sobre a aprovação %s.", membro_id, revisao_id)
 
         else:
             revisao = await revisoes.rejeitar(interaction.guild.id, revisao_id, interaction.user.id)
