@@ -242,7 +242,13 @@ class NavegacaoMissoesView(discord.ui.View):
         row=2,
     )
     async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.cog.abrir_seletor_prova(interaction, self.categoria)
+        categoria = "missao"
+        if interaction.message and interaction.message.embeds:
+            rodape = interaction.message.embeds[0].footer.text or ""
+            match = re.search(r"CATEGORIA:([a-z_]+)", rodape)
+            if match and match.group(1) in TIPOS:
+                categoria = match.group(1)
+        await self.cog.abrir_seletor_prova(interaction, categoria)
 
 
 class RankingJogoSelect(discord.ui.Select):
@@ -676,14 +682,16 @@ class Missoes(commands.Cog):
             embed.add_field(name="CATÁLOGO VAZIO", value="Não existem atividades ativas nesta categoria no momento.", inline=False)
         else:
             linhas = []
-            for item in atividades[inicio:inicio + 25]:
+            for item in atividades[inicio:inicio + 8]:
                 codigo = str(item.get("id") or "—")
                 titulo = str(item.get("titulo") or "Atividade sem título")
                 try:
                     xp = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
                 except (TypeError, ValueError, OverflowError):
                     xp = 0
-                linhas.append(f"• **{titulo[:70]}** — {codigo} · **{xp:,} XP**".replace(",", "."))
+                linhas.append(f"• **{titulo[:58]}** — {codigo} · **{xp:,} XP**".replace(",", "."))
+            if len(atividades[inicio:inicio + 25]) > 8:
+                linhas.append(f"*+ {len(atividades[inicio:inicio + 25]) - 8} opções nesta página; consulte o seletor.*")
             embed.add_field(name="◈ SELEÇÃO", value="\n".join(linhas)[:1024], inline=False)
         embed.set_footer(text="NÊMESIS • CENTRAL DE OPERAÇÕES • Evidências sujeitas à validação")
         return embed
