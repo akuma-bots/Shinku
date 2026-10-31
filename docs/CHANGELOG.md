@@ -54,6 +54,8 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 - Filtros combináveis por situação e categoria (Missões, Contribuições, Operações especiais, PvP e PvE).
 - Paginação de oito registros por página, com atualização manual e navegação.
 - Cada registro exibe protocolo, referência, participante, auxiliar, categoria, data e revisor; recusas exibem a justificativa.
+- Painel e cartões de revisão usam ícone do servidor e avatar do bot; o banner aparece no painel sem substituir a imagem da evidência.
+- Participante e auxiliar recebem DM após uma aprovação, com o protocolo e o resultado da validação.
 - O painel e seus controles verificam o administrador que abriu a sessão; as decisões continuam protegidas pela validação administrativa e pelo estado pendente no armazenamento.
 
 ## Observações de implantação
