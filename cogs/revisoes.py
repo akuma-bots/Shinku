@@ -599,8 +599,13 @@ class Revisoes(commands.Cog):
                     except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                         continue
                 try:
+                    contexto = (
+                        "Sua evidência"
+                        if membro_id == int(revisao.get("autor_id") or 0)
+                        else "Uma evidência em que você foi registrado como auxiliar"
+                    )
                     await membro.send(
-                        f"✅ Sua evidência para **{revisao.get('titulo', 'atividade')}** foi aprovada pela equipe da NÊMESIS.\n"
+                        f"✅ {contexto} para **{revisao.get('titulo', 'atividade')}** foi aprovada pela equipe da NÊMESIS.\n"
                         f"Protocolo: `{revisao.get('id', '—')}`\n"
                         f"{resultado_texto or 'A validação foi concluída.'}"
                     )
