@@ -447,9 +447,8 @@ class TutorialDetalheView(discord.ui.View):
         )
 
 
-class TutorialDetalheIndiceView(discord.ui.View):
+class SeletorTutorialIndice(discord.ui.Select):
     def __init__(self, autor_id: int):
-        super().__init__(timeout=900)
         self.autor_id = autor_id
         opcoes = [
             discord.SelectOption(
@@ -459,7 +458,7 @@ class TutorialDetalheIndiceView(discord.ui.View):
             )
             for chave, dados in TUTORIAIS.items()
         ]
-        seletor = discord.ui.Select(
+        super().__init__(
             placeholder="Selecione outro tutorial",
             min_values=1,
             max_values=1,
@@ -467,22 +466,29 @@ class TutorialDetalheIndiceView(discord.ui.View):
             custom_id=f"nemesis:tutoriais:indice:{autor_id}",
             row=0,
         )
-        seletor.callback = self._selecionar
-        self.add_item(seletor)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.autor_id:
+            await interaction.response.send_message("Esta consulta pertence a outra pessoa.", ephemeral=True)
+            return
+        chave = self.values[0]
+        await interaction.response.edit_message(
+            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
+            view=TutorialDetalheView(self.autor_id, chave),
+        )
+
+
+class TutorialDetalheIndiceView(discord.ui.View):
+    def __init__(self, autor_id: int):
+        super().__init__(timeout=900)
+        self.autor_id = autor_id
+        self.add_item(SeletorTutorialIndice(autor_id))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.autor_id:
             await interaction.response.send_message("Esta consulta pertence a outra pessoa.", ephemeral=True)
             return False
         return True
-
-    async def _selecionar(self, interaction: discord.Interaction):
-        chave = self.children[0].values[0]
-        await interaction.response.edit_message(
-            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
-            view=TutorialDetalheView(self.autor_id, chave),
-        )
-
 
 class Tutorial(commands.Cog):
     """Mantém a central pública e persistente de tutoriais da NÊMESIS."""
