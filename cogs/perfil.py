@@ -2,6 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.guild_config import lideranca_only
+
 from utils.apresentacao import criar_embed
 from utils.storage import carregar
 from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_patente, kdr, ARQUIVO_PERFIS
@@ -318,7 +320,7 @@ class Perfil(commands.Cog):
     # ---------------- Patentes ----------------
     @app_commands.command(name="patente-configurar", description="Cria ou atualiza uma patente (evolução automática por XP).")
     @app_commands.describe(nome="Nome da patente", xp_minimo="XP mínimo pra alcançar essa patente", cargo_recompensa="Cargo dado automaticamente ao alcançar (opcional)")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def patente_configurar(self, interaction: discord.Interaction, nome: str, xp_minimo: int, cargo_recompensa: discord.Role = None):
         patentes = await get_patentes(interaction.guild.id)
         patentes = [p for p in patentes if p["nome"].lower() != nome.lower()]
@@ -328,7 +330,7 @@ class Perfil(commands.Cog):
 
     @app_commands.command(name="patente-remover", description="Remove uma patente configurada.")
     @app_commands.describe(nome="Nome exato da patente")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def patente_remover(self, interaction: discord.Interaction, nome: str):
         patentes = await get_patentes(interaction.guild.id)
         nova_lista = [p for p in patentes if p["nome"].lower() != nome.lower()]
@@ -350,7 +352,7 @@ class Perfil(commands.Cog):
 
     @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
     @app_commands.describe(membro="Quem promover", patente="Nome exato da patente configurada")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @lideranca_only()
     async def patente_promover(self, interaction: discord.Interaction, membro: discord.Member, patente: str):
         patentes = await get_patentes(interaction.guild.id)
         alvo = next((p for p in patentes if p["nome"].lower() == patente.lower()), None)
