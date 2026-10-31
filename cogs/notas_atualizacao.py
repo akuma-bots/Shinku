@@ -8,11 +8,15 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.boas_vindas_dm import DesativarAvisosButton
+
 log = logging.getLogger(__name__)
 GUILD_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
 COLOR = 0xB3132B
 SEND_DELAY = 1.0
 MAX_RETRIES = 3
+CANAL_SISTEMAS_URL = "https://discord.com/channels/1563995879981981817/1563995880833421512"
+CANAL_MISSOES_URL = "https://discord.com/channels/1563995879981981817/1563995881315897549"
 
 # Notas públicas: comunicar resultados e benefícios, nunca o histórico interno de execução.
 VERSAO_PADRAO = "1.5.22"
@@ -78,7 +82,7 @@ def _adicionar_secao(embed: discord.Embed, titulo: str, linhas: list[str], prefi
         embed.add_field(name=nome[:256], value=bloco or "—", inline=False)
 
 
-def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str]) -> discord.Embed:
+def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list[str], guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
     """Monta um embed com margem de segurança abaixo do limite de 6.000 caracteres."""
     embed = criar_embed(
         title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — NOTAS DE ATUALIZAÇÃO ・✦",
@@ -90,6 +94,16 @@ def _criar_embed(versao: str, resumo: str, novidades: list[str], correcoes: list
     if correcoes:
         _adicionar_secao(embed, "⚙ CORREÇÕES E MELHORIAS", correcoes[:5], "✓")
     embed.set_footer(text="NÊMESIS • Notas oficiais de atualização")
+    if guild is not None and bot is not None:
+        usuario = getattr(bot, "user", None)
+        avatar = getattr(getattr(usuario, "display_avatar", None), "url", None)
+        banner_bot = getattr(getattr(usuario, "banner", None), "url", None)
+        banner_servidor = getattr(getattr(guild, "banner", None), "url", None)
+        if avatar:
+            embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 • COMUNICADO OFICIAL", icon_url=avatar)
+            embed.set_thumbnail(url=avatar)
+        if banner_bot or banner_servidor:
+            embed.set_image(url=banner_bot or banner_servidor)
     while len(embed) > 5700 and embed.fields:
         embed.remove_field(len(embed.fields) - 1)
     if len(embed) > 5900:
@@ -122,6 +136,25 @@ async def _enviar_nota(member: discord.Member, embed: discord.Embed) -> str:
     return "falha"
 
 
+class NotasPublicasView(discord.ui.View):
+    """Ações úteis anexadas às notas públicas, incluindo cancelamento de DMs."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(
+            label="Ver sistemas",
+            style=discord.ButtonStyle.link,
+            emoji="📚",
+            url=CANAL_SISTEMAS_URL,
+        ))
+        self.add_item(discord.ui.Button(
+            label="Ver missões",
+            style=discord.ButtonStyle.link,
+            emoji="⚔️",
+            url=CANAL_MISSOES_URL,
+        ))
+        self.add_item(DesativarAvisosButton())
+
+
 class ConfirmarEnvioNotas(discord.ui.View):
     def __init__(self, cog: "NotasAtualizacao", guild_id: int, autor_id: int):
         super().__init__(timeout=300)
@@ -152,9 +185,9 @@ class ConfirmarEnvioNotas(discord.ui.View):
                 canal = await self.cog.bot.fetch_channel(1564076387797569577)
             if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
                 raise ValueError("Canal oficial de anúncios inválido.")
-            embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
+            embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, guild, self.cog.bot)
             embed.set_footer(text="NÊMESIS • Notas oficiais de atualização • Consulte os canais para acompanhar novidades")
-            mensagem = await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            mensagem = await canal.send(embed=embed, view=NotasPublicasView(), allowed_mentions=discord.AllowedMentions.none())
         except (discord.HTTPException, ValueError):
             log.exception("Falha ao publicar as notas no canal oficial.")
             await interaction.edit_original_response(content="Não foi possível publicar as notas. Nenhuma DM foi enviada.", view=self)
@@ -196,7 +229,7 @@ class NotasAtualizacao(commands.Cog):
             await interaction.response.send_message("Já existe um envio de notas em andamento. Aguarde a conclusão.", ephemeral=True)
             return
 
-        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO)
+        embed = _criar_embed(VERSAO_PADRAO, RESUMO_PADRAO, NOVIDADES_PADRAO, CORRECOES_PADRAO, interaction.guild, self.bot)
         view = ConfirmarEnvioNotas(self, interaction.guild_id, interaction.user.id)
         await interaction.response.send_message(
             "Modelo da atualização pronto. Revise a nota abaixo e publique no canal oficial de anúncios. Os membros não receberão DMs em massa.",
