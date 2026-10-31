@@ -109,7 +109,7 @@ class Conquistas(commands.Cog):
                     color=COR_NEMESIS,
                     timestamp=discord.utils.utcnow(),
                 )
-                for conquista in novos[:10]:
+                for conquista in novos:
                     embed.add_field(
                         name=f"{conquista['icone']}  {conquista['nome']} · {conquista['raridade']}",
                         value=(
