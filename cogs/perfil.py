@@ -21,15 +21,21 @@ def _resumo_progressao(perfil: dict) -> dict:
         xp = 0
     rank = rank_por_xp(xp)
     proximo = proximo_rank(xp)
+    def inteiro(campo: str) -> int:
+        try:
+            return max(0, int(perfil.get(campo, 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            return 0
+
     return {
         "xp": xp,
         "rank": rank,
         "proximo": proximo,
         "barra": barra_progresso(xp, rank, proximo),
         "faltam": max(0, int(proximo["xp"]) - xp) if proximo else 0,
-        "mensagens": max(0, int(perfil.get("mensagens", 0) or 0)),
-        "missoes": max(0, int(perfil.get("missoes", 0) or 0)),
-        "guerras": max(0, int(perfil.get("guerras", 0) or 0)),
+        "mensagens": inteiro("mensagens"),
+        "missoes": inteiro("missoes"),
+        "guerras": inteiro("guerras"),
     }
 
 
@@ -142,7 +148,7 @@ class Perfil(commands.Cog):
             preenchido = int(percentual * 10)
             barra_xp = "▰" * preenchido + "▱" * (10 - preenchido)
             texto_progresso = (
-                f"{barra_xp}  **{int(percentual * 100)}%**\\n"
+                f"{barra_xp}  **{int(percentual * 100)}%**\n"
                 f"Próxima patente: **{proxima['nome']}** · faltam **{alvo_xp - p['xp']:,} XP**"
             ).replace(",", ".")
         else:
@@ -150,9 +156,9 @@ class Perfil(commands.Cog):
             texto_progresso = "🏆 **Patente máxima alcançada**"
 
         descricao_perfil = (
-            "╭────────────── ◈ ──────────────╮\\n"
-            "        **DOSSIÊ DE COMBATE**\\n"
-            "  PROGRESSÃO  •  DESEMPENHO  •  IDENTIDADE\\n"
+            "╭────────────── ◈ ──────────────╮\n"
+            "        **DOSSIÊ DE COMBATE**\n"
+            "  PROGRESSÃO  •  DESEMPENHO  •  IDENTIDADE\n"
             "╰────────────── ◈ ──────────────╯"
         )
         embed = criar_embed(
@@ -180,8 +186,8 @@ class Perfil(commands.Cog):
         )
         embed.add_field(name="◈ PATENTE", value=p["patente"] or "Sem patente", inline=True)
         embed.add_field(
-            name="◈ XP / PROGRESSO",
-            value=f"**{p['xp']:,} XP**\\n{barra_xp}\\n{texto_progresso}".replace(",", "."),
+            name="◈ XP COMPETITIVO",
+            value=f"**{p['xp']:,} XP**\n{barra_xp}\n{texto_progresso}".replace(",", "."),
             inline=False,
         )
         rank_org = resumo_progressao["rank"]
@@ -193,23 +199,23 @@ class Perfil(commands.Cog):
         embed.add_field(
             name="◈ PROGRESSÃO ORGANIZACIONAL",
             value=(
-                f"**Nº {rank_org['no']:02d} · {rank_org['nome']}**\\n"
+                f"**Nº {rank_org['no']:02d} · {rank_org['nome']}**\n"
                 f"**{resumo_progressao['xp']:,} XP de progressão**".replace(",", ".")
-                + f"\\n{resumo_progressao['barra']}\\n{destino_org}"
+                + f"\n{resumo_progressao['barra']}\n{destino_org}"
             ),
             inline=False,
         )
         embed.add_field(
             name="◈ PARTICIPAÇÃO REGISTRADA",
             value=(
-                f"**{resumo_progressao['mensagens']:,}** mensagens válidas\\n"
-                f"**{resumo_progressao['missoes']:,}** missões\\n"
+                f"**{resumo_progressao['mensagens']:,}** mensagens válidas\n"
+                f"**{resumo_progressao['missoes']:,}** missões\n"
                 f"**{resumo_progressao['guerras']:,}** guerras"
             ).replace(",", "."),
             inline=True,
         )
         embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
-        embed.add_field(name="◈ P.C. DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
+        embed.add_field(name="◈ PONTOS DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
         embed.add_field(name="◈ TEMPORADA", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
         embed.add_field(name="◈ TEMPO NO TOP 10", value=tempo_top_texto, inline=True)
         embed.add_field(name="◈ VITÓRIAS", value=str(p["vitorias"]), inline=True)
@@ -256,7 +262,7 @@ class Perfil(commands.Cog):
                 )
             embed.add_field(
                 name="◈ ATIVIDADES RECENTES",
-                value="\\n".join(linhas_historico)[:1024],
+                value="\n".join(linhas_historico)[:1024],
                 inline=False,
             )
         embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
