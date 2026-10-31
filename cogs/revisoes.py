@@ -7,6 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
+from utils.guild_config import lideranca_only, membro_tem_lideranca
 
 CORES = {"pvp": 0x9F2035, "pve": 0x8B6A35, "missao": 0x9F2035, "contribuicao": 0x8B6A35, "especial": 0x754A9E}
 _ABRIR_REVISAO_LOCK = asyncio.Lock()
@@ -357,7 +358,7 @@ class Revisoes(commands.Cog):
 
 
     @app_commands.command(name="painel-provas", description="Acompanhar, filtrar e revisar provas por status e categoria.")
-    @app_commands.default_permissions(administrator=True)
+    @lideranca_only()
     async def painel_provas(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
@@ -379,7 +380,7 @@ class Revisoes(commands.Cog):
             interaction.guild is None
             or interaction.user.id != owner_id
             or permissoes is None
-            or not permissoes.administrator
+            or not membro_tem_lideranca(interaction.user)
         ):
             await interaction.response.send_message(
                 "Este painel é restrito ao administrador que o abriu. Reabra com /painel-provas se necessário.",
@@ -488,8 +489,8 @@ class Revisoes(commands.Cog):
             return
 
         permissoes = getattr(interaction.user, "guild_permissions", None)
-        if permissoes is None or not permissoes.administrator:
-            await interaction.response.send_message("Só administradores podem revisar isso.", ephemeral=True)
+        if permissoes is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("Somente a liderança autorizada pode revisar isso.", ephemeral=True)
             return
 
         partes = custom_id.split(":", 2)
