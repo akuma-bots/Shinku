@@ -45,7 +45,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             embed = await cog._montar_painel_missoes(guild, "shigaku")
 
         self.assertIn("CENTRAL DE MISSÕES", embed.title)
-        self.assertIn("Shigaku", embed.description)
+        self.assertIn("TODOS OS JOGOS", embed.description)
         self.assertIn("Envio de evidências", embed.description)
         fields = {field.name: field.value for field in embed.fields}
         self.assertEqual(fields["🟢 EM OPERAÇÃO"], "**1**")
@@ -54,7 +54,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("Operação de Reconhecimento" in name for name in fields))
         self.assertTrue(any("Operação Encerrada" in name for name in fields))
         self.assertTrue(any("Outro jogo" in name for name in fields))
-        self.assertIn("PÁGINA:shigaku", embed.footer.text)
+        self.assertIn("PAGINA:1/1", embed.footer.text)
 
     async def test_painel_vazio_e_recompensa_invalida_nao_quebram(self):
         dados = {
