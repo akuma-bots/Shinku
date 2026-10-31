@@ -39,6 +39,20 @@ class TestFormularios(unittest.TestCase):
         self.assertIn((1, 2, "recente"), cog_formularios.SESSOES_FORMULARIOS)
         cog_formularios.SESSOES_FORMULARIOS.clear()
 
+    def test_formulario_staff_tem_20_perguntas_em_quatro_etapas(self):
+        formulario = cog_formularios.FORMULARIOS_AUTOMATICOS[0]
+        self.assertEqual(len(cog_formularios._perguntas_flat(formulario)), 20)
+        self.assertEqual(
+            [len(pagina["perguntas"]) for pagina in cog_formularios._paginas_modal(formulario)],
+            [5, 5, 5, 5],
+        )
+
+    def test_canal_de_recebimento_e_o_canal_oficial_configurado(self):
+        self.assertEqual(
+            cog_formularios.CANAL_RECEBIMENTO_CANDIDATURAS,
+            1563995882540498996,
+        )
+
     def test_etapas_com_mais_de_cinco_perguntas_sao_divididas_para_modais(self):
         formulario = {
             "paginas": [{
