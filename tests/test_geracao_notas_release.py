@@ -59,6 +59,7 @@ class TestGeracaoNotasRelease(unittest.TestCase):
             MOD.arquivos_alterados = lambda before, after: [("M", "cogs/missoes.py")]
             release = MOD.gerar("a" * 40, "b" * 40)
             self.assertIsNotNone(release)
+            self.assertFalse(release["habilitada"])
         finally:
             MOD.git = original_git
             MOD.arquivos_alterados = original_arquivos
