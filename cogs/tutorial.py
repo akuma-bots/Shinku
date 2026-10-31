@@ -259,10 +259,10 @@ TUTORIAIS = {
         "passos": [
             "As notas de atualização automáticas são publicadas no canal Anúncios, por DM aos membros inscritos, sem publicação em #Anúncios.",
             "A equipe autorizada pode usar /avisos-enviar; o comunicado privado respeita a preferência de cada membro.",
-            "Na DM de boas-vindas ou nos comunicados privados, toque em Não quero receber avisos para desativar as mensagens privadas. Use /avisos-privados para ativar ou desativar novamente.",
+            "Na DM de boas-vindas ou nos comunicados privados, toque em Não quero receber avisos para desativar as mensagens privadas. Use o botão de configuração na própria mensagem para ativar ou desativar novamente.",
             "As configurações de privacidade do Discord podem bloquear a entrega de uma DM; o bot registra essas falhas.",
         ],
-        "comandos": "/avisos-privados (todos) · /avisos-enviar (staff autorizada)",
+        "comandos": "As preferências de DM são controladas pelo botão nas mensagens automáticas.",
     },
     "lideranca": {
         "titulo": "Liderança e staff",
