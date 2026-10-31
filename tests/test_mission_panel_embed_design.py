@@ -86,7 +86,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
     async def test_painel_respeita_limite_de_caracteres_do_embed(self):
         atividades = [
             {
-                "id": f"SHI-{i:03d}",
+                "id": f"NEM-{i:03d}",
                 "jogo": "shigaku",
                 "tipo": "missao",
                 "titulo": "Operação " + ("Reconhecimento " * 10),
