@@ -80,3 +80,12 @@ Este arquivo registra mudanças por estado de entrega. Merge no GitHub não sign
 - As recompensas são XP organizacional e reconhecimento visual; não concedem permissões administrativas nem alteram a hierarquia de liderança.
 - O sistema não apaga nem substitui medalhas competitivas antigas.
 - Ativação no Discord depende do deploy e da inicialização do Shinku.
+
+
+## 2026-10-31 — Destinos de registro do AutoMod
+
+- Registros de infrações, punições automáticas e falhas de punição direcionados ao canal #Moderação (`1563995882234450006`).
+- Auditoria do AutoMod direcionada ao canal #Logs (`1563995882234450005`), com fallback quando uma configuração antiga aponta para canal indisponível.
+- Resolução dos destinos valida tipo de canal, servidor e permissões de visualização, envio e incorporação de embeds.
+- Erros de destino passam a gerar logs explícitos para diagnóstico, em vez de falharem silenciosamente.
+- Testes protegem os IDs oficiais de destino.
