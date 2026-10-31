@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.progressao_gangue import ARQUIVO as ARQUIVO_PROGRESSAO, CARGO_NEMESIS_ID
-from utils.apresentacao import criar_embed
+from utils.apresentacao import aplicar_identidade_servidor, criar_embed
 from utils.perfis import get_perfil
 from utils.revisoes import listar as listar_revisoes
 from utils.storage import carregar
@@ -115,7 +115,7 @@ class Conquistas(commands.Cog):
                         ),
                         inline=False,
                     )
-                embed.set_thumbnail(url=membro.display_avatar.url)
+                aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
                 embed.set_footer(text="NÊMESIS • MÉRITO REGISTRADO • Conquistas permanentes")
                 try:
                     await canal.send(
@@ -160,7 +160,7 @@ class Conquistas(commands.Cog):
             color=COR_NEMESIS,
             timestamp=discord.utils.utcnow(),
         )
-        embed.set_thumbnail(url=alvo.display_avatar.url)
+        aplicar_identidade_servidor(embed, interaction.guild, self.bot, banner=True)
         for conquista in conquistas_storage.CATALOGO_CONQUISTAS:
             registro = desbloqueadas.get(conquista["id"])
             valor = estatisticas.get(conquista["campo"], 0)
