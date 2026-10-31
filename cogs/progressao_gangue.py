@@ -9,6 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
+from utils.guild_config import lideranca_only
 
 log = logging.getLogger(__name__)
 
