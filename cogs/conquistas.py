@@ -30,7 +30,10 @@ def montar_estatisticas(progressao: dict, competitivo: dict, revisoes: list, use
     aprovadas = sum(
         1 for item in revisoes
         if isinstance(item, dict)
-        and str(item.get("autor_id")) == str(user_id)
+        and (
+            str(item.get("autor_id")) == str(user_id)
+            or str(item.get("auxiliar_id")) == str(user_id)
+        )
         and item.get("status") == "aprovada"
         and str(item.get("tipo", "")).lower() in {"missao", "contribuicao", "especial", "pve"}
     )
