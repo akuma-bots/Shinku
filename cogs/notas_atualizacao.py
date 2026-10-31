@@ -173,6 +173,8 @@ class ConfirmarEnvioNotas(discord.ui.View):
 
     @discord.ui.button(label="Enviar notas por DM", style=discord.ButtonStyle.danger, emoji="✉️")
     async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("O envio de notas por DM está temporariamente pausado para corrigir duplicações. Nenhuma mensagem foi enviada.", ephemeral=True)
+        return
         if interaction.user.id != self.autor_id:
             await interaction.response.send_message("Somente quem preparou esta nota pode publicar.", ephemeral=True)
             return
