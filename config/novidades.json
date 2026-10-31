@@ -1,10 +1,10 @@
 {
-  "release_id": "20261031-004722",
+  "release_id": "20261031-024107",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Track Roblox membership without requiring role mappings",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Track Roblox membership without requiring role mappings\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Padroniza identidade visual carmesim nos guias",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Padroniza identidade visual carmesim nos guias\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "31/10/2026",
-  "hora_atualizacao": "00:47",
+  "hora_atualizacao": "02:41",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-31T00:47:22.896736-03:00"
+  "gerado_em": "2026-10-31T02:41:07.266105-03:00"
 }
