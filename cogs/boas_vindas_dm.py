@@ -121,6 +121,15 @@ class SeletorBoasVindas(discord.ui.Select):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
+class DesativarAvisosButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Não quero receber avisos", style=discord.ButtonStyle.secondary, emoji="🔕", custom_id="nemesis:desativar_avisos_privados", row=3)
+
+    async def callback(self, interaction: discord.Interaction):
+        await desativar_todas(GUILD_NEMESIS_ID, interaction.user.id)
+        await interaction.response.send_message("🔕 **Avisos privados desativados.** Você continuará vendo os comunicados nos canais da NÊMESIS. Se mudar de ideia, use /avisos-privados.", ephemeral=True)
+
+
 class OptOutView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -132,6 +141,7 @@ class BoasVindasView(discord.ui.View):
         super().__init__(timeout=900)
         adicionar_botoes_guia(self)
         self.add_item(SeletorBoasVindas(autor_id, selecionado))
+        self.add_item(DesativarAvisosButton())
 
 
 class BoasVindasDM(commands.Cog):
