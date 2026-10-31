@@ -45,6 +45,52 @@ class CentralRobloxView(discord.ui.View):
             ephemeral=True,
         )
 
+    @discord.ui.button(label="Verificar participação", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:participacao", emoji="🛡️")
+    async def verificar_participacao(self, interaction: discord.Interaction, button: discord.ui.Button):
+        vinculos = await carregar(ARQUIVO_VINCULOS, {})
+        vinculo = (vinculos.get(str(interaction.guild_id), {}) or {}).get(str(interaction.user.id))
+        if not isinstance(vinculo, dict) or not vinculo.get("roblox_id"):
+            await interaction.response.send_message(
+                "Sua conta ainda não está vinculada. Use **Vincular minha conta** primeiro.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        try:
+            grupo_id = ROBLOX_GRUPO_ID
+            rank = await _buscar_rank_no_grupo(int(vinculo["roblox_id"]), grupo_id)
+            if rank:
+                embed = criar_embed(
+                    title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ VERIFICAÇÃO ROBLOX",
+                    description=(
+                        "Sua conta vinculada foi encontrada na comunidade oficial.\n\n"
+                        f"**Conta:** [{vinculo.get('roblox_username', 'Roblox')}]"
+                        f"(https://www.roblox.com/users/{int(vinculo['roblox_id'])}/profile)\n"
+                        f"**Participação:** Confirmada\n**Rank no grupo:** {rank}\n"
+                        f"**Comunidade:** [Acessar grupo]({ROBLOX_GRUPO_URL})"
+                    ),
+                    color=0x2E8B57,
+                )
+            else:
+                embed = criar_embed(
+                    title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ VERIFICAÇÃO ROBLOX",
+                    description=(
+                        "A conta está vinculada, mas não foi encontrada como membro da comunidade oficial.\n\n"
+                        f"**Conta:** {vinculo.get('roblox_username', 'Roblox')}\n"
+                        "**Participação:** Não confirmada\n"
+                        f"**Próximo passo:** [Entrar na comunidade]({ROBLOX_GRUPO_URL})"
+                    ),
+                    color=0xB8860B,
+                )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except (aiohttp.ClientError, ValueError, TypeError):
+            _LOG.exception("Falha ao verificar participação no grupo Roblox.")
+            await interaction.followup.send(
+                "Não foi possível consultar o grupo Roblox agora. Tente novamente em alguns instantes.",
+                ephemeral=True,
+            )
+
     @discord.ui.button(label="Meu perfil Roblox", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:perfil", emoji="👤")
     async def meu_perfil(self, interaction: discord.Interaction, button: discord.ui.Button):
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
@@ -54,6 +100,15 @@ class CentralRobloxView(discord.ui.View):
             return
         rid = int(vinculo["roblox_id"])
         embed = criar_embed(title="NÊMESIS • PERFIL ROBLOX", description=f"**Usuário:** {vinculo.get('roblox_username', 'Não informado')}\n**Perfil:** https://www.roblox.com/users/{rid}/profile\n**Comunidade:** [Abrir grupo oficial]({ROBLOX_GRUPO_URL})", color=0xB3132B)
+        try:
+            rank = await _buscar_rank_no_grupo(rid, ROBLOX_GRUPO_ID)
+            embed.add_field(
+                name="COMUNIDADE NÊMESIS",
+                value=f"Participação confirmada — **{rank}**" if rank else "Não encontrado como membro do grupo",
+                inline=False,
+            )
+        except (aiohttp.ClientError, ValueError, TypeError):
+            embed.add_field(name="COMUNIDADE NÊMESIS", value="Não foi possível consultar agora", inline=False)
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rid}&width=150&height=150&format=png")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -217,6 +272,12 @@ class Roblox(commands.Cog):
                 if isinstance(membros, int):
                     valor += "\n**" + format(membros, ",") + "** membros\n"
                 embed.add_field(name="GRUPO OFICIAL", value=valor, inline=True)
+                owner = dados.get("owner") or {}
+                owner_name = owner.get("username") if isinstance(owner, dict) else None
+                if owner_name:
+                    embed.add_field(name="PROPRIETÁRIO", value=str(owner_name)[:100], inline=True)
+                if dados.get("hasVerifiedBadge") is True:
+                    embed.add_field(name="STATUS", value="Comunidade verificada pelo Roblox", inline=True)
                 descricao = str(dados.get("description") or "").strip()
                 if descricao:
                     embed.add_field(name="SOBRE A COMUNIDADE", value=descricao[:900], inline=False)
