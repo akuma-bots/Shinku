@@ -121,6 +121,12 @@ class SeletorBoasVindas(discord.ui.Select):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
+class OptOutView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(DesativarAvisosButton())
+
+
 class BoasVindasView(discord.ui.View):
     def __init__(self, autor_id: int, selecionado: str = "inicio"):
         super().__init__(timeout=900)
