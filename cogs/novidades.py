@@ -323,7 +323,7 @@ class Novidades(commands.Cog):
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "**◈ O QUE VOCÊ PRECISA SABER**\n"
                         "Esta mensagem resume as novidades publicadas para a comunidade. "
-                        "Consulte /help ou /tutorial para conhecer os comandos e os sistemas."
+                        "Consulte #Sistemas para acessar os tutoriais e /help para localizar os comandos."
                     ),
                     color=0xB3132B,
                     timestamp=datetime.now(timezone.utc),
@@ -346,7 +346,7 @@ class Novidades(commands.Cog):
                 )
                 embed.add_field(
                     name="◈ ACESSO RÁPIDO",
-                    value="**/tutorial** — guias dos sistemas\n**/help** — central de comandos\n",
+                    value="**#Sistemas** — biblioteca de tutoriais\n**/help** — central de comandos\n",
                     inline=False,
                 )
                 embed.set_footer(
