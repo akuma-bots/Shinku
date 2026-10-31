@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
 CANAL_TUTORIAIS_ID = 1563995880833421512
 ARQUIVO_CENTRAL_TUTORIAIS = "central_tutoriais.json"
-MARCADOR_CENTRAL_TUTORIAIS = "NÊMESIS • CENTRAL DE TUTORIAIS • V3"
+MARCADOR_CENTRAL_TUTORIAIS = "NÊMESIS • CENTRAL DE TUTORIAIS • V4"
 
 
 TUTORIAIS = {
@@ -31,14 +31,19 @@ TUTORIAIS = {
     },
     "inicio": {
         "titulo": "Começando na NÊMESIS",
-        "descricao": "Guia inicial para novos membros.",
+        "descricao": "Guia de integração para novos integrantes: identidade, cargo inicial, canais e primeiros passos.",
         "passos": [
-            "Leia as regras e acompanhe os anúncios oficiais.",
-            "Use /perfil para consultar sua progressão e estatísticas.",
-            "Use /roblox-vincular e depois /roblox-confirmar para associar sua conta Roblox.",
-            "Consulte /help para ver os comandos disponíveis para seu cargo.",
+            "Ao entrar no servidor, o Shinku atribui automaticamente o cargo Visitantes. Se ele não aparecer, aguarde alguns segundos e procure a equipe pelo canal de Atendimento.",
+            "A TAG oficial da organização é NΞM. Ela identifica a NÊMESIS e deve ser preservada conforme as orientações da liderança.",
+            "Leia o canal Regras (categoria Informações) e acompanhe os comunicados em Anúncios antes de participar das atividades.",
+            "Abra Como funciona para entender a proposta da organização e Divisões para conhecer a estrutura das equipes.",
+            "Consulte #Sistemas: o painel Central de Tutoriais possui um seletor para abrir o guia de cada sistema sem precisar de comando.",
+            "Use Inscrições para conhecer os formulários disponíveis e Missões para consultar atividades e requisitos.",
+            "Acompanhe Progressão e Ranking para entender sua evolução. As recompensas e estatísticas seguem os critérios oficiais de cada sistema.",
+            "Use /help para localizar apenas os comandos disponíveis ao seu cargo. Não possuir um comando significa que ele pode ser restrito a outra função.",
+            "Se precisar de suporte, abra um atendimento pelo canal oficial. Nunca compartilhe senhas, tokens ou códigos de autenticação.",
         ],
-        "comandos": "/help · /perfil · /roblox-vincular",
+        "comandos": "#Sistemas · #Regras · #Como-funciona · #Divisões · /help · /perfil",
     },
     "missoes": {
         "titulo": "Missões e Contribuições",
@@ -276,7 +281,7 @@ def _embed_indice(guild: discord.Guild | None = None, bot: commands.Bot | None =
         title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE TUTORIAIS ・✦",
         description=(
             "⟡・**Conhecimento, organização e evolução.**\n"
-            "Esta é a biblioteca oficial de orientação da NÊMESIS. Cada guia explica o funcionamento "
+            "Esta é a biblioteca oficial de orientação da NÊMESIS. Comece pelo guia **Começando na NÊMESIS** para conhecer a TAG da Org, o cargo Visitantes e o roteiro de integração. Os demais guias explicam o funcionamento "
             "de um sistema, os procedimentos corretos e os canais que você deve consultar.\n\n"
             "**Selecione um assunto no menu abaixo** para abrir o passo a passo completo. "
             "A consulta é privada: sua navegação não altera o painel público."
