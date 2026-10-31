@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
+from utils.guild_config import lideranca_only
 
 
 class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
@@ -18,7 +19,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         self._inicio = time.monotonic()
 
     @app_commands.command(name="status", description="Mostra a saúde, latência e os módulos ativos do bot.")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def status(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
