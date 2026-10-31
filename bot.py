@@ -29,6 +29,7 @@ CAMINHO_ENV = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=CAMINHO_ENV)
 
 from utils.storage import USANDO_UPSTASH, verificar_conexao_storage
+from utils.guild_config import membro_tem_acesso_nemesis
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 NEMESIS_GUILD_ID = os.getenv("NEMESIS_GUILD_ID")
@@ -100,20 +101,9 @@ bot = NemesisBot(
 )
 
 
-# Controle central de acesso: os comandos da NÊMESIS exigem o cargo oficial.
-NEMESIS_ROLE_ID = 1563995879990624372
-
-
-def membro_tem_acesso_nemesis(membro) -> bool:
-    return (
-        isinstance(membro, discord.Member)
-        and membro.guild.id == NEMESIS_GUILD_ID
-        and any(cargo.id == NEMESIS_ROLE_ID for cargo in membro.roles)
-    )
-
-
+# Controle central de acesso: membros reconhecidos e liderança autorizada.
 async def verificar_acesso_slash(interaction: discord.Interaction) -> bool:
-    # O bot é exclusivo da NÊMESIS; não libera acesso por ser administrador.
+    # O bot é exclusivo da NÊMESIS; permissões genéricas do Discord não liberam acesso.
     return membro_tem_acesso_nemesis(interaction.user)
 
 
