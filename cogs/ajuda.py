@@ -12,7 +12,6 @@ SISTEMAS = {
     "Guerras": ("🏰", "Guerras"),
     "Perfil": ("🎖️", "Perfil & Patentes"),
     "Roblox": ("🎮", "Conta Roblox"),
-    "Tutorial": ("📚", "Tutoriais por sistema"),
     "RankingGeral": ("🌍", "Ranking Geral"),
     "Recordes": ("🏅", "Recordes"),
     "Temporadas": ("🏁", "Temporadas"),
