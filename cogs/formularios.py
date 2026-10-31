@@ -208,9 +208,8 @@ class ModalFormulario(discord.ui.Modal):
             rotulo = f"Questão {len(self.inputs) + 1:02d} • Resposta"
             placeholder = texto[:100] or "Digite sua resposta..."
             if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha" and opcoes:
-                opcoes_texto = " | ".join(str(opcao) for opcao in opcoes)
-                prefixo = f"{texto[:55]} • Opções: "
-                placeholder = (prefixo + opcoes_texto)[:100]
+                # O enunciado tem prioridade visual; as opções continuam
+                # registradas no formulário e não devem substituir a pergunta.
             campo = discord.ui.TextInput(
                 label=rotulo,
                 style=discord.TextStyle.paragraph,
@@ -322,7 +321,7 @@ def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild, bot
         embed.set_author(name="N̷ÊMESIS  /  COMISSÃO AVALIADORA")
         for numero, (pergunta, resp) in enumerate(bloco, start=(indice - 1) * 20 + 1):
             valor = str(resp if resp is not None else "—").strip() or "—"
-            embed.add_field(name=f"〔 {numero:02d} 〕 {str(pergunta or 'Questão')[:220]}", value=valor[:1024], inline=False)
+            embed.add_field(name=f"〔 {numero:02d} 〕 {str(pergunta or 'Questão')[:245]}", value=valor[:1024], inline=False)
         aplicar_identidade_servidor(embed, guild, bot, banner=False)
         embeds.append(embed)
     return embeds
