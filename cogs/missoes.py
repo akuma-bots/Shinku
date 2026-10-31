@@ -599,7 +599,7 @@ class Missoes(commands.Cog):
         inicio = pagina * itens_por_pagina
         nome_categoria = tipo["plural"].upper()
         embed = criar_embed(
-            "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE OPERAÇÕES ・✦",
+            "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE MISSÕES E OPERAÇÕES ・✦",
             (
                 "╭────────────── ◈ ──────────────╮\n"
                 f"                 **{nome_categoria}  /  TODOS OS JOGOS**\n"
