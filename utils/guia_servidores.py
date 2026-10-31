@@ -1,6 +1,9 @@
 import discord
 
 GUILD_NEMESIS_ID = 1563995879981981817
+CARGO_VISITANTES_ID = 1563995879990624371
+NOME_CARGO_VISITANTES = "Visitantes"
+TAG_ORG_NEMESIS = "NΞM"
 
 # Áreas oficiais que ajudam um novo integrante a entender a estrutura da NÊMESIS.
 CANAIS_GUIA_SERVIDORES = (
