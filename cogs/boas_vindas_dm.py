@@ -1,5 +1,5 @@
 from utils.apresentacao import criar_embed
-from utils.preferencias_notificacoes import desativar_todas
+from utils.preferencias_notificacoes import obter_preferencias, definir_preferencia
 from utils.guia_servidores import (
     adicionar_botoes_guia,
     CARGO_VISITANTES_ID,
@@ -122,19 +122,43 @@ class SeletorBoasVindas(discord.ui.Select):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
-class DesativarAvisosButton(discord.ui.Button):
+class AlternarAvisosButton(discord.ui.Button):
+    """Alterna o recebimento das notas automáticas diretamente pela mensagem."""
+
     def __init__(self):
-        super().__init__(label="Não quero receber avisos", style=discord.ButtonStyle.secondary, emoji="🔕", custom_id="nemesis:desativar_avisos_privados", row=3)
+        super().__init__(
+            label="Configurar recebimento de notas",
+            style=discord.ButtonStyle.secondary,
+            emoji="🔔",
+            custom_id="nemesis:alternar_notas_dm",
+            row=3,
+        )
 
     async def callback(self, interaction: discord.Interaction):
-        await desativar_todas(GUILD_NEMESIS_ID, interaction.user.id)
-        await interaction.response.send_message("🔕 **Avisos privados desativados.** Você continuará vendo os comunicados nos canais da NÊMESIS. Se mudar de ideia, use /avisos-privados.", ephemeral=True)
+        preferencias = await obter_preferencias(GUILD_NEMESIS_ID, interaction.user.id)
+        novo_estado = not preferencias["notas_atualizacao"]
+        await definir_preferencia(
+            GUILD_NEMESIS_ID, interaction.user.id, "notas_atualizacao", novo_estado
+        )
+        self.label = "Desativar notas por DM" if novo_estado else "Ativar notas por DM"
+        self.emoji = "🔕" if novo_estado else "🔔"
+        self.style = (
+            discord.ButtonStyle.success if novo_estado
+            else discord.ButtonStyle.secondary
+        )
+        await interaction.response.edit_message(view=self.view)
+        estado = "ativadas" if novo_estado else "desativadas"
+        await interaction.followup.send(
+            f"**Notas automáticas por DM {estado}.** "
+            "Você pode alterar essa preferência novamente pelo mesmo botão nesta mensagem.",
+            ephemeral=True,
+        )
 
 
 class OptOutView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(DesativarAvisosButton())
+        self.add_item(AlternarAvisosButton())
 
 
 class BoasVindasView(discord.ui.View):
