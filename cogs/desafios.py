@@ -540,7 +540,7 @@ class Desafios(commands.Cog):
         name="diagnostico-canais",
         description="Verifica canais padrão, IDs configurados e permissões do bot.",
     )
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def diagnostico_canais(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         guild = interaction.guild
