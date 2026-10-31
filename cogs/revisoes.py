@@ -81,72 +81,210 @@ STATUS_LABELS = {
     "aprovada": ("✅ Aprovadas", 0x57F287),
     "rejeitada": ("❌ Recusadas", 0xED4245),
 }
+TIPO_LABELS = {
+    "todos": "Todas as categorias",
+    "missao": "Missões",
+    "contribuicao": "Contribuições",
+    "especial": "Operações especiais",
+    "pvp": "PvP",
+    "pve": "PvE",
+}
+ITENS_POR_PAGINA = 8
 
 
-def _embed_painel_provas(guild: discord.Guild, status: str, itens: list[dict]) -> discord.Embed:
-    label, cor = STATUS_LABELS[status]
+def _contagens_provas(itens: list[dict]) -> dict:
+    return {
+        status: sum(1 for item in itens if item.get("status") == status)
+        for status in STATUS_LABELS
+    }
+
+
+def _filtrar_provas(itens: list[dict], status: str, tipo: str = "todos") -> list[dict]:
+    resultado = [
+        item for item in itens
+        if isinstance(item, dict)
+        and item.get("status") == status
+        and (tipo == "todos" or str(item.get("tipo") or "").lower() == tipo)
+    ]
+    return sorted(resultado, key=lambda item: float(item.get("timestamp", 0) or 0), reverse=True)
+
+
+def _embed_painel_provas(
+    guild: discord.Guild,
+    status: str,
+    itens: list[dict],
+    tipo: str = "todos",
+    pagina: int = 0,
+    total: int = None,
+    contagens: dict = None,
+) -> discord.Embed:
+    label, cor = STATUS_LABELS.get(status, STATUS_LABELS["pendente"])
+    total = len(itens) if total is None else max(0, int(total))
+    total_paginas = max(1, (total + ITENS_POR_PAGINA - 1) // ITENS_POR_PAGINA)
+    pagina = max(0, min(int(pagina), total_paginas - 1))
+    inicio = pagina * ITENS_POR_PAGINA
+    exibidos = itens[inicio:inicio + ITENS_POR_PAGINA]
+    contagens = contagens or _contagens_provas(itens)
     embed = criar_embed(
-        title=f"✦・NÊMESIS — ACOMPANHAMENTO DE PROVAS",
-        description=f"**Filtro:** {label}\n**Registros encontrados:** {len(itens)}",
+        title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE VALIDAÇÃO ・✦",
+        description=(
+            "⟡・Acompanhamento operacional de evidências, decisões e histórico de análise.\n"
+            f"**Status:** {label}  •  **Categoria:** {TIPO_LABELS.get(tipo, tipo.title())}\n"
+            f"**Registros encontrados:** {total}  •  **Página:** {pagina + 1}/{total_paginas}"
+        ),
         color=cor,
     )
-    if not itens:
-        embed.add_field(name="Nenhuma prova encontrada", value="Não há provas com este status.", inline=False)
-        return embed
-
-    for item in itens[:10]:
-        tipo = str(item.get("tipo", "—")).upper()
-        autor = f"<@{item.get('autor_id')}>" if item.get("autor_id") else "Desconhecido"
-        referencia = str(item.get("referencia_id") or "—")
-        enviado = item.get("timestamp")
-        data = f"<t:{int(enviado)}:R>" if isinstance(enviado, (int, float)) else "Data indisponível"
-        revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "—"
-        motivo = str(item.get("motivo_rejeicao") or "").strip()
-        detalhe = (
-            f"**ID da prova:** `{item.get('id', '—')}`\n"
-            f"**ID da missão/atividade:** `{referencia}`\n"
-            f"**Membro:** {autor} • **Tipo:** {tipo}\n"
-            f"**Enviada:** {data} • **Revisor:** {revisor}"
-        )
-        if status == "rejeitada" and motivo:
-            detalhe += f"\n**Motivo:** {motivo[:500]}"
+    embed.add_field(name="⏳ PENDENTES", value=f"**{contagens.get('pendente', 0)}**", inline=True)
+    embed.add_field(name="✓ APROVADAS", value=f"**{contagens.get('aprovada', 0)}**", inline=True)
+    embed.add_field(name="✕ RECUSADAS", value=f"**{contagens.get('rejeitada', 0)}**", inline=True)
+    if not exibidos:
         embed.add_field(
-            name=f"{item.get('titulo', 'Prova sem título')}"[:256],
-            value=detalhe[:1024],
+            name="◈ NENHUM REGISTRO",
+            value="Não há provas correspondentes aos filtros selecionados.",
             inline=False,
         )
-    if len(itens) > 10:
-        embed.set_footer(text=f"Mostrando 10 de {len(itens)} registros. Use o filtro para consultar cada status.")
+    for item in exibidos:
+        tipo_item = str(item.get("tipo") or "—").lower()
+        autor = f"<@{item.get('autor_id')}>" if item.get("autor_id") else "Não identificado"
+        auxiliar = f"<@{item.get('auxiliar_id')}>" if item.get("auxiliar_id") else "Não informado"
+        revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "Aguardando análise"
+        timestamp = item.get("timestamp")
+        data = f"<t:{int(timestamp)}:F> · <t:{int(timestamp)}:R>" if isinstance(timestamp, (int, float)) else "Data indisponível"
+        detalhes = (
+            f"**Protocolo:** `{item.get('id', '—')}`  •  **Referência:** `{str(item.get('referencia_id') or '—')[:60]}`\n"
+            f"**Participante:** {autor}  •  **Auxiliar:** {auxiliar}\n"
+            f"**Categoria:** {TIPO_LABELS.get(tipo_item, tipo_item.upper())}  •  **Enviado:** {data}\n"
+            f"**Revisor:** {revisor}"
+        )
+        motivo = str(item.get("motivo_rejeicao") or "").strip()
+        if status == "rejeitada" and motivo:
+            detalhes += f"\n**Justificativa:** {motivo[:300]}"
+        embed.add_field(
+            name=f"◈ {str(item.get('titulo') or 'Comprovante sem título')[:245]}",
+            value=detalhes[:1024],
+            inline=False,
+        )
+    embed.set_footer(
+        text=f"NÊMESIS • AUDITORIA OPERACIONAL • Exibindo {len(exibidos)} de {total} registros"
+    )
     return embed
 
 
 class FiltroPainelProvas(discord.ui.Select):
-    def __init__(self, cog: "Revisoes", guild_id: int, owner_id: int, status: str = "pendente"):
+    def __init__(
+        self,
+        cog: "Revisoes",
+        guild_id: int,
+        owner_id: int,
+        status: str = "pendente",
+        tipo: str = "todos",
+    ):
         self.cog = cog
         self.guild_id = guild_id
         self.owner_id = owner_id
+        self.status = status
+        self.tipo = tipo
         options = [
-            discord.SelectOption(label="Pendentes", value="pendente", emoji="⏳", default=status == "pendente"),
-            discord.SelectOption(label="Aprovadas", value="aprovada", emoji="✅", default=status == "aprovada"),
-            discord.SelectOption(label="Recusadas", value="rejeitada", emoji="❌", default=status == "rejeitada"),
+            discord.SelectOption(label=STATUS_LABELS[chave][0].split(" ", 1)[1], value=chave, emoji=STATUS_LABELS[chave][0].split(" ", 1)[0], default=status == chave)
+            for chave in STATUS_LABELS
         ]
-        super().__init__(placeholder="Filtrar provas por status", min_values=1, max_values=1, options=options)
+        super().__init__(
+            placeholder="◈ Filtrar por situação",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.owner_id:
-            await interaction.response.send_message("Este painel foi aberto por outro administrador.", ephemeral=True)
+        if not await self.cog._autorizar_painel(interaction, self.owner_id):
             return
-        status = self.values[0]
-        itens = await revisoes.listar(self.guild_id, status=status)
-        itens.sort(key=lambda x: float(x.get("timestamp", 0) or 0), reverse=True)
-        view = PainelProvasView(self.cog, self.guild_id, self.owner_id, status)
-        await interaction.response.edit_message(embed=_embed_painel_provas(interaction.guild, status, itens), view=view)
+        await self.cog._atualizar_painel(
+            interaction, self.owner_id, self.values[0], self.tipo, 0
+        )
+
+
+class FiltroTipoProvas(discord.ui.Select):
+    def __init__(
+        self,
+        cog: "Revisoes",
+        guild_id: int,
+        owner_id: int,
+        status: str = "pendente",
+        tipo: str = "todos",
+    ):
+        self.cog = cog
+        self.guild_id = guild_id
+        self.owner_id = owner_id
+        self.status = status
+        options = [
+            discord.SelectOption(label=nome, value=chave, default=tipo == chave)
+            for chave, nome in TIPO_LABELS.items()
+        ]
+        super().__init__(
+            placeholder="◈ Filtrar por categoria",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.cog._autorizar_painel(interaction, self.owner_id):
+            return
+        await self.cog._atualizar_painel(
+            interaction, self.owner_id, self.status, self.values[0], 0
+        )
 
 
 class PainelProvasView(discord.ui.View):
-    def __init__(self, cog: "Revisoes", guild_id: int, owner_id: int, status: str = "pendente"):
-        super().__init__(timeout=300)
-        self.add_item(FiltroPainelProvas(cog, guild_id, owner_id, status))
+    def __init__(
+        self,
+        cog: "Revisoes",
+        guild_id: int,
+        owner_id: int,
+        status: str = "pendente",
+        tipo: str = "todos",
+        pagina: int = 0,
+        total: int = 0,
+    ):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.guild_id = guild_id
+        self.owner_id = owner_id
+        self.status = status
+        self.tipo = tipo
+        self.pagina = pagina
+        self.total = total
+        self.add_item(FiltroPainelProvas(cog, guild_id, owner_id, status, tipo))
+        self.add_item(FiltroTipoProvas(cog, guild_id, owner_id, status, tipo))
+        paginas = max(1, (total + ITENS_POR_PAGINA - 1) // ITENS_POR_PAGINA)
+        self.anterior.disabled = pagina <= 0
+        self.proxima.disabled = pagina >= paginas - 1
+
+    async def _mudar_pagina(self, interaction: discord.Interaction, delta: int):
+        if not await self.cog._autorizar_painel(interaction, self.owner_id):
+            return
+        await self.cog._atualizar_painel(
+            interaction, self.owner_id, self.status, self.tipo, self.pagina + delta
+        )
+
+    @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️", row=2)
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._mudar_pagina(interaction, -1)
+
+    @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️", row=2)
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._mudar_pagina(interaction, 1)
+
+    @discord.ui.button(label="Atualizar", style=discord.ButtonStyle.success, emoji="🔄", row=2)
+    async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog._autorizar_painel(interaction, self.owner_id):
+            return
+        await self.cog._atualizar_painel(
+            interaction, self.owner_id, self.status, self.tipo, self.pagina
+        )
+
 
 class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
     motivo = discord.ui.TextInput(
@@ -215,21 +353,60 @@ class Revisoes(commands.Cog):
             bot.processadores_revisao = {}
 
 
-    @app_commands.command(name="painel-provas", description="Acompanhar provas de missões e atividades por status.")
+    @app_commands.command(name="painel-provas", description="Acompanhar, filtrar e revisar provas por status e categoria.")
     @app_commands.default_permissions(administrator=True)
     async def painel_provas(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
             return
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Só administradores podem abrir este painel.", ephemeral=True)
+        if not await self._autorizar_painel(interaction, interaction.user.id):
             return
-        itens = await revisoes.listar(interaction.guild.id, status="pendente")
-        itens.sort(key=lambda x: float(x.get("timestamp", 0) or 0), reverse=True)
+        todos = await revisoes.listar(interaction.guild.id)
+        pendentes = _filtrar_provas(todos, "pendente", "todos")
+        contagens = _contagens_provas(todos)
         await interaction.response.send_message(
-            embed=_embed_painel_provas(interaction.guild, "pendente", itens),
-            view=PainelProvasView(self, interaction.guild.id, interaction.user.id),
+            embed=_embed_painel_provas(interaction.guild, "pendente", pendentes, total=len(pendentes), contagens=contagens),
+            view=PainelProvasView(self, interaction.guild.id, interaction.user.id, "pendente", "todos", 0, len(pendentes)),
             ephemeral=True,
+        )
+
+    async def _autorizar_painel(self, interaction: discord.Interaction, owner_id: int) -> bool:
+        permissoes = getattr(interaction.user, "guild_permissions", None)
+        if (
+            interaction.guild is None
+            or interaction.user.id != owner_id
+            or permissoes is None
+            or not permissoes.administrator
+        ):
+            await interaction.response.send_message(
+                "Este painel é restrito ao administrador que o abriu. Reabra com /painel-provas se necessário.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _atualizar_painel(
+        self,
+        interaction: discord.Interaction,
+        owner_id: int,
+        status: str,
+        tipo: str,
+        pagina: int,
+    ):
+        todos = await revisoes.listar(interaction.guild.id)
+        filtrados = _filtrar_provas(todos, status, tipo)
+        contagens = _contagens_provas(todos)
+        total = len(filtrados)
+        paginas = max(1, (total + ITENS_POR_PAGINA - 1) // ITENS_POR_PAGINA)
+        pagina = max(0, min(int(pagina), paginas - 1))
+        view = PainelProvasView(
+            self, interaction.guild.id, owner_id, status, tipo, pagina, total
+        )
+        await interaction.response.edit_message(
+            embed=_embed_painel_provas(
+                interaction.guild, status, filtrados, tipo, pagina, total, contagens
+            ),
+            view=view,
         )
 
     async def abrir_revisao(
