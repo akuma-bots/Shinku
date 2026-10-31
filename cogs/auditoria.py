@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import embed_erro, embed_sucesso
-from utils.guild_config import set_config
+from utils.guild_config import set_config, lideranca_only
 
 
 class Auditoria(commands.Cog):
@@ -17,7 +17,7 @@ class Auditoria(commands.Cog):
         description="Define o canal de log de auditoria (aprovações/recusas).",
     )
     @app_commands.describe(canal="Canal onde os logs de auditoria serão postados")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     @app_commands.guild_only()
     async def auditoria_canal(self, interaction: discord.Interaction, canal: discord.TextChannel):
         if interaction.guild is None:
