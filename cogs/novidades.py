@@ -22,6 +22,27 @@ CONCORRENCIA_ENVIO = 40
 INTERVALO_ENVIO = 1.2  # Mantido apenas para a fila de releases automáticos.
 TENTATIVAS_DM = 3
 
+def _aplicar_identidade_bot(embed: discord.Embed, guild: discord.Guild, bot: discord.Client) -> discord.Embed:
+    """Assina os comunicados com o avatar e o banner do próprio bot."""
+    usuario = getattr(bot, "user", None)
+    avatar = getattr(getattr(usuario, "display_avatar", None), "url", None)
+    banner = getattr(getattr(usuario, "banner", None), "url", None)
+    banner_servidor = getattr(getattr(guild, "banner", None), "url", None)
+
+    if avatar:
+        embed.set_author(name="N̷ÊMESIS  •  COMUNICADO OFICIAL", icon_url=avatar)
+        embed.set_thumbnail(url=avatar)
+    else:
+        embed.set_author(name="N̷ÊMESIS  •  COMUNICADO OFICIAL")
+
+    # Prioriza o banner configurado no perfil do bot; usa o banner do servidor
+    # como alternativa quando a aplicação não possui banner próprio.
+    if banner or banner_servidor:
+        embed.set_image(url=banner or banner_servidor)
+    return embed
+
+
+
 
 async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
     """Retorna enviada, permanente ou temporaria; repete falhas transitórias."""
@@ -194,6 +215,7 @@ class Novidades(commands.Cog):
         embed.add_field(name="◈ CATEGORIA", value=f"**{tipo.value}**", inline=True)
         embed.add_field(name="◈ ENVIADO POR", value=interaction.user.mention, inline=True)
         embed.set_footer(text="NÊMESIS • Comunicados oficiais")
+        _aplicar_identidade_bot(embed, guild, self.bot)
 
         async def processar_envio_em_segundo_plano():
             enviados = 0
@@ -300,16 +322,13 @@ class Novidades(commands.Cog):
                         f"{release['mensagem']}\n\n"
                         "━━━━━━━━━━━━━━━━━━━━\n"
                         "**◈ O QUE VOCÊ PRECISA SABER**\n"
-                        "Esta mensagem resume as novidades publicadas para a gangue. "
+                        "Esta mensagem resume as novidades publicadas para a comunidade. "
                         "Consulte /help ou /tutorial para conhecer os comandos e os sistemas."
                     ),
                     color=0xB3132B,
                     timestamp=datetime.now(timezone.utc),
                 )
-                embed.set_author(
-                    name="NÊMESIS  •  COMUNICADO OFICIAL",
-                    icon_url="https://cdn.discordapp.com/embed/avatars/0.png",
-                )
+                _aplicar_identidade_bot(embed, guild, self.bot)
                 embed.add_field(
                     name="◈ CATEGORIA",
                     value=f"**{release['tipo']}**",
