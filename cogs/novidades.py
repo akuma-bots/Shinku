@@ -340,6 +340,7 @@ class Novidades(commands.Cog):
                 guild_estado = guilds.setdefault(str(guild.id), {})
                 release_estado = guild_estado.setdefault(release["release_id"], {})
                 enviados_ids = set(str(x) for x in release_estado.get("dms_enviadas", []))
+                indisponiveis_ids = set(str(x) for x in release_estado.get("dms_indisponiveis", []))
 
                 embed = criar_embed(
                     description=(
@@ -362,7 +363,12 @@ class Novidades(commands.Cog):
 
                 membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
                 inscritos = await listar_inscritos(guild.id, "notas_atualizacao", [str(m.id) for m in membros])
-                destinatarios = [m for m in membros if str(m.id) in inscritos and str(m.id) not in enviados_ids]
+                destinatarios = [
+                    m for m in membros
+                    if str(m.id) in inscritos
+                    and str(m.id) not in enviados_ids
+                    and str(m.id) not in indisponiveis_ids
+                ]
                 enviados = 0
                 falhas = 0
                 for membro in destinatarios:
@@ -377,6 +383,12 @@ class Novidades(commands.Cog):
                         await salvar(ARQUIVO_ESTADO, estados)
                     else:
                         falhas += 1
+                        if resultado == "permanente":
+                            indisponiveis_ids.add(str(membro.id))
+                            release_estado["dms_indisponiveis"] = sorted(indisponiveis_ids)
+                            guild_estado[release["release_id"]] = release_estado
+                            guilds[str(guild.id)] = guild_estado
+                            await salvar(ARQUIVO_ESTADO, estados)
                     await asyncio.sleep(INTERVALO_ENVIO)
 
                 release_estado["total_inscritos"] = len(inscritos)
