@@ -432,20 +432,6 @@ class Novidades(commands.Cog):
     async def _before_retry_releases(self):
         await self.bot.wait_until_ready()
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        guild_id = os.getenv("NEMESIS_GUILD_ID")
-        if not guild_id:
-            logger.error("NEMESIS_GUILD_ID não configurado; novidades automáticas ignoradas.")
-            return
-        try:
-            guild_id = int(guild_id)
-        except (TypeError, ValueError):
-            logger.error("NEMESIS_GUILD_ID inválido; novidades automáticas ignoradas.")
-            return
-        guild = self.bot.get_guild(guild_id)
-        if guild is not None:
-            await self._anunciar_release(guild)
 
 
 async def setup(bot: commands.Bot):
