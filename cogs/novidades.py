@@ -24,6 +24,9 @@ CONCORRENCIA_ENVIO = 40
 INTERVALO_ENVIO = 1.2  # Mantido apenas para a fila de releases automáticos.
 TENTATIVAS_DM = 3
 CANAL_ANUNCIOS_ID = 1564076387797569577
+GUILD_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
+CANAL_SISTEMAS_URL = "https://discord.com/channels/1563995879981981817/1563995880833421512"
+CANAL_MISSOES_URL = "https://discord.com/channels/1563995879981981817/1563995881315897549"
 
 def _aplicar_identidade_bot(embed: discord.Embed, guild: discord.Guild, bot: discord.Client) -> discord.Embed:
     """Assina os comunicados com o avatar e o banner do próprio bot."""
@@ -102,6 +105,16 @@ async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed
             return "temporaria"
         await asyncio.sleep(espera)
     return "temporaria"
+
+
+class AvisosPublicosView(discord.ui.View):
+    """Atalhos úteis e cancelamento individual de mensagens privadas."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
+        self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
+        from cogs.boas_vindas_dm import DesativarAvisosButton
+        self.add_item(DesativarAvisosButton())
 
 
 class Novidades(commands.Cog):
@@ -343,7 +356,7 @@ class Novidades(commands.Cog):
                     canal = await self.bot.fetch_channel(CANAL_ANUNCIOS_ID)
                 if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
                     raise ValueError("Canal oficial de anúncios inválido.")
-                mensagem = await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                mensagem = await canal.send(embed=embed, view=AvisosPublicosView(), allowed_mentions=discord.AllowedMentions.none())
                 release_estado["publicado_no_canal"] = True
                 release_estado["mensagem_id"] = str(mensagem.id)
                 release_estado["publicado_em"] = datetime.now(timezone.utc).isoformat()
