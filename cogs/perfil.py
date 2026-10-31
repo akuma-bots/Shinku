@@ -308,7 +308,7 @@ class Perfil(commands.Cog):
         ]
         embed.add_field(
             name=f"◈ CONQUISTAS ({len(conquistas_desbloqueadas)}/{len(catalogo_conquistas)})",
-            value="\\n".join(linhas_conquistas) if linhas_conquistas else "Nenhuma conquista desbloqueada. Use /conquistas para consultar os próximos marcos.",
+            value="\n".join(linhas_conquistas) if linhas_conquistas else "Nenhuma conquista desbloqueada. Use /conquistas para consultar os próximos marcos.",
             inline=False,
         )
         embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
