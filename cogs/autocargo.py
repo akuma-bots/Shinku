@@ -5,6 +5,7 @@ import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
+from utils.guia_servidores import CARGO_VISITANTES_ID
 from utils.guild_config import (
     get_config,
     definir_canal_cargo_automatico,
@@ -40,7 +41,7 @@ class CargoAutomatico(commands.Cog):
     # Cargos-base concedidos automaticamente a novos membros da NÊMESIS.
     GUILD_ID_CARGOS_ENTRADA = 1563995879981981817
     CARGOS_ENTRADA = (
-        1563995879990624371,
+        CARGO_VISITANTES_ID,
         1563995879981981825,
         1563995879981981818,
     )
