@@ -75,6 +75,8 @@ async def _atualizar_stats_pvp(
     if not evento_id or evento_id not in eventos_vitoria:
         pv["vitorias"] = int(pv.get("vitorias", 0) or 0) + 1
         pv["kills"] = int(pv.get("kills", 0) or 0) + 1
+        pv["sequencia_atual"] = int(pv.get("sequencia_atual", 0) or 0) + 1
+        pv["maior_sequencia"] = max(int(pv.get("maior_sequencia", 0) or 0), pv["sequencia_atual"])
         pv["xp"] = int(pv.get("xp", 0) or 0) + XP_VITORIA_PVP + xp_extra_vencedor
         if evento_id:
             eventos_vitoria.append(evento_id)
@@ -87,6 +89,7 @@ async def _atualizar_stats_pvp(
     if not evento_id or evento_id not in eventos_derrota:
         pp["derrotas"] = int(pp.get("derrotas", 0) or 0) + 1
         pp["deaths"] = int(pp.get("deaths", 0) or 0) + 1
+        pp["sequencia_atual"] = 0
         if evento_id:
             eventos_derrota.append(evento_id)
             pp["resultados_pvp_aplicados"] = eventos_derrota[-1000:]
