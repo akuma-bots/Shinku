@@ -45,3 +45,15 @@ async def listar_inscritos(guild_id: int, categoria: str, membros_ids: list[str]
         if not isinstance(guild.get(str(user_id)), dict)
         or guild[str(user_id)].get(categoria, True) is True
     }
+
+
+async def desativar_todas(guild_id: int, user_id: int) -> dict:
+    dados = await carregar(ARQUIVO, {"guilds": {}})
+    if not isinstance(dados, dict):
+        dados = {"guilds": {}}
+    guild = dados.setdefault("guilds", {}).setdefault(str(guild_id), {})
+    usuario = guild.setdefault(str(user_id), {})
+    usuario["avisos_comunidade"] = False
+    usuario["notas_atualizacao"] = False
+    await salvar(ARQUIVO, dados)
+    return await obter_preferencias(guild_id, user_id)
