@@ -313,3 +313,51 @@ async def remover_contador(
         await salvar(ARQUIVO, dados)
         return lista
 
+
+
+# ============================================================
+# AUTORIZAÇÃO CENTRAL DA NÊMESIS
+# ============================================================
+
+import discord
+from discord import app_commands
+
+GUILD_NEMESIS_ID = 1563995879981981817
+CARGO_ACESSO_NEMESIS_ID = 1563995879990624372
+
+# Somente liderança organizacional. Os cargos competitivos e a staff
+# operacional não recebem autorização administrativa por progressão.
+CARGOS_LIDERANCA_IDS = frozenset({
+    1563995880007139425,  # OCTÓGONO
+    1563995880007139424,  # Diretor Staff
+    1563995880007139423,  # Vice-Diretor Staff
+    1563995880007139422,  # Supervisor Staff
+})
+
+
+def membro_tem_lideranca(membro) -> bool:
+    return bool(
+        isinstance(membro, discord.Member)
+        and membro.guild.id == GUILD_NEMESIS_ID
+        and any(cargo.id in CARGOS_LIDERANCA_IDS for cargo in membro.roles)
+    )
+
+
+def membro_tem_acesso_nemesis(membro) -> bool:
+    return bool(
+        isinstance(membro, discord.Member)
+        and membro.guild.id == GUILD_NEMESIS_ID
+        and (
+            membro_tem_lideranca(membro)
+            or any(cargo.id == CARGO_ACESSO_NEMESIS_ID for cargo in membro.roles)
+        )
+    )
+
+
+async def verificar_lideranca(interaction: discord.Interaction) -> bool:
+    return membro_tem_lideranca(interaction.user)
+
+
+def lideranca_only():
+    """Restringe comandos administrativos aos cargos de liderança autorizados."""
+    return app_commands.check(verificar_lideranca)
