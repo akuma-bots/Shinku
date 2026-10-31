@@ -326,9 +326,7 @@ class Novidades(commands.Cog):
         )
 
     async def _anunciar_release(self, guild: discord.Guild):
-        """Envia cada release por DM aos membros inscritos, sem publicar em #Anúncios."""
-        logger.warning("Envio automático de notas pausado temporariamente para conter duplicações.")
-        return
+        """Entrega uma release uma única vez por membro, com trava persistente antes da DM."""
         async with self._lock:
             if self._processando:
                 return
@@ -337,14 +335,22 @@ class Novidades(commands.Cog):
                 release = self._ler_release()
                 if release is None:
                     return
+
                 estados = await carregar(ARQUIVO_ESTADO, {"guilds": {}})
                 if not isinstance(estados, dict):
                     estados = {"guilds": {}}
                 guilds = estados.setdefault("guilds", {})
                 guild_estado = guilds.setdefault(str(guild.id), {})
                 release_estado = guild_estado.setdefault(release["release_id"], {})
+
                 enviados_ids = set(str(x) for x in release_estado.get("dms_enviadas", []))
                 indisponiveis_ids = set(str(x) for x in release_estado.get("dms_indisponiveis", []))
+                # A reserva é gravada ANTES da chamada ao Discord. Se o processo cair
+                # depois da entrega e antes da confirmação, o destinatário não recebe
+                # uma segunda cópia na próxima inicialização.
+                tentadas_ids = set(str(x) for x in release_estado.get("dms_tentadas", []))
+                tentadas_ids.update(enviados_ids)
+                tentadas_ids.update(indisponiveis_ids)
 
                 embed = criar_embed(
                     description=(
@@ -366,47 +372,66 @@ class Novidades(commands.Cog):
                 embed.set_footer(text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)")
 
                 membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
-                inscritos = await listar_inscritos(guild.id, "notas_atualizacao", [str(m.id) for m in membros])
+                inscritos = await listar_inscritos(
+                    guild.id, "notas_atualizacao", [str(m.id) for m in membros]
+                )
                 destinatarios = [
-                    m for m in membros
-                    if str(m.id) in inscritos
-                    and str(m.id) not in enviados_ids
-                    and str(m.id) not in indisponiveis_ids
+                    membro for membro in membros
+                    if str(membro.id) in inscritos
+                    and str(membro.id) not in tentadas_ids
                 ]
+
                 enviados = 0
                 falhas = 0
                 for membro in destinatarios:
+                    user_id = str(membro.id)
+
+                    # Persistência anterior ao envio: protege contra on_ready duplicado,
+                    # reinicializações e retries do ciclo periódico.
+                    tentadas_ids.add(user_id)
+                    release_estado["dms_tentadas"] = sorted(tentadas_ids)
+                    release_estado["ultima_tentativa_em"] = datetime.now(timezone.utc).isoformat()
+                    guild_estado[release["release_id"]] = release_estado
+                    guilds[str(guild.id)] = guild_estado
+                    await salvar(ARQUIVO_ESTADO, estados)
+
                     resultado = await _enviar_dm_com_retry(membro, embed=embed)
                     if resultado == "enviada":
-                        enviados_ids.add(str(membro.id))
-                        enviados += 1
+                        enviados_ids.add(user_id)
                         release_estado["dms_enviadas"] = sorted(enviados_ids)
-                        release_estado["ultima_tentativa_em"] = datetime.now(timezone.utc).isoformat()
-                        guild_estado[release["release_id"]] = release_estado
-                        guilds[str(guild.id)] = guild_estado
-                        await salvar(ARQUIVO_ESTADO, estados)
-                    else:
+                        enviados += 1
+                    elif resultado == "permanente":
+                        indisponiveis_ids.add(user_id)
+                        release_estado["dms_indisponiveis"] = sorted(indisponiveis_ids)
                         falhas += 1
-                        if resultado == "permanente":
-                            indisponiveis_ids.add(str(membro.id))
-                            release_estado["dms_indisponiveis"] = sorted(indisponiveis_ids)
-                            guild_estado[release["release_id"]] = release_estado
-                            guilds[str(guild.id)] = guild_estado
-                            await salvar(ARQUIVO_ESTADO, estados)
+                    else:
+                        # Resultado de transporte incerto: não repetir automaticamente,
+                        # pois o Discord pode ter aceitado a DM antes da perda da resposta.
+                        release_estado.setdefault("dms_resultado_incerto", [])
+                        incertas = set(str(x) for x in release_estado["dms_resultado_incerto"])
+                        incertas.add(user_id)
+                        release_estado["dms_resultado_incerto"] = sorted(incertas)
+                        falhas += 1
+
+                    release_estado["ultima_tentativa_em"] = datetime.now(timezone.utc).isoformat()
+                    guild_estado[release["release_id"]] = release_estado
+                    guilds[str(guild.id)] = guild_estado
+                    await salvar(ARQUIVO_ESTADO, estados)
                     await asyncio.sleep(INTERVALO_ENVIO)
 
                 release_estado["total_inscritos"] = len(inscritos)
                 release_estado["ultimo_envio_em"] = datetime.now(timezone.utc).isoformat()
-                release_estado["envio_concluido"] = len(enviados_ids) >= len(inscritos)
+                release_estado["envio_concluido"] = len(tentadas_ids) >= len(inscritos)
                 guild_estado[release["release_id"]] = release_estado
                 guilds[str(guild.id)] = guild_estado
                 await salvar(ARQUIVO_ESTADO, estados)
+
                 logger.info(
-                    "Notas enviadas por DM (guild=%s, release=%s, inscritos=%s, enviados_nesta_execucao=%s, falhas=%s, total_acumulado=%s).",
-                    guild.id, release["release_id"], len(inscritos), enviados, falhas, len(enviados_ids),
+                    "Notas processadas (guild=%s, release=%s, inscritos=%s, enviados_nesta_execucao=%s, falhas=%s, reservas_persistidas=%s).",
+                    guild.id, release["release_id"], len(inscritos), enviados, falhas, len(tentadas_ids),
                 )
             except Exception:
-                logger.exception("Falha ao enviar notas automáticas por DM.")
+                logger.exception("Falha ao processar notas automáticas por DM.")
             finally:
                 self._processando = False
 
