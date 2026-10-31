@@ -37,3 +37,9 @@ def test_start_tutorial_explains_visitor_role_and_org_tag():
     assert "NΞM" in texto
     assert CARGO_VISITANTES_ID == 1563995879990624371
     assert TAG_ORG_NEMESIS == "NΞM"
+
+
+def test_visitor_role_is_part_of_automatic_entry_roles():
+    from cogs.autocargo import CargoAutomatico
+
+    assert CARGO_VISITANTES_ID in CargoAutomatico.CARGOS_ENTRADA
