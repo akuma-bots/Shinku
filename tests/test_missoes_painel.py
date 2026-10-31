@@ -57,10 +57,6 @@ class TestRankingPanelEditLimit(unittest.IsolatedAsyncioTestCase):
         mensagem_antiga.delete.assert_awaited_once()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestMissionEvidenceSelector(unittest.TestCase):
     def setUp(self):
         self.atividades = [
@@ -95,3 +91,8 @@ class TestMissionEvidenceSelector(unittest.TestCase):
     def test_evidence_modal_keeps_selected_mission_code(self):
         modal = EnviarProvaMissaoModal(Mock(), "NM007")
         self.assertEqual(modal.missao_id_selecionada, "NM007")
+
+
+
+if __name__ == "__main__":
+    unittest.main()
