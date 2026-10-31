@@ -230,7 +230,8 @@ class NavegacaoMissoesView(discord.ui.View):
     def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
         super().__init__(timeout=None)
         self.cog = cog
-        self.add_item(CategoriaMissoesSelect(cog, categoria))
+        self.categoria = categoria if categoria in TIPOS else "missao"
+        self.add_item(CategoriaMissoesSelect(cog, self.categoria))
         self.add_item(PaginaMissoesSelect(cog, categoria, pagina, total_paginas))
 
     @discord.ui.button(
