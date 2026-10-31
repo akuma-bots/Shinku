@@ -255,14 +255,14 @@ TUTORIAIS = {
     },
     "avisos": {
         "titulo": "Avisos oficiais por mensagem privada",
-        "descricao": "Os comunicados oficiais são enviados automaticamente a todos os membros humanos.",
+        "descricao": "Comunicados oficiais ficam nos canais; DMs podem ser desativadas individualmente pelo membro.",
         "passos": [
-            "As novidades de versões novas são enviadas por DM a todos os membros humanos do servidor.",
-            "A staff autorizada pode usar /avisos-enviar para publicar um comunicado oficial para todos os membros.",
-            "Não existe inscrição ou cancelamento de avisos pelo bot.",
+            "As notas de atualização automáticas são publicadas no canal Anúncios, sem disparo de DM em massa.",
+            "A equipe autorizada pode usar /avisos-enviar; o comunicado privado respeita a preferência de cada membro.",
+            "Na DM de boas-vindas ou nos comunicados privados, toque em Não quero receber avisos para desativar as mensagens privadas. Use /avisos-privados para ativar ou desativar novamente.",
             "As configurações de privacidade do Discord podem bloquear a entrega de uma DM; o bot registra essas falhas.",
         ],
-        "comandos": "/avisos-enviar (staff autorizada)",
+        "comandos": "/avisos-privados (todos) · /avisos-enviar (staff autorizada)",
     },
     "lideranca": {
         "titulo": "Liderança e staff",
