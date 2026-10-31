@@ -10,7 +10,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         dados = {
             "missoes": [
                 {
-                    "id": "SHI-001",
+                    "id": "NEM-001",
                     "jogo": "shigaku",
                     "tipo": "missao",
                     "titulo": "Operação de Reconhecimento",
@@ -19,7 +19,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
                     "ativa": True,
                 },
                 {
-                    "id": "SHI-002",
+                    "id": "NEM-002",
                     "jogo": "shigaku",
                     "tipo": "missao",
                     "titulo": "Operação Encerrada",
@@ -28,7 +28,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
                     "ativa": False,
                 },
                 {
-                    "id": "GAK-001",
+                    "id": "NEM-003",
                     "jogo": "gakuran",
                     "tipo": "missao",
                     "titulo": "Outro jogo",
@@ -46,21 +46,21 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("CENTRAL DE MISSÕES", embed.title)
         self.assertIn("Shigaku", embed.description)
-        self.assertIn("/missao-enviar-prova", embed.description)
+        self.assertIn("Envio de evidências", embed.description)
         fields = {field.name: field.value for field in embed.fields}
         self.assertEqual(fields["🟢 EM OPERAÇÃO"], "**1**")
         self.assertEqual(fields["⛔ ENCERRADAS"], "**1**")
-        self.assertEqual(fields["◈ NO CATÁLOGO"], "**2**")
+        self.assertEqual(fields["◈ TOTAL REGISTRADO"], "**3**\nTodos os jogos")
         self.assertTrue(any("Operação de Reconhecimento" in name for name in fields))
         self.assertTrue(any("Operação Encerrada" in name for name in fields))
-        self.assertFalse(any("Outro jogo" in name for name in fields))
+        self.assertTrue(any("Outro jogo" in name for name in fields))
         self.assertIn("PÁGINA:shigaku", embed.footer.text)
 
     async def test_painel_vazio_e_recompensa_invalida_nao_quebram(self):
         dados = {
             "missoes": [
                 {
-                    "id": "SHI-X",
+                    "id": "NEM-X",
                     "jogo": "shigaku",
                     "tipo": "missao",
                     "titulo": "Teste",
@@ -112,7 +112,7 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
             + len(embed.author.name or "")
         )
         self.assertLessEqual(tamanho, 6000)
-        self.assertTrue(any("CATÁLOGO COMPLEMENTAR" in field.name for field in embed.fields))
+        self.assertTrue(any("NAVEGAÇÃO DO CATÁLOGO" in field.name for field in embed.fields))
         self.assertLessEqual(len(embed.fields), 25)
 
 
