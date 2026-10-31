@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 import asyncio
 import hashlib
 import aiohttp
@@ -25,7 +25,7 @@ async def _hash_imagem(url: str):
         return None
 
 
-def _embed_revisao(revisao: dict) -> discord.Embed:
+def _embed_revisao(revisao: dict, guild: discord.Guild = None, bot: commands.Bot = None) -> discord.Embed:
     tipo = str(revisao.get("tipo") or "missao").lower()
     autor_id = revisao.get("autor_id")
     auxiliar_id = revisao.get("auxiliar_id")
@@ -65,7 +65,7 @@ def _embed_revisao(revisao: dict) -> discord.Embed:
         )
     embed.set_image(url=revisao["print_url"])
     embed.set_footer(text="NÊMESIS  •  CENTRAL DE VALIDAÇÃO  •  DECISÃO REGISTRADA EM AUDITORIA")
-    return embed
+    return aplicar_identidade_servidor(embed, guild, bot, banner=False)
 
 def _view_revisao(revisao_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
@@ -117,6 +117,7 @@ def _embed_painel_provas(
     pagina: int = 0,
     total: int = None,
     contagens: dict = None,
+    bot: commands.Bot = None,
 ) -> discord.Embed:
     label, cor = STATUS_LABELS.get(status, STATUS_LABELS["pendente"])
     total = len(itens) if total is None else max(0, int(total))
@@ -167,7 +168,7 @@ def _embed_painel_provas(
     embed.set_footer(
         text=f"NÊMESIS • AUDITORIA OPERACIONAL • Exibindo {len(exibidos)} de {total} registros"
     )
-    return embed
+    return aplicar_identidade_servidor(embed, guild, bot, banner=True)
 
 
 class FiltroPainelProvas(discord.ui.Select):
@@ -296,12 +297,13 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
         required=True,
     )
 
-    def __init__(self, guild: discord.Guild, revisao_id: str, mensagem: discord.Message, revisor: discord.Member):
+    def __init__(self, guild: discord.Guild, revisao_id: str, mensagem: discord.Message, revisor: discord.Member, bot: commands.Bot = None):
         super().__init__(timeout=300)
         self.guild = guild
         self.revisao_id = revisao_id
         self.mensagem = mensagem
         self.revisor = revisor
+        self.bot = bot
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -311,7 +313,7 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
             if not revisao:
                 await interaction.followup.send("Esta prova já foi processada ou não está mais disponível.", ephemeral=True)
                 return
-            embed = _embed_revisao(revisao)
+            embed = _embed_revisao(revisao, self.guild, self.bot)
             embed.color = 0x9F2035
             embed.add_field(name="✕ DECISÃO", value="**REJEITADA**", inline=True)
             embed.add_field(name="◈ RESPONSÁVEL PELA ANÁLISE", value=self.revisor.mention, inline=True)
@@ -365,7 +367,7 @@ class Revisoes(commands.Cog):
         pendentes = _filtrar_provas(todos, "pendente", "todos")
         contagens = _contagens_provas(todos)
         await interaction.response.send_message(
-            embed=_embed_painel_provas(interaction.guild, "pendente", pendentes, total=len(pendentes), contagens=contagens),
+            embed=_embed_painel_provas(interaction.guild, "pendente", pendentes, total=len(pendentes), contagens=contagens, bot=self.bot),
             view=PainelProvasView(self, interaction.guild.id, interaction.user.id, "pendente", "todos", 0, len(pendentes)),
             ephemeral=True,
         )
@@ -404,7 +406,7 @@ class Revisoes(commands.Cog):
         )
         await interaction.response.edit_message(
             embed=_embed_painel_provas(
-                interaction.guild, status, filtrados, tipo, pagina, total, contagens
+                interaction.guild, status, filtrados, tipo, pagina, total, contagens, self.bot
             ),
             view=view,
         )
@@ -460,7 +462,7 @@ class Revisoes(commands.Cog):
             if encontradas:
                 duplicata = encontradas[0]
 
-        embed = _embed_revisao(revisao)
+        embed = _embed_revisao(revisao, guild, self.bot)
         if duplicata:
             embed.add_field(
                 name="⚠️ Possível print repetida",
@@ -497,7 +499,7 @@ class Revisoes(commands.Cog):
 
         if acao == "rejeitar":
             await interaction.response.send_modal(
-                MotivoRejeicaoModal(interaction.guild, revisao_id, interaction.message, interaction.user)
+                MotivoRejeicaoModal(interaction.guild, revisao_id, interaction.message, interaction.user, self.bot)
             )
             return
 
@@ -568,7 +570,7 @@ class Revisoes(commands.Cog):
                 await interaction.followup.send(mensagem, ephemeral=True)
                 return
 
-            embed = _embed_revisao(revisao)
+            embed = _embed_revisao(revisao, interaction.guild, self.bot)
             embed.color = 0x57F287
             embed.add_field(name="✅ Aprovado por", value=interaction.user.mention, inline=False)
             if resultado_texto:
@@ -590,7 +592,7 @@ class Revisoes(commands.Cog):
                     ephemeral=True,
                 )
                 return
-            embed = _embed_revisao(revisao)
+            embed = _embed_revisao(revisao, interaction.guild, self.bot)
             embed.color = 0xED4245
             embed.add_field(name="❌ Rejeitado por", value=interaction.user.mention, inline=False)
             await interaction.message.edit(embed=embed, view=None)
