@@ -9,7 +9,7 @@ from cogs.novidades import _enviar_dm_com_retry
 
 
 class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
-    async def test_dm_repete_falha_transitoria_e_entrega(self):
+    async def test_dm_nao_repete_erro_http_ambiguo(self):
         membro = Mock()
         membro.id = 123
         membro.send = AsyncMock(side_effect=[
@@ -26,10 +26,10 @@ class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
                 embed=discord.Embed(title="Teste"),
             )
 
-        self.assertEqual(resultado, "enviada")
-        self.assertEqual(membro.send.await_count, 2)
+        self.assertEqual(resultado, "temporaria")
+        membro.send.assert_awaited_once()
 
-    async def test_dm_repete_timeout_de_conexao(self):
+    async def test_dm_timeout_nao_repete_envio_ambiguo(self):
         membro = Mock()
         membro.id = 789
         membro.send = AsyncMock(side_effect=[asyncio.TimeoutError(), None])
@@ -40,9 +40,9 @@ class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
                 embed=discord.Embed(title="Teste"),
             )
 
-        self.assertEqual(resultado, "enviada")
-        self.assertEqual(membro.send.await_count, 2)
-        dormir.assert_awaited_once()
+        self.assertEqual(resultado, "temporaria")
+        membro.send.assert_awaited_once()
+        dormir.assert_not_awaited()
 
     async def test_dm_bloqueada_nao_faz_retry(self):
         membro = Mock()
