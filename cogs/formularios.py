@@ -655,9 +655,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             embed=criar_embed(
                 "✦・ LIMPEZA DE PENDÊNCIAS CONCLUÍDA ・✦",
                 (
-                    f"**Candidaturas recusadas:** {len(pendentes)}\\n"
-                    f"**Candidatos notificados:** {notificadas}\\n"
-                    f"**Falhas de mensagem privada:** {falhas_dm}\\n\\n"
+                    f"**Candidaturas recusadas:** {len(pendentes)}\n"
+                    f"**Candidatos notificados:** {notificadas}\n"
+                    f"**Falhas de mensagem privada:** {falhas_dm}\n\n"
                     "Os registros foram preservados no histórico com o status **RECUSADA**. "
                     "Nenhuma candidatura ou resposta foi apagada."
                 ),
