@@ -12,8 +12,8 @@ async def obter_preferencias(guild_id: int, user_id: int) -> dict:
         .get(str(user_id), {})
     )
     return {
-        "avisos_comunidade": bool(usuario.get("avisos_comunidade", False)),
-        "notas_atualizacao": bool(usuario.get("notas_atualizacao", False)),
+        "avisos_comunidade": bool(usuario.get("avisos_comunidade", True)),
+        "notas_atualizacao": bool(usuario.get("notas_atualizacao", True)),
     }
 
 
