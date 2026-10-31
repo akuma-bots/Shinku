@@ -1,10 +1,10 @@
 {
-  "release_id": "20261030-174046",
+  "release_id": "20261031-003840",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Remove emoji inválido do painel automático de formulários",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Remove emoji inválido do painel automático de formulários\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
-  "data_atualizacao": "30/10/2026",
-  "hora_atualizacao": "17:40",
+  "titulo": "Improve Roblox group membership verification and panel",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Improve Roblox group membership verification and panel\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "data_atualizacao": "31/10/2026",
+  "hora_atualizacao": "00:38",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-30T17:40:46.420863-03:00"
+  "gerado_em": "2026-10-31T00:38:40.269259-03:00"
 }
