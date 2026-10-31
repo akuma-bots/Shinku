@@ -158,7 +158,7 @@ def gerar(before: str, after: str) -> dict | None:
     agora = datetime.now(FUSO)
     return {
         "release_id": agora.strftime("%Y%m%d-%H%M%S"),
-        "habilitada": True,
+        "habilitada": False,
         "tipo": tipo,
         "titulo": titulo[:180] or "Atualização da NÊMESIS",
         "mensagem": mensagem[:3400],
