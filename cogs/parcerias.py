@@ -9,7 +9,7 @@ from discord.ext import commands
 from utils.apresentacao import criar_embed
 
 from utils.storage import carregar, salvar
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 
 
 ARQUIVO = "parcerias.json"
@@ -363,9 +363,7 @@ class Parcerias(commands.Cog):
             "Canal de texto para os anúncios de parceria"
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def configurar_canal_parcerias(
         self,
         interaction: discord.Interaction,
@@ -394,9 +392,7 @@ class Parcerias(commands.Cog):
             "Cargo usado como separador de PARCERIAS"
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def configurar_cargo_parcerias(
         self,
         interaction: discord.Interaction,
@@ -427,9 +423,7 @@ class Parcerias(commands.Cog):
         descricao="Descrição curta da parceria",
         banner="URL de uma imagem/banner (opcional)",
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def adicionar_parceria(
         self,
         interaction: discord.Interaction,
@@ -601,9 +595,7 @@ class Parcerias(commands.Cog):
     @app_commands.describe(
         nome="Nome exato da parceria a remover"
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def remover_parceria(
         self,
         interaction: discord.Interaction,
