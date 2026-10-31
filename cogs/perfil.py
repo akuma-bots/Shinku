@@ -8,6 +8,7 @@ from utils.perfis import get_perfil, get_patentes, salvar_patentes, definir_pate
 from utils.competitivo_sync import ARQUIVO_COMPETITIVO
 from cogs.progressao_gangue import ARQUIVO as ARQUIVO_PROGRESSAO, rank_por_xp, proximo_rank, barra_progresso
 from utils import revisoes as revisoes_storage
+from utils import conquistas as conquistas_storage
 
 
 ARQUIVO_VINCULOS_ROBLOX = "roblox_vinculos.json"
@@ -114,6 +115,9 @@ class Perfil(commands.Cog):
         posicao_progressao = _posicao_progressao(membros_progressao, alvo.id)
         historico_missoes = _resumo_historico_missoes(
             await revisoes_storage.listar(interaction.guild.id), alvo.id
+        )
+        conquistas_desbloqueadas = await conquistas_storage.listar_desbloqueadas(
+            interaction.guild.id, alvo.id
         )
         patentes = await get_patentes(interaction.guild.id)
         vinculos_roblox = await carregar(ARQUIVO_VINCULOS_ROBLOX, {})
@@ -291,6 +295,22 @@ class Perfil(commands.Cog):
                 value="\n".join(linhas_historico)[:1024],
                 inline=False,
             )
+        catalogo_conquistas = conquistas_storage.CATALOGO_POR_ID
+        conquistas_ordenadas = sorted(
+            conquistas_desbloqueadas.items(),
+            key=lambda item: int(item[1].get("desbloqueada_em", 0) or 0),
+            reverse=True,
+        )
+        linhas_conquistas = [
+            f"{catalogo_conquistas[identificador]['icone']} **{catalogo_conquistas[identificador]['nome']}**"
+            for identificador, _ in conquistas_ordenadas[:6]
+            if identificador in catalogo_conquistas
+        ]
+        embed.add_field(
+            name=f"◈ CONQUISTAS ({len(conquistas_desbloqueadas)}/{len(catalogo_conquistas)})",
+            value="\\n".join(linhas_conquistas) if linhas_conquistas else "Nenhuma conquista desbloqueada. Use /conquistas para consultar os próximos marcos.",
+            inline=False,
+        )
         embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
 
         await interaction.response.send_message(embed=embed)
