@@ -344,9 +344,7 @@ class RankingGeral(
             "ficará publicado."
         ),
     )
-    @app_commands.checks.has_permissions(
-        administrator=True
-    )
+    @lideranca_only()
     async def ranking_canal(
         self,
         interaction: discord.Interaction,
@@ -383,7 +381,7 @@ class RankingGeral(
             value="CONFIRMAR RESET COMPLETO",
         )
     ])
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def resetar_perfis_global(
         self,
         interaction: discord.Interaction,
@@ -506,7 +504,7 @@ class RankingGeral(
         name="temporada-reiniciar",
         description="Encerra a temporada atual e inicia outra sem apagar estatísticas acumuladas.",
     )
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def temporada_reiniciar(
         self,
         interaction: discord.Interaction,
