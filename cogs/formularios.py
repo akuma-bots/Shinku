@@ -701,8 +701,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             interaction.guild.id, nome, titulo_painel, descricao_painel,
             banner.url if banner else None, interaction.user.id,
         )
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Formulário **{nome}** criado (ID: `{formulario['id']}`). "
             f"Agora use `/formularios pagina-adicionar` pra adicionar as perguntas (até 5 por página, "
             f"quantas páginas quiser), depois `/formularios cargo-adicionar` e `/formularios painel`.",
@@ -724,8 +725,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not formulario:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Página {len(formulario['paginas'])} adicionada ({len(perguntas)} pergunta(s)). "
             f"Total agora: {len(formulario['paginas'])} página(s).", ephemeral=True,
         )
@@ -738,8 +740,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not ok:
             await interaction.response.send_message("Não achei essa página nesse formulário.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(f"🗑️ Página {numero_pagina} removida.", ephemeral=True)
+        await interaction.followup.send(f"🗑️ Página {numero_pagina} removida.", ephemeral=True)
 
     @app_commands.command(name="paginas-listar", description="Lista as páginas e perguntas de um formulário.")
     @app_commands.describe(formulario_id="ID do formulário")
@@ -790,9 +793,10 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not ok:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(
-            "✦ Formulário arquivado. O painel foi desativado e o histórico de candidaturas foi preservado.",
+        await interaction.followup.send(
+            "✦ Formulário arquivado. O histórico de candidaturas foi preservado.",
             ephemeral=True,
         )
 
@@ -805,8 +809,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
             return
         await formularios.reativar_formulario(interaction.guild.id, formulario_id)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✦ **{formulario.get('nome', 'Formulário')}** reativado e já está disponível no seletor de inscrições.",
             ephemeral=True,
         )
@@ -819,8 +824,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         if not formulario:
             await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Inscrições de **{formulario.get('nome', 'Formulário')}** pausadas. O histórico foi preservado.",
             ephemeral=True,
         )
