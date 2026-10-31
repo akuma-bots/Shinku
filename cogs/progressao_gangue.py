@@ -568,7 +568,7 @@ class ProgressaoGangue(commands.Cog):
         app_commands.Choice(name="Contribuição", value="contribuicao"),
         app_commands.Choice(name="Guerra", value="guerra"),
     ])
-    @app_commands.default_permissions(manage_guild=True)
+    @lideranca_only()
     async def gangue_registrar_atividade(self, interaction: discord.Interaction, membro: discord.Member, atividade: app_commands.Choice[str], quantidade: app_commands.Range[int, 1, 5000], motivo: str):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
