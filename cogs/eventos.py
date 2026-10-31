@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.guild_config import get_config, set_config
+from utils.guild_config import get_config, set_config, lideranca_only
 from utils.storage import carregar, salvar
 
 
@@ -168,9 +168,7 @@ class Eventos(commands.Cog):
             "Canal de texto para os anúncios de evento"
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def configurar_canal_eventos(
         self,
         interaction: discord.Interaction,
@@ -206,9 +204,7 @@ class Eventos(commands.Cog):
             "Canal de voz onde o campeonato vai ocorrer"
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def campeonato_agendar(
         self,
         interaction: discord.Interaction,
@@ -480,9 +476,7 @@ class Eventos(commands.Cog):
             "Atualiza o registro interno dos eventos atuais do Discord."
         ),
     )
-    @app_commands.checks.has_permissions(
-        manage_guild=True
-    )
+    @lideranca_only()
     async def eventos_sincronizar(
         self,
         interaction: discord.Interaction,
