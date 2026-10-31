@@ -1,10 +1,10 @@
 {
-  "release_id": "20261031-121305",
+  "release_id": "20261031-121320",
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Keep public form selector synchronized with question changes",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Keep public form selector synchronized with question changes\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Update form administration labels for selector workflow",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Update form administration labels for selector workflow\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "31/10/2026",
   "hora_atualizacao": "12:13",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-31T12:13:05.629647-03:00"
+  "gerado_em": "2026-10-31T12:13:20.383500-03:00"
 }
