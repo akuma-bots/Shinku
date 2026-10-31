@@ -57,7 +57,7 @@ TUTORIAIS = {
         "descricao": "Atividades que ajudam a manter e desenvolver a NÊMESIS.",
         "passos": [
             "Confira no canal oficial quais ações são aceitas como contribuição.",
-            "Leia a quantidade de pontos, limites e requisitos antes de participar.",
+            "Leia a recompensa em XP, os limites e os requisitos antes de participar.",
             "Guarde a prova e envie pelo fluxo oficial quando a atividade exigir validação.",
             "Aguarde a aprovação antes de considerar o XP confirmado.",
             "Não repita envios para tentar multiplicar pontos; em caso de divergência, abra um ticket.",
