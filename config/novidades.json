@@ -1,10 +1,10 @@
 {
-  "release_id": "20261031-122525",
+  "release_id": "20261031-123040",
   "tipo": "Correções",
-  "titulo": "Fix application delivery channel and migrate Staff form questions",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Fix application delivery channel and migrate Staff form questions\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Fix multi-step form continuation interaction listener",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Fix multi-step form continuation interaction listener\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "31/10/2026",
-  "hora_atualizacao": "12:25",
+  "hora_atualizacao": "12:30",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-10-31T12:25:25.533804-03:00"
+  "gerado_em": "2026-10-31T12:30:40.107080-03:00"
 }
