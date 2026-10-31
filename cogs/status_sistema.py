@@ -82,7 +82,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="diagnostico", description="Testa a conexão com o armazenamento persistente do bot.")
-    @app_commands.checks.has_permissions(administrator=True)
+    @lideranca_only()
     async def diagnostico(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         if not USANDO_UPSTASH:
