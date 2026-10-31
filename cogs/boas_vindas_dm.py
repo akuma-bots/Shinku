@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed\nfrom utils.preferencias_notificacoes import desativar_todas
 from utils.guia_servidores import (
     adicionar_botoes_guia,
     CARGO_VISITANTES_ID,
