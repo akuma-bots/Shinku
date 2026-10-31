@@ -40,6 +40,29 @@ class TestGeracaoNotasRelease(unittest.TestCase):
             MOD.git = original_git
             MOD.arquivos_alterados = original_arquivos
 
+    def test_ignora_commits_de_manutencao_e_correcao_comum(self):
+        original_git = MOD.git
+        original_arquivos = MOD.arquivos_alterados
+        try:
+            MOD.git = lambda *args: "fix(releases): ajuste interno\\nchore: limpeza"
+            MOD.arquivos_alterados = lambda before, after: [("M", "cogs/novidades.py")]
+            self.assertIsNone(MOD.gerar("a" * 40, "b" * 40))
+        finally:
+            MOD.git = original_git
+            MOD.arquivos_alterados = original_arquivos
+
+    def test_gera_nota_para_novo_recurso(self):
+        original_git = MOD.git
+        original_arquivos = MOD.arquivos_alterados
+        try:
+            MOD.git = lambda *args: "feat(missoes): adiciona categoria especial"
+            MOD.arquivos_alterados = lambda before, after: [("M", "cogs/missoes.py")]
+            release = MOD.gerar("a" * 40, "b" * 40)
+            self.assertIsNotNone(release)
+        finally:
+            MOD.git = original_git
+            MOD.arquivos_alterados = original_arquivos
+
     def test_ignora_manifesto_para_evitar_loop(self):
         before = "a" * 40
         after = "b" * 40
