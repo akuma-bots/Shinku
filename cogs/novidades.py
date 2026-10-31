@@ -9,9 +9,9 @@ from pathlib import Path
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
-from utils.guild_config import lideranca_only, tasks
+from utils.guild_config import lideranca_only
 
 from utils.storage import carregar, salvar
 from utils.preferencias_notificacoes import listar_inscritos, definir_preferencia
