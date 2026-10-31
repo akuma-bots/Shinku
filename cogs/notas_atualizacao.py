@@ -6,6 +6,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from utils.guild_config import lideranca_only, membro_tem_lideranca
+
 GUILD_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
 CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades.json"
 
@@ -21,7 +23,7 @@ class NotasAtualizacao(commands.Cog):
         description="Consultar a nota de atualização programada da NÊMESIS.",
     )
     @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)
+    @lideranca_only()
     async def notas_atualizacao(self, interaction: discord.Interaction):
         if interaction.guild_id != GUILD_ID or interaction.guild is None:
             await interaction.response.send_message(
@@ -30,10 +32,10 @@ class NotasAtualizacao(commands.Cog):
             return
         if (
             not isinstance(interaction.user, discord.Member)
-            or not interaction.user.guild_permissions.administrator
+            or not membro_tem_lideranca(interaction.user)
         ):
             await interaction.response.send_message(
-                "Somente administradores podem consultar este painel.",
+                "Somente a liderança autorizada pode consultar este painel.",
                 ephemeral=True,
             )
             return
