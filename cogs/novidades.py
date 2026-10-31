@@ -116,6 +116,9 @@ class Novidades(commands.Cog):
 
         if not isinstance(release, dict):
             return None
+        if release.get("habilitada") is False:
+            logger.info("Manifesto atual sem disparo: aguardando uma release importante aprovada pelo gerador.")
+            return None
         release_id = str(release.get("release_id", "")).strip()
         titulo = str(release.get("titulo", "")).strip()
         mensagem = str(release.get("mensagem", "")).strip()
