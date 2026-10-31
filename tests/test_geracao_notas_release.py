@@ -27,7 +27,7 @@ class TestGeracaoNotasRelease(unittest.TestCase):
         original_git = MOD.git
         original_arquivos = MOD.arquivos_alterados
         try:
-            MOD.git = lambda *args: "fix: corrige validação de provas"
+            MOD.git = lambda *args: "fix!: corrige validação de provas"
             MOD.arquivos_alterados = lambda before, after: [("M", "cogs/revisoes.py")]
             release = MOD.gerar("a" * 40, "b" * 40)
             self.assertEqual(release["tipo"], "Correções")
