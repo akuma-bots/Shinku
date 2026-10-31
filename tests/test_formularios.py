@@ -88,7 +88,7 @@ class TestFormularios(unittest.TestCase):
         self.assertEqual(len(embeds), 4)
         self.assertTrue(all(len(embed.fields) <= 25 for embed in embeds))
         self.assertEqual(
-            sum(len(embed.fields) - 1 for embed in embeds),
+            sum(len(embed.fields) for embed in embeds),
             61,
         )
 
