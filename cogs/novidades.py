@@ -12,6 +12,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from utils.storage import carregar, salvar
+from utils.preferencias_notificacoes import listar_inscritos
+from cogs.boas_vindas_dm import OptOutView
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ CAMINHO_RELEASE = Path(__file__).resolve().parent.parent / "config" / "novidades
 CONCORRENCIA_ENVIO = 40
 INTERVALO_ENVIO = 1.2  # Mantido apenas para a fila de releases automáticos.
 TENTATIVAS_DM = 3
+CANAL_ANUNCIOS_ID = 1564076387797569577
 
 def _aplicar_identidade_bot(embed: discord.Embed, guild: discord.Guild, bot: discord.Client) -> discord.Embed:
     """Assina os comunicados com o avatar e o banner do próprio bot."""
@@ -51,6 +54,7 @@ async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed
         try:
             await membro.send(
                 embed=embed,
+                view=OptOutView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return "enviada"
@@ -143,7 +147,7 @@ class Novidades(commands.Cog):
 
     @app_commands.command(
         name="avisos-enviar",
-        description="Envia um comunicado privado a todos os membros humanos da NÊMESIS.",
+        description="Envia um comunicado privado aos membros inscritos para receber DMs.",
     )
     @app_commands.describe(
         tipo="Categoria do comunicado",
@@ -190,7 +194,8 @@ class Novidades(commands.Cog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
+            inscritos = await listar_inscritos(guild.id, "avisos_comunidade")
+            membros = [m async for m in guild.fetch_members(limit=None) if not m.bot and str(m.id) in inscritos]
         except discord.HTTPException:
             logger.exception("Não foi possível obter a lista completa de membros para aviso privado.")
             await interaction.followup.send(
