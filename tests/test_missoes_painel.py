@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import discord
 
-from cogs.missoes import Missoes
+from cogs.missoes import Missoes, SeletorMissaoProvaView, EnviarProvaMissaoModal
 from utils import ranking_missoes_jogos
 
 
@@ -59,3 +59,39 @@ class TestRankingPanelEditLimit(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMissionEvidenceSelector(unittest.TestCase):
+    def setUp(self):
+        self.atividades = [
+            {
+                "id": f"NM{indice:03d}",
+                "titulo": f"Operação {indice:03d}",
+                "tipo": "missao",
+                "recompensa_xp": 25,
+                "ativa": True,
+            }
+            for indice in range(30)
+        ]
+
+    def test_selector_shows_up_to_25_active_missions_per_page(self):
+        view = SeletorMissaoProvaView(Mock(), 123, "missao", self.atividades)
+        seletor = next(item for item in view.children if hasattr(item, "options"))
+        self.assertEqual(len(seletor.options), 25)
+        self.assertEqual(seletor.options[0].value, "NM000")
+        self.assertEqual(seletor.options[-1].value, "NM024")
+        self.assertTrue(view.pagina_anterior.disabled)
+        self.assertFalse(view.proxima_pagina.disabled)
+
+    def test_selector_paginates_remaining_missions(self):
+        view = SeletorMissaoProvaView(Mock(), 123, "missao", self.atividades, pagina=1)
+        seletor = next(item for item in view.children if hasattr(item, "options"))
+        self.assertEqual(len(seletor.options), 5)
+        self.assertEqual(seletor.options[0].value, "NM025")
+        self.assertEqual(seletor.options[-1].value, "NM029")
+        self.assertFalse(view.pagina_anterior.disabled)
+        self.assertTrue(view.proxima_pagina.disabled)
+
+    def test_evidence_modal_keeps_selected_mission_code(self):
+        modal = EnviarProvaMissaoModal(Mock(), "NM007")
+        self.assertEqual(modal.missao_id_selecionada, "NM007")
