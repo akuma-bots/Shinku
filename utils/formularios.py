@@ -491,6 +491,37 @@ async def definir_status_resposta(
         await _salvar_respostas_guild(guild_id, lista)
         return alvo
 
+
+async def recusar_respostas_pendentes(
+    guild_id: int,
+    revisor_id: int,
+    formulario_id: str | None = None,
+    motivo: str = "Encerramento administrativo de pendências antigas.",
+) -> list[dict]:
+    """Recusa em lote candidaturas pendentes, preservando o histórico e a auditoria."""
+    async with _STATUS_RESPOSTA_LOCK:
+        dados = await _tudo_respostas()
+        lista = dados.get(str(guild_id), [])
+        if not isinstance(lista, list):
+            lista = []
+        lista = [item for item in lista if isinstance(item, dict)]
+        agora = time.time()
+        atualizadas = []
+        for resposta in lista:
+            if resposta.get("status") != "pendente":
+                continue
+            if formulario_id and resposta.get("formulario_id") != formulario_id:
+                continue
+            resposta["status"] = "recusada"
+            resposta["revisor_id"] = int(revisor_id)
+            resposta["motivo_decisao"] = str(motivo or "").strip()[:1000]
+            resposta["atualizado_em"] = agora
+            atualizadas.append(dict(resposta))
+        if atualizadas:
+            await _salvar_respostas_guild(guild_id, lista)
+        return atualizadas
+
+
 async def listar_respostas(
     guild_id: int,
     formulario_id: str = None,
