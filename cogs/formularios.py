@@ -193,21 +193,21 @@ def _embed_central_inscricoes(lista: list, guild: discord.Guild, bot: discord.Cl
         f"{len(_perguntas_flat(item))} questões  ·  {len(_paginas_modal(item))} etapas"
         for i, item in enumerate(disponiveis[:25], start=1)
     ]
-    corpo = "\\n".join(linhas) if linhas else "No momento, não há inscrições abertas."
+    corpo = "\n".join(linhas) if linhas else "No momento, não há inscrições abertas."
     orientacao = ("Selecione no menu abaixo o processo seletivo desejado para iniciar sua inscrição."
                   if linhas else "Novos processos seletivos serão disponibilizados aqui quando forem ativados.")
     embed = criar_embed(
         "✦・ CENTRAL DE INSCRIÇÕES ・✦",
-        "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\\n"
-        "　　　 **N̷ÊMESIS  /  RECRUTAMENTO**\\n"
-        "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\\n\\n"
+        "╭━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╮\n"
+        "　　　 **N̷ÊMESIS  /  RECRUTAMENTO**\n"
+        "╰━━━━━━━━━━━━━━ ◈ ━━━━━━━━━━━━━━╯\n\n"
         "Acesse os processos seletivos disponíveis em um único lugar. "
-        "Cada formulário possui suas próprias etapas e perguntas.\\n\\n"
-        "**PROCESSOS DISPONÍVEIS**\\n"
-        f"{corpo}\\n\\n"
-        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\\n"
-        f"{orientacao}\\n"
-        "Responda com atenção e aguarde a avaliação da comissão responsável.\\n"
+        "Cada formulário possui suas próprias etapas e perguntas.\n\n"
+        "**PROCESSOS DISPONÍVEIS**\n"
+        f"{corpo}\n\n"
+        "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
+        f"{orientacao}\n"
+        "Responda com atenção e aguarde a avaliação da comissão responsável.\n"
         "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬",
         cor=0x9F1239,
         rodape=f"N̷ÊMESIS  •  CENTRAL DE RECRUTAMENTO  •  {len(disponiveis)} inscrição(ões) aberta(s)",
@@ -478,19 +478,16 @@ class SeletorAcaoFormulario(discord.ui.Select):
         acao = self.values[0]
         if acao == "publicar":
             if not _perguntas_flat(formulario):
-                await interaction.response.send_message("Adicione perguntas antes de publicar.", ephemeral=True)
+                await interaction.response.send_message("Adicione perguntas antes de disponibilizar a inscrição.", ephemeral=True)
                 return
             await interaction.response.defer(ephemeral=True, thinking=True)
             try:
-                embeds = _embeds_painel(formulario, interaction.guild, central.cog.bot)
-                view = _view_painel(formulario)
-                for indice, embed in enumerate(embeds):
-                    await interaction.channel.send(embed=embed, view=view if indice == 0 else None)
-            except (discord.Forbidden, discord.HTTPException):
-                logging.exception("Falha ao publicar formulário pela central: %s", formulario.get("id"))
-                await interaction.followup.send("Não consegui publicar. Verifique as permissões do bot neste canal.", ephemeral=True)
+                await central.cog.atualizar_central_inscricoes(interaction.guild)
+            except (discord.Forbidden, discord.HTTPException, TypeError):
+                logging.exception("Falha ao atualizar a central pública de inscrições.")
+                await interaction.followup.send("Não consegui atualizar a central. Verifique as permissões do bot no canal de inscrições.", ephemeral=True)
                 return
-            await interaction.followup.send(f"Painel de **{formulario.get('nome')}** publicado.", ephemeral=True)
+            await interaction.followup.send("Central pública de inscrições atualizada.", ephemeral=True)
             return
         if acao == "pausar":
             await formularios.atualizar_formulario(interaction.guild.id, central.formulario_id, ativo=False)
@@ -498,6 +495,7 @@ class SeletorAcaoFormulario(discord.ui.Select):
             await formularios.reativar_formulario(interaction.guild.id, central.formulario_id)
         elif acao == "arquivar":
             await formularios.remover_formulario(interaction.guild.id, central.formulario_id)
+        await central.cog.atualizar_central_inscricoes(interaction.guild)
         await central.atualizar(interaction, mensagem=f"Ação aplicada: **{acao.upper()}**.")
 
 
@@ -846,40 +844,32 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             return
         await interaction.response.send_message(f"✅ {cargo.mention} não recebe mais candidaturas desse formulário.", ephemeral=True)
 
-    @app_commands.command(name="painel", description="Publica o painel de um formulário neste canal.")
-    @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
+    @app_commands.command(name="painel", description="Atualiza a central pública com os formulários disponíveis.")
+    @app_commands.describe(formulario_id="ID do formulário que deseja disponibilizar")
     @app_commands.checks.has_permissions(administrator=True)
     async def formulario_painel(self, interaction: discord.Interaction, formulario_id: str):
         formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
         if not formulario:
             await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
             return
-        if not formulario["paginas"]:
+        if not _perguntas_flat(formulario):
             await interaction.response.send_message(
-                "Esse formulário ainda não tem nenhuma pergunta. Use `/formularios pagina-adicionar` primeiro.",
+                "Esse formulário ainda não tem perguntas. Use `/formularios pagina-adicionar` primeiro.",
                 ephemeral=True,
             )
             return
-
-        embeds = _embeds_painel(formulario, interaction.guild, self.bot)
-        view = _view_painel(formulario)
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
-            for indice, embed in enumerate(embeds):
-                await interaction.channel.send(
-                    embed=embed,
-                    view=view if indice == 0 else None,
-                )
-        except (discord.Forbidden, discord.HTTPException):
-            logging.exception("Falha ao publicar painel manual do formulário %s.", formulario_id)
-            await interaction.followup.send(
-                "Não consegui publicar todas as partes do painel. Verifique as permissões do bot no canal.",
-                ephemeral=True,
-            )
+            await self.atualizar_central_inscricoes(interaction.guild)
+        except (discord.Forbidden, discord.HTTPException, TypeError):
+            logging.exception("Falha ao atualizar central pública pelo comando painel.")
+            await interaction.followup.send("Não consegui atualizar a central. Verifique as permissões do bot.", ephemeral=True)
             return
-        await interaction.followup.send("✅ Painel publicado.", ephemeral=True)
+        await interaction.followup.send(
+            f"Central atualizada. **{formulario.get('nome')}** aparece no seletor se estiver ativo.",
+            ephemeral=True,
+        )
 
-    @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type != discord.InteractionType.component:
             return
