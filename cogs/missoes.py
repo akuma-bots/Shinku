@@ -1691,7 +1691,7 @@ class Missoes(commands.Cog):
                 linhas_ativos.append(
                     (
                         f"**#{pos:02d}** {nome} · **{perfil['envios']}** envios · "
-                        f"**{perfil['xp_missoes']:,} XP** acumulados\\n"
+                        f"**{perfil['xp_missoes']:,} XP** acumulados\n"
                         f"Últimos 30 dias: **{perfil['xp_ultimos_30d']:,} XP** · "
                         f"30 dias anteriores: **{perfil['xp_30d_anteriores']:,} XP**"
                     ).replace(",", ".")
