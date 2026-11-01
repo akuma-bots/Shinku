@@ -709,6 +709,36 @@ def _linhas_csv_relatorio_missoes(revisoes: list) -> str:
     return arquivo.getvalue()
 
 
+class PeriodoRelatorioSelect(discord.ui.Select):
+    def __init__(self, view):
+        self.pai = view
+        opcoes = [
+            discord.SelectOption(label=nome, value=valor, default=valor == view.periodo)
+            for valor, (nome, _) in PERIODOS_RELATORIOS.items()
+        ]
+        super().__init__(
+            placeholder="◈ Período de apuração", min_values=1, max_values=1,
+            options=opcoes, row=0, custom_id="nemesis:relatorios:periodo",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.pai._selecionar_periodo(interaction, self.values[0])
+
+
+class IntegranteRelatorioSelect(discord.ui.UserSelect):
+    def __init__(self, view):
+        self.pai = view
+        super().__init__(
+            placeholder="◈ Relatório individual (opcional)", min_values=1, max_values=1, row=1
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        selecionado = self.values[0]
+        await self.pai._selecionar_integrante(
+            interaction, int(getattr(selecionado, "id", selecionado))
+        )
+
+
 class RelatoriosMissoesView(discord.ui.View):
     """Central privada de relatórios administrativos e exportação CSV."""
 
@@ -718,19 +748,8 @@ class RelatoriosMissoesView(discord.ui.View):
         self.owner_id = int(owner_id)
         self.periodo = periodo if periodo in PERIODOS_RELATORIOS else "30"
         self.user_id = int(user_id) if user_id else None
-        opcoes = [
-            discord.SelectOption(label=nome, value=valor, default=valor == self.periodo)
-            for valor, (nome, _) in PERIODOS_RELATORIOS.items()
-        ]
-        self.add_item(discord.ui.Select(
-            placeholder="◈ Período de apuração", min_values=1, max_values=1,
-            options=opcoes, row=0, custom_id="nemesis:relatorios:periodo",
-        ))
-        self.children[0].callback = self._selecionar_periodo
-        self.add_item(discord.ui.UserSelect(
-            placeholder="◈ Relatório individual (opcional)", min_values=1, max_values=1, row=1
-        ))
-        self.children[1].callback = self._selecionar_integrante
+        self.add_item(PeriodoRelatorioSelect(self))
+        self.add_item(IntegranteRelatorioSelect(self))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if (
@@ -751,14 +770,12 @@ class RelatoriosMissoesView(discord.ui.View):
             return False
         return True
 
-    async def _selecionar_periodo(self, interaction: discord.Interaction):
-        self.periodo = interaction.data.get("values", ["30"])[0]
+    async def _selecionar_periodo(self, interaction: discord.Interaction, periodo: str):
+        self.periodo = periodo if periodo in PERIODOS_RELATORIOS else "30"
         await self._atualizar(interaction)
 
-    async def _selecionar_integrante(self, interaction: discord.Interaction):
-        valores = interaction.data.get("resolved", {}).get("users", {})
-        ids = list(valores.keys())
-        self.user_id = int(ids[0]) if ids else None
+    async def _selecionar_integrante(self, interaction: discord.Interaction, user_id: int):
+        self.user_id = int(user_id)
         await self._atualizar(interaction)
 
     async def _atualizar(self, interaction: discord.Interaction):
