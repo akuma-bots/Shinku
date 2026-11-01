@@ -15,7 +15,7 @@ class TestInteligenciaParticipantes(unittest.TestCase):
             {
                 "tipo": "especial", "status": "aprovada",
                 "autor_id": 101, "recompensa_xp": 50,
-                "timestamp": self.agora - 20 * 86400,
+                "timestamp": self.agora - 40 * 86400,
             },
             {
                 "tipo": "contribuicao", "status": "rejeitada",
@@ -41,6 +41,8 @@ class TestInteligenciaParticipantes(unittest.TestCase):
     def test_xp_individual_respeita_divisao_do_auxiliar(self):
         dados = _calcular_inteligencia_participantes(self.revisoes, self.agora)
         self.assertEqual(dados["perfis"]["101"]["xp_missoes"], 110)
+        self.assertEqual(dados["perfis"]["101"]["xp_ultimos_30d"], 60)
+        self.assertEqual(dados["perfis"]["101"]["xp_30d_anteriores"], 50)
         self.assertEqual(dados["perfis"]["202"]["xp_missoes"], 40)
         self.assertEqual(dados["perfis"]["404"]["xp_missoes"], 0)
 
