@@ -55,6 +55,7 @@ async def criar_pendencia(
     titulo: str,
     descricao: str = None,
     auxiliar_id: int = None,
+    recompensa_xp: int = None,
 ) -> dict:
     tipo = str(tipo or "").strip().lower()
     if tipo not in {"pvp", "pve", "missao", "contribuicao", "especial"}:
@@ -98,6 +99,7 @@ async def criar_pendencia(
             "titulo": titulo,
             "descricao": descricao,
             "auxiliar_id": int(auxiliar_id) if auxiliar_id else None,
+            "recompensa_xp": max(0, int(recompensa_xp or 0)) if recompensa_xp is not None else None,
             "status": "pendente",
             "revisor_id": None,
             "motivo_rejeicao": None,
