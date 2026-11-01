@@ -56,6 +56,23 @@ class TestDesempenhoMissoes(unittest.TestCase):
         self.assertEqual(ranking, [("101", 76), ("202", 24)])
 
 
+    def test_data_legada_invalida_nao_interrompe_a_ordenacao(self):
+        revisoes = [
+            {
+                "id": "REV-BAD", "tipo": "missao", "status": "pendente",
+                "autor_id": 101, "timestamp": "data-invalida",
+            },
+            {
+                "id": "REV-OK", "tipo": "missao", "status": "pendente",
+                "autor_id": 101, "timestamp": 500,
+            },
+        ]
+        resumo = _resumir_desempenho_missoes(revisoes, 101)
+        self.assertEqual(
+            [item["id"] for item in resumo["historico"]],
+            ["REV-OK", "REV-BAD"],
+        )
+
     def test_historico_preserva_justificativa_de_rejeicao(self):
         resumo = _resumir_desempenho_missoes(self.revisoes, 202)
         rejeitada = next(
