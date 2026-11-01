@@ -820,6 +820,76 @@ class RelatoriosMissoesView(discord.ui.View):
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="Central de relatórios encerrada.", embed=None, view=None)
 
+    @discord.ui.button(label="Auditoria de integridade", emoji="🛡️", style=discord.ButtonStyle.secondary, row=3)
+    async def abrir_auditoria(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self.cog._montar_embed_auditoria_integridade(interaction.guild, 0)
+        await interaction.followup.send(
+            embed=embed,
+            view=AuditoriaIntegridadeView(self.cog, self.owner_id, 0),
+            ephemeral=True,
+        )
+
+
+
+
+class AuditoriaIntegridadeView(discord.ui.View):
+    """Consulta privada de inconsistências e trilhas de decisão dos protocolos."""
+
+    def __init__(self, cog, owner_id: int, pagina: int = 0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = int(owner_id)
+        self.pagina = max(0, int(pagina))
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "A auditoria de integridade é exclusiva da liderança do OCTÓGONO.",
+                ephemeral=True,
+            )
+            return False
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "Esta sessão de auditoria foi aberta por outro integrante.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _atualizar(self, interaction: discord.Interaction, pagina: int = None):
+        if pagina is not None:
+            self.pagina = max(0, pagina)
+        embed = await self.cog._montar_embed_auditoria_integridade(
+            interaction.guild, self.pagina
+        )
+        await interaction.response.edit_message(
+            embed=embed,
+            view=AuditoriaIntegridadeView(self.cog, self.owner_id, self.pagina),
+        )
+
+    @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=0)
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._atualizar(interaction, self.pagina - 1)
+
+    @discord.ui.button(label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary, row=0)
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._atualizar(interaction, self.pagina + 1)
+
+    @discord.ui.button(label="Reanalisar", emoji="🔄", style=discord.ButtonStyle.success, row=0)
+    async def reanalisar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._atualizar(interaction, self.pagina)
+
+    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger, row=0)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="Auditoria de integridade encerrada.", embed=None, view=None
+        )
+
 
 class HistoricoDesempenhoView(discord.ui.View):
     """Paginação privada do histórico completo de evidências de um integrante."""
@@ -1797,6 +1867,68 @@ class Missoes(commands.Cog):
             view=RelatoriosMissoesView(self, interaction.user.id, "30"),
             ephemeral=True,
         )
+
+
+    async def _montar_embed_auditoria_integridade(
+        self, guild: discord.Guild, pagina: int = 0
+    ) -> discord.Embed:
+        from utils import revisoes as revisoes_storage
+        resultado = revisoes_storage.analisar_integridade(
+            await revisoes_storage.listar(guild.id), guild.id
+        )
+        ocorrencias = resultado["ocorrencias"]
+        por_pagina = 5
+        total_paginas = max(1, (len(ocorrencias) + por_pagina - 1) // por_pagina)
+        pagina = max(0, min(int(pagina), total_paginas - 1))
+        inicio = pagina * por_pagina
+        embed = criar_embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  AUDITORIA DE INTEGRIDADE",
+            description=(
+                "**ACESSO RESTRITO · OCTÓGONO**\\n"
+                "Diagnóstico somente leitura dos protocolos de missão e suas trilhas de decisão.\\n"
+                f"**Página:** {pagina + 1}/{total_paginas} · **Ocorrências:** {resultado['total_ocorrencias']}"
+            ),
+            cor=0x9F2035,
+            rodape="NÊMESIS • AUDITORIA DE OPERAÇÕES • SOMENTE LEITURA",
+        )
+        aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else self.bot.user.display_avatar.url)
+        embed.add_field(
+            name="◈ INTEGRIDADE GERAL",
+            value=f"**{resultado['integridade_percentual']:.1f}%** · {resultado['protocolos_analisados']} protocolos analisados",
+            inline=False,
+        )
+        embed.add_field(name="🔴 CRÍTICAS", value=f"**{resultado['criticas']}**", inline=True)
+        embed.add_field(name="🟠 ALTAS", value=f"**{resultado['altas']}**", inline=True)
+        embed.add_field(name="🟡 MODERADAS", value=f"**{resultado['medias']}**", inline=True)
+        embed.add_field(
+            name="◈ COMPATIBILIDADE HISTÓRICA",
+            value=f"**{resultado['sem_trilha']}** protocolos sem trilha nova (registros legados preservados).",
+            inline=False,
+        )
+        if not ocorrencias:
+            embed.add_field(
+                name="◈ NENHUMA INCONSISTÊNCIA DETECTADA",
+                value="Os protocolos analisados não apresentaram divergências nos critérios disponíveis.",
+                inline=False,
+            )
+        for ocorrencia in ocorrencias[inicio:inicio + por_pagina]:
+            nivel = {"critica": "🔴 CRÍTICA", "alta": "🟠 ALTA", "media": "🟡 MODERADA"}.get(
+                ocorrencia["severidade"], "⚪ INFORMATIVA"
+            )
+            embed.add_field(
+                name=f"{nivel} · {ocorrencia['codigo']}"[:256],
+                value=(
+                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\\n"
+                    f"{ocorrencia['descricao']}\\n"
+                    f"**Participante:** <@{ocorrencia['autor_id']}>"
+                    if ocorrencia.get("autor_id") else
+                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\\n{ocorrencia['descricao']}"
+                )[:1024],
+                inline=False,
+            )
+        embed.set_footer(text=f"NÊMESIS • DIAGNÓSTICO SOMENTE LEITURA • Página {pagina + 1}/{total_paginas}")
+        return embed
 
     async def _montar_embed_relatorio_missoes(
         self, guild: discord.Guild, periodo: str = "30", user_id: int = None
