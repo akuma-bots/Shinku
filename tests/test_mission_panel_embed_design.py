@@ -16,6 +16,8 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
                     "titulo": "Operação de Reconhecimento",
                     "descricao": "Investigue a área designada e envie evidências para validação.",
                     "recompensa_xp": 60,
+                    "requisitos": "Participar de uma partida oficial.",
+                    "prazo": "Até domingo, 22h.",
                     "ativa": True,
                 },
                 {
@@ -47,11 +49,17 @@ class TestMissionPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CENTRAL DE MISSÕES", embed.title)
         self.assertIn("TODOS OS JOGOS", embed.description)
         self.assertIn("Envio de evidências", embed.description)
+        self.assertIn("XP em recompensas abertas", embed.description)
+        self.assertIn("70 XP", embed.description)
         fields = {field.name: field.value for field in embed.fields}
         self.assertEqual(fields["◈ OPERAÇÕES ATIVAS"], "**02**\nDisponíveis para execução")
         self.assertEqual(fields["◈ ARQUIVADAS"], "**01**\nMantidas em histórico")
         self.assertEqual(fields["◈ TOTAL REGISTRADO"], "**03**\nTodos os jogos")
         self.assertTrue(any("Operação de Reconhecimento" in name for name in fields))
+        cartao = next(value for name, value in fields.items() if "Operação de Reconhecimento" in name)
+        self.assertIn("**Requisitos**", cartao)
+        self.assertIn("**Prazo**", cartao)
+        self.assertIn("◉ DISPONÍVEL", cartao)
         self.assertTrue(any("Operação Encerrada" in name for name in fields))
         self.assertTrue(any("Outro jogo" in name for name in fields))
         self.assertIn("PAGINA:1/1", embed.footer.text)
