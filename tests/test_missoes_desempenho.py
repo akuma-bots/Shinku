@@ -42,6 +42,8 @@ class TestDesempenhoMissoes(unittest.TestCase):
         self.assertEqual(resumo["xp_missoes"], 76)
         self.assertEqual(resumo["registros_com_xp"], 2)
         self.assertEqual(resumo["recentes"][0]["id"], "REV-04")
+        self.assertEqual(len(resumo["historico"]), 3)
+        self.assertEqual(resumo["historico"][0]["id"], "REV-04")
 
     def test_auxiliar_recebe_parcela_correspondente_da_recompensa(self):
         resumo = _resumir_desempenho_missoes(self.revisoes, 202)
@@ -52,6 +54,19 @@ class TestDesempenhoMissoes(unittest.TestCase):
     def test_ranking_soma_recompensas_sem_estimar_registros_legados(self):
         ranking = _ranking_xp_missoes(self.revisoes)
         self.assertEqual(ranking, [("101", 76), ("202", 24)])
+
+
+    def test_historico_preserva_justificativa_de_rejeicao(self):
+        resumo = _resumir_desempenho_missoes(self.revisoes, 202)
+        rejeitada = next(
+            item for item in resumo["historico"]
+            if item["status"] == "rejeitada"
+        )
+        rejeitada["motivo_rejeicao"] = "Evidência incompleta para validação."
+        self.assertEqual(
+            rejeitada["motivo_rejeicao"],
+            "Evidência incompleta para validação.",
+        )
 
 
 if __name__ == "__main__":
