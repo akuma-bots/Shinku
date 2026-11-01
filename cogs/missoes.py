@@ -440,6 +440,7 @@ def _calcular_inteligencia_participantes(
             perfil = participantes.setdefault(uid, {
                 "user_id": uid, "envios": 0, "aprovadas": 0,
                 "rejeitadas": 0, "pendentes": 0, "xp_missoes": 0,
+                "xp_ultimos_30d": 0, "xp_30d_anteriores": 0,
                 "ultima_atividade": None,
             })
             perfil["envios"] += 1
@@ -455,9 +456,19 @@ def _calcular_inteligencia_participantes(
                 distribuicao = ((autor, parte_autor), (auxiliar, recompensa - parte_autor))
             else:
                 distribuicao = ((autor, recompensa),)
+            momento_aprovacao = _momento({
+                "timestamp": item.get("aprovado_em") or item.get("timestamp")
+            })
             for uid, xp in distribuicao:
-                if uid in participantes:
-                    participantes[uid]["xp_missoes"] += xp
+                if uid not in participantes:
+                    continue
+                perfil = participantes[uid]
+                perfil["xp_missoes"] += xp
+                if momento_aprovacao is not None:
+                    if momento_aprovacao >= agora - 30 * 86400:
+                        perfil["xp_ultimos_30d"] += xp
+                    elif momento_aprovacao >= agora - 60 * 86400:
+                        perfil["xp_30d_anteriores"] += xp
 
     ordenados = list(participantes.values())
     for perfil in ordenados:
@@ -1681,7 +1692,9 @@ class Missoes(commands.Cog):
                 nome = membro.mention if membro else f"<@{perfil['user_id']}>"
                 linhas_ativos.append(
                     f"**#{pos:02d}** {nome} · **{perfil['envios']}** envios · "
-                    f"**{perfil['xp_missoes']:,} XP**".replace(",", ".")
+                    f"**{perfil['xp_missoes']:,} XP** acumulados\\n"
+                    f"Últimos 30 dias: **{perfil['xp_ultimos_30d']:,} XP** · "
+                    f"30 dias anteriores: **{perfil['xp_30d_anteriores']:,} XP**".replace(",", ".")
                 )
             embed.add_field(
                 name="◈ PARTICIPANTES MAIS ATIVOS",
