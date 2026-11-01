@@ -1873,9 +1873,8 @@ class Missoes(commands.Cog):
         self, guild: discord.Guild, pagina: int = 0
     ) -> discord.Embed:
         from utils import revisoes as revisoes_storage
-        resultado = revisoes_storage.analisar_integridade(
-            await revisoes_storage.listar(guild.id), guild.id
-        )
+        revisoes = await revisoes_storage.listar(guild.id)
+        resultado = revisoes_storage.analisar_integridade(revisoes, guild.id)
         ocorrencias = resultado["ocorrencias"]
         por_pagina = 5
         total_paginas = max(1, (len(ocorrencias) + por_pagina - 1) // por_pagina)
@@ -1884,8 +1883,8 @@ class Missoes(commands.Cog):
         embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  AUDITORIA DE INTEGRIDADE",
             description=(
-                "**ACESSO RESTRITO · OCTÓGONO**\\n"
-                "Diagnóstico somente leitura dos protocolos de missão e suas trilhas de decisão.\\n"
+                "**ACESSO RESTRITO · OCTÓGONO**\n"
+                "Diagnóstico somente leitura dos protocolos de missão e suas trilhas de decisão.\n"
                 f"**Página:** {pagina + 1}/{total_paginas} · **Ocorrências:** {resultado['total_ocorrencias']}"
             ),
             cor=0x9F2035,
@@ -1906,6 +1905,37 @@ class Missoes(commands.Cog):
             value=f"**{resultado['sem_trilha']}** protocolos sem trilha nova (registros legados preservados).",
             inline=False,
         )
+        rotulos_eventos = {
+            "protocolo_criado": "Protocolo criado",
+            "protocolo_aprovado": "Evidência aprovada",
+            "protocolo_rejeitado": "Evidência rejeitada",
+            "aplicacao_reaberta_apos_falha": "Reaberta após falha de aplicação",
+        }
+        eventos_recentes = []
+        for registro in revisoes:
+            trilha = registro.get("trilha_auditoria")
+            if not isinstance(trilha, list):
+                continue
+            for evento in reversed(trilha):
+                if not isinstance(evento, dict) or evento.get("evento") not in rotulos_eventos:
+                    continue
+                try:
+                    instante = int(float(evento.get("em")))
+                except (TypeError, ValueError, OverflowError):
+                    instante = None
+                data = f"<t:{instante}:R>" if instante else "data indisponível"
+                ator = f"<@{evento['ator_id']}>" if evento.get("ator_id") else "sistema"
+                eventos_recentes.append((
+                    instante or 0,
+                    f"**{rotulos_eventos[evento['evento']]}** · [{registro.get('id', '—')}] · {ator} · {data}"
+                ))
+        eventos_recentes.sort(key=lambda item: item[0], reverse=True)
+        embed.add_field(
+            name="◈ HISTÓRICO RECENTE DE DECISÕES",
+            value="\\n".join(item[1] for item in eventos_recentes[:5])[:1024]
+            if eventos_recentes else "Nenhuma decisão nova registrada na trilha. Protocolos antigos permanecem preservados.",
+            inline=False,
+        )
         if not ocorrencias:
             embed.add_field(
                 name="◈ NENHUMA INCONSISTÊNCIA DETECTADA",
@@ -1919,11 +1949,11 @@ class Missoes(commands.Cog):
             embed.add_field(
                 name=f"{nivel} · {ocorrencia['codigo']}"[:256],
                 value=(
-                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\\n"
-                    f"{ocorrencia['descricao']}\\n"
+                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\n"
+                    f"{ocorrencia['descricao']}\n"
                     f"**Participante:** <@{ocorrencia['autor_id']}>"
                     if ocorrencia.get("autor_id") else
-                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\\n{ocorrencia['descricao']}"
+                    f"**Protocolo:** `{ocorrencia['protocolo']}` · **{ocorrencia['titulo']}**\n{ocorrencia['descricao']}"
                 )[:1024],
                 inline=False,
             )
