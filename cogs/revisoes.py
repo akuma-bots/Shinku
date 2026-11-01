@@ -164,10 +164,18 @@ def _embed_painel_provas(
         revisor = f"<@{item.get('revisor_id')}>" if item.get("revisor_id") else "Aguardando análise"
         timestamp = item.get("timestamp")
         data = f"<t:{int(timestamp)}:F> · <t:{int(timestamp)}:R>" if isinstance(timestamp, (int, float)) else "Data indisponível"
+        recompensa = item.get("recompensa_xp")
+        linha_recompensa = ""
+        if recompensa is not None:
+            try:
+                recompensa = max(0, int(recompensa))
+            except (TypeError, ValueError, OverflowError):
+                recompensa = 0
+            linha_recompensa = f"**Recompensa:** +{recompensa:,} XP  •  ".replace(",", ".")
         detalhes = (
             f"**Protocolo:** `{item.get('id', '—')}`  •  **Referência:** `{str(item.get('referencia_id') or '—')[:60]}`\n"
             f"**Participante:** {autor}  •  **Auxiliar:** {auxiliar}\n"
-            f"**Categoria:** {TIPO_LABELS.get(tipo_item, tipo_item.upper())}  •  **Enviado:** {data}\n"
+            f"**Categoria:** {TIPO_LABELS.get(tipo_item, tipo_item.upper())}  •  {linha_recompensa}**Enviado:** {data}\n"
             f"**Revisor:** {revisor}"
         )
         motivo = str(item.get("motivo_rejeicao") or "").strip()
@@ -647,6 +655,10 @@ class Revisoes(commands.Cog):
             if resultado_texto:
                 embed.add_field(name="Resultado aplicado", value=resultado_texto, inline=False)
             await mensagem_decisao.edit(embed=embed, view=None)
+            await interaction.edit_original_response(
+                content="Aprovação confirmada. A decisão foi registrada e a recompensa foi processada.",
+                view=None,
+            )
 
             await auditoria.registrar(
                 interaction.guild, "📋 Revisão aprovada",
