@@ -1,4 +1,4 @@
-from utils.storage import carregar, salvar
+from utils.storage import carregar, salvar, atualizar_json
 
 ARQUIVO = "missoes_jogos.json"
 
@@ -300,23 +300,53 @@ async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str], jogo:
     return resultado
 
 
-async def resetar_pontuacoes_jogos(guild_id: int) -> int:
-    """Zera os rankings por jogo junto do reset global, preservando os painéis."""
-    todos = await carregar(ARQUIVO, {})
-    if not isinstance(todos, dict):
-        todos = {}
-    registro = todos.setdefault(str(guild_id), {})
-    jogos = registro.setdefault("jogos", {})
-    registro["ranking_geral"] = {"pontuacao": {}, "eventos_aplicados": []}
-    alterados = 0
-    for slug in JOGOS:
-        atual = jogos.setdefault(slug, {"pontuacao": {}, "eventos_aplicados": []})
-        atual["pontuacao"] = {}
-        atual["eventos_aplicados"] = []
-        atual["ranking_message_id"] = registro.get("paineis", {}).get("ranking")
-        alterados += 1
-    await salvar(ARQUIVO, todos)
-    return alterados
+async def resetar_pontuacoes_jogos(
+    guild_id: int,
+    operation_id: str = None,
+) -> int:
+    """Zera rankings por jogo atomicamente, preservando as referências dos painéis."""
+    chave = str(guild_id)
+    operation_id = str(operation_id or "")
+    resultado = {"alterados": 0}
+
+    def aplicar(todos):
+        if not isinstance(todos, dict):
+            todos = {}
+        registro = todos.get(chave)
+        if not isinstance(registro, dict):
+            registro = {}
+        if operation_id and registro.get("ultimo_reset_global_id") == operation_id:
+            return todos
+
+        jogos = registro.get("jogos")
+        if not isinstance(jogos, dict):
+            jogos = {}
+        registro["ranking_geral"] = {
+            "pontuacao": {},
+            "eventos_aplicados": [],
+        }
+        alterados = 0
+        paineis = registro.get("paineis", {})
+        if not isinstance(paineis, dict):
+            paineis = {}
+        for slug in JOGOS:
+            atual = jogos.get(slug)
+            if not isinstance(atual, dict):
+                atual = {}
+            atual["pontuacao"] = {}
+            atual["eventos_aplicados"] = []
+            atual["ranking_message_id"] = paineis.get("ranking")
+            jogos[slug] = atual
+            alterados += 1
+        registro["jogos"] = jogos
+        if operation_id:
+            registro["ultimo_reset_global_id"] = operation_id
+        resultado["alterados"] = alterados
+        todos[chave] = registro
+        return todos
+
+    dados = await atualizar_json(ARQUIVO, {}, aplicar)
+    return resultado["alterados"]
 
 
 async def atualizar_tempo_top_jogos(guild_id: int, agora: float | None = None) -> None:

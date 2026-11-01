@@ -12,6 +12,7 @@ class TestRankingCentral(unittest.TestCase):
         }
         self.assertNotIn("ranking-canal", nomes)
         self.assertNotIn("temporada-reiniciar", nomes)
+        self.assertNotIn("resetar-perfis-global", nomes)
         # O comando público restante continua servindo como acesso informativo.
         self.assertIn("ranking-geral", nomes)
 
@@ -28,6 +29,7 @@ class TestRankingCentral(unittest.TestCase):
         self.assertIn("Reiniciar temporada", botoes)
         self.assertIn("Atualizar ranking", botoes)
         self.assertIn("Fechar central", botoes)
+        self.assertIn("Resetar dados globais", botoes)
         self.assertTrue(any(item.__class__.__name__ == "SeletorCanalRanking" for item in central.children))
 
 

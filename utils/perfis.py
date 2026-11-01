@@ -1,4 +1,6 @@
 from utils.storage import carregar, salvar, atualizar_json
+import time
+import uuid
 from utils.competitivo_sync import somar_pontos_competitivo
 
 
@@ -157,6 +159,129 @@ async def atualizar_perfil(
     guild = atualizado.get(chave_guild, {})
     perfil = guild.get(chave_usuario, {}) if isinstance(guild, dict) else {}
     return _normalizar_perfil(perfil)
+
+
+async def resetar_perfis_globais(
+    agora: float = None,
+    operation_id: str = None,
+) -> dict:
+    """Zera estatísticas locais e competitivas, preservando identidades e catálogo.
+
+    Cada documento recebe o identificador da operação. Se a execução cair
+    entre os dois arquivos, repetir com o mesmo operation_id conclui apenas
+    a parte que ainda não foi persistida.
+    """
+    agora = float(agora or time.time())
+    operation_id = str(operation_id or uuid.uuid4().hex)
+    campos_zero = {
+        "xp": 0,
+        "pontos_pve": 0,
+        "vitorias": 0,
+        "derrotas": 0,
+        "empates": 0,
+        "kills": 0,
+        "deaths": 0,
+        "mvps": 0,
+        "sequencia_atual": 0,
+        "maior_sequencia": 0,
+        "medalhas": [],
+        "patente": None,
+        "recompensas_missoes_aplicadas": [],
+        "resultados_pvp_aplicados": [],
+        "resultados_guerra_aplicados": [],
+        "sorteios_recompensados": [],
+        "temporadas_bonus_aplicados": [],
+        "eventos_recompensa": [],
+    }
+    contagem_local = {"valor": 0}
+
+    def resetar_local(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        meta = dados.get("_nemesis_meta")
+        if not isinstance(meta, dict):
+            meta = {}
+        if meta.get("ultimo_reset_global_id") == operation_id:
+            return dados
+
+        quantidade = 0
+        for guild_id, perfis_guild in dados.items():
+            if guild_id == "_nemesis_meta" or not isinstance(perfis_guild, dict):
+                continue
+            for perfil in perfis_guild.values():
+                if not isinstance(perfil, dict):
+                    continue
+                for campo, valor in campos_zero.items():
+                    perfil[campo] = list(valor) if isinstance(valor, list) else valor
+                quantidade += 1
+        meta["ultimo_reset_global_id"] = operation_id
+        meta["ultimo_reset_global_em"] = agora
+        dados["_nemesis_meta"] = meta
+        contagem_local["valor"] = quantidade
+        return dados
+
+    await atualizar_json(ARQUIVO_PERFIS, {}, resetar_local)
+
+    contagem_competitiva = {"valor": 0}
+
+    def resetar_competitivo(dados):
+        if not isinstance(dados, dict):
+            dados = {"catalogo": [], "perfis": {}}
+        if not isinstance(dados.get("catalogo"), list):
+            dados["catalogo"] = []
+        if not isinstance(dados.get("perfis"), dict):
+            dados["perfis"] = {}
+        meta = dados.get("_nemesis_meta")
+        if not isinstance(meta, dict):
+            meta = {}
+        if meta.get("ultimo_reset_global_id") == operation_id:
+            return dados
+
+        quantidade = 0
+        for perfil in dados["perfis"].values():
+            if not isinstance(perfil, dict):
+                continue
+            perfil.update({
+                "pontos": 0,
+                "pontos_temporada": 0,
+                "xp": 0,
+                "vitorias": 0,
+                "derrotas": 0,
+                "kills": 0,
+                "deaths": 0,
+                "mvps": 0,
+                "sequencia_atual": 0,
+                "maior_sequencia": 0,
+                "medalhas": [],
+                "patente": None,
+                "kdr": 0,
+                "tempo_top_global_segundos": 0,
+                "em_top_global": False,
+                "ultima_verificacao_top_global": agora,
+                "eventos_pontos_aplicados": [],
+            })
+            quantidade += 1
+
+        dados["temporada_global"] = {
+            "numero": 1,
+            "inicio_timestamp": agora,
+            "duracao_dias": 30,
+            "historico": [],
+        }
+        meta["ultimo_reset_global_id"] = operation_id
+        meta["ultimo_reset_global_em"] = agora
+        dados["_nemesis_meta"] = meta
+        contagem_competitiva["valor"] = quantidade
+        return dados
+
+    await atualizar_json(
+        ARQUIVO_COMPETITIVO, {"catalogo": [], "perfis": {}}, resetar_competitivo
+    )
+    return {
+        "quantidade_local": contagem_local["valor"],
+        "quantidade_global": contagem_competitiva["valor"],
+        "operation_id": operation_id,
+    }
 
 
 async def _salvar_perfil(

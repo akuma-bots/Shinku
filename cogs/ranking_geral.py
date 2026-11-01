@@ -10,17 +10,17 @@ from discord.ext import (
     tasks,
 )
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar
 
 from utils.guild_config import (
     get_config,
     set_config,
-    lideranca_only,
     membro_tem_lideranca,
 )
 
 from utils.perfis import (
     ARQUIVO_PERFIS,
+    resetar_perfis_globais,
 )
 
 from utils.competitivo_sync import (
@@ -164,12 +164,77 @@ class ConfirmarTemporadaRankingView(discord.ui.View):
         )
 
 
+class ResetarRankingGlobalModal(discord.ui.Modal, title="Reset global da NÊMESIS"):
+    confirmacao = discord.ui.TextInput(
+        label="Digite RESETAR NÊMESIS para confirmar",
+        placeholder="RESETAR NÊMESIS",
+        required=True,
+        max_length=32,
+    )
+
+    def __init__(self, central):
+        super().__init__(timeout=120)
+        self.central = central
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if (
+            interaction.guild is None
+            or interaction.guild.id != self.central.guild.id
+            or interaction.user.id != self.central.owner_id
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "Acesso não autorizado para executar o reset global.",
+                ephemeral=True,
+            )
+            return
+        if str(self.confirmacao.value).strip().upper() != "RESETAR NÊMESIS":
+            await interaction.response.send_message(
+                "Confirmação inválida. Nenhum dado foi alterado.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        operation_id = self.central.reset_operation_id
+        resultado = await resetar_perfis_globais(operation_id=operation_id)
+        from utils import ranking_missoes_jogos
+        quantidade_jogos = await ranking_missoes_jogos.resetar_pontuacoes_jogos(
+            self.central.guild.id,
+            operation_id=operation_id,
+        )
+
+        painel_atualizado = True
+        cog_missoes = interaction.client.get_cog("Missoes")
+        if cog_missoes is not None:
+            try:
+                await cog_missoes._atualizar_ranking_geral(self.central.guild)
+            except Exception:
+                painel_atualizado = False
+
+        mensagem = (
+            "RESET GLOBAL EXECUTADO.\n"
+            f"Perfis locais: **{resultado['quantidade_local']}**.\n"
+            f"Perfis competitivos: **{resultado['quantidade_global']}**.\n"
+            f"Rankings por jogo reiniciados: **{quantidade_jogos}**.\n"
+            "XP, estatísticas, medalhas, patentes, pontuação PvE e histórico sazonal foram zerados. "
+            "O catálogo de missões, identidades e configurações foram preservados."
+        )
+        if not painel_atualizado:
+            mensagem += "\nO reset foi salvo, mas o painel público não pôde ser atualizado automaticamente."
+        await interaction.followup.send(mensagem, ephemeral=True)
+        import uuid
+        self.central.reset_operation_id = uuid.uuid4().hex
+
+
 class CentralRankingGeralView(discord.ui.View):
     def __init__(self, cog, guild: discord.Guild, owner_id: int):
         super().__init__(timeout=600)
         self.cog = cog
         self.guild = guild
         self.owner_id = int(owner_id)
+        import uuid
+        self.reset_operation_id = uuid.uuid4().hex
         self.add_item(SeletorCanalRanking(self))
 
     async def autorizar(self, interaction: discord.Interaction) -> bool:
@@ -239,6 +304,12 @@ class CentralRankingGeralView(discord.ui.View):
             embed=await self.criar_embed(),
             view=self,
         )
+
+    @discord.ui.button(label="Resetar dados globais", style=discord.ButtonStyle.danger, emoji="⚠️", row=2)
+    async def solicitar_reset_global(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        await interaction.response.send_modal(ResetarRankingGlobalModal(self))
 
     @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="✕", row=1)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -516,119 +587,7 @@ class RankingGeral(
 
 
 
-    @app_commands.command(
-        name="resetar-perfis-global",
-        description="Zera os perfis e o Top Global da NÊMESIS.",
-    )
-    @app_commands.describe(
-        confirmacao="Selecione a confirmação para executar o reset completo."
-    )
-    @app_commands.choices(confirmacao=[
-        app_commands.Choice(
-            name="CONFIRMAR RESET COMPLETO",
-            value="CONFIRMAR RESET COMPLETO",
-        )
-    ])
-    @lideranca_only()
-    async def resetar_perfis_global(
-        self,
-        interaction: discord.Interaction,
-        confirmacao: app_commands.Choice[str],
-    ):
-        if confirmacao.value != "CONFIRMAR RESET COMPLETO":
-            await interaction.response.send_message(
-                "Reset cancelado: confirmação inválida.",
-                ephemeral=True,
-            )
-            return
 
-        await interaction.response.defer(ephemeral=True, thinking=True)
-
-        import time
-        agora = time.time()
-
-        # Zera perfis locais usados pelo /perfil em todos os servidores.
-        todos_perfis = await carregar(ARQUIVO_PERFIS, {})
-        quantidade_local = 0
-        campos_zero = {
-            "xp": 0,
-            "vitorias": 0,
-            "derrotas": 0,
-            "kills": 0,
-            "deaths": 0,
-            "mvps": 0,
-            "sequencia_atual": 0,
-            "maior_sequencia": 0,
-            "medalhas": [],
-            "patente": None,
-        }
-        for dados_guilda in todos_perfis.values():
-            if not isinstance(dados_guilda, dict):
-                continue
-            for perfil in dados_guilda.values():
-                if not isinstance(perfil, dict):
-                    continue
-                for campo, valor in campos_zero.items():
-                    perfil[campo] = list(valor) if isinstance(valor, list) else valor
-                quantidade_local += 1
-        await salvar(ARQUIVO_PERFIS, todos_perfis)
-
-        # Preserva o catálogo competitivo e as identidades já registradas.
-        competitivo = await carregar(
-            ARQUIVO_COMPETITIVO,
-            {"catalogo": [], "perfis": {}},
-        )
-        competitivo.setdefault("catalogo", [])
-        competitivo.setdefault("perfis", {})
-        quantidade_global = 0
-        for perfil in competitivo["perfis"].values():
-            if not isinstance(perfil, dict):
-                continue
-            perfil["pontos"] = 0
-            perfil["pontos_temporada"] = 0
-            perfil["xp"] = 0
-            perfil["vitorias"] = 0
-            perfil["derrotas"] = 0
-            perfil["kills"] = 0
-            perfil["deaths"] = 0
-            perfil["mvps"] = 0
-            perfil["sequencia_atual"] = 0
-            perfil["maior_sequencia"] = 0
-            perfil["medalhas"] = []
-            perfil["patente"] = None
-            perfil["kdr"] = 0
-            perfil["tempo_top_global_segundos"] = 0
-            perfil["em_top_global"] = False
-            perfil["ultima_verificacao_top_global"] = agora
-            quantidade_global += 1
-
-        competitivo["temporada_global"] = {
-            "numero": 1,
-            "inicio_timestamp": agora,
-            "duracao_dias": 30,
-            "historico": [],
-        }
-        await salvar(ARQUIVO_COMPETITIVO, competitivo)
-
-        # O ranking por jogo usa um armazenamento próprio; reseta-o junto dos perfis globais.
-        from utils import ranking_missoes_jogos
-        quantidade_rankings_jogo = await ranking_missoes_jogos.resetar_pontuacoes_jogos(
-            interaction.guild.id
-        )
-        cog_missoes = interaction.client.get_cog("Missoes")
-        if cog_missoes is not None:
-            await cog_missoes._atualizar_ranking_geral(interaction.guild)
-
-        await interaction.followup.send(
-            "RESET COMPLETO EXECUTADO.\n"
-            f"Perfis locais zerados: **{quantidade_local}**.\n"
-            f"Perfis do ranking competitivo zerados: **{quantidade_global}**.\n"
-            "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
-            "tempo no Top 10 foram zerados. Os rankings de Shigaku, Gakuran e Fistborn "
-            f"também foram limpos ({quantidade_rankings_jogo} registros legados por jogo). O histórico sazonal "
-            "foi limpo e uma nova temporada de 30 dias foi iniciada. O catálogo de missões foi preservado.",
-            ephemeral=True,
-        )
 
     @app_commands.command(
         name="ranking-geral",
