@@ -16,7 +16,7 @@ from utils.catalogo_missoes import (
     salvar_mensagem_discord,
     obter_mensagem_discord,
 )
-from utils.guild_config import get_config, lideranca_only
+from utils.guild_config import get_config, lideranca_only, membro_tem_lideranca
 from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
@@ -307,6 +307,92 @@ def _ranking_xp_missoes(revisoes: list, limite: int = 5) -> list:
     return sorted(totais.items(), key=lambda item: (-item[1], item[0]))[:limite]
 
 
+
+def _calcular_inteligencia_missoes(revisoes: list, agora: float = None) -> dict:
+    """Agrega métricas administrativas sem estimar recompensas de registros legados."""
+    import time
+
+    agora = float(agora if agora is not None else time.time())
+    tipos = {"missao", "contribuicao", "especial", "pve"}
+    validas = [
+        item for item in revisoes
+        if isinstance(item, dict)
+        and str(item.get("tipo", "")).lower() in tipos
+        and item.get("status") in {"aprovada", "rejeitada", "pendente"}
+    ]
+    aprovadas = [item for item in validas if item.get("status") == "aprovada"]
+    rejeitadas = [item for item in validas if item.get("status") == "rejeitada"]
+    pendentes = [item for item in validas if item.get("status") == "pendente"]
+    finalizadas = len(aprovadas) + len(rejeitadas)
+    xp_total = 0
+    participantes = set()
+    ativos_7d = set()
+    envios_7d = 0
+    categorias = {}
+    ranking = {}
+
+    def _timestamp(item, campos):
+        for campo in campos:
+            try:
+                valor = item.get(campo)
+                if valor is not None:
+                    return float(valor)
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return None
+
+    for item in validas:
+        autor = str(item.get("autor_id") or "")
+        auxiliar = str(item.get("auxiliar_id") or "")
+        if autor:
+            participantes.add(autor)
+        if auxiliar:
+            participantes.add(auxiliar)
+        momento_envio = _timestamp(item, ("timestamp", "criado_em"))
+        if momento_envio is not None and momento_envio >= agora - 7 * 86400:
+            envios_7d += 1
+            if autor:
+                ativos_7d.add(autor)
+            if auxiliar:
+                ativos_7d.add(auxiliar)
+
+        tipo = str(item.get("tipo") or "missao").lower()
+        bucket = categorias.setdefault(tipo, {"aprovadas": 0, "rejeitadas": 0, "pendentes": 0})
+        bucket[{"aprovada": "aprovadas", "rejeitada": "rejeitadas", "pendente": "pendentes"}[item["status"]]] += 1
+
+        if item.get("status") != "aprovada" or item.get("recompensa_xp") is None:
+            continue
+        try:
+            recompensa = max(0, int(item.get("recompensa_xp") or 0))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        if not autor:
+            continue
+        if auxiliar and auxiliar != autor:
+            parte_autor = (recompensa * 60 + 50) // 100
+            distribuicao = ((autor, parte_autor), (auxiliar, recompensa - parte_autor))
+        else:
+            distribuicao = ((autor, recompensa),)
+        for uid, quantidade in distribuicao:
+            if uid and quantidade > 0:
+                xp_total += quantidade
+                ranking[uid] = ranking.get(uid, 0) + quantidade
+
+    return {
+        "total": len(validas),
+        "aprovadas": len(aprovadas),
+        "rejeitadas": len(rejeitadas),
+        "pendentes": len(pendentes),
+        "taxa_aprovacao": (len(aprovadas) / finalizadas * 100) if finalizadas else 0.0,
+        "xp_distribuido": xp_total,
+        "participantes": len(participantes),
+        "ativos_7d": len(ativos_7d),
+        "envios_7d": envios_7d,
+        "categorias": categorias,
+        "ranking": sorted(ranking.items(), key=lambda par: (-par[1], par[0]))[:5],
+    }
+
+
 class NavegacaoMissoesView(discord.ui.View):
     """Navegação por seletores; mantém apenas a ação de envio de evidência como botão."""
     def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
@@ -342,6 +428,80 @@ class NavegacaoMissoesView(discord.ui.View):
     async def meu_desempenho(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.enviar_painel_desempenho(interaction)
 
+    @discord.ui.button(
+        label="Central OCTÓGONO",
+        emoji="📈",
+        style=discord.ButtonStyle.secondary,
+        custom_id="nemesis:missoes:inteligencia",
+        row=2,
+    )
+    async def central_inteligencia(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.enviar_painel_inteligencia(interaction)
+
+
+
+
+class InteligenciaMissoesView(discord.ui.View):
+    """Navegação privada da central administrativa de inteligência."""
+
+    def __init__(self, cog, owner_id: int, pagina: int = 0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = int(owner_id)
+        self.pagina = max(0, min(int(pagina), 1))
+        self.anterior.disabled = self.pagina == 0
+        self.proxima.disabled = self.pagina == 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "A Central de Inteligência é restrita à liderança do OCTÓGONO.",
+                ephemeral=True,
+            )
+            return False
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "Esta sessão administrativa foi aberta por outro integrante.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _navegar(self, interaction: discord.Interaction, delta: int):
+        self.pagina = max(0, min(1, self.pagina + delta))
+        embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=InteligenciaMissoesView(self.cog, self.owner_id, self.pagina),
+        )
+
+    @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary)
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._navegar(interaction, -1)
+
+    @discord.ui.button(label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary)
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._navegar(interaction, 1)
+
+    @discord.ui.button(label="Atualizar", emoji="🔄", style=discord.ButtonStyle.success)
+    async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
+        await interaction.response.edit_message(
+            embed=embed,
+            view=InteligenciaMissoesView(self.cog, self.owner_id, self.pagina),
+        )
+
+    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="Central administrativa encerrada.",
+            embed=None,
+            view=None,
+        )
 
 
 class HistoricoDesempenhoView(discord.ui.View):
@@ -1300,6 +1460,130 @@ class Missoes(commands.Cog):
         )
 
 
+
+
+    async def _montar_embed_inteligencia(
+        self, guild: discord.Guild, pagina: int = 0
+    ) -> discord.Embed:
+        from utils import revisoes as revisoes_storage
+        import time
+
+        revisoes = await revisoes_storage.listar(guild.id)
+        metricas = _calcular_inteligencia_missoes(revisoes, time.time())
+        pagina = max(0, min(int(pagina), 1))
+        embed = criar_embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  INTELIGÊNCIA DE OPERAÇÕES",
+            description=(
+                "**ACESSO RESTRITO · OCTÓGONO**\n"
+                "Visão consolidada da execução, validação e distribuição de recompensas das missões."
+            ),
+            cor=0x9F2035,
+            rodape=f"NÊMESIS • INTELIGÊNCIA ADMINISTRATIVA • Página {pagina + 1}/2",
+        )
+        aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else self.bot.user.display_avatar.url)
+
+        if pagina == 0:
+            embed.add_field(
+                name="◈ VOLUME OPERACIONAL",
+                value=(
+                    f"**{metricas['total']}** evidências registradas\n"
+                    f"**{metricas['aprovadas']}** aprovadas · **{metricas['rejeitadas']}** rejeitadas\n"
+                    f"**{metricas['pendentes']}** aguardando análise"
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ EFICIÊNCIA DE VALIDAÇÃO",
+                value=(
+                    f"**{metricas['taxa_aprovacao']:.1f}%** de aprovação\n"
+                    f"Base: {metricas['aprovadas'] + metricas['rejeitadas']} decisões concluídas"
+                ),
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ RECOMPENSAS DISTRIBUÍDAS",
+                value=f"**{metricas['xp_distribuido']:,} XP** confirmados".replace(",", "."),
+                inline=True,
+            )
+            embed.add_field(
+                name="◈ PARTICIPAÇÃO",
+                value=(
+                    f"**{metricas['participantes']}** participantes no histórico\n"
+                    f"**{metricas['ativos_7d']}** participantes envolvidos nos últimos 7 dias\n"
+                    f"**{metricas['envios_7d']}** evidências recebidas nos últimos 7 dias"
+                ),
+                inline=False,
+            )
+            embed.add_field(
+                name="◈ LEITURA EXECUTIVA",
+                value=(
+                    "A taxa de aprovação considera apenas decisões concluídas. "
+                    "Evidências pendentes não entram no denominador. "
+                    "O XP considera exclusivamente recompensas persistidas em protocolos aprovados."
+                ),
+                inline=False,
+            )
+        else:
+            nomes = {
+                "missao": "Missões",
+                "contribuicao": "Contribuições",
+                "especial": "Missões especiais",
+                "pve": "PvE",
+            }
+            linhas = []
+            for tipo, dados in sorted(metricas["categorias"].items()):
+                linhas.append(
+                    f"**{nomes.get(tipo, tipo.title())}**\n"
+                    f"Aprovadas: {dados['aprovadas']} · Rejeitadas: {dados['rejeitadas']} · Pendentes: {dados['pendentes']}"
+                )
+            embed.add_field(
+                name="◈ DESEMPENHO POR CATEGORIA",
+                value="\n\n".join(linhas)[:1024] if linhas else "Nenhuma evidência de missão registrada.",
+                inline=False,
+            )
+            ranking = metricas["ranking"]
+            if ranking:
+                medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+                linhas_ranking = [
+                    f"{medalhas.get(pos, f'#{pos:02d}')} <@{uid}> · **{xp:,} XP**".replace(",", ".")
+                    for pos, (uid, xp) in enumerate(ranking, start=1)
+                ]
+                embed.add_field(
+                    name="◈ MAIORES CONTRIBUINTES",
+                    value="\n".join(linhas_ranking),
+                    inline=False,
+                )
+            embed.add_field(
+                name="◈ CRITÉRIOS DE APURAÇÃO",
+                value=(
+                    "Participante ativo: integrante vinculado a uma evidência enviada nos últimos 7 dias. "
+                    "Contribuições com auxiliar seguem a divisão oficial de 60%/40%. "
+                    "Registros antigos sem recompensa persistida não são estimados."
+                ),
+                inline=False,
+            )
+        embed.set_footer(text="NÊMESIS • DADOS DE REVISÕES OFICIAIS • ACESSO EXCLUSIVO À LIDERANÇA")
+        return embed
+
+    async def enviar_painel_inteligencia(self, interaction: discord.Interaction) -> None:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "A Central de Inteligência é restrita à liderança do OCTÓGONO.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self._montar_embed_inteligencia(interaction.guild, 0)
+        await interaction.followup.send(
+            embed=embed,
+            view=InteligenciaMissoesView(self, interaction.user.id, 0),
+            ephemeral=True,
+        )
 
     def _montar_embed_historico_desempenho(
         self, guild: discord.Guild, user_id: int, registros: list, pagina: int
