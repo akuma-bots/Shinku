@@ -13,25 +13,78 @@ LIMITE_TOP_GLOBAL = 10
 
 
 async def atualizar_temporada_global(agora: float | None = None) -> dict:
-    """
-    Mantém a temporada competitiva global no armazenamento privado do bot.
-    A cada 30 dias arquiva o Top 10 e zera somente a pontuação sazonal.
-    """
+    """Inicializa/encerra a temporada global em uma única atualização atômica."""
     import time
 
     agora = float(agora or time.time())
-    dados = await carregar(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO.copy())
-    dados.setdefault("catalogo", [])
-    dados.setdefault("perfis", {})
-    estado = dados.get("temporada_global") or {}
 
-    if not estado.get("inicio_timestamp"):
-        estado = {
-            "numero": int(estado.get("numero", 1) or 1),
-            "inicio_timestamp": agora,
-            "duracao_dias": 30,
-            "historico": estado.get("historico", []) or [],
-        }
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"catalogo": [], "perfis": {}}
+        if not isinstance(dados.get("catalogo"), list):
+            dados["catalogo"] = []
+        if not isinstance(dados.get("perfis"), dict):
+            dados["perfis"] = {}
+        estado = dados.get("temporada_global")
+        if not isinstance(estado, dict):
+            estado = {}
+
+        if not estado.get("inicio_timestamp"):
+            estado = {
+                "numero": max(1, int(estado.get("numero", 1) or 1)),
+                "inicio_timestamp": agora,
+                "duracao_dias": 30,
+                "historico": estado.get("historico", []) if isinstance(estado.get("historico"), list) else [],
+            }
+        else:
+            inicio = float(estado["inicio_timestamp"])
+            duracao_dias = max(1, int(estado.get("duracao_dias", 30) or 30))
+            duracao = duracao_dias * 86400
+            if agora - inicio >= duracao:
+                ordenados = sorted(
+                    (
+                        (str(uid), perfil)
+                        for uid, perfil in dados["perfis"].items()
+                        if isinstance(perfil, dict)
+                    ),
+                    key=lambda item: (
+                        int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                        int(item[1].get("vitorias", 0) or 0),
+                    ),
+                    reverse=True,
+                )
+                historico = estado.get("historico", [])
+                if not isinstance(historico, list):
+                    historico = []
+                historico.append({
+                    "numero": int(estado.get("numero", 1) or 1),
+                    "inicio_timestamp": inicio,
+                    "fim_timestamp": agora,
+                    "top": [
+                        {
+                            "discordId": uid,
+                            "nome": perfil.get("nome", ""),
+                            "pontos": int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0),
+                            "xp": int(perfil.get("xp", 0) or 0),
+                            "vitorias": int(perfil.get("vitorias", 0) or 0),
+                            "derrotas": int(perfil.get("derrotas", 0) or 0),
+                        }
+                        for uid, perfil in ordenados[:LIMITE_TOP_GLOBAL]
+                    ],
+                })
+                estado.update({
+                    "numero": int(estado.get("numero", 1) or 1) + 1,
+                    "inicio_timestamp": inicio + (int((agora - inicio) // duracao) * duracao),
+                    "duracao_dias": 30,
+                    "historico": historico[-1000:],
+                })
+                for perfil in dados["perfis"].values():
+                    if not isinstance(perfil, dict):
+                        continue
+                    perfil["pontos_temporada"] = 0
+                    perfil["em_top_global"] = False
+                    perfil["ultima_verificacao_top_global"] = agora
+
         for perfil in dados["perfis"].values():
             if not isinstance(perfil, dict):
                 continue
@@ -40,12 +93,39 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
             perfil.setdefault("em_top_global", False)
             perfil.setdefault("ultima_verificacao_top_global", agora)
         dados["temporada_global"] = estado
-        await salvar(ARQUIVO_COMPETITIVO, dados)
         return dados
 
-    inicio = float(estado["inicio_timestamp"])
-    duracao = max(1, int(estado.get("duracao_dias", 30) or 30)) * 86400
-    if agora - inicio >= duracao:
+    return await atualizar_json(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar)
+
+
+async def reiniciar_temporada_global(
+    agora: float | None = None,
+    numero_esperado: int | None = None,
+) -> dict:
+    """Fecha a temporada atual e inicia outra sem apagar estatísticas acumuladas.
+
+    numero_esperado permite que uma confirmação antiga não reinicie uma
+    temporada diferente caso duas interações ocorram quase ao mesmo tempo.
+    """
+    import time
+
+    agora = float(agora or time.time())
+
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"catalogo": [], "perfis": {}}
+        if not isinstance(dados.get("catalogo"), list):
+            dados["catalogo"] = []
+        if not isinstance(dados.get("perfis"), dict):
+            dados["perfis"] = {}
+        estado = dados.get("temporada_global")
+        if not isinstance(estado, dict):
+            estado = {}
+        numero_atual = max(1, int(estado.get("numero", 1) or 1))
+        if numero_esperado is not None and numero_atual != int(numero_esperado):
+            return dados
+
+        inicio = float(estado.get("inicio_timestamp") or agora)
         ordenados = sorted(
             (
                 (str(uid), perfil)
@@ -58,9 +138,11 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
             ),
             reverse=True,
         )
-        historico = estado.setdefault("historico", [])
+        historico = estado.get("historico", [])
+        if not isinstance(historico, list):
+            historico = []
         historico.append({
-            "numero": int(estado.get("numero", 1) or 1),
+            "numero": numero_atual,
             "inicio_timestamp": inicio,
             "fim_timestamp": agora,
             "top": [
@@ -75,124 +157,71 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
                 for uid, perfil in ordenados[:LIMITE_TOP_GLOBAL]
             ],
         })
-        estado["numero"] = int(estado.get("numero", 1) or 1) + 1
-        # Avança por blocos de 30 dias sem perder o alinhamento se o bot ficou offline.
-        estado["inicio_timestamp"] = inicio + (int((agora - inicio) // duracao) * duracao)
-        estado["duracao_dias"] = 30
+        estado.update({
+            "numero": numero_atual + 1,
+            "inicio_timestamp": agora,
+            "duracao_dias": 30,
+            "historico": historico[-1000:],
+        })
         for perfil in dados["perfis"].values():
             if not isinstance(perfil, dict):
                 continue
             perfil["pontos_temporada"] = 0
             perfil["em_top_global"] = False
             perfil["ultima_verificacao_top_global"] = agora
-    for perfil in dados["perfis"].values():
-        if not isinstance(perfil, dict):
-            continue
-        perfil.setdefault("pontos_temporada", int(perfil.get("pontos", 0) or 0))
-        perfil.setdefault("tempo_top_global_segundos", 0)
-        perfil.setdefault("em_top_global", False)
-        perfil.setdefault("ultima_verificacao_top_global", agora)
-    dados["temporada_global"] = estado
-    await salvar(ARQUIVO_COMPETITIVO, dados)
-    return dados
+            perfil.setdefault("tempo_top_global_segundos", 0)
+        dados["temporada_global"] = estado
+        return dados
+
+    return await atualizar_json(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar)
 
 
-async def reiniciar_temporada_global(agora: float | None = None) -> dict:
-    """Fecha a temporada atual e inicia outra sem apagar estatísticas acumuladas."""
+async def registrar_tempo_top_global(
+    agora: float | None = None,
+    limite: int = 10,
+) -> dict:
+    """Acumula permanência no Top 10 em uma atualização atômica."""
     import time
 
     agora = float(agora or time.time())
-    dados = await carregar(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO.copy())
-    dados.setdefault("catalogo", [])
-    dados.setdefault("perfis", {})
-    estado = dados.get("temporada_global") or {}
-    inicio = float(estado.get("inicio_timestamp") or agora)
-    numero_atual = int(estado.get("numero", 1) or 1)
+    limite = max(0, int(limite))
+    await atualizar_temporada_global(agora)
 
-    ordenados = sorted(
-        (
-            (str(uid), perfil)
-            for uid, perfil in dados["perfis"].items()
-            if isinstance(perfil, dict)
-        ),
-        key=lambda item: (
-            int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
-            int(item[1].get("vitorias", 0) or 0),
-        ),
-        reverse=True,
-    )
+    def aplicar(dados):
+        perfis = dados.get("perfis", {})
+        if not isinstance(perfis, dict):
+            perfis = {}
+            dados["perfis"] = perfis
+        ordenados = sorted(
+            (
+                (str(uid), perfil)
+                for uid, perfil in perfis.items()
+                if isinstance(perfil, dict)
+            ),
+            key=lambda item: (
+                int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                int(item[1].get("vitorias", 0) or 0),
+            ),
+            reverse=True,
+        )
+        ids_top = {uid for uid, _ in ordenados[:limite]}
+        for uid, perfil in perfis.items():
+            if not isinstance(perfil, dict):
+                continue
+            try:
+                ultima = float(perfil.get("ultima_verificacao_top_global", agora) or agora)
+            except (TypeError, ValueError, OverflowError):
+                ultima = agora
+            decorrido = max(0, min(120, agora - ultima))
+            if perfil.get("em_top_global"):
+                perfil["tempo_top_global_segundos"] = int(
+                    perfil.get("tempo_top_global_segundos", 0) or 0
+                ) + int(decorrido)
+            perfil["em_top_global"] = str(uid) in ids_top
+            perfil["ultima_verificacao_top_global"] = agora
+        return dados
 
-    historico = estado.setdefault("historico", [])
-    historico.append({
-        "numero": numero_atual,
-        "inicio_timestamp": inicio,
-        "fim_timestamp": agora,
-        "top": [
-            {
-                "discordId": uid,
-                "nome": perfil.get("nome", ""),
-                "pontos": int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0),
-                "xp": int(perfil.get("xp", 0) or 0),
-                "vitorias": int(perfil.get("vitorias", 0) or 0),
-                "derrotas": int(perfil.get("derrotas", 0) or 0),
-            }
-            for uid, perfil in ordenados[:LIMITE_TOP_GLOBAL]
-        ],
-    })
-
-    estado.update({
-        "numero": numero_atual + 1,
-        "inicio_timestamp": agora,
-        "duracao_dias": 30,
-        "historico": historico,
-    })
-
-    for perfil in dados["perfis"].values():
-        if not isinstance(perfil, dict):
-            continue
-        perfil["pontos_temporada"] = 0
-        perfil["em_top_global"] = False
-        perfil["ultima_verificacao_top_global"] = agora
-        perfil.setdefault("tempo_top_global_segundos", 0)
-
-    dados["temporada_global"] = estado
-    await salvar(ARQUIVO_COMPETITIVO, dados)
-    return dados
-
-
-async def registrar_tempo_top_global(agora: float | None = None, limite: int = 10) -> dict:
-    """Acumula tempo apenas durante intervalos em que o perfil permaneceu no Top 10."""
-    import time
-
-    agora = float(agora or time.time())
-    dados = await atualizar_temporada_global(agora)
-    perfis = dados.get("perfis", {})
-    ordenados = sorted(
-        (
-            (str(uid), perfil)
-            for uid, perfil in perfis.items()
-            if isinstance(perfil, dict)
-        ),
-        key=lambda item: (
-            int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
-            int(item[1].get("vitorias", 0) or 0),
-        ),
-        reverse=True,
-    )
-    ids_top = {uid for uid, _ in ordenados[:limite]}
-    for uid, perfil in perfis.items():
-        if not isinstance(perfil, dict):
-            continue
-        ultima = float(perfil.get("ultima_verificacao_top_global", agora) or agora)
-        decorrido = max(0, min(120, agora - ultima))
-        if perfil.get("em_top_global"):
-            perfil["tempo_top_global_segundos"] = int(
-                perfil.get("tempo_top_global_segundos", 0) or 0
-            ) + int(decorrido)
-        perfil["em_top_global"] = str(uid) in ids_top
-        perfil["ultima_verificacao_top_global"] = agora
-    await salvar(ARQUIVO_COMPETITIVO, dados)
-    return dados
+    return await atualizar_json(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar)
 
 
 async def somar_pontos_competitivo(
