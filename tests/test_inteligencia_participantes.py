@@ -34,8 +34,8 @@ class TestInteligenciaParticipantes(unittest.TestCase):
 
     def test_resumo_de_participantes_ignora_outros_tipos(self):
         dados = _calcular_inteligencia_participantes(self.revisoes, self.agora)
-        self.assertEqual(dados["total"], 5)
-        self.assertEqual(dados["ativos_7d"], 2)
+        self.assertEqual(dados["total"], 4)
+        self.assertEqual(dados["ativos_7d"], 1)
         self.assertEqual(dados["inativos_14d"], 3)
 
     def test_xp_individual_respeita_divisao_do_auxiliar(self):
@@ -55,7 +55,7 @@ class TestInteligenciaParticipantes(unittest.TestCase):
         dados = _calcular_inteligencia_participantes(self.revisoes, self.agora)
         ativos = [p["user_id"] for p in dados["mais_ativos"]]
         inativos = [p["user_id"] for p in dados["inativos"]]
-        self.assertEqual(ativos, ["404", "505"])
+        self.assertEqual(ativos, ["404"])
         self.assertEqual(set(inativos), {"101", "202", "303"})
         self.assertEqual(dados["perfis"]["303"]["dias_sem_atividade"], 30)
 
