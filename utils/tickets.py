@@ -2,7 +2,7 @@ import time
 import uuid
 import unicodedata
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 
 ARQUIVO_TIPOS = "ticket_tipos.json"
@@ -53,28 +53,25 @@ async def get_tipos(
 ) -> list:
 
     dados = await _tudo()
+    if not isinstance(dados, dict):
+        dados = {}
+    tipos = dados.get(str(guild_id))
+    if not isinstance(tipos, list):
+        return list(TIPOS_PADRAO)
+    return [item for item in tipos if isinstance(item, dict)]
 
-    return (
-        dados.get(
-            str(guild_id)
-        )
-        or list(TIPOS_PADRAO)
-    )
 
+async def set_tipos(guild_id: int, lista: list):
+    if not isinstance(lista, list):
+        raise TypeError("A lista de categorias de tickets precisa ser uma lista.")
 
-async def set_tipos(
-    guild_id: int,
-    lista: list,
-):
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        dados[str(guild_id)] = lista
+        return dados
 
-    dados = await _tudo()
-
-    dados[str(guild_id)] = lista
-
-    await salvar(
-        ARQUIVO_TIPOS,
-        dados,
-    )
+    await atualizar_json(ARQUIVO_TIPOS, {}, aplicar)
 
 
 async def adicionar_tipo(
@@ -84,61 +81,83 @@ async def adicionar_tipo(
     emoji: str,
     usa_ia: bool,
 ) -> dict:
-
-    tipos = await get_tipos(
-        guild_id
-    )
-
     tipo = {
         "valor": _slug(label),
-        "label": label,
-        "emoji": emoji,
-        "descricao": descricao,
-        "usa_ia": usa_ia,
+        "label": str(label).strip()[:100],
+        "emoji": str(emoji)[:100],
+        "descricao": str(descricao)[:500],
+        "usa_ia": bool(usa_ia),
     }
 
-    tipos = [
-        item
-        for item in tipos
-        if item["valor"] != tipo["valor"]
-    ]
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        tipos = dados.get(str(guild_id))
+        if not isinstance(tipos, list):
+            tipos = list(TIPOS_PADRAO)
+        tipos = [
+            item for item in tipos
+            if isinstance(item, dict) and item.get("valor") != tipo["valor"]
+        ]
+        tipos.append(tipo)
+        dados[str(guild_id)] = tipos
+        return dados
 
-    tipos.append(
-        tipo
-    )
-
-    await set_tipos(
-        guild_id,
-        tipos,
-    )
-
+    await atualizar_json(ARQUIVO_TIPOS, {}, aplicar)
     return tipo
 
 
-async def remover_tipo(
+async def atualizar_tipo_visual(
     guild_id: int,
     valor: str,
-) -> bool:
+    emoji: str,
+    descricao: str,
+    nome: str = None,
+):
+    resultado = {"tipo": None}
 
-    tipos = await get_tipos(
-        guild_id
-    )
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        tipos = dados.get(str(guild_id))
+        if not isinstance(tipos, list):
+            tipos = list(TIPOS_PADRAO)
+        alvo = next(
+            (item for item in tipos if isinstance(item, dict) and item.get("valor") == valor),
+            None,
+        )
+        if alvo is not None:
+            alvo["emoji"] = str(emoji)[:64]
+            alvo["descricao"] = str(descricao)[:100]
+            if nome:
+                alvo["label"] = str(nome)[:100]
+            resultado["tipo"] = dict(alvo)
+        dados[str(guild_id)] = tipos
+        return dados
 
-    nova_lista = [
-        tipo
-        for tipo in tipos
-        if tipo["valor"] != valor
-    ]
+    await atualizar_json(ARQUIVO_TIPOS, {}, aplicar)
+    return resultado["tipo"]
 
-    if len(nova_lista) == len(tipos):
-        return False
 
-    await set_tipos(
-        guild_id,
-        nova_lista,
-    )
+async def remover_tipo(guild_id: int, valor: str) -> bool:
+    resultado = {"removido": False}
 
-    return True
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        tipos = dados.get(str(guild_id))
+        if not isinstance(tipos, list):
+            tipos = list(TIPOS_PADRAO)
+        novos = [
+            item for item in tipos
+            if not isinstance(item, dict) or item.get("valor") != valor
+        ]
+        resultado["removido"] = len(novos) != len(tipos)
+        dados[str(guild_id)] = novos
+        return dados
+
+    await atualizar_json(ARQUIVO_TIPOS, {}, aplicar)
+    return resultado["removido"]
 
 
 def construir_topic(
@@ -151,35 +170,21 @@ def construir_topic(
     )
 
 
-def parse_topic(
-    topic: str,
-):
-
-    if (
-        not topic
-        or not topic.startswith(
-            "ticket-owner:"
-        )
-    ):
+def parse_topic(topic: str):
+    if not isinstance(topic, str) or not topic.startswith("ticket-owner:"):
         return None
 
-    resto = topic[
-        len("ticket-owner:") :
-    ]
-
+    resto = topic[len("ticket-owner:"):]
     if ":tipo:" in resto:
-
-        owner_id, tipo = (
-            resto.split(
-                ":tipo:",
-                1,
-            )
-        )
-
+        owner_id, tipo = resto.split(":tipo:", 1)
     else:
+        owner_id, tipo = resto, "outro"
 
-        owner_id = resto
-        tipo = "outro"
+    if not owner_id.isdigit() or len(owner_id) > 20 or int(owner_id) <= 0:
+        return None
+    tipo = tipo.strip() or "outro"
+    if len(tipo) > 100 or any(ord(caractere) < 32 for caractere in tipo):
+        return None
 
     return {
         "owner_id": owner_id,
@@ -193,19 +198,25 @@ def parse_topic(
 
 
 async def _tudo_tickets():
-    return await carregar(
-        ARQUIVO_TICKETS,
-        {},
-    )
+    return await carregar(ARQUIVO_TICKETS, {})
 
 
-async def _salvar_tickets(
-    dados: dict,
-):
-    await salvar(
-        ARQUIVO_TICKETS,
-        dados,
-    )
+async def _atualizar_tickets(guild_id: int, transformador):
+    chave = str(guild_id)
+
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        lista = dados.get(chave)
+        if not isinstance(lista, list):
+            lista = []
+        resultado = transformador(lista)
+        dados[chave] = lista if resultado is None else resultado
+        return dados
+
+    dados = await atualizar_json(ARQUIVO_TICKETS, {}, aplicar)
+    lista = dados.get(chave, [])
+    return lista if isinstance(lista, list) else []
 
 
 async def listar_tickets(
@@ -214,11 +225,12 @@ async def listar_tickets(
 ) -> list:
 
     dados = await _tudo_tickets()
-
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
+    if not isinstance(dados, dict):
+        return []
+    lista = dados.get(str(guild_id), [])
+    if not isinstance(lista, list):
+        return []
+    lista = [ticket for ticket in lista if isinstance(ticket, dict)]
 
     if status:
         lista = [
@@ -301,40 +313,13 @@ async def criar_ticket(
     canal_id: int = None,
     mensagem_id: int = None,
 ) -> dict:
-
-    dados = await _tudo_tickets()
-
-    lista = dados.setdefault(
-        str(guild_id),
-        [],
-    )
-
-    ticket_existente = next(
-        (
-            ticket
-            for ticket in lista
-            if str(
-                ticket.get("usuario_id")
-            )
-            == str(usuario_id)
-            and ticket.get("status")
-            == "aberto"
-        ),
-        None,
-    )
-
-    if ticket_existente:
-        return ticket_existente
-
-    ticket = {
-        "id": str(
-            uuid.uuid4()
-        )[:8],
-        "guild_id": guild_id,
-        "usuario_id": usuario_id,
-        "tipo": tipo,
-        "canal_id": canal_id,
-        "mensagem_id": mensagem_id,
+    novo = {
+        "id": str(uuid.uuid4())[:8],
+        "guild_id": int(guild_id),
+        "usuario_id": int(usuario_id),
+        "tipo": str(tipo),
+        "canal_id": int(canal_id) if canal_id is not None else None,
+        "mensagem_id": int(mensagem_id) if mensagem_id is not None else None,
         "status": "aberto",
         "criado_em": time.time(),
         "fechado_em": None,
@@ -342,53 +327,46 @@ async def criar_ticket(
         "motivo_fechamento": None,
         "atendido_por_id": None,
     }
+    resultado = {"ticket": None}
 
-    lista.append(
-        ticket
-    )
+    def aplicar(lista):
+        existente = next(
+            (item for item in lista
+             if str(item.get("usuario_id")) == str(usuario_id)
+             and item.get("status") == "aberto"),
+            None,
+        )
+        if existente:
+            resultado["ticket"] = dict(existente)
+        else:
+            lista.append(novo)
+            resultado["ticket"] = dict(novo)
+        return lista
 
-    await _salvar_tickets(
-        dados
-    )
-
-    return ticket
+    await _atualizar_tickets(guild_id, aplicar)
+    return resultado["ticket"]
 
 
-async def atualizar_ticket(
-    guild_id: int,
-    ticket_id: str,
-    **campos,
-):
+async def atualizar_ticket(guild_id: int, ticket_id: str, **campos):
+    resultado = {"ticket": None}
 
-    dados = await _tudo_tickets()
+    def aplicar(lista):
+        alvo = next((item for item in lista if item.get("id") == ticket_id), None)
+        if alvo is None:
+            return lista
+        limpar_responsavel = bool(campos.get("limpar_responsavel"))
+        for chave, valor in campos.items():
+            if chave == "limpar_responsavel":
+                continue
+            if valor is not None:
+                alvo[chave] = valor
+        if limpar_responsavel:
+            alvo["atendido_por_id"] = None
+        resultado["ticket"] = dict(alvo)
+        return lista
 
-    lista = dados.get(
-        str(guild_id),
-        [],
-    )
-
-    alvo = next(
-        (
-            ticket
-            for ticket in lista
-            if ticket.get("id") == ticket_id
-        ),
-        None,
-    )
-
-    if not alvo:
-        return None
-
-    for chave, valor in campos.items():
-
-        if valor is not None:
-            alvo[chave] = valor
-
-    await _salvar_tickets(
-        dados
-    )
-
-    return alvo
+    await _atualizar_tickets(guild_id, aplicar)
+    return resultado["ticket"]
 
 
 async def fechar_ticket(
@@ -408,6 +386,82 @@ async def fechar_ticket(
     )
 
 
+async def registrar_avaliacao(
+    guild_id: int,
+    ticket_id: str,
+    nota: int,
+    feedback: str = "",
+    avaliado_em: float = None,
+):
+    resultado = {"ticket": None, "registrada": False}
+    nota = int(nota)
+    if nota < 1 or nota > 5:
+        raise ValueError("A avaliação precisa estar entre 1 e 5.")
+    timestamp = float(avaliado_em or time.time())
+
+    def aplicar(lista):
+        alvo = next((item for item in lista if item.get("id") == ticket_id), None)
+        if (
+            alvo is None
+            or alvo.get("status") != "fechado"
+            or alvo.get("avaliacao") is not None
+        ):
+            return lista
+        alvo["avaliacao"] = nota
+        alvo["feedback"] = str(feedback)[:1000]
+        alvo["avaliado_em"] = timestamp
+        resultado["ticket"] = dict(alvo)
+        resultado["registrada"] = True
+        return lista
+
+    await _atualizar_tickets(guild_id, aplicar)
+    return resultado["ticket"] if resultado["registrada"] else None
+
+
+async def iniciar_fechamento_ticket(
+    guild_id: int,
+    ticket_id: str,
+    fechado_por_id: int = None,
+    motivo: str = None,
+    lease_segundos: int = 90,
+) -> bool:
+    """Adquire uma reserva temporária para fechar um ticket em apenas um worker."""
+    agora = time.time()
+    resultado = {"adquirido": False}
+
+    def aplicar(lista):
+        alvo = next((item for item in lista if item.get("id") == ticket_id), None)
+        if alvo is None or alvo.get("status") == "fechado":
+            return lista
+        try:
+            iniciado = float(alvo.get("fechamento_iniciado_em") or 0)
+        except (TypeError, ValueError):
+            iniciado = 0
+        if (
+            alvo.get("status") == "fechando"
+            and agora - iniciado < max(30, int(lease_segundos))
+        ):
+            return lista
+        alvo["status"] = "fechando"
+        alvo["fechamento_iniciado_em"] = agora
+        alvo["fechado_por_id"] = fechado_por_id
+        alvo["motivo_fechamento"] = motivo
+        resultado["adquirido"] = True
+        return lista
+
+    await _atualizar_tickets(guild_id, aplicar)
+    return resultado["adquirido"]
+
+
+async def finalizar_fechamento_ticket(guild_id: int, ticket_id: str):
+    return await atualizar_ticket(
+        guild_id,
+        ticket_id,
+        status="fechado",
+        fechado_em=time.time(),
+    )
+
+
 async def registrar_atendimento(
     guild_id: int,
     ticket_id: str,
@@ -421,22 +475,11 @@ async def registrar_atendimento(
     )
 
 
-async def remover_responsavel_atendimento(
-    guild_id: int,
-    ticket_id: str,
-):
+async def remover_responsavel_atendimento(guild_id: int, ticket_id: str):
     """Remove a atribuição quando a aplicação de permissões falha."""
-    dados = await _tudo_tickets()
-    lista = dados.get(str(guild_id), [])
-    alvo = next(
-        (ticket for ticket in lista if ticket.get("id") == ticket_id),
-        None,
+    return await atualizar_ticket(
+        guild_id, ticket_id, limpar_responsavel=True
     )
-    if not alvo:
-        return None
-    alvo["atendido_por_id"] = None
-    await _salvar_tickets(dados)
-    return alvo
 
 
 async def sincronizar_canal_ticket(
@@ -446,43 +489,40 @@ async def sincronizar_canal_ticket(
     usuario_id: int = None,
     tipo: str = "outro",
 ):
+    resultado = {"ticket": None}
+    agora = time.time()
 
-    ticket = await get_ticket_por_canal(
-        guild_id,
-        canal_id,
-    )
-
-    if ticket:
-
-        campos = {}
-
-        if mensagem_id is not None:
-            campos["mensagem_id"] = (
-                mensagem_id
-            )
-
-        if usuario_id is not None:
-            campos["usuario_id"] = (
-                usuario_id
-            )
-
-        if tipo:
-            campos["tipo"] = tipo
-
-        return await atualizar_ticket(
-            guild_id,
-            ticket["id"],
-            **campos,
+    def aplicar(lista):
+        ticket = next(
+            (item for item in lista if str(item.get("canal_id")) == str(canal_id)),
+            None,
         )
+        if ticket is None:
+            ticket = {
+                "id": str(uuid.uuid4())[:8],
+                "guild_id": int(guild_id),
+                "usuario_id": int(usuario_id or 0),
+                "tipo": str(tipo or "outro"),
+                "canal_id": int(canal_id),
+                "mensagem_id": int(mensagem_id) if mensagem_id is not None else None,
+                "status": "aberto",
+                "criado_em": agora,
+                "fechado_em": None,
+                "fechado_por_id": None,
+                "motivo_fechamento": None,
+                "atendido_por_id": None,
+                "recuperado": True,
+            }
+            lista.append(ticket)
+        else:
+            if mensagem_id is not None:
+                ticket["mensagem_id"] = int(mensagem_id)
+            if usuario_id is not None and int(usuario_id) > 0:
+                ticket["usuario_id"] = int(usuario_id)
+            if tipo:
+                ticket["tipo"] = str(tipo)
+        resultado["ticket"] = dict(ticket)
+        return lista
 
-    return await criar_ticket(
-        guild_id=guild_id,
-        usuario_id=(
-            usuario_id
-            if usuario_id is not None
-            else 0
-        ),
-        tipo=tipo,
-        canal_id=canal_id,
-        mensagem_id=mensagem_id,
-    )
+    await _atualizar_tickets(guild_id, aplicar)
+    return resultado["ticket"]

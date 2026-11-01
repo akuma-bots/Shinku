@@ -7,10 +7,9 @@ import unicodedata
 from urllib.parse import urlparse
 import discord
 from discord.ext import commands, tasks
-from discord import app_commands
 from utils.apresentacao import criar_embed
 from utils.storage import carregar_config
-from utils.guild_config import get_config, set_config, lideranca_only
+from utils.guild_config import get_config, set_config, membro_tem_lideranca
 from utils import tickets
 
 
@@ -99,16 +98,40 @@ async def fechar_canal_ticket(
         ticket = await tickets.get_ticket_por_canal(canal.guild.id, canal.id)
 
         if ticket:
-            await tickets.fechar_ticket(
+            adquirido = await tickets.iniciar_fechamento_ticket(
                 canal.guild.id,
                 ticket["id"],
                 fechado_por_id=fechado_por_id,
                 motivo=motivo,
             )
+            if not adquirido:
+                return
             ticket = await tickets.get_ticket(canal.guild.id, ticket["id"]) or ticket
-            await _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id)
+            historico_ok = await _publicar_historico_ticket(
+                canal, ticket, motivo, fechado_por_id
+            )
+            if not historico_ok:
+                raise RuntimeError(
+                    f"Histórico do ticket {ticket['id']} não foi preservado; "
+                    "canal mantido para nova tentativa."
+                )
 
+
+        await canal.send(f"🔒 Fechando este ticket em {delay}s. Motivo: {motivo}")
+        await asyncio.sleep(max(0, delay))
+        await canal.delete(reason=motivo)
         if ticket:
+            await tickets.finalizar_fechamento_ticket(
+                canal.guild.id,
+                ticket["id"],
+            )
+
+        if ticket and not ticket.get("avaliacao_solicitada"):
+            await tickets.atualizar_ticket(
+                canal.guild.id,
+                ticket["id"],
+                avaliacao_solicitada=True,
+            )
             dono = canal.guild.get_member(int(ticket.get("usuario_id") or 0))
             if dono:
                 try:
@@ -121,15 +144,11 @@ async def fechar_canal_ticket(
                         canal.guild.id, str(ticket["id"]), int(ticket.get("usuario_id") or 0),
                         int(ticket.get("atendido_por_id") or 0),
                     ))
-                    await tickets.atualizar_ticket(canal.guild.id, ticket["id"], avaliacao_solicitada=True)
                 except discord.Forbidden:
                     logging.info("Não foi possível enviar a avaliação por DM; usuário %s.", ticket.get("usuario_id"))
                 except discord.HTTPException:
                     logging.exception("Falha ao enviar prompt de avaliação do ticket.")
 
-        await canal.send(f"🔒 Fechando este ticket em {delay}s. Motivo: {motivo}")
-        await asyncio.sleep(delay)
-        await canal.delete(reason=motivo)
 
     except discord.NotFound:
         # Mesmo que o canal já tenha sido apagado, tenta manter
@@ -138,12 +157,18 @@ async def fechar_canal_ticket(
             ticket = await tickets.get_ticket_por_canal(canal.guild.id, canal.id)
 
             if ticket:
-                await tickets.fechar_ticket(
-                    canal.guild.id,
-                    ticket["id"],
-                    fechado_por_id=fechado_por_id,
-                    motivo=motivo,
-                )
+                if ticket.get("status") == "fechando":
+                    await tickets.finalizar_fechamento_ticket(
+                        canal.guild.id,
+                        ticket["id"],
+                    )
+                else:
+                    await tickets.fechar_ticket(
+                        canal.guild.id,
+                        ticket["id"],
+                        fechado_por_id=fechado_por_id,
+                        motivo=motivo,
+                    )
         except Exception:
             pass
 
@@ -243,26 +268,28 @@ CANAL_AVALIACOES_TICKET_ID = 1563995881806758056
 CANAL_HISTORICO_TICKETS_ID = 1563995882540498997
 
 async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
+    if ticket.get("historico_publicado"):
+        return True
     destino = canal.guild.get_channel(CANAL_HISTORICO_TICKETS_ID)
     if destino is None:
         try:
             destino = await canal.guild.fetch_channel(CANAL_HISTORICO_TICKETS_ID)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logging.error("Canal de histórico de tickets indisponível: %s", CANAL_HISTORICO_TICKETS_ID)
-            return
+            return False
     if not callable(getattr(destino, "send", None)):
-        return
+        return False
     usuario_id = int(ticket.get("usuario_id") or 0)
     atendente_id = int(ticket.get("atendido_por_id") or 0)
     registros = await tickets.listar_tickets(canal.guild.id)
-    atendidos = [t for t in registros if isinstance(t, dict) and str(t.get("atendido_por_id") or "") == str(atendente_id) and t.get("status") == "fechado"] if atendente_id else []
+    atendidos = [t for t in registros if isinstance(t, dict) and str(t.get("atendido_por_id") or "") == str(atendente_id) and t.get("status") in {"fechando", "fechado"}] if atendente_id else []
     notas = [int(t["avaliacao"]) for t in atendidos if str(t.get("avaliacao", "")).isdigit() and 1 <= int(t["avaliacao"]) <= 5]
     media = sum(notas) / len(notas) if notas else None
     try:
         mensagens = [m async for m in canal.history(limit=None, oldest_first=True)]
     except (discord.Forbidden, discord.HTTPException):
         logging.exception("Não foi possível ler o histórico do ticket %s", ticket.get("id"))
-        mensagens = []
+        return False
     linhas = [
         f"TRANSCRIÇÃO DO TICKET #{ticket.get('id', '—')}",
         f"Servidor: {canal.guild.name} ({canal.guild.id})",
@@ -322,8 +349,16 @@ async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
                     bloco = candidato
             if bloco:
                 await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{bloco}", allowed_mentions=discord.AllowedMentions.none())
+        await tickets.atualizar_ticket(
+            canal.guild.id,
+            ticket["id"],
+            historico_publicado=True,
+            historico_publicado_em=time.time(),
+        )
+        return True
     except (discord.Forbidden, discord.HTTPException):
         logging.exception("Falha ao publicar a transcrição do ticket %s", ticket.get("id"))
+        return False
 
 
 async def _estatisticas_atendente(guild_id: int, atendente_id: int) -> tuple[int, float | None]:
@@ -343,6 +378,12 @@ class FeedbackTicketModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         ticket = await tickets.get_ticket(self.guild_id, self.ticket_id)
+        if interaction.user.id != self.owner_id:
+            await interaction.followup.send(
+                "Somente quem abriu o ticket pode enviar esta avaliação.",
+                ephemeral=True,
+            )
+            return
         if not ticket or ticket.get("status") != "fechado":
             await interaction.followup.send("Este ticket não foi encontrado ou ainda não foi encerrado.", ephemeral=True)
             return
@@ -350,9 +391,18 @@ class FeedbackTicketModal(discord.ui.Modal):
             await interaction.followup.send("Esta avaliação já foi enviada ou não pertence a este atendimento.", ephemeral=True)
             return
         comentario = str(self.comentario.value or "").strip()
-        atualizado = await tickets.atualizar_ticket(self.guild_id, self.ticket_id, avaliacao=self.nota, feedback=comentario, avaliado_em=time.time())
+        atualizado = await tickets.registrar_avaliacao(
+            self.guild_id,
+            self.ticket_id,
+            self.nota,
+            comentario,
+            time.time(),
+        )
         if not atualizado:
-            await interaction.followup.send("Não consegui salvar sua avaliação. Tente novamente.", ephemeral=True)
+            await interaction.followup.send(
+                "Esta avaliação já foi registrada ou o atendimento não está encerrado.",
+                ephemeral=True,
+            )
             return
         guild = interaction.client.get_guild(self.guild_id)
         canal = guild.get_channel(CANAL_AVALIACOES_TICKET_ID) if guild else None
@@ -411,29 +461,68 @@ class FeedbackTicketModal(discord.ui.Modal):
         await interaction.followup.send(f"Obrigado pelo feedback! Sua avaliação foi registrada: {self.nota}/5 — {rotulo}.", ephemeral=True)
 
 
+class AvaliacaoTicketButton(
+    discord.ui.DynamicItem[discord.ui.Button],
+    template=r"ticket:avaliar:(?P<guild_id>\d{1,20}):(?P<ticket_id>[a-fA-F0-9]{8}):(?P<nota>[1-5])",
+):
+    def __init__(self, guild_id: int, ticket_id: str, nota: int):
+        self.guild_id = int(guild_id)
+        self.ticket_id = str(ticket_id)
+        self.nota = int(nota)
+        super().__init__(
+            discord.ui.Button(
+                label=f"{self.nota}/5",
+                emoji="⭐",
+                style=discord.ButtonStyle.primary,
+                custom_id=f"ticket:avaliar:{self.guild_id}:{self.ticket_id}:{self.nota}",
+            )
+        )
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match):
+        return cls(
+            int(match["guild_id"]),
+            match["ticket_id"],
+            int(match["nota"]),
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        ticket = await tickets.get_ticket(self.guild_id, self.ticket_id)
+        if not ticket or str(interaction.user.id) != str(ticket.get("usuario_id")):
+            await interaction.response.send_message(
+                "Somente quem abriu o ticket pode avaliá-lo.",
+                ephemeral=True,
+            )
+            return
+        if ticket.get("status") != "fechado":
+            await interaction.response.send_message(
+                "Este ticket ainda não foi encerrado.",
+                ephemeral=True,
+            )
+            return
+        if ticket.get("avaliacao") is not None:
+            await interaction.response.send_message(
+                "Você já avaliou este atendimento.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_modal(
+            FeedbackTicketModal(
+                self.guild_id,
+                self.ticket_id,
+                int(ticket.get("usuario_id") or 0),
+                int(ticket.get("atendido_por_id") or 0),
+                self.nota,
+            )
+        )
+
+
 class AvaliacaoTicketView(discord.ui.View):
     def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
         super().__init__(timeout=None)
-        self.guild_id, self.ticket_id, self.owner_id, self.atendente_id = guild_id, ticket_id, owner_id, atendente_id
         for nota in range(1, 6):
-            button = discord.ui.Button(label=f"{nota}/5", emoji="⭐", style=discord.ButtonStyle.primary, custom_id=f"ticket:avaliar:{ticket_id}:{nota}")
-            button.callback = self._callback(nota)
-            self.add_item(button)
+            self.add_item(AvaliacaoTicketButton(guild_id, ticket_id, nota))
 
-    def _callback(self, nota: int):
-        async def callback(interaction: discord.Interaction):
-            if interaction.user.id != self.owner_id:
-                await interaction.response.send_message("Somente quem abriu o ticket pode avaliá-lo.", ephemeral=True)
-                return
-            ticket = await tickets.get_ticket(self.guild_id, self.ticket_id)
-            if not ticket or ticket.get("status") != "fechado":
-                await interaction.response.send_message("Este ticket não foi encontrado ou ainda não foi encerrado.", ephemeral=True)
-                return
-            if ticket.get("avaliacao") is not None:
-                await interaction.response.send_message("Você já avaliou este atendimento.", ephemeral=True)
-                return
-            await interaction.response.send_modal(FeedbackTicketModal(self.guild_id, self.ticket_id, self.owner_id, self.atendente_id, nota))
-        return callback
 
 class AdicionarParticipanteModal(discord.ui.Modal, title="Adicionar participante ao ticket"):
     usuario = discord.ui.TextInput(label="ID ou menção do membro", placeholder="ID do Discord ou @membro", required=True, max_length=40)
@@ -772,12 +861,339 @@ class FecharTicketView(discord.ui.View):
         )
 
 
+async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
+    config = await get_config(guild.id)
+    canal_id = int(config.get("ticket_painel_canal_id") or TICKET_PAINEL_CANAL_ID)
+    canal = guild.get_channel(canal_id)
+    if canal is None:
+        canal = await guild.fetch_channel(canal_id)
+    if not isinstance(canal, discord.TextChannel):
+        raise RuntimeError("O canal configurado para o painel de tickets não é um canal de texto.")
+
+    embed = await _montar_embed_painel(guild.id, guild)
+    view = await _montar_select(guild.id, guild)
+    mensagem = None
+    mensagem_id = config.get("ticket_painel_mensagem_id")
+    if mensagem_id:
+        try:
+            mensagem = await canal.fetch_message(int(mensagem_id))
+        except discord.NotFound:
+            mensagem = None
+
+    if mensagem is not None:
+        await mensagem.edit(embed=embed, view=view)
+    else:
+        mensagem = await canal.send(embed=embed, view=view)
+        try:
+            await mensagem.pin(reason="Central permanente de atendimento NÊMESIS")
+        except (discord.Forbidden, discord.HTTPException):
+            log.warning("Não foi possível fixar o painel de tickets no canal %s.", canal.id)
+
+    await set_config(
+        guild.id,
+        ticket_painel_canal_id=canal.id,
+        ticket_painel_mensagem_id=mensagem.id,
+    )
+    return mensagem
+
+
+class SeletorCategoriaTickets(discord.ui.ChannelSelect):
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Selecionar categoria onde os tickets serão criados",
+            min_values=1,
+            max_values=1,
+            channel_types=[discord.ChannelType.category],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.central.autorizar(interaction):
+            return
+        categoria = self.values[0]
+        await set_config(
+            self.central.guild.id,
+            ticket_category_id=categoria.id,
+        )
+        await interaction.response.edit_message(
+            embed=await self.central.criar_embed(),
+            view=self.central,
+        )
+
+
+class SeletorEquipeTickets(discord.ui.RoleSelect):
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Selecionar cargo responsável pelo atendimento",
+            min_values=1,
+            max_values=1,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.central.autorizar(interaction):
+            return
+        cargo = self.values[0]
+        if cargo.is_default():
+            await interaction.response.send_message(
+                "O cargo @everyone não pode ser usado como equipe de atendimento.",
+                ephemeral=True,
+            )
+            return
+        await set_config(
+            self.central.guild.id,
+            support_role_id=cargo.id,
+        )
+        await interaction.response.edit_message(
+            embed=await self.central.criar_embed(),
+            view=self.central,
+        )
+
+
+class EditarCategoriaTicketModal(discord.ui.Modal, title="Personalizar categoria de atendimento"):
+    nome = discord.ui.TextInput(label="Nome exibido", required=True, max_length=100)
+    emoji = discord.ui.TextInput(label="Emoji", required=True, max_length=64)
+    descricao = discord.ui.TextInput(
+        label="Descrição",
+        style=discord.TextStyle.paragraph,
+        required=True,
+        max_length=100,
+    )
+
+    def __init__(self, central, tipo: dict):
+        super().__init__(timeout=180)
+        self.central = central
+        self.valor = str(tipo.get("valor") or "")
+        self.nome.default = str(tipo.get("label") or "")[:100]
+        self.emoji.default = str(tipo.get("emoji") or "◈")[:64]
+        self.descricao.default = str(tipo.get("descricao") or "")[:100]
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.central.autorizar(interaction):
+            return
+        tipo = await tickets.atualizar_tipo_visual(
+            self.central.guild.id,
+            self.valor,
+            self.emoji.value,
+            self.descricao.value,
+            self.nome.value,
+        )
+        if not tipo:
+            await interaction.response.send_message(
+                "A categoria não existe mais. Atualize a central e tente novamente.",
+                ephemeral=True,
+            )
+            return
+        try:
+            mensagem = await sincronizar_painel_ticket(self.central.guild)
+            await interaction.response.send_message(
+                f"Categoria **{tipo['label']}** atualizada. Painel sincronizado: {mensagem.jump_url}",
+                ephemeral=True,
+            )
+        except Exception:
+            log.exception("Falha ao sincronizar o painel após editar categoria de ticket.")
+            await interaction.response.send_message(
+                "A categoria foi salva, mas o painel não pôde ser sincronizado. Use Atualizar painel na central.",
+                ephemeral=True,
+            )
+
+
+class PersonalizarPainelTicketModal(discord.ui.Modal, title="Personalizar painel de atendimento"):
+    titulo = discord.ui.TextInput(label="Título do painel", required=False, max_length=240)
+    descricao = discord.ui.TextInput(
+        label="Descrição",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=1500,
+    )
+    banner = discord.ui.TextInput(label="Banner HTTPS (opcional)", required=False, max_length=500)
+    icone = discord.ui.TextInput(label="Ícone HTTPS (opcional)", required=False, max_length=500)
+
+    def __init__(self, central, config: dict):
+        super().__init__(timeout=180)
+        self.central = central
+        self.titulo.default = str(config.get("ticket_painel_titulo") or TITULO_PADRAO)[:240]
+        self.descricao.default = str(config.get("ticket_painel_descricao") or DESCRICAO_PADRAO)[:1500]
+        self.banner.default = str(config.get("ticket_painel_banner_url") or "")[:500]
+        self.icone.default = str(config.get("ticket_painel_thumbnail_url") or "")[:500]
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.central.autorizar(interaction):
+            return
+        updates = {
+            "ticket_painel_titulo": str(self.titulo.value).strip()[:240],
+            "ticket_painel_descricao": str(self.descricao.value).strip()[:1500],
+        }
+        for chave, valor in (
+            ("ticket_painel_banner_url", self.banner.value),
+            ("ticket_painel_thumbnail_url", self.icone.value),
+        ):
+            valor = str(valor or "").strip()
+            if valor:
+                parsed = urlparse(valor)
+                if parsed.scheme != "https" or not parsed.netloc:
+                    await interaction.response.send_message(
+                        "Banner e ícone precisam usar URLs HTTPS válidas.",
+                        ephemeral=True,
+                    )
+                    return
+            updates[chave] = valor
+        await set_config(self.central.guild.id, **updates)
+        try:
+            mensagem = await sincronizar_painel_ticket(self.central.guild)
+            await interaction.response.send_message(
+                f"Painel personalizado e publicado: {mensagem.jump_url}",
+                ephemeral=True,
+            )
+        except Exception:
+            log.exception("Falha ao publicar painel de tickets personalizado.")
+            await interaction.response.send_message(
+                "As configurações foram salvas, mas não consegui atualizar o painel. Tente Atualizar painel na central.",
+                ephemeral=True,
+            )
+
+
+class CentralTicketsView(discord.ui.View):
+    def __init__(self, cog, guild: discord.Guild, owner_id: int):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.guild = guild
+        self.owner_id = int(owner_id)
+        self.add_item(SeletorCategoriaTickets(self))
+        self.add_item(SeletorEquipeTickets(self))
+        self.seletor_tipos = None
+
+    async def configurar(self):
+        tipos = await tickets.get_tipos(self.guild.id)
+        if tipos:
+            options = [
+                discord.SelectOption(
+                    label=str(tipo.get("label") or "Atendimento")[:100],
+                    value=str(tipo.get("valor") or "outro")[:100],
+                    description=str(tipo.get("descricao") or "Categoria de atendimento.")[:100],
+                    emoji=str(tipo.get("emoji") or "◈"),
+                )
+                for tipo in tipos[:25]
+            ]
+            self.seletor_tipos = discord.ui.Select(
+                placeholder="Selecionar categoria para personalizar",
+                min_values=1,
+                max_values=1,
+                options=options,
+                row=2,
+            )
+            self.seletor_tipos.callback = self.editar_categoria
+            self.add_item(self.seletor_tipos)
+        return self
+
+    async def autorizar(self, interaction: discord.Interaction) -> bool:
+        if (
+            interaction.guild is None
+            or interaction.guild.id != self.guild.id
+            or interaction.user.id != self.owner_id
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "Esta central pertence à liderança que a abriu ou seu acesso expirou.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def editar_categoria(self, interaction: discord.Interaction):
+        if not await self.autorizar(interaction):
+            return
+        valor = interaction.data.get("values", [None])[0]
+        tipo = next(
+            (item for item in await tickets.get_tipos(self.guild.id) if item.get("valor") == valor),
+            None,
+        )
+        if not tipo:
+            await interaction.response.send_message(
+                "Categoria não encontrada. Atualize a central.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_modal(EditarCategoriaTicketModal(self, tipo))
+
+    async def criar_embed(self) -> discord.Embed:
+        config = await get_config(self.guild.id)
+        todos = await tickets.listar_tickets(self.guild.id)
+        abertos = sum(item.get("status") == "aberto" for item in todos)
+        fechando = sum(item.get("status") == "fechando" for item in todos)
+        fechados = sum(item.get("status") == "fechado" for item in todos)
+        categoria_id = config.get("ticket_category_id")
+        suporte_id = config.get("support_role_id")
+        painel_id = config.get("ticket_painel_canal_id") or TICKET_PAINEL_CANAL_ID
+        embed = criar_embed(
+            "Central de Gestão de Atendimento",
+            "Configure o canal de criação, a equipe responsável, o visual do painel e as categorias de atendimento. "
+            "As alterações são aplicadas sem comandos separados.",
+        )
+        embed.add_field(name="Tickets abertos", value=f"**{abertos}**", inline=True)
+        embed.add_field(name="Fechamentos pendentes", value=f"**{fechando}**", inline=True)
+        embed.add_field(name="Histórico", value=f"**{fechados}**", inline=True)
+        embed.add_field(
+            name="Categoria de criação",
+            value=f"<#{categoria_id}>" if categoria_id else "Não configurada",
+            inline=True,
+        )
+        embed.add_field(
+            name="Equipe responsável",
+            value=f"<@&{suporte_id}>" if suporte_id else "Não configurada",
+            inline=True,
+        )
+        embed.add_field(name="Canal do painel", value=f"<#{painel_id}>", inline=True)
+        embed.set_footer(text="Acesso exclusivo à liderança • NÊMESIS")
+        return embed
+
+    @discord.ui.button(label="Personalizar painel", style=discord.ButtonStyle.primary, emoji="🎨", row=3)
+    async def personalizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        await interaction.response.send_modal(
+            PersonalizarPainelTicketModal(self, await get_config(self.guild.id))
+        )
+
+    @discord.ui.button(label="Atualizar painel", style=discord.ButtonStyle.success, emoji="🔄", row=3)
+    async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            mensagem = await sincronizar_painel_ticket(self.guild)
+            await interaction.followup.send(
+                f"Painel de atendimento sincronizado: {mensagem.jump_url}",
+                ephemeral=True,
+            )
+        except Exception:
+            log.exception("Falha ao sincronizar painel pela Central de Tickets.")
+            await interaction.followup.send(
+                "Não consegui atualizar o painel. Verifique as permissões e o canal configurado.",
+                ephemeral=True,
+            )
+
+    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="✕", row=3)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="Central de Gestão de Atendimento encerrada.",
+            embed=None,
+            view=self,
+        )
+
+
 class Tickets(commands.Cog):
     """
     Sistema de tickets por categoria.
 
-    O painel mostra um menu suspenso configurável com /ticket-tipo-*.
-    Cada opção cria um canal já identificado pelo tipo escolhido.
+    O painel público abre solicitações por categoria; a liderança gerencia
+    configurações e categorias pela central administrativa integrada.
 
     Os tickets são persistidos em tickets.json através de utils.tickets, permitindo que o próprio bot mantenha:
     - tickets abertos;
@@ -798,6 +1214,7 @@ class Tickets(commands.Cog):
         )["entradas"]
 
         bot.add_view(FecharTicketView())
+        bot.add_dynamic_items(AvaliacaoTicketButton)
 
         self.verificar_inatividade.start()
         self.verificar_painel_permanente.start()
@@ -931,9 +1348,19 @@ class Tickets(commands.Cog):
                         canal.id,
                     )
                 canal_existente = guild.get_channel(canal_existente_id)
-                if canal_existente is not None:
+                if canal_existente is None and canal_existente_id:
+                    try:
+                        canal_existente = await guild.fetch_channel(canal_existente_id)
+                    except discord.NotFound:
+                        canal_existente = None
+                    except (discord.Forbidden, discord.HTTPException):
+                        logging.getLogger(__name__).exception(
+                            "Não foi possível recuperar o canal do ticket já existente %s.",
+                            canal_existente_id,
+                        )
+                if isinstance(canal_existente, discord.TextChannel):
                     return canal_existente
-                raise RuntimeError("Já havia um ticket aberto, mas seu canal não foi encontrado.")
+                raise RuntimeError("Já havia um ticket aberto, mas seu canal não pôde ser recuperado.")
         except Exception:
             # Sem registro persistido, não deixamos um canal privado órfão.
             try:
@@ -965,12 +1392,22 @@ class Tickets(commands.Cog):
 
         if interaction.data.get("custom_id") != CUSTOM_ID_SELECT:
             return
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "O painel de atendimento só funciona dentro do servidor.",
+                ephemeral=True,
+            )
+            return
+        valores = interaction.data.get("values") or []
+        if not valores:
+            await interaction.response.send_message(
+                "Nenhuma categoria foi selecionada. Atualize o painel e tente novamente.",
+                ephemeral=True,
+            )
+            return
 
-        valor_escolhido = interaction.data["values"][0]
-
-        tipos = await tickets.get_tipos(
-            interaction.guild.id
-        )
+        valor_escolhido = valores[0]
+        tipos = await tickets.get_tipos(interaction.guild.id)
 
         tipo = next(
             (
@@ -1006,8 +1443,25 @@ class Tickets(commands.Cog):
                 except (TypeError, ValueError):
                     canal_existente_id = 0
                 canal_existente = interaction.guild.get_channel(canal_existente_id)
+                if canal_existente is None and canal_existente_id:
+                    try:
+                        canal_existente = await interaction.guild.fetch_channel(canal_existente_id)
+                    except discord.NotFound:
+                        canal_existente = None
+                    except discord.Forbidden:
+                        await interaction.followup.send(
+                            "Encontrei um ticket aberto, mas não tenho permissão para verificar o canal. A equipe técnica precisa revisar as permissões.",
+                            ephemeral=True,
+                        )
+                        return
+                    except discord.HTTPException:
+                        await interaction.followup.send(
+                            "Não consegui consultar seu ticket existente agora. Tente novamente em instantes.",
+                            ephemeral=True,
+                        )
+                        return
 
-                if canal_existente:
+                if isinstance(canal_existente, discord.TextChannel):
                     await interaction.followup.send(
                         f"Você já possui um ticket aberto: {canal_existente.mention}",
                         ephemeral=True,
@@ -1250,77 +1704,23 @@ class Tickets(commands.Cog):
                 "Este assunto precisa da revisão de um atendente humano.",
             )
 
-    @app_commands.command(name="ticket-painel-configurar", description="Personaliza banner, ícone e textos da central de tickets.")
-    @lideranca_only()
-    @app_commands.describe(banner_url="URL HTTPS do banner horizontal", icone_url="URL HTTPS do ícone da central", titulo="Título do painel", descricao="Texto de apresentação")
-    async def ticket_painel_configurar(self, interaction: discord.Interaction, banner_url: str | None = None, icone_url: str | None = None, titulo: str | None = None, descricao: str | None = None):
-        if not interaction.guild:
-            await interaction.response.send_message("Este comando só funciona em um servidor.", ephemeral=True)
+    async def abrir_central(self, interaction: discord.Interaction, owner_id: int):
+        if (
+            interaction.guild is None
+            or interaction.user.id != int(owner_id)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "A Central de Gestão de Atendimento é restrita à liderança autorizada.",
+                ephemeral=True,
+            )
             return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        updates = {}
-        for key, value in (("ticket_painel_banner_url", banner_url), ("ticket_painel_thumbnail_url", icone_url)):
-            if value is not None:
-                parsed = urlparse(value)
-                if parsed.scheme != "https" or not parsed.netloc:
-                    await interaction.followup.send("As imagens precisam usar uma URL HTTPS válida.", ephemeral=True)
-                    return
-                updates[key] = value
-        if titulo is not None:
-            updates["ticket_painel_titulo"] = titulo[:240]
-        if descricao is not None:
-            updates["ticket_painel_descricao"] = descricao[:1500]
-        if not updates:
-            await interaction.followup.send("Informe ao menos um campo para atualizar.", ephemeral=True)
-            return
-        await set_config(interaction.guild.id, **updates)
-        canal = interaction.guild.get_channel(TICKET_PAINEL_CANAL_ID)
-        if not isinstance(canal, discord.TextChannel):
-            await interaction.followup.send("O canal ticket-available não foi encontrado ou está inacessível.", ephemeral=True)
-            return
-        config = await get_config(interaction.guild.id)
-        mensagem = None
-        if config.get("ticket_painel_mensagem_id"):
-            try:
-                mensagem = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                mensagem = None
-        embed, view = await _montar_embed_painel(interaction.guild.id, interaction.guild), await _montar_select(interaction.guild.id, interaction.guild)
-        if mensagem:
-            await mensagem.edit(embed=embed, view=view)
-        else:
-            mensagem = await canal.send(embed=embed, view=view)
-            try:
-                await mensagem.pin(reason="Central de tickets NÊMESIS")
-            except (discord.Forbidden, discord.HTTPException):
-                pass
-        await set_config(interaction.guild.id, ticket_painel_canal_id=canal.id, ticket_painel_mensagem_id=mensagem.id)
-        await interaction.followup.send(f"Central atualizada: {mensagem.jump_url}", ephemeral=True)
-
-    @app_commands.command(name="ticket-categoria-visual", description="Altera o nome, ícone e descrição de uma categoria.")
-    @lideranca_only()
-    async def ticket_categoria_visual(self, interaction: discord.Interaction, categoria: str, emoji: str, descricao: str, nome: str | None = None):
-        if not interaction.guild:
-            await interaction.response.send_message("Este comando só funciona em um servidor.", ephemeral=True)
-            return
-        tipos = await tickets.get_tipos(interaction.guild.id)
-        tipo = next((item for item in tipos if item.get("valor") == categoria), None)
-        if not tipo:
-            await interaction.response.send_message("Categoria não encontrada. Informe o valor interno.", ephemeral=True)
-            return
-        tipo["emoji"], tipo["descricao"] = emoji[:64], descricao[:100]
-        if nome:
-            tipo["label"] = nome[:100]
-        await tickets.set_tipos(interaction.guild.id, tipos)
-        config = await get_config(interaction.guild.id)
-        canal = interaction.guild.get_channel(TICKET_PAINEL_CANAL_ID)
-        if isinstance(canal, discord.TextChannel) and config.get("ticket_painel_mensagem_id"):
-            try:
-                msg = await canal.fetch_message(int(config["ticket_painel_mensagem_id"]))
-                await msg.edit(embed=await _montar_embed_painel(interaction.guild.id, interaction.guild), view=await _montar_select(interaction.guild.id, interaction.guild))
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                pass
-        await interaction.response.send_message(f"Categoria {tipo['label']} atualizada e sincronizada.", ephemeral=True)
+        view = await CentralTicketsView(self, interaction.guild, owner_id).configurar()
+        await interaction.response.send_message(
+            embed=await view.criar_embed(),
+            view=view,
+            ephemeral=True,
+        )
 
     @tasks.loop(seconds=300)
     async def verificar_painel_permanente(self):
@@ -1397,12 +1797,106 @@ class Tickets(commands.Cog):
     async def antes_de_verificar_painel_permanente(self):
         await self.bot.wait_until_ready()
 
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
+        if not isinstance(channel, discord.TextChannel):
+            return
+        info = tickets.parse_topic(channel.topic)
+        if not info:
+            return
+        ULTIMA_ATIVIDADE.pop(channel.id, None)
+        CANAIS_ESCALADOS.discard(channel.id)
+        try:
+            registro = await tickets.get_ticket_por_canal(channel.guild.id, channel.id)
+            if registro and registro.get("status") == "fechando":
+                await tickets.finalizar_fechamento_ticket(
+                    channel.guild.id,
+                    registro["id"],
+                )
+            elif registro and registro.get("status") == "aberto":
+                await tickets.fechar_ticket(
+                    channel.guild.id,
+                    registro["id"],
+                    motivo="Canal removido manualmente do servidor.",
+                )
+                log.info(
+                    "Registro do ticket %s encerrado após exclusão manual do canal %s.",
+                    registro.get("id"),
+                    channel.id,
+                )
+        except Exception:
+            log.exception(
+                "Falha ao sincronizar exclusão do canal de ticket %s.",
+                channel.id,
+            )
+
     @tasks.loop(seconds=60)
     async def verificar_inatividade(self):
         agora = time.time()
 
         for guild in self.bot.guilds:
             try:
+                todos_registros = await tickets.listar_tickets(guild.id)
+                canais_registrados = {
+                    str(item.get("canal_id"))
+                    for item in todos_registros
+                    if item.get("canal_id") is not None
+                }
+
+                for canal_candidato in guild.text_channels:
+                    info = tickets.parse_topic(canal_candidato.topic)
+                    if not info or str(canal_candidato.id) in canais_registrados:
+                        continue
+                    recuperado = await tickets.sincronizar_canal_ticket(
+                        guild_id=guild.id,
+                        canal_id=canal_candidato.id,
+                        usuario_id=int(info.get("owner_id") or 0),
+                        tipo=info.get("tipo") or "outro",
+                    )
+                    if recuperado:
+                        ULTIMA_ATIVIDADE[canal_candidato.id] = float(
+                            recuperado.get("criado_em") or agora
+                        )
+                        log.warning(
+                            "Ticket órfão recuperado: guild=%s channel=%s ticket=%s",
+                            guild.id,
+                            canal_candidato.id,
+                            recuperado.get("id"),
+                        )
+
+                fechando = await tickets.listar_tickets(
+                    guild.id,
+                    status="fechando",
+                )
+                for ticket_fechando in fechando:
+                    try:
+                        canal_fechando_id = int(ticket_fechando.get("canal_id") or 0)
+                    except (TypeError, ValueError):
+                        canal_fechando_id = 0
+                    if not canal_fechando_id:
+                        await tickets.finalizar_fechamento_ticket(
+                            guild.id, ticket_fechando["id"]
+                        )
+                        continue
+                    canal_fechando = guild.get_channel(canal_fechando_id)
+                    if canal_fechando is None:
+                        try:
+                            canal_fechando = await guild.fetch_channel(canal_fechando_id)
+                        except discord.NotFound:
+                            await tickets.finalizar_fechamento_ticket(
+                                guild.id, ticket_fechando["id"]
+                            )
+                            continue
+                        except (discord.Forbidden, discord.HTTPException):
+                            continue
+                    if isinstance(canal_fechando, discord.TextChannel):
+                        await fechar_canal_ticket(
+                            canal_fechando,
+                            ticket_fechando.get("motivo_fechamento") or "Retomando fechamento pendente.",
+                            delay=0,
+                            fechado_por_id=ticket_fechando.get("fechado_por_id"),
+                        )
+
                 abertos = await tickets.listar_tickets(
                     guild.id,
                     status="aberto",
@@ -1421,11 +1915,17 @@ class Tickets(commands.Cog):
                     if canal is None:
                         try:
                             canal = await guild.fetch_channel(canal_id)
-                        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        except discord.NotFound:
                             await tickets.fechar_ticket(
                                 guild.id,
                                 ticket["id"],
-                                motivo="Canal do ticket removido ou inacessível.",
+                                motivo="Canal do ticket removido.",
+                            )
+                            continue
+                        except (discord.Forbidden, discord.HTTPException):
+                            log.warning(
+                                "Canal do ticket %s está inacessível; registro mantido para nova tentativa.",
+                                canal_id,
                             )
                             continue
 
@@ -1434,10 +1934,21 @@ class Tickets(commands.Cog):
 
                     ultima = ULTIMA_ATIVIDADE.get(canal.id)
                     if ultima is None:
-                        # Após reiniciar, inicia a contagem no primeiro ciclo,
-                        # evitando fechar tickets antigos sem verificar atividade.
-                        ULTIMA_ATIVIDADE[canal.id] = agora
-                        continue
+                        # Recupera a última atividade humana do próprio histórico,
+                        # em vez de reiniciar o prazo inteiro após cada restart.
+                        ultima = float(ticket.get("ultima_atividade") or ticket.get("criado_em") or agora)
+                        try:
+                            async for mensagem_recente in canal.history(limit=100):
+                                if not mensagem_recente.author.bot:
+                                    ultima = mensagem_recente.created_at.timestamp()
+                                    break
+                        except (discord.Forbidden, discord.HTTPException):
+                            log.warning(
+                                "Não foi possível ler o histórico do ticket %s para recuperar a inatividade; prazo reiniciado por segurança.",
+                                canal.id,
+                            )
+                            ultima = agora
+                        ULTIMA_ATIVIDADE[canal.id] = ultima
 
                     if agora - ultima >= TEMPO_INATIVIDADE_SEGUNDOS:
                         await fechar_canal_ticket(

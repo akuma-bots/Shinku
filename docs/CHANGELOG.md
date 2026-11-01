@@ -2,6 +2,24 @@
 
 Este arquivo registra mudanças por estado de entrega. Merge no GitHub não significa, por si só, que o recurso já esteja ativo no Discord; a ativação depende do deploy e da inicialização correta do bot.
 
+## 2026-11-01 — Etapa 20: integridade e recuperação do atendimento
+
+### Entregue no código
+- Abertura e alterações de tickets migradas para atualizações JSON atômicas, evitando perda de dados em operações concorrentes e entre instâncias do bot.
+- Prevenção de tickets duplicados por usuário, inclusive quando duas instâncias tentam abrir atendimento simultaneamente.
+- Recuperação de canais órfãos identificados pelo tópico do canal.
+- Recuperação do prazo de inatividade pelo histórico real após reinicializações; canais inacessíveis não são encerrados como se tivessem sido excluídos.
+- Fechamento com reserva temporária, retomada automática após falhas e proteção contra exclusões concorrentes.
+- O canal do ticket só é excluído depois que a transcrição é preservada; falhas no canal de histórico mantêm o atendimento para nova tentativa.
+- Avaliações com gravação única e botões dinâmicos compatíveis com reinicializações do Shinku.
+- Gestão de tickets integrada à Central Administrativa, com configuração de categoria, equipe, painel e categorias visuais.
+- Remoção dos comandos independentes /ticket-painel-configurar e /ticket-categoria-visual.
+- O botão Atendimento foi adicionado à central administrativa existente.
+
+### Validação
+- Testes de concorrência, recuperação, fechamento, avaliação e central administrativa.
+- Validação automatizada executada após as alterações.
+
 ## 2026-10-30 — Central de tickets
 
 ### Entregue no código (PRs #49 e #50)

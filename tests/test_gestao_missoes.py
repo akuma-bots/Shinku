@@ -40,7 +40,8 @@ class TestCentralGestaoMissoes(unittest.TestCase):
         view = CentralMissoesView(1, 2)
         labels = {item.label for item in view.children}
         self.assertTrue({"Página anterior", "Próxima página", "Editar atividade",
-                         "Arquivar / reativar", "Atualizar painel"}.issubset(labels))
+                         "Arquivar / reativar", "Atualizar painel", "Atendimento",
+                         "Ranking geral", "Temporadas"}.issubset(labels))
 
     def test_ordenacao_e_estavel(self):
         ordenadas = _ordenar_atividades(list(reversed(self.atividades)))

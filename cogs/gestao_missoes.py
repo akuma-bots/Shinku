@@ -331,7 +331,8 @@ class CentralMissoesView(discord.ui.View):
             self.pagina,
             self.mensagem_original or interaction.message,
         )
-        nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
+        if atividades:
+            nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
             embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
             view=nova,
@@ -360,7 +361,8 @@ class CentralMissoesView(discord.ui.View):
             self.guild_id, self.owner_id, self.selecionada_id, self.pagina,
             self.mensagem_original or interaction.message,
         )
-        nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
+        if atividades:
+            nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
             embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
             view=nova,
@@ -411,6 +413,19 @@ class CentralMissoesView(discord.ui.View):
             return
         await self.atualizar(interaction)
 
+    @discord.ui.button(label="Atendimento", style=discord.ButtonStyle.primary, emoji="🎫", row=3)
+    async def abrir_atendimento(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        central = interaction.client.get_cog("Tickets")
+        if central is None:
+            await interaction.response.send_message(
+                "O sistema de atendimento está temporariamente indisponível.",
+                ephemeral=True,
+            )
+            return
+        await central.abrir_central(interaction, self.owner_id)
+
     @discord.ui.button(label="Ranking geral", style=discord.ButtonStyle.primary, emoji="🏅", row=3)
     async def abrir_ranking_geral(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
@@ -458,11 +473,9 @@ class GestaoMissoes(commands.Cog):
             return
         atividades = await missoes._guild(interaction.guild.id)
         lista = _ordenar_atividades(atividades.get("missoes", []))
-        if not lista:
-            await interaction.response.send_message("O catálogo ainda não possui atividades cadastradas.", ephemeral=True)
-            return
         view = CentralMissoesView(interaction.guild.id, interaction.user.id)
-        view.add_item(SeletorAtividade(view, lista))
+        if lista:
+            view.add_item(SeletorAtividade(view, lista))
         await interaction.response.send_message(
             embed=_embed_central(lista, guild=interaction.guild, bot=self.bot),
             view=view,
