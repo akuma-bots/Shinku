@@ -261,9 +261,9 @@ class Novidades(commands.Cog):
         # Mantém pendências vivas mesmo sem reinicialização ou reconexão do bot.
         if not CAMINHO_RELEASE.exists():
             return
-        guild_id = os.getenv("NEMESIS_GUILD_ID")
+        guild_id = os.getenv("NEMESIS_GUILD_ID", str(GUILD_ID))
         try:
-            guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+            guild = self.bot.get_guild(int(guild_id))
         except (TypeError, ValueError):
             logger.error("NEMESIS_GUILD_ID inválido durante a recuperação de releases.")
             return
