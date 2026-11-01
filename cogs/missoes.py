@@ -560,9 +560,9 @@ class InteligenciaMissoesView(discord.ui.View):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = int(owner_id)
-        self.pagina = max(0, min(int(pagina), 2))
+        self.pagina = max(0, min(int(pagina), 3))
         self.anterior.disabled = self.pagina == 0
-        self.proxima.disabled = self.pagina == 2
+        self.proxima.disabled = self.pagina == 3
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if (
@@ -584,7 +584,7 @@ class InteligenciaMissoesView(discord.ui.View):
         return True
 
     async def _navegar(self, interaction: discord.Interaction, delta: int):
-        self.pagina = max(0, min(2, self.pagina + delta))
+        self.pagina = max(0, min(3, self.pagina + delta))
         embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
         await interaction.response.edit_message(
             embed=embed,
@@ -2061,7 +2061,7 @@ class Missoes(commands.Cog):
 
         revisoes = await revisoes_storage.listar(guild.id)
         metricas = _calcular_inteligencia_missoes(revisoes, time.time())
-        pagina = max(0, min(int(pagina), 2))
+        pagina = max(0, min(int(pagina), 3))
         embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  INTELIGÊNCIA DE OPERAÇÕES",
             description=(
@@ -2069,7 +2069,7 @@ class Missoes(commands.Cog):
                 "Visão consolidada da execução, validação e distribuição de recompensas das missões."
             ),
             cor=0x9F2035,
-            rodape=f"NÊMESIS • INTELIGÊNCIA ADMINISTRATIVA • Página {pagina + 1}/3",
+            rodape=f"NÊMESIS • INTELIGÊNCIA ADMINISTRATIVA • Página {pagina + 1}/4",
         )
         aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
         embed.set_thumbnail(url=guild.icon.url if guild.icon else self.bot.user.display_avatar.url)
@@ -2154,7 +2154,7 @@ class Missoes(commands.Cog):
                 ),
                 inline=False,
             )
-        else:
+        elif pagina == 2:
             participantes = _calcular_inteligencia_participantes(revisoes, time.time())
             embed.add_field(
                 name="◈ VISÃO DE PARTICIPANTES",
@@ -2204,6 +2204,29 @@ class Missoes(commands.Cog):
                 ),
                 inline=False,
             )
+        elif pagina == 3:
+            qualidade = revisoes_storage.analisar_qualidade(revisoes, time.time(), 30)
+            embed.add_field(name="◈ AMOSTRA ANALISADA", value=f"**{qualidade['evidencias_analisadas']}** evidências · últimos 30 dias", inline=True)
+            embed.add_field(name="◈ EVIDÊNCIAS REPETIDAS", value=f"**{len(qualidade['duplicidades'])}** grupos com hash idêntico", inline=True)
+            embed.add_field(name="◈ PADRÕES DE ENVIO", value=f"**{len(qualidade['padroes_envio'])}** padrões de alta frequência", inline=True)
+            duplicadas = qualidade["duplicidades"][:5]
+            linhas = [
+                f"Hash `{x['hash_prefixo']}` · **{x['quantidade']}** protocolos · "
+                f"{', '.join(x['participantes'][:4]) or 'participante não identificado'} · "
+                f"{', '.join(x['protocolos'][:4])}"
+                for x in duplicadas
+            ]
+            embed.add_field(name="◈ REUTILIZAÇÃO DE EVIDÊNCIAS · HISTÓRICO", value="\n".join(linhas)[:1024] if linhas else "Nenhum hash de imagem repetido identificado.", inline=False)
+            linhas = [f"<@{x['autor_id']}> · **{x['envios_10min']}** envios em 10 min" for x in qualidade["padroes_envio"][:5]]
+            embed.add_field(name="◈ FREQUÊNCIA DE ENVIOS", value="\n".join(linhas)[:1024] if linhas else "Nenhum padrão de alta frequência identificado.", inline=False)
+            linhas = []
+            for x in qualidade["revisores"][:6]:
+                mediana = f"{x['mediana_minutos']:.0f} min" if x["mediana_minutos"] is not None else "tempo indisponível"
+                alerta = " · amostra com rejeições elevadas" if x["alerta_amostra"] else ""
+                linhas.append(f"<@{x['revisor_id']}> · {x['decisoes']} decisões · mediana {mediana} · {x['taxa_rejeicao']:.0f}% rejeições{alerta}")
+            embed.add_field(name="◈ INDICADORES DE REVISÃO", value="\n".join(linhas)[:1024] if linhas else "Sem decisões com timestamps confiáveis no período.", inline=False)
+            embed.add_field(name="◈ PROTOCOLO DE INTERPRETAÇÃO", value="Envios e decisões: últimos 30 dias. Hashes: histórico completo. Indicadores sinalizam padrões para conferência humana; hash idêntico pode ocorrer por reenvio legítimo, e frequência ou taxa de rejeição não comprova irregularidade. Tempos usam apenas datas válidas.", inline=False)
+
         embed.set_footer(text="NÊMESIS • DADOS DE REVISÕES OFICIAIS • ACESSO EXCLUSIVO À LIDERANÇA")
         return embed
 
