@@ -1932,7 +1932,7 @@ class Missoes(commands.Cog):
         eventos_recentes.sort(key=lambda item: item[0], reverse=True)
         embed.add_field(
             name="◈ HISTÓRICO RECENTE DE DECISÕES",
-            value="\\n".join(item[1] for item in eventos_recentes[:5])[:1024]
+            value="\n".join(item[1] for item in eventos_recentes[:5])[:1024]
             if eventos_recentes else "Nenhuma decisão nova registrada na trilha. Protocolos antigos permanecem preservados.",
             inline=False,
         )
