@@ -11,11 +11,13 @@ class TestInteligenciaParticipantes(unittest.TestCase):
                 "tipo": "missao", "status": "aprovada",
                 "autor_id": 101, "auxiliar_id": 202,
                 "recompensa_xp": 100, "timestamp": self.agora - 20 * 86400,
+                "aprovado_em": self.agora - 20 * 86400,
             },
             {
                 "tipo": "especial", "status": "aprovada",
                 "autor_id": 101, "recompensa_xp": 50,
                 "timestamp": self.agora - 40 * 86400,
+                "aprovado_em": self.agora - 40 * 86400,
             },
             {
                 "tipo": "contribuicao", "status": "rejeitada",
