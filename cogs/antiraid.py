@@ -4,7 +4,6 @@ import time
 import discord
 from discord.ext import commands
 
-from utils.apresentacao import embed_aviso
 from utils.guild_config import get_config
 
 
@@ -33,56 +32,24 @@ class AntiRaid(commands.Cog):
             return False
         return True
 
-    async def _canal_logs(self, guild: discord.Guild):
-        try:
-            config = await get_config(guild.id)
-            log_id = config.get("log_channel_id")
-            if not log_id:
-                return None
-            canal = guild.get_channel(int(log_id))
-            if canal is None:
-                try:
-                    canal = await self.bot.fetch_channel(int(log_id))
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    return None
-            return canal if callable(getattr(canal, "send", None)) else None
-        except Exception:
-            logger.exception("Falha ao resolver canal de logs do anti-raid (guild=%s).", guild.id)
-            return None
-
     async def _avisar(self, guild: discord.Guild, texto: str, mencionar_suporte: bool = False):
-        canal = await self._canal_logs(guild)
-        if canal is None:
-            return
-        try:
-            if mencionar_suporte:
-                config = await get_config(guild.id)
-                cargo_id = config.get("support_role_id")
-                prefixo = f"<@&{cargo_id}> " if cargo_id else ""
-                await canal.send(
-                    content=prefixo or None,
-                    embed=embed_aviso(
-                        "ALERTA DE SEGURANÇA • ANTI-RAID",
-                        texto.replace("🚨 **Possível raid detectado!** ", "")
-                             .replace("🛡️ **Revisão recomendada:** ", ""),
-                    ),
-                    allowed_mentions=discord.AllowedMentions(
-                        roles=bool(cargo_id), users=False, everyone=False,
-                    ),
-                )
-            else:
-                await canal.send(
-                    embed=embed_aviso(
-                        "ALERTA DE SEGURANÇA • ANTI-RAID",
-                        texto.replace("🚨 **Possível raid detectado!** ", "")
-                             .replace("🛡️ **Revisão recomendada:** ", ""),
-                    ),
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-        except (discord.Forbidden, discord.HTTPException):
-            logger.warning("Não foi possível enviar aviso anti-raid (guild=%s, channel=%s).", guild.id, getattr(canal, "id", None))
-        except Exception:
-            logger.exception("Erro inesperado ao enviar aviso anti-raid (guild=%s).", guild.id)
+        from utils.registro_global import registrar
+        config = await get_config(guild.id) if mencionar_suporte else {}
+        cargo_id = config.get("support_role_id")
+        cargo = guild.get_role(int(cargo_id)) if cargo_id else None
+        await registrar(
+            guild,
+            "seguranca",
+            "ALERTA DE SEGURANÇA • ANTI-RAID",
+            texto.replace("🚨 **Possível raid detectado!** ", "")
+                 .replace("🛡️ **Revisão recomendada:** ", ""),
+            cor=0xED4245,
+            content=cargo.mention if cargo and mencionar_suporte else None,
+            allowed_mentions=(
+                discord.AllowedMentions(roles=True, users=False, everyone=False)
+                if cargo and mencionar_suporte else discord.AllowedMentions.none()
+            ),
+        )
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):

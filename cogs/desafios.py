@@ -561,7 +561,6 @@ class Desafios(commands.Cog):
             ("Provas de missões", "canal_provas_missao_id", 1556543417843056641),
             ("Provas de contribuições", "canal_provas_contribuicao_id", 1556543628296593448),
             ("Provas especiais", "canal_provas_especial_id", 1556543872534839336),
-            ("Auditoria", "canal_auditoria_id", 1545837705609617428),
         ]
         linhas = []
         bot_member = guild.me

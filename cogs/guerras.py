@@ -201,6 +201,17 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             registro["mensagem_id"] = mensagem.id
             registro["canal_id"] = canal.id
             await self._salvar_dados_guild(interaction.guild.id, dados)
+            from utils.registro_global import registrar
+            await registrar(
+                interaction.guild,
+                "sistemas",
+                f"Guerra registrada • {gangue_inimiga}",
+                f"Protocolo: `{registro_id}`\nPlacar: **NÊMESIS {placar_nemesis} × {placar_inimiga} {gangue_inimiga}**\n"
+                f"Resultado: **{status}**\nTemporada: `{registro['temporada']}`\n"
+                f"Responsável: {interaction.user.mention} (`{interaction.user.id}`)\n"
+                f"Relatório público: {mensagem.jump_url}",
+                cor=COR_NEMESIS,
+            )
         except (discord.Forbidden, discord.HTTPException):
             await interaction.followup.send(
                 "O resultado foi salvo no histórico, mas não consegui publicar no canal de guerras. Verifique as permissões do bot.",

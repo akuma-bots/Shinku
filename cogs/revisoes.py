@@ -347,6 +347,7 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
                 f"Participante: <@{revisao.get('autor_id')}>\nRevisor: {self.revisor.mention}\n"
                 f"Protocolo: {revisao.get('id', '—')}\nMotivo: {motivo}",
                 cor=0x9F2035,
+                categoria="sistemas",
             )
             autor = self.guild.get_member(int(revisao.get("autor_id") or 0))
             if autor:
@@ -497,6 +498,23 @@ class Revisoes(commands.Cog):
 
         msg = await canal.send(embed=embed, view=_view_revisao(revisao["id"]))
         await revisoes.definir_mensagem(guild.id, revisao["id"], canal.id, msg.id)
+        try:
+            from utils.registro_global import registrar
+            await registrar(
+                guild,
+                "sistemas",
+                f"Evidência enviada para revisão • {revisao.get('titulo', 'Atividade')}",
+                f"Protocolo: `{revisao.get('id', '—')}`\n"
+                f"Tipo: **{revisao.get('tipo', '—')}**\n"
+                f"Participante: <@{revisao.get('autor_id')}> (`{revisao.get('autor_id')}`)\n"
+                f"Status: **Pendente de revisão**\n"
+                f"Prova original: {msg.jump_url}",
+                cor=0xFEE75C,
+            )
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Falha ao arquivar evidência %s no Registro Global.", revisao.get("id")
+            )
         return revisao
 
     @commands.Cog.listener()
@@ -666,6 +684,7 @@ class Revisoes(commands.Cog):
                 f"Aprovado por: {interaction.user.mention}\nID: `{revisao['id']}`\n"
                 f"Resultado: {resultado_texto or 'Aprovação registrada.'}",
                 cor=0x57F287,
+                categoria="sistemas",
             )
 
             destinatarios = {
@@ -714,6 +733,7 @@ class Revisoes(commands.Cog):
                 f"Tipo: **{revisao['tipo']}**\nAutor: <@{revisao['autor_id']}>\n"
                 f"Rejeitado por: {interaction.user.mention}\nID: `{revisao['id']}`",
                 cor=0xED4245,
+                categoria="sistemas",
             )
 
             autor = interaction.guild.get_member(revisao["autor_id"])

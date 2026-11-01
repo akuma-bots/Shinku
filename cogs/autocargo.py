@@ -204,16 +204,15 @@ class CargoAutomatico(commands.Cog):
                     "Falha ao atribuir cargo automático (guild=%s, member=%s, role=%s).",
                     message.guild.id, membro.id, cargo.id,
                 )
-                canal_logs_id = config.get("log_channel_id")
-                canal_logs = message.guild.get_channel(canal_logs_id) if canal_logs_id else None
-                if canal_logs:
-                    try:
-                        await canal_logs.send(
-                            f"⚠️ Não consegui atribuir o cargo automático (membro ID: {membro.id}, cargo ID: {cargo.id}).",
-                            allowed_mentions=discord.AllowedMentions.none(),
-                        )
-                    except discord.HTTPException:
-                        _LOG.warning("Falha ao enviar aviso de cargo automático (guild=%s).", message.guild.id)
+                try:
+                    from utils.registro_global import registrar
+                    await registrar(
+                        message.guild, "administracao", "Falha na atribuição automática de cargo",
+                        f"Membro: <@{membro.id}> (`{membro.id}`)\nCargo: <@&{cargo.id}> (`{cargo.id}`)",
+                        cor=0xED4245,
+                    )
+                except Exception:
+                    _LOG.exception("Falha ao registrar erro de cargo automático (guild=%s).", message.guild.id)
                 return
 
         try:

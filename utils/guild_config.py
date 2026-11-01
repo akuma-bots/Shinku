@@ -12,7 +12,6 @@ ARQUIVO = "guild_configs.json"
 
 PADRAO = {
     "support_role_id": 1547307501345579219,
-    "log_channel_id": 1545838386944938024,
     "ticket_category_id": 1545835749369446603,
 
     "canais_cargo_automatico": {},
@@ -23,7 +22,6 @@ PADRAO = {
 
     "contadores": [],
 
-    "canal_auditoria_id": 1545837705609617428,
     "canal_guerras_id": 1545834530085142678,
 
     # ========================================================
@@ -72,14 +70,12 @@ PADRAO = {
 
 CAMPOS_ID = (
     "support_role_id",
-    "log_channel_id",
     "ticket_category_id",
 
     "canal_eventos_id",
     "canal_parcerias_id",
     "cargo_categoria_parcerias_id",
 
-    "canal_auditoria_id",
     "canal_guerras_id",
 
     "canal_desafios_id",

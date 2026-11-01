@@ -6,11 +6,11 @@ from cogs import automod
 
 
 class TestDestinosAutoMod(unittest.TestCase):
-    def test_infracoes_apontam_para_canal_moderacao_atual(self):
-        self.assertEqual(automod.CANAL_INFRACOES_ID, 1563995882234450006)
+    def test_infracoes_sao_encaminhadas_ao_registro_global(self):
+        self.assertEqual(automod.registrar_global.__module__, "utils.registro_global")
 
     def test_auditoria_aponta_para_canal_logs_atual(self):
-        self.assertEqual(automod.CANAL_AUDITORIA_ID, 1563995882234450005)
+        self.assertEqual(automod.registrar_global.__module__, "utils.registro_global")
 
 
 class TestPersistenciaBanTemporario(unittest.IsolatedAsyncioTestCase):
