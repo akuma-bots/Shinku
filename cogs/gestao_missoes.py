@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils import missoes, revisoes
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 from utils.guild_config import lideranca_only, membro_tem_lideranca
 
 
@@ -72,7 +72,7 @@ async def _estatisticas(guild_id: int, atividade: dict) -> dict:
     }
 
 
-def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dict = None) -> discord.Embed:
+def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dict = None, guild: discord.Guild = None, bot: commands.Bot = None) -> discord.Embed:
     ativas = sum(1 for item in atividades if item.get("ativa", True) is not False)
     arquivadas = len(atividades) - ativas
     embed = criar_embed(
@@ -91,7 +91,7 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
             inline=False,
         )
         embed.set_footer(text="NÊMESIS • GESTÃO OPERACIONAL • Acesso restrito à administração")
-        return embed
+        return aplicar_identidade_servidor(embed, guild, bot)
 
     tipo = str(selecionada.get("tipo", "missao")).lower()
     ativa = selecionada.get("ativa", True) is not False
@@ -118,7 +118,7 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
     ]
     embed.add_field(
         name="◈ PARÂMETROS DA ATIVIDADE",
-        value="\\n".join(configuracao)[:1024],
+        value="\n".join(configuracao)[:1024],
         inline=False,
     )
     if estatisticas:
@@ -131,7 +131,7 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
                 f"**Provas registradas:** {estatisticas['total']}\n"
                 f"**Participantes únicos:** {estatisticas['participantes']}\n"
                 f"**XP aprovado estimado:** {estatisticas['xp_liberado_estimado']:,}".replace(",", ".")
-                + "\\n*Estimativa calculada pela recompensa atual da atividade.*"
+                + "\n*Estimativa calculada pela recompensa atual da atividade.*"
             ),
             inline=False,
         )
@@ -148,7 +148,7 @@ def _embed_central(atividades: list, selecionada: dict = None, estatisticas: dic
                 linhas.append(f"• {membro} — **{estado}** — `{item.get('id', '—')}`")
             embed.add_field(name="◈ ATIVIDADE RECENTE", value="\n".join(linhas), inline=False)
     embed.set_footer(text="NÊMESIS • GESTÃO OPERACIONAL • Alterações preservam o histórico")
-    return embed
+    return aplicar_identidade_servidor(embed, guild, bot)
 
 
 class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
@@ -227,7 +227,7 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
             nova.add_item(SeletorAtividade(nova, atividades, self.atividade_id))
             try:
                 await self.mensagem_original.edit(
-                    embed=_embed_central(atividades, selecionada, stats),
+                    embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
                     view=nova,
                 )
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
@@ -332,7 +332,7 @@ class CentralMissoesView(discord.ui.View):
         )
         nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
-            embed=_embed_central(atividades, selecionada, stats),
+            embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
             view=nova,
         )
 
@@ -361,7 +361,7 @@ class CentralMissoesView(discord.ui.View):
         )
         nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
-            embed=_embed_central(atividades, selecionada, stats),
+            embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
             view=nova,
         )
 
@@ -444,7 +444,7 @@ class GestaoMissoes(commands.Cog):
         view = CentralMissoesView(interaction.guild.id, interaction.user.id)
         view.add_item(SeletorAtividade(view, lista))
         await interaction.response.send_message(
-            embed=_embed_central(lista),
+            embed=_embed_central(lista, guild=interaction.guild, bot=self.bot),
             view=view,
             ephemeral=True,
         )

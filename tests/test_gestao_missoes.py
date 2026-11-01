@@ -1,6 +1,12 @@
 import unittest
+from types import SimpleNamespace
 
-from cogs.gestao_missoes import CentralMissoesView, SeletorAtividade, _ordenar_atividades
+from cogs.gestao_missoes import (
+    CentralMissoesView,
+    SeletorAtividade,
+    _embed_central,
+    _ordenar_atividades,
+)
 
 
 class TestCentralGestaoMissoes(unittest.TestCase):
@@ -40,6 +46,47 @@ class TestCentralGestaoMissoes(unittest.TestCase):
         ordenadas = _ordenar_atividades(list(reversed(self.atividades)))
         self.assertEqual(ordenadas[0]["id"], "MS-000")
         self.assertEqual(ordenadas[-1]["id"], "MS-062")
+
+
+    def test_embed_da_central_apresenta_quebras_de_linha_reais(self):
+        atividade = {
+            "id": "MS-001",
+            "titulo": "Operação de teste",
+            "tipo": "missao",
+            "descricao": "Descrição da operação",
+            "recompensa_xp": 120,
+            "dificuldade": "Intermediária",
+            "prazo": "7 dias",
+            "requisitos": "Participar de uma partida",
+            "ativa": True,
+        }
+        estatisticas = {
+            "pendente": 1,
+            "aprovada": 2,
+            "rejeitada": 0,
+            "total": 3,
+            "participantes": 2,
+            "xp_liberado_estimado": 240,
+            "registros": [{"id": "REV-001", "autor_id": 123, "status": "aprovada", "timestamp": 1}],
+        }
+        embed = _embed_central([atividade], atividade, estatisticas)
+        campos = {campo.name: campo.value for campo in embed.fields}
+        self.assertIn("\n", campos["◈ PARÂMETROS DA ATIVIDADE"])
+        self.assertNotIn("\\n", campos["◈ PARÂMETROS DA ATIVIDADE"])
+        self.assertIn("\n", campos["◈ INDICADORES"])
+
+    def test_embed_da_central_aplica_identidade_do_servidor_e_bot(self):
+        guild = SimpleNamespace(
+            icon=SimpleNamespace(url="https://example.com/server.png"),
+            banner=SimpleNamespace(url="https://example.com/banner.png"),
+        )
+        bot = SimpleNamespace(
+            user=SimpleNamespace(display_avatar=SimpleNamespace(url="https://example.com/bot.png"))
+        )
+        embed = _embed_central([], guild=guild, bot=bot)
+        self.assertEqual(embed.thumbnail.url, "https://example.com/server.png")
+        self.assertEqual(embed.image.url, "https://example.com/banner.png")
+        self.assertEqual(embed.author.icon_url, "https://example.com/bot.png")
 
 
 if __name__ == "__main__":
