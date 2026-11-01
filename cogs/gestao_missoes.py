@@ -185,32 +185,33 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
         except (TypeError, ValueError):
             await interaction.response.send_message("A recompensa deve ser um número inteiro entre 0 e 1.000.000 XP.", ephemeral=True)
             return
-        async with missoes._MISSOES_LOCK:
-            dados = await missoes._guild(self.guild_id)
-            alvo = next((item for item in dados["missoes"] if str(item.get("id")) == self.atividade_id), None)
-            if alvo is None:
-                await interaction.response.send_message("A atividade não existe mais no catálogo.", ephemeral=True)
-                return
-            linhas_config = str(self.requisitos_prazo.value or "").splitlines()
-            prazo = ""
-            requisitos = []
-            for linha in linhas_config:
-                if linha.strip().casefold().startswith("prazo:"):
-                    prazo = linha.split(":", 1)[1].strip()[:100]
-                else:
-                    requisitos.append(linha)
-            alvo.update({
+        linhas_config = str(self.requisitos_prazo.value or "").splitlines()
+        prazo = ""
+        requisitos = []
+        for linha in linhas_config:
+            if linha.strip().casefold().startswith("prazo:"):
+                prazo = linha.split(":", 1)[1].strip()[:100]
+            else:
+                requisitos.append(linha)
+        alvo = await missoes.atualizar_missao(
+            self.guild_id,
+            self.atividade_id,
+            {
                 "titulo": str(self.titulo.value).strip(),
                 "descricao": str(self.descricao.value).strip(),
                 "recompensa_xp": xp,
-                "pontos": xp,
                 "dificuldade": str(self.dificuldade.value or "").strip(),
                 "requisitos": "\n".join(requisitos).strip()[:1000],
                 "prazo": prazo,
                 "atualizado_em": __import__("time").time(),
                 "atualizado_por": interaction.user.id,
-            })
-            await missoes._salvar_guild(self.guild_id, dados)
+            },
+        )
+        if alvo is None:
+            await interaction.response.send_message(
+                "A atividade não existe mais no catálogo.", ephemeral=True
+            )
+            return
         if self.mensagem_original is not None:
             atividades = _ordenar_atividades((await missoes._guild(self.guild_id)).get("missoes", []))
             selecionada = next(
@@ -400,21 +401,14 @@ class CentralMissoesView(discord.ui.View):
                 "Selecione uma atividade antes de alterar o estado.", ephemeral=True
             )
             return
-        async with missoes._MISSOES_LOCK:
-            dados = await missoes._guild(self.guild_id)
-            alvo = next(
-                (item for item in dados["missoes"] if str(item.get("id")) == str(self.selecionada_id)),
-                None,
+        alvo = await missoes.alternar_estado_missao(
+            self.guild_id, self.selecionada_id, interaction.user.id
+        )
+        if alvo is None:
+            await interaction.response.send_message(
+                "A atividade não foi encontrada.", ephemeral=True
             )
-            if alvo is None:
-                await interaction.response.send_message(
-                    "A atividade não foi encontrada.", ephemeral=True
-                )
-                return
-            alvo["ativa"] = alvo.get("ativa", True) is False
-            alvo["atualizado_em"] = __import__("time").time()
-            alvo["atualizado_por"] = interaction.user.id
-            await missoes._salvar_guild(self.guild_id, dados)
+            return
         await self.atualizar(interaction)
 
     @discord.ui.button(label="Temporadas", style=discord.ButtonStyle.primary, emoji="🏆", row=3)

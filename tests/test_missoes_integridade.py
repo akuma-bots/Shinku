@@ -6,22 +6,18 @@ from utils import missoes
 
 class TestIntegridadeMissoes(unittest.IsolatedAsyncioTestCase):
     async def test_rejeita_recompensa_negativa_sem_gravar(self):
-        with patch.object(missoes, "carregar", new=AsyncMock(return_value={"guilds": {}})), patch.object(
-            missoes, "salvar", new=AsyncMock()
-        ) as salvar:
+        with patch.object(missoes, "_atualizar_guild", new=AsyncMock()) as atualizar:
             with self.assertRaisesRegex(ValueError, "não pode ser negativa"):
                 await missoes.criar(123, "missao", "Treino", "Descrição", -50)
 
-        salvar.assert_not_awaited()
+        atualizar.assert_not_awaited()
 
     async def test_rejeita_titulo_vazio(self):
-        with patch.object(missoes, "carregar", new=AsyncMock(return_value={"guilds": {}})), patch.object(
-            missoes, "salvar", new=AsyncMock()
-        ) as salvar:
+        with patch.object(missoes, "_atualizar_guild", new=AsyncMock()) as atualizar:
             with self.assertRaisesRegex(ValueError, "título"):
                 await missoes.criar(123, "missao", "  ", "Descrição", 10)
 
-        salvar.assert_not_awaited()
+        atualizar.assert_not_awaited()
 
     async def test_missao_legada_com_recompensa_negativa_e_normalizada_para_zero(self):
         normalizada = missoes._normalizar_missao({
@@ -51,10 +47,12 @@ class TestIntegridadeMissoes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([s["id"] for s in submissoes], ["sub-1"])
 
     async def test_criacao_valida_persiste_recompensa_nao_negativa(self):
-        dados = {"guilds": {}}
-        with patch.object(missoes, "carregar", new=AsyncMock(return_value=dados)), patch.object(
-            missoes, "salvar", new=AsyncMock()
-        ) as salvar:
+        async def atualizar(_guild_id, transformador):
+            guild = {"missoes": [], "submissoes": []}
+            transformador(guild)
+            return guild
+
+        with patch.object(missoes, "_atualizar_guild", new=AsyncMock(side_effect=atualizar)) as salvar:
             criada = await missoes.criar(123, "missao", "Treino", "Descrição", 25)
 
         self.assertEqual(criada["recompensa_xp"], 25)

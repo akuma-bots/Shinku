@@ -2525,19 +2525,9 @@ class Missoes(commands.Cog):
                     )
 
 
-        dados_guild = await missoes._guild(guild.id)
-        alvo = next(
-            (
-                item for item in dados_guild.get("missoes", [])
-                if str(item.get("id")) == str(atividade.get("id"))
-            ),
-            None,
+        await missoes.registrar_recompensa_aplicada(
+            guild.id, str(atividade.get("id")), str(revisao_id)
         )
-        if alvo is not None:
-            aplicadas = alvo.setdefault("recompensas_aplicadas", [])
-            if revisao_id not in aplicadas:
-                aplicadas.append(revisao_id)
-            await missoes._salvar_guild(guild.id, dados_guild)
 
         mensagens = []
         for resultado in resultados:

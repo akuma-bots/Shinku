@@ -2,7 +2,7 @@ import asyncio
 import time
 import uuid
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 
 ARQUIVO_REVISOES = "revisoes.json"
@@ -235,17 +235,24 @@ async def _tudo():
     return dados if isinstance(dados, dict) else {}
 
 
-async def _salvar_guild(
-    guild_id: int,
-    lista: list,
-):
-    dados = await _tudo()
-    dados[str(guild_id)] = lista
+async def _atualizar_guild(guild_id: int, transformador):
+    """Aplica mutações sobre a versão mais recente do documento via CAS."""
+    chave = str(guild_id)
 
-    await salvar(
-        ARQUIVO_REVISOES,
-        dados,
-    )
+    def aplicar(documento):
+        if not isinstance(documento, dict):
+            documento = {}
+        lista = documento.get(chave, [])
+        if not isinstance(lista, list):
+            lista = []
+        lista = [item for item in lista if isinstance(item, dict)]
+        transformador(lista)
+        documento[chave] = lista
+        return documento
+
+    documento = await atualizar_json(ARQUIVO_REVISOES, {}, aplicar)
+    lista = documento.get(chave, [])
+    return lista if isinstance(lista, list) else []
 
 
 async def listar(
@@ -268,15 +275,9 @@ async def listar(
 
 
 async def criar_pendencia(
-    guild_id: int,
-    tipo: str,
-    autor_id: int,
-    referencia_id: str,
-    print_url: str,
-    titulo: str,
-    descricao: str = None,
-    auxiliar_id: int = None,
-    recompensa_xp: int = None,
+    guild_id: int, tipo: str, autor_id: int, referencia_id: str,
+    print_url: str, titulo: str, descricao: str = None,
+    auxiliar_id: int = None, recompensa_xp: int = None,
 ) -> dict:
     tipo = str(tipo or "").strip().lower()
     if tipo not in {"pvp", "pve", "missao", "contribuicao", "especial"}:
@@ -291,60 +292,40 @@ async def criar_pendencia(
         raise ValueError("O participante não pode ser o próprio auxiliar.")
 
     async with _REVISOES_LOCK:
-
-        lista = await listar(guild_id)
-
-        # Idempotência para provas PvP: duas chamadas quase simultâneas
-        # não podem criar duas pendências para o mesmo desafio.
-        if str(tipo).lower() == "pvp":
-            existente = next(
-                (
-                    item for item in lista
-                    if isinstance(item, dict)
-                    and str(item.get("tipo", "")).lower() == "pvp"
-                    and str(item.get("referencia_id")) == str(referencia_id)
-                    and item.get("status") == "pendente"
-                ),
-                None,
-            )
-            if existente:
-                return existente
-
         revisao = {
-            "id": str(uuid.uuid4())[:8],
-            "guild_id": guild_id,
-            "tipo": tipo,
-            "autor_id": autor_id,
-            "referencia_id": referencia_id,
-            "print_url": print_url,
-            "titulo": titulo,
-            "descricao": descricao,
+            "id": str(uuid.uuid4())[:8], "guild_id": guild_id,
+            "tipo": tipo, "autor_id": autor_id, "referencia_id": referencia_id,
+            "print_url": print_url, "titulo": titulo, "descricao": descricao,
             "auxiliar_id": int(auxiliar_id) if auxiliar_id else None,
             "recompensa_xp": max(0, int(recompensa_xp or 0)) if recompensa_xp is not None else None,
-            "status": "pendente",
-            "revisor_id": None,
-            "motivo_rejeicao": None,
-            "timestamp": time.time(),
-            "mensagem_id": None,
-            "canal_id": None,
-            "hash_imagem": None,
-            "criado_em": time.time(),
-            "atualizado_em": time.time(),
-            "trilha_auditoria": [],
+            "status": "pendente", "revisor_id": None, "motivo_rejeicao": None,
+            "timestamp": time.time(), "mensagem_id": None, "canal_id": None,
+            "hash_imagem": None, "criado_em": time.time(),
+            "atualizado_em": time.time(), "trilha_auditoria": [],
         }
-        _adicionar_evento_auditoria(revisao, "protocolo_criado", autor_id,
-            status_anterior=None, status_novo="pendente", categoria=tipo,
-            referencia_id=referencia_id)
-
-        lista.append(revisao)
-
-        await _salvar_guild(
-            guild_id,
-            lista,
+        _adicionar_evento_auditoria(
+            revisao, "protocolo_criado", autor_id,
+            status_anterior=None, status_novo="pendente",
+            categoria=tipo, referencia_id=referencia_id,
         )
+        resultado = {"revisao": None}
 
-        return revisao
+        def aplicar(lista):
+            if tipo == "pvp":
+                existente = next((
+                    item for item in lista
+                    if str(item.get("tipo", "")).lower() == "pvp"
+                    and str(item.get("referencia_id")) == str(referencia_id)
+                    and item.get("status") == "pendente"
+                ), None)
+                if existente:
+                    resultado["revisao"] = existente
+                    return
+            lista.append(revisao)
+            resultado["revisao"] = revisao
 
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["revisao"]
 
 async def get(
     guild_id: int,
@@ -363,74 +344,42 @@ async def get(
 
 
 async def definir_mensagem(
-    guild_id: int,
-    revisao_id: str,
-    canal_id: int,
-    mensagem_id: int,
+    guild_id: int, revisao_id: str, canal_id: int, mensagem_id: int,
 ):
     async with _REVISOES_LOCK:
+        resultado = {"alvo": None}
+        def aplicar(lista):
+            alvo = next((item for item in lista if item.get("id") == revisao_id), None)
+            if not alvo:
+                resultado["alvo"] = None
+                return
+            alvo["canal_id"], alvo["mensagem_id"] = canal_id, mensagem_id
+            alvo["atualizado_em"] = time.time()
+            _adicionar_evento_auditoria(
+                alvo, "mensagem_publicada", status_novo=alvo.get("status"),
+                canal_id=canal_id, mensagem_id=mensagem_id,
+            )
+            resultado["alvo"] = alvo
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["alvo"]
 
-        lista = await listar(guild_id)
-
-        alvo = next(
-            (
-                revisao
-                for revisao in lista
-                if revisao.get("id") == revisao_id
-            ),
-            None,
-        )
-
-        if not alvo:
-            return None
-
-        alvo["canal_id"] = canal_id
-        alvo["mensagem_id"] = mensagem_id
-        alvo["atualizado_em"] = time.time()
-        _adicionar_evento_auditoria(alvo, "mensagem_publicada",
-            status_novo=alvo.get("status"), canal_id=canal_id, mensagem_id=mensagem_id)
-
-        await _salvar_guild(
-            guild_id,
-            lista,
-        )
-
-        return alvo
-
-
-async def definir_hash(
-    guild_id: int,
-    revisao_id: str,
-    hash_imagem: str,
-):
+async def definir_hash(guild_id: int, revisao_id: str, hash_imagem: str):
     async with _REVISOES_LOCK:
-
-        lista = await listar(guild_id)
-
-        alvo = next(
-            (
-                revisao
-                for revisao in lista
-                if revisao.get("id") == revisao_id
-            ),
-            None,
-        )
-
-        if not alvo:
-            return None
-
-        alvo["hash_imagem"] = hash_imagem
-        alvo["atualizado_em"] = time.time()
-        _adicionar_evento_auditoria(alvo, "hash_evidencia_registrado",
-            status_novo=alvo.get("status"), hash_prefixo=str(hash_imagem)[:16])
-
-        await _salvar_guild(
-            guild_id,
-            lista,
-        )
-
-        return alvo
-
+        resultado = {"alvo": None}
+        def aplicar(lista):
+            alvo = next((item for item in lista if item.get("id") == revisao_id), None)
+            if not alvo:
+                resultado["alvo"] = None
+                return
+            alvo["hash_imagem"] = hash_imagem
+            alvo["atualizado_em"] = time.time()
+            _adicionar_evento_auditoria(
+                alvo, "hash_evidencia_registrado",
+                status_novo=alvo.get("status"), hash_prefixo=str(hash_imagem)[:16],
+            )
+            resultado["alvo"] = alvo
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["alvo"]
 
 async def buscar_por_hash(
     guild_id: int,
@@ -452,147 +401,96 @@ async def buscar_por_hash(
     ]
 
 
-async def aprovar(
-    guild_id: int,
-    revisao_id: str,
-    revisor_id: int,
-):
+async def aprovar(guild_id: int, revisao_id: str, revisor_id: int):
     async with _REVISOES_LOCK:
+        resultado = {"alvo": None}
 
-        lista = await listar(guild_id)
+        def aplicar(lista):
+            alvo = next((item for item in lista if item.get("id") == revisao_id), None)
+            if not alvo or alvo.get("status") != "pendente":
+                resultado["alvo"] = None
+                return
+            agora = time.time()
+            alvo["status"] = "aprovada"
+            alvo["revisor_id"] = revisor_id
+            alvo["aprovado_em"] = agora
+            alvo["atualizado_em"] = agora
+            _adicionar_evento_auditoria(
+                alvo, "protocolo_aprovado", revisor_id,
+                status_anterior="pendente", status_novo="aprovada",
+            )
+            resultado["alvo"] = alvo
 
-        alvo = next(
-            (
-                revisao
-                for revisao in lista
-                if revisao.get("id") == revisao_id
-            ),
-            None,
-        )
-
-        if not alvo:
-            return None
-
-        if alvo.get("status") != "pendente":
-            return None
-
-        status_anterior = alvo.get("status")
-        alvo["status"] = "aprovada"
-        alvo["revisor_id"] = revisor_id
-        alvo["aprovado_em"] = time.time()
-        alvo["atualizado_em"] = time.time()
-        _adicionar_evento_auditoria(alvo, "protocolo_aprovado", revisor_id,
-            status_anterior=status_anterior, status_novo="aprovada")
-
-        await _salvar_guild(
-            guild_id,
-            lista,
-        )
-
-        return alvo
-
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["alvo"]
 
 async def rejeitar(
-    guild_id: int,
-    revisao_id: str,
-    revisor_id: int,
-    motivo: str = None,
+    guild_id: int, revisao_id: str, revisor_id: int, motivo: str = None,
 ):
     motivo = str(motivo or "").strip()
     if len(motivo) < 8:
         raise ValueError("Informe um motivo de rejeição com pelo menos 8 caracteres.")
     motivo = motivo[:800]
     async with _REVISOES_LOCK:
+        resultado = {"alvo": None}
 
-        lista = await listar(guild_id)
+        def aplicar(lista):
+            alvo = next((item for item in lista if item.get("id") == revisao_id), None)
+            if not alvo or alvo.get("status") != "pendente":
+                resultado["alvo"] = None
+                return
+            agora = time.time()
+            alvo["status"] = "rejeitada"
+            alvo["revisor_id"] = revisor_id
+            alvo["motivo_rejeicao"] = motivo
+            alvo["rejeitada_em"] = agora
+            alvo["atualizado_em"] = agora
+            _adicionar_evento_auditoria(
+                alvo, "protocolo_rejeitado", revisor_id,
+                status_anterior="pendente", status_novo="rejeitada",
+                justificativa=motivo,
+            )
+            resultado["alvo"] = alvo
 
-        alvo = next(
-            (
-                revisao
-                for revisao in lista
-                if revisao.get("id") == revisao_id
-            ),
-            None,
-        )
-
-        if not alvo:
-            return None
-
-        if alvo.get("status") != "pendente":
-            return None
-
-        status_anterior = alvo.get("status")
-        alvo["status"] = "rejeitada"
-        alvo["revisor_id"] = revisor_id
-        alvo["motivo_rejeicao"] = motivo
-        alvo["rejeitada_em"] = time.time()
-        alvo["atualizado_em"] = time.time()
-        _adicionar_evento_auditoria(alvo, "protocolo_rejeitado", revisor_id,
-            status_anterior=status_anterior, status_novo="rejeitada", justificativa=motivo)
-
-        await _salvar_guild(
-            guild_id,
-            lista,
-        )
-
-        return alvo
-
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["alvo"]
 
 async def reabrir_apos_falha_aplicacao(
-    guild_id: int,
-    revisao_id: str,
-    erro_tipo: str = "Erro",
+    guild_id: int, revisao_id: str, erro_tipo: str = "Erro",
 ):
-    """Devolve uma aprovação com falha para pendente, permitindo nova tentativa."""
+    """Devolve uma aprovação com falha para pendente sem sobrescrever dados concorrentes."""
     async with _REVISOES_LOCK:
-        lista = await listar(guild_id)
-        alvo = next(
-            (item for item in lista if item.get("id") == revisao_id),
-            None,
-        )
-        if not alvo or alvo.get("status") != "aprovada":
-            return None
+        resultado = {"alvo": None}
 
-        status_anterior = alvo.get("status")
-        alvo["status"] = "pendente"
-        alvo["falha_aplicacao_tipo"] = str(erro_tipo)[:100]
-        alvo["falha_aplicacao_em"] = time.time()
-        alvo["atualizado_em"] = time.time()
-        _adicionar_evento_auditoria(alvo, "aplicacao_reaberta_apos_falha",
-            status_anterior=status_anterior, status_novo="pendente", erro_tipo=str(erro_tipo)[:100])
-        await _salvar_guild(guild_id, lista)
-        return alvo
+        def aplicar(lista):
+            alvo = next((item for item in lista if item.get("id") == revisao_id), None)
+            if not alvo or alvo.get("status") != "aprovada":
+                resultado["alvo"] = None
+                return
+            agora = time.time()
+            alvo["status"] = "pendente"
+            alvo["falha_aplicacao_tipo"] = str(erro_tipo)[:100]
+            alvo["falha_aplicacao_em"] = agora
+            alvo["atualizado_em"] = agora
+            _adicionar_evento_auditoria(
+                alvo, "aplicacao_reaberta_apos_falha",
+                status_anterior="aprovada", status_novo="pendente",
+                erro_tipo=str(erro_tipo)[:100],
+            )
+            resultado["alvo"] = alvo
 
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["alvo"]
 
-async def normalizar_revisoes_guild(
-    guild_id: int,
-) -> int:
+async def normalizar_revisoes_guild(guild_id: int) -> int:
     async with _REVISOES_LOCK:
+        resultado = {"quantidade": 0}
 
-        lista = await listar(guild_id)
+        def aplicar(lista):
+            for revisao in lista:
+                revisao.setdefault("guild_id", guild_id)
+                revisao.setdefault("atualizado_em", time.time())
+            resultado["quantidade"] = len(lista)
 
-        quantidade = 0
-
-        for revisao in lista:
-
-            if not isinstance(revisao, dict):
-                continue
-
-            revisao.setdefault(
-                "guild_id",
-                guild_id,
-            )
-
-            revisao.setdefault(
-                "atualizado_em",
-                time.time(),
-            )
-
-            quantidade += 1
-
-        await _salvar_guild(
-            guild_id,
-            lista,
-        )
-
-        return quantidade
+        await _atualizar_guild(guild_id, aplicar)
+        return resultado["quantidade"]

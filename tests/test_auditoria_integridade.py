@@ -56,8 +56,12 @@ class TestAuditoriaIntegridade(unittest.TestCase):
 
 class TestTrilhaAuditoriaRevisoes(unittest.IsolatedAsyncioTestCase):
     async def test_criacao_registra_evento_inicial_sem_apagar_legado(self):
-        with patch.object(revisoes, "carregar", new=AsyncMock(side_effect=[{}, {}])), \
-             patch.object(revisoes, "salvar", new=AsyncMock()):
+        async def atualizar(_guild_id, transformador):
+            lista = []
+            transformador(lista)
+            return lista
+
+        with patch.object(revisoes, "_atualizar_guild", new=AsyncMock(side_effect=atualizar)):
             registro = await revisoes.criar_pendencia(
                 10, "missao", 20, "ref-1", "https://cdn.example/prova.png",
                 "Missão de teste", recompensa_xp=100,

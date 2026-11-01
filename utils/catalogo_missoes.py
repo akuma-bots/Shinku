@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from utils import missoes as armazenamento
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 
 ARQUIVO_MENSAGENS_DISCORD = "missoes_discord.json"
@@ -54,75 +54,63 @@ def carregar_catalogo() -> list:
 
 
 async def sincronizar_catalogo(guild_id: int, catalogo: list = None) -> list:
-    """Mescla as missões do GitHub sem apagar histórico nem provas já aplicadas."""
+    """Mescla o catálogo versionado sobre a versão mais recente do servidor."""
     catalogo = catalogo if catalogo is not None else carregar_catalogo()
-    guild_data = await armazenamento._guild(guild_id)
-    existentes = {
-        str(item.get("id")): item
-        for item in guild_data.get("missoes", [])
-        if isinstance(item, dict)
-    }
+    resultado = {"atualizadas": []}
 
-    ids_padrao = {str(item["id"]) for item in catalogo}
-    # As missões antigas sem jogo são arquivadas na migração para os três catálogos.
-    ids_legados = {
-        missao_id
-        for missao_id in existentes
-        if missao_id.startswith("NM")
-        and missao_id[2:].isdigit()
-        and any(item_id.endswith("-" + missao_id) for item_id in ids_padrao)
-    }
-    atualizadas = []
+    def mesclar(guild_data):
+        existentes = {
+            str(item.get("id")): item
+            for item in guild_data.get("missoes", [])
+            if isinstance(item, dict)
+        }
+        ids_padrao = {str(item["id"]) for item in catalogo}
+        ids_legados = {
+            missao_id for missao_id in existentes
+            if missao_id.startswith("NM") and missao_id[2:].isdigit()
+            and any(item_id.endswith("-" + missao_id) for item_id in ids_padrao)
+        }
+        atualizadas = []
+        for definicao in catalogo:
+            missao_id = str(definicao["id"])
+            antiga = existentes.get(missao_id, {})
+            atual = armazenamento._normalizar_missao({
+                **antiga, **definicao, "id": missao_id, "origem": "github",
+                "recompensas_aplicadas": antiga.get("recompensas_aplicadas", []),
+                "discord_message_id": antiga.get("discord_message_id"),
+                "discord_channel_id": antiga.get("discord_channel_id"),
+            })
+            atual["canal_config"] = definicao.get("canal_config", "")
+            atualizadas.append(atual)
 
-    for definicao in catalogo:
-        missao_id = str(definicao["id"])
-        antiga = existentes.get(missao_id, {})
-        atual = armazenamento._normalizar_missao({
-            **antiga,
-            **definicao,
-            "id": missao_id,
-            "origem": "github",
-            "recompensas_aplicadas": antiga.get("recompensas_aplicadas", []),
-            "discord_message_id": antiga.get("discord_message_id"),
-            "discord_channel_id": antiga.get("discord_channel_id"),
-        })
-        atual["canal_config"] = definicao.get("canal_config", "")
-        atualizadas.append(atual)
+        for missao_id in ids_legados:
+            antiga = existentes[missao_id]
+            atualizadas.append(armazenamento._normalizar_missao({
+                **antiga, "ativa": False,
+                "origem": antiga.get("origem", "migracao"),
+            }))
 
-    # Mantém os registros antigos para histórico, mas desativa a submissão por eles.
-    for missao_id in ids_legados:
-        antiga = existentes[missao_id]
-        arquivada = armazenamento._normalizar_missao({
-            **antiga,
-            "ativa": False,
-            "origem": antiga.get("origem", "migracao"),
-        })
-        atualizadas.append(arquivada)
+        ids_catalogo = {str(item["id"]) for item in catalogo}
+        for item in guild_data.get("missoes", []):
+            identificador = str(item.get("id") or "")
+            if not identificador.startswith(("SHI-", "GAK-", "FIS-")):
+                continue
+            sufixo = identificador.split("-", 1)[1] if "-" in identificador else ""
+            if sufixo in ids_catalogo:
+                item["ativa"] = False
+                item["origem"] = "migracao_global"
+                item["arquivada_em"] = __import__("time").time()
 
-    # Migra cópias históricas geradas por jogo para arquivo, sem apagar provas,
-    # recompensas aplicadas ou referências de mensagens antigas.
-    ids_catalogo = {str(item["id"]) for item in catalogo}
-    prefixos_legados = ("SHI-", "GAK-", "FIS-")
-    duplicadas_legadas = []
-    for item in guild_data.get("missoes", []):
-        identificador = str(item.get("id") or "")
-        if not identificador.startswith(prefixos_legados):
-            continue
-        sufixo = identificador.split("-", 1)[1] if "-" in identificador else ""
-        if sufixo in ids_catalogo:
-            item["ativa"] = False
-            item["origem"] = "migracao_global"
-            item["arquivada_em"] = __import__("time").time()
-            duplicadas_legadas.append(identificador)
+        personalizadas = [
+            item for item in guild_data.get("missoes", [])
+            if str(item.get("id")) not in ids_padrao
+            and str(item.get("id")) not in ids_legados
+        ]
+        guild_data["missoes"] = personalizadas + atualizadas
+        resultado["atualizadas"] = atualizadas
 
-    personalizadas = [
-        item for item in guild_data.get("missoes", [])
-        if str(item.get("id")) not in ids_padrao
-        and str(item.get("id")) not in ids_legados
-    ]
-    guild_data["missoes"] = personalizadas + atualizadas
-    await armazenamento._salvar_guild(guild_id, guild_data)
-    return atualizadas
+    await armazenamento._atualizar_guild(guild_id, mesclar)
+    return resultado["atualizadas"]
 
 
 async def obter_mensagem_discord(guild_id: int, missao_id: str) -> dict:
@@ -134,27 +122,31 @@ async def obter_mensagem_discord(guild_id: int, missao_id: str) -> dict:
 
 
 async def salvar_mensagem_discord(
-    guild_id: int,
-    missao_id: str,
-    canal_id: int,
-    mensagem_ids,
+    guild_id: int, missao_id: str, canal_id: int, mensagem_ids,
 ) -> None:
-    """Persiste todas as mensagens de uma missão, mantendo compatibilidade com IDs antigos."""
+    """Persiste IDs das mensagens sem sobrescrever atualizações concorrentes."""
     if isinstance(mensagem_ids, (str, int)):
         ids = [int(mensagem_ids)]
     else:
         ids = [int(valor) for valor in (mensagem_ids or [])]
-
     if not ids:
         raise ValueError("É necessário salvar pelo menos um ID de mensagem.")
 
-    dados = await carregar(ARQUIVO_MENSAGENS_DISCORD, {})
-    if not isinstance(dados, dict):
-        dados = {}
-    guild = dados.setdefault(str(guild_id), {})
-    guild[str(missao_id)] = {
-        "discord_channel_id": int(canal_id),
-        "discord_message_id": ids[0],
-        "discord_message_ids": ids,
-    }
-    await salvar(ARQUIVO_MENSAGENS_DISCORD, dados)
+    chave_guild = str(guild_id)
+    chave_missao = str(missao_id)
+
+    def atualizar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        guild = dados.get(chave_guild)
+        if not isinstance(guild, dict):
+            guild = {}
+        guild[chave_missao] = {
+            "discord_channel_id": int(canal_id),
+            "discord_message_id": ids[0],
+            "discord_message_ids": ids,
+        }
+        dados[chave_guild] = guild
+        return dados
+
+    await atualizar_json(ARQUIVO_MENSAGENS_DISCORD, {}, atualizar)
