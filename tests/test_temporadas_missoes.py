@@ -22,9 +22,10 @@ class TestTemporadasMissoes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(estado["recompensas"]["1"], "Distinção de Campeão da Temporada")
 
     async def test_rejeita_duracao_e_meta_fora_dos_limites(self):
-        with patch.object(temporadas_missoes, "get_estado", new=AsyncMock(return_value=temporadas_missoes._normalizar_estado({}))), patch.object(
-            temporadas_missoes, "_salvar_estado", new=AsyncMock()
-        ) as salvar:
+        async def atualizar(_guild_id, transformador):
+            return transformador(temporadas_missoes._normalizar_estado({}))
+
+        with patch.object(temporadas_missoes, "_atualizar_estado", new=AsyncMock(side_effect=atualizar)) as salvar:
             with self.assertRaisesRegex(ValueError, "1 e 365"):
                 await temporadas_missoes.configurar(123, duracao_dias=0)
             with self.assertRaisesRegex(ValueError, "1 e 100.000.000"):
@@ -33,9 +34,11 @@ class TestTemporadasMissoes(unittest.IsolatedAsyncioTestCase):
 
     async def test_configuracao_inicia_temporada_e_define_prazo(self):
         estado = temporadas_missoes._normalizar_estado({})
-        with patch.object(temporadas_missoes, "get_estado", new=AsyncMock(return_value=estado)), patch.object(
-            temporadas_missoes, "_salvar_estado", new=AsyncMock()
-        ) as salvar:
+
+        async def atualizar(_guild_id, transformador):
+            return transformador(estado)
+
+        with patch.object(temporadas_missoes, "_atualizar_estado", new=AsyncMock(side_effect=atualizar)) as salvar:
             resultado = await temporadas_missoes.configurar(
                 123, agora=1000, duracao_dias=7, meta_xp=5000,
                 recompensa_1="Medalha sazonal",
@@ -92,9 +95,12 @@ class TestTemporadasMissoes(unittest.IsolatedAsyncioTestCase):
             "provas_aprovadas": 2,
             "participantes": 1,
         }
+        async def atualizar(_guild_id, transformador):
+            return transformador(estado)
+
         with patch.object(temporadas_missoes, "get_estado", new=AsyncMock(return_value=estado)), patch.object(
             temporadas_missoes, "calcular_resultados", new=AsyncMock(return_value=resultados)
-        ), patch.object(temporadas_missoes, "_salvar_estado", new=AsyncMock()) as salvar:
+        ), patch.object(temporadas_missoes, "_atualizar_estado", new=AsyncMock(side_effect=atualizar)) as salvar:
             registro = await temporadas_missoes.encerrar_temporada(123, agora=200)
 
         self.assertEqual(registro["numero"], 4)

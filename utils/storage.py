@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import copy
 import tempfile
 from pathlib import Path
 from threading import Lock
@@ -346,6 +347,105 @@ async def salvar(
         nome_arquivo,
         dados,
     )
+
+
+
+# =========================================================
+# ATUALIZAÇÃO JSON ATÔMICA
+# =========================================================
+
+_SCRIPT_CAS_JSON = (
+    "local atual = redis.call('GET', KEYS[1]); "
+    "if ARGV[1] == '__NEMESIS_NIL__' then "
+    "if atual ~= false then return 0 end "
+    "elseif atual ~= ARGV[1] then return 0 end; "
+    "redis.call('SET', KEYS[1], ARGV[2]); return 1"
+)
+
+
+async def atualizar_json(
+    nome_arquivo: str,
+    padrao,
+    transformador,
+    max_tentativas: int = 8,
+):
+    """Atualiza um documento JSON sem janela de perda entre leitura e gravação.
+
+    No Upstash usa compare-and-set via EVAL, com repetição limitada em caso
+    de concorrência. No armazenamento local mantém leitura, transformação e
+    substituição dentro do mesmo lock. O transformador deve ser síncrono,
+    determinístico e seguro para ser executado novamente.
+    """
+    if not callable(transformador):
+        raise TypeError("O transformador do armazenamento precisa ser chamável.")
+    tentativas = max(1, min(int(max_tentativas), 32))
+
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise ErroStorage(
+            "Configuração parcial do Upstash: configure URL e token juntos; "
+            "o armazenamento local não será usado como fallback silencioso."
+        )
+
+    if USANDO_UPSTASH:
+        chave = _chave_bot(nome_arquivo)
+        for _ in range(tentativas):
+            bruto = await _comando_redis("GET", chave)
+            esperado = bruto
+            if bruto is None:
+                # Migração legada somente como origem de leitura; a gravação
+                # no namespace privado ainda ocorre por CAS contra chave ausente.
+                esperado = "__NEMESIS_NIL__"
+                bruto = await _comando_redis("GET", nome_arquivo)
+            if bruto is None:
+                atual = copy.deepcopy(padrao)
+                esperado = "__NEMESIS_NIL__"
+            else:
+                try:
+                    atual = json.loads(bruto)
+                except (json.JSONDecodeError, TypeError) as erro:
+                    raise ErroStorage(
+                        f"Os dados armazenados em {nome_arquivo} são inválidos."
+                    ) from erro
+
+            novo = transformador(atual)
+            if novo is None:
+                novo = atual
+            try:
+                conteudo = json.dumps(novo, ensure_ascii=False, separators=(",", ":"))
+            except (TypeError, ValueError) as erro:
+                raise ErroStorage(
+                    f"Não foi possível serializar os dados de {nome_arquivo}."
+                ) from erro
+
+            confirmado = await _comando_redis(
+                "EVAL", _SCRIPT_CAS_JSON, "1", chave, esperado, conteudo
+            )
+            if str(confirmado) == "1":
+                return novo
+
+        raise ErroStorage(
+            f"Conflito concorrente ao atualizar {nome_arquivo}; "
+            "nenhuma gravação foi confirmada após várias tentativas."
+        )
+
+    caminho = _path(nome_arquivo)
+    with _lock:
+        if not caminho.exists():
+            atual = copy.deepcopy(padrao)
+        else:
+            try:
+                with open(caminho, "r", encoding="utf-8") as arquivo:
+                    atual = json.load(arquivo)
+            except json.JSONDecodeError as erro:
+                raise ErroStorage(
+                    f"O arquivo {nome_arquivo} possui JSON inválido."
+                ) from erro
+
+        novo = transformador(atual)
+        if novo is None:
+            novo = atual
+        _escrever_json_atomico(caminho, novo)
+        return novo
 
 
 # =========================================================

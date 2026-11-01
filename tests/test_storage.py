@@ -1,3 +1,4 @@
+import asyncio
 import json
 import tempfile
 import unittest
@@ -62,6 +63,100 @@ class TestStorageConfiguracao(unittest.IsolatedAsyncioTestCase):
                 await storage.carregar("estado.json", {})
             with self.assertRaises(storage.ErroStorage):
                 await storage.salvar("estado.json", {})
+
+
+class TestAtualizacaoAtomica(unittest.IsolatedAsyncioTestCase):
+    async def test_atualizacao_local_preserva_incrementos_concorrentes(self):
+        with tempfile.TemporaryDirectory() as pasta, patch.object(storage, "DATA_DIR", Path(pasta)), patch.multiple(
+            storage, USANDO_UPSTASH=False, UPSTASH_CONFIG_INCOMPLETA=False
+        ):
+            async def incrementar(_):
+                return await storage.atualizar_json(
+                    "contador.json", {"total": 0},
+                    lambda estado: {**estado, "total": estado["total"] + 1},
+                )
+
+            await asyncio.gather(*(incrementar(i) for i in range(75)))
+            resultado = await storage.carregar("contador.json", {})
+            self.assertEqual(resultado["total"], 75)
+
+    async def test_upstash_compare_and_set_repete_apos_conflito(self):
+        estado_remoto = {"valor": 1}
+        leituras = 0
+        chamadas_eval = 0
+
+        async def redis_mock(*args):
+            nonlocal leituras, chamadas_eval, estado_remoto
+            if args[0] == "GET":
+                leituras += 1
+                return json.dumps(estado_remoto, separators=(",", ":"))
+            if args[0] == "EVAL":
+                chamadas_eval += 1
+                esperado, novo = args[-2], args[-1]
+                atual = json.dumps(estado_remoto, separators=(",", ":"))
+                if chamadas_eval == 1:
+                    estado_remoto = {"valor": 5}
+                    return 0
+                if esperado == atual:
+                    estado_remoto = json.loads(novo)
+                    return 1
+                return 0
+            raise AssertionError(args)
+
+        with patch.multiple(storage, USANDO_UPSTASH=True, UPSTASH_CONFIG_INCOMPLETA=False), patch.object(
+            storage, "_comando_redis", side_effect=redis_mock
+        ):
+            resultado = await storage.atualizar_json(
+                "contador.json", {"valor": 0},
+                lambda atual: {**atual, "valor": atual["valor"] + 1},
+            )
+
+        self.assertEqual(leituras, 2)
+        self.assertEqual(chamadas_eval, 2)
+        self.assertEqual(resultado, {"valor": 6})
+
+    async def test_migracao_legada_usa_cas_na_chave_privada_ausente(self):
+        chamadas = []
+
+        async def redis_mock(*args):
+            chamadas.append(args)
+            if args == ("GET", "nemesis_bot:perfil.json"):
+                return None
+            if args == ("GET", "perfil.json"):
+                return '{"xp": 4}'
+            if args[0] == "EVAL":
+                self.assertEqual(args[-2], "__NEMESIS_NIL__")
+                return 1
+            raise AssertionError(args)
+
+        with patch.multiple(storage, USANDO_UPSTASH=True, UPSTASH_CONFIG_INCOMPLETA=False), patch.object(
+            storage, "_comando_redis", side_effect=redis_mock
+        ):
+            resultado = await storage.atualizar_json(
+                "perfil.json", {},
+                lambda atual: {**atual, "xp": atual["xp"] + 3},
+            )
+
+        self.assertEqual(resultado, {"xp": 7})
+        self.assertEqual(chamadas[-1][0], "EVAL")
+
+    async def test_conflito_esgotado_nao_confirma_gravacao(self):
+        async def redis_mock(*args):
+            if args[0] == "GET":
+                return '{"valor": 1}'
+            if args[0] == "EVAL":
+                return 0
+            raise AssertionError(args)
+
+        with patch.multiple(storage, USANDO_UPSTASH=True, UPSTASH_CONFIG_INCOMPLETA=False), patch.object(
+            storage, "_comando_redis", side_effect=redis_mock
+        ):
+            with self.assertRaisesRegex(storage.ErroStorage, "Conflito concorrente"):
+                await storage.atualizar_json(
+                    "contador.json", {"valor": 0},
+                    lambda atual: {**atual, "valor": atual["valor"] + 1},
+                    max_tentativas=2,
+                )
 
 
 if __name__ == "__main__":

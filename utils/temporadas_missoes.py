@@ -7,7 +7,7 @@ import asyncio
 import math
 import time
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 from utils import revisoes
 
 
@@ -91,10 +91,19 @@ async def get_estado(guild_id: int) -> dict:
     return _normalizar_estado(dados.get(str(guild_id), {}))
 
 
-async def _salvar_estado(guild_id: int, estado: dict):
-    dados = await _todos()
-    dados[str(guild_id)] = estado
-    await salvar(ARQUIVO_TEMPORADAS_MISSOES, dados)
+async def _atualizar_estado(guild_id: int, transformador):
+    chave = str(guild_id)
+
+    def aplicar(documento):
+        if not isinstance(documento, dict):
+            documento = {}
+        estado = _normalizar_estado(documento.get(chave, {}))
+        novo_estado = transformador(estado)
+        documento[chave] = novo_estado if isinstance(novo_estado, dict) else estado
+        return documento
+
+    dados = await atualizar_json(ARQUIVO_TEMPORADAS_MISSOES, {}, aplicar)
+    return _normalizar_estado(dados.get(chave, {}))
 
 
 async def configurar(guild_id: int, agora: float = None, **campos) -> dict:
@@ -128,24 +137,25 @@ async def configurar(guild_id: int, agora: float = None, **campos) -> dict:
                 raise ValueError("As descrições das recompensas não podem ficar vazias.")
 
     async with _LOCK:
-        estado = await get_estado(guild_id)
-        recompensas = dict(estado["recompensas"])
-        for chave, valor in campos.items():
-            if chave.startswith("recompensa_"):
-                recompensas[chave.rsplit("_", 1)[1]] = valor
-            elif valor is not None:
-                estado[chave] = valor
-        estado["recompensas"] = recompensas
+        def aplicar(estado):
+            recompensas = dict(estado["recompensas"])
+            for chave, valor in campos.items():
+                if chave.startswith("recompensa_"):
+                    recompensas[chave.rsplit("_", 1)[1]] = valor
+                elif valor is not None:
+                    estado[chave] = valor
+            estado["recompensas"] = recompensas
 
-        if estado["inicio_timestamp"] is None:
-            estado["inicio_timestamp"] = agora
-            estado["fim_timestamp"] = agora + estado["duracao_dias"] * 86400
-        elif campos.get("duracao_dias") is not None:
-            estado["fim_timestamp"] = (
-                estado["inicio_timestamp"] + estado["duracao_dias"] * 86400
-            )
-        await _salvar_estado(guild_id, estado)
-        return estado
+            if estado["inicio_timestamp"] is None:
+                estado["inicio_timestamp"] = agora
+                estado["fim_timestamp"] = agora + estado["duracao_dias"] * 86400
+            elif campos.get("duracao_dias") is not None:
+                estado["fim_timestamp"] = (
+                    estado["inicio_timestamp"] + estado["duracao_dias"] * 86400
+                )
+            return estado
+
+        return await _atualizar_estado(guild_id, aplicar)
 
 
 def _timestamp_aprovacao(registro: dict):
@@ -294,21 +304,32 @@ async def encerrar_temporada(guild_id: int, agora: float = None) -> dict:
             "recompensas": dict(estado["recompensas"]),
             "canal_id": estado.get("canal_id"),
         }
-        historico = list(estado["historico"])
-        historico.append(registro)
-        estado["historico"] = historico[-100:]
-        pendentes = list(estado["anuncios_pendentes"])
-        pendentes.append(registro)
-        estado["anuncios_pendentes"] = pendentes[-20:]
+        def aplicar(estado_atual):
+            # Impede que um resultado calculado sobre uma temporada antiga
+            # sobrescreva uma configuração ou encerramento concorrente.
+            if (
+                estado_atual.get("numero_atual") != numero
+                or estado_atual.get("inicio_timestamp") != inicio
+                or estado_atual.get("fim_timestamp") != fim
+            ):
+                raise ValueError("A temporada foi alterada durante o encerramento; atualize o painel e tente novamente.")
+            if any(
+                isinstance(item, dict)
+                and _inteiro(item.get("numero"), -1, 0) == numero
+                for item in estado_atual["historico"]
+            ):
+                raise ValueError("Esta temporada já foi encerrada.")
 
-        # A próxima temporada começa imediatamente, inclusive quando a liderança
-        # encerra a atual antes do prazo previsto.
-        proximo_inicio = agora
-        estado["numero_atual"] = numero + 1
-        estado["inicio_timestamp"] = proximo_inicio
-        estado["fim_timestamp"] = proximo_inicio + estado["duracao_dias"] * 86400
+            estado_atual["historico"] = (list(estado_atual["historico"]) + [registro])[-100:]
+            estado_atual["anuncios_pendentes"] = (
+                list(estado_atual["anuncios_pendentes"]) + [registro]
+            )[-20:]
+            estado_atual["numero_atual"] = numero + 1
+            estado_atual["inicio_timestamp"] = agora
+            estado_atual["fim_timestamp"] = agora + estado_atual["duracao_dias"] * 86400
+            return estado_atual
 
-        await _salvar_estado(guild_id, estado)
+        await _atualizar_estado(guild_id, aplicar)
         return registro
 
 
@@ -324,12 +345,17 @@ async def listar_anuncios_pendentes(guild_id: int) -> list:
 
 async def marcar_anuncio_enviado(guild_id: int, numero: int):
     async with _LOCK:
-        estado = await get_estado(guild_id)
-        estado["anuncios_pendentes"] = [
-            item for item in estado["anuncios_pendentes"]
-            if not (isinstance(item, dict) and _inteiro(item.get("numero"), -1, 0) == int(numero))
-        ]
-        await _salvar_estado(guild_id, estado)
+        def aplicar(estado):
+            estado["anuncios_pendentes"] = [
+                item for item in estado["anuncios_pendentes"]
+                if not (
+                    isinstance(item, dict)
+                    and _inteiro(item.get("numero"), -1, 0) == int(numero)
+                )
+            ]
+            return estado
+
+        await _atualizar_estado(guild_id, aplicar)
 
 
 async def listar_recompensas_usuario(guild_id: int, user_id: int, limite: int = 20) -> list:
