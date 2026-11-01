@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import logging
 import re
 from urllib.parse import urlparse
@@ -597,6 +599,10 @@ class InteligenciaMissoesView(discord.ui.View):
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._navegar(interaction, 1)
 
+    @discord.ui.button(label="Relatórios", emoji="📑", style=discord.ButtonStyle.primary, row=1)
+    async def abrir_relatorios(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.enviar_painel_relatorios(interaction)
+
     @discord.ui.button(label="Atualizar", emoji="🔄", style=discord.ButtonStyle.success)
     async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
@@ -612,6 +618,190 @@ class InteligenciaMissoesView(discord.ui.View):
             embed=None,
             view=None,
         )
+
+
+PERIODOS_RELATORIOS = {
+    "7": ("Últimos 7 dias", 7 * 86400),
+    "30": ("Últimos 30 dias", 30 * 86400),
+    "90": ("Últimos 90 dias", 90 * 86400),
+    "total": ("Todo o histórico", None),
+}
+
+
+def _filtrar_relatorio_missoes(revisoes: list, periodo: str = "30", agora: float = None) -> list:
+    """Filtra evidências por data de envio; registros sem data só entram no histórico total."""
+    import time
+    agora = float(agora if agora is not None else time.time())
+    periodo = str(periodo or "30")
+    if periodo not in PERIODOS_RELATORIOS:
+        periodo = "30"
+    duracao = PERIODOS_RELATORIOS[periodo][1]
+    validas = [
+        item for item in revisoes
+        if isinstance(item, dict)
+        and str(item.get("tipo", "")).lower() in {"missao", "contribuicao", "especial", "pve"}
+        and item.get("status") in {"aprovada", "rejeitada", "pendente"}
+    ]
+    if duracao is None:
+        return sorted(validas, key=lambda item: _timestamp_relatorio(item), reverse=True)
+    limite = agora - duracao
+    return sorted(
+        [item for item in validas if (_timestamp_relatorio(item) is not None and _timestamp_relatorio(item) >= limite)],
+        key=lambda item: _timestamp_relatorio(item) or 0,
+        reverse=True,
+    )
+
+
+def _timestamp_relatorio(item: dict, campo: str = "timestamp"):
+    for chave in ((campo, "criado_em") if campo == "timestamp" else (campo,)):
+        try:
+            valor = item.get(chave)
+            if valor is not None:
+                return float(valor)
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return None
+
+
+def _linhas_csv_relatorio_missoes(revisoes: list) -> str:
+    """Exporta os registros filtrados com XP distribuído somente quando auditável."""
+    arquivo = io.StringIO(newline="")
+    campos = [
+        "protocolo", "titulo", "categoria", "status", "autor_id", "auxiliar_id",
+        "revisor_id", "enviado_em", "aprovado_em", "rejeitada_em",
+        "recompensa_xp_registrada", "xp_responsavel", "xp_auxiliar",
+        "motivo_rejeicao",
+    ]
+    escritor = csv.DictWriter(arquivo, fieldnames=campos, delimiter=";")
+    escritor.writeheader()
+    for item in revisoes:
+        recompensa = item.get("recompensa_xp")
+        try:
+            recompensa = max(0, int(recompensa)) if recompensa is not None and item.get("status") == "aprovada" else None
+        except (TypeError, ValueError, OverflowError):
+            recompensa = None
+        autor = str(item.get("autor_id") or "")
+        auxiliar = str(item.get("auxiliar_id") or "")
+        xp_autor = xp_auxiliar = ""
+        if recompensa is not None and autor:
+            if auxiliar and auxiliar != autor:
+                xp_autor = (recompensa * 60 + 50) // 100
+                xp_auxiliar = recompensa - xp_autor
+            else:
+                xp_autor = recompensa
+                xp_auxiliar = 0 if auxiliar else ""
+        escritor.writerow({
+            "protocolo": item.get("id", ""),
+            "titulo": item.get("titulo", ""),
+            "categoria": item.get("tipo", ""),
+            "status": item.get("status", ""),
+            "autor_id": autor,
+            "auxiliar_id": auxiliar,
+            "revisor_id": item.get("revisor_id") or "",
+            "enviado_em": _timestamp_relatorio(item),
+            "aprovado_em": _timestamp_relatorio(item, "aprovado_em") or "",
+            "rejeitada_em": _timestamp_relatorio(item, "rejeitada_em") or "",
+            "recompensa_xp_registrada": recompensa if recompensa is not None else "",
+            "xp_responsavel": xp_autor,
+            "xp_auxiliar": xp_auxiliar,
+            "motivo_rejeicao": item.get("motivo_rejeicao") or "",
+        })
+    return arquivo.getvalue()
+
+
+class RelatoriosMissoesView(discord.ui.View):
+    """Central privada de relatórios administrativos e exportação CSV."""
+
+    def __init__(self, cog, owner_id: int, periodo: str = "30", user_id: int = None):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = int(owner_id)
+        self.periodo = periodo if periodo in PERIODOS_RELATORIOS else "30"
+        self.user_id = int(user_id) if user_id else None
+        opcoes = [
+            discord.SelectOption(label=nome, value=valor, default=valor == self.periodo)
+            for valor, (nome, _) in PERIODOS_RELATORIOS.items()
+        ]
+        self.add_item(discord.ui.Select(
+            placeholder="◈ Período de apuração", min_values=1, max_values=1,
+            options=opcoes, row=0, custom_id="nemesis:relatorios:periodo",
+        ))
+        self.children[0].callback = self._selecionar_periodo
+        self.add_item(discord.ui.UserSelect(
+            placeholder="◈ Relatório individual (opcional)", min_values=1, max_values=1, row=1
+        ))
+        self.children[1].callback = self._selecionar_integrante
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "Os relatórios administrativos são exclusivos da liderança do OCTÓGONO.",
+                ephemeral=True,
+            )
+            return False
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "Esta sessão de relatórios foi aberta por outro integrante.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _selecionar_periodo(self, interaction: discord.Interaction):
+        self.periodo = interaction.data.get("values", ["30"])[0]
+        await self._atualizar(interaction)
+
+    async def _selecionar_integrante(self, interaction: discord.Interaction):
+        valores = interaction.data.get("resolved", {}).get("users", {})
+        ids = list(valores.keys())
+        self.user_id = int(ids[0]) if ids else None
+        await self._atualizar(interaction)
+
+    async def _atualizar(self, interaction: discord.Interaction):
+        embed = await self.cog._montar_embed_relatorio_missoes(
+            interaction.guild, self.periodo, self.user_id
+        )
+        await interaction.response.edit_message(
+            embed=embed,
+            view=RelatoriosMissoesView(self.cog, self.owner_id, self.periodo, self.user_id),
+        )
+
+    @discord.ui.button(label="Atualizar relatório", emoji="🔄", style=discord.ButtonStyle.success, row=2)
+    async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._atualizar(interaction)
+
+    @discord.ui.button(label="Exportar CSV", emoji="📄", style=discord.ButtonStyle.primary, row=2)
+    async def exportar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        from utils import revisoes as revisoes_storage
+        registros = _filtrar_relatorio_missoes(
+            await revisoes_storage.listar(interaction.guild.id), self.periodo
+        )
+        if self.user_id:
+            uid = str(self.user_id)
+            registros = [
+                item for item in registros
+                if uid in {str(item.get("autor_id") or ""), str(item.get("auxiliar_id") or "")}
+            ]
+        conteudo = _linhas_csv_relatorio_missoes(registros)
+        nome_periodo = self.periodo if self.periodo != "total" else "historico"
+        arquivo = discord.File(
+            io.BytesIO(conteudo.encode("utf-8-sig")),
+            filename=f"nemesis_relatorio_missoes_{nome_periodo}.csv",
+        )
+        await interaction.followup.send(
+            content=f"Exportação concluída · **{len(registros)}** protocolos incluídos.",
+            file=arquivo,
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger, row=2)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content="Central de relatórios encerrada.", embed=None, view=None)
 
 
 class HistoricoDesempenhoView(discord.ui.View):
@@ -1571,6 +1761,107 @@ class Missoes(commands.Cog):
 
 
 
+
+    async def enviar_painel_relatorios(self, interaction: discord.Interaction) -> None:
+        if (
+            interaction.guild is None
+            or not isinstance(interaction.user, discord.Member)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "Os relatórios administrativos são exclusivos da liderança do OCTÓGONO.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        embed = await self._montar_embed_relatorio_missoes(interaction.guild, "30")
+        await interaction.followup.send(
+            embed=embed,
+            view=RelatoriosMissoesView(self, interaction.user.id, "30"),
+            ephemeral=True,
+        )
+
+    async def _montar_embed_relatorio_missoes(
+        self, guild: discord.Guild, periodo: str = "30", user_id: int = None
+    ) -> discord.Embed:
+        from utils import revisoes as revisoes_storage
+        import time
+        todos = await revisoes_storage.listar(guild.id)
+        registros = _filtrar_relatorio_missoes(todos, periodo, time.time())
+        if user_id:
+            uid = str(user_id)
+            registros = [
+                item for item in registros
+                if uid in {str(item.get("autor_id") or ""), str(item.get("auxiliar_id") or "")}
+            ]
+        aprovadas = [item for item in registros if item.get("status") == "aprovada"]
+        rejeitadas = [item for item in registros if item.get("status") == "rejeitada"]
+        pendentes = [item for item in registros if item.get("status") == "pendente"]
+        xp_total = 0
+        for item in aprovadas:
+            recompensa = item.get("recompensa_xp")
+            if recompensa is None:
+                continue
+            try:
+                xp_total += max(0, int(recompensa))
+            except (TypeError, ValueError, OverflowError):
+                continue
+        nome_periodo = PERIODOS_RELATORIOS.get(periodo, PERIODOS_RELATORIOS["30"])[0]
+        membro = guild.get_member(int(user_id)) if user_id else None
+        titulo = "RELATÓRIO INDIVIDUAL" if user_id else "RELATÓRIO EXECUTIVO"
+        descricao = (
+            f"**INTEGRANTE** · {membro.mention if membro else f'<@{user_id}>'}\n"
+            if user_id else "**ACESSO RESTRITO · OCTÓGONO**\n"
+        )
+        descricao += f"Apuração: **{nome_periodo}** · Base: evidências oficiais de missões."
+        embed = criar_embed(
+            title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  {titulo}",
+            description=descricao,
+            cor=0x9F2035,
+            rodape="NÊMESIS • RELATÓRIOS ADMINISTRATIVOS • DADOS AUDITÁVEIS",
+        )
+        aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
+        if membro:
+            embed.set_thumbnail(url=membro.display_avatar.url)
+        embed.add_field(name="◈ VOLUME", value=f"**{len(registros)}** protocolos", inline=True)
+        embed.add_field(
+            name="◈ RESULTADOS",
+            value=f"**{len(aprovadas)}** aprovadas\n**{len(rejeitadas)}** rejeitadas\n**{len(pendentes)}** pendentes",
+            inline=True,
+        )
+        embed.add_field(
+            name="◈ XP REGISTRADO",
+            value=f"**{xp_total:,} XP** em recompensas persistidas".replace(",", "."),
+            inline=True,
+        )
+        por_categoria = {}
+        for item in registros:
+            tipo = str(item.get("tipo") or "missao")
+            por_categoria.setdefault(tipo, {"aprovada": 0, "rejeitada": 0, "pendente": 0})
+            por_categoria[tipo][item["status"]] += 1
+        linhas = []
+        rotulos = {"missao": "Missões", "contribuicao": "Contribuições", "especial": "Operações especiais", "pve": "PvE"}
+        for tipo, dados in sorted(por_categoria.items()):
+            linhas.append(
+                f"**{rotulos.get(tipo, tipo.title())}** · {dados['aprovada']} aprovadas · "
+                f"{dados['rejeitada']} rejeitadas · {dados['pendente']} pendentes"
+            )
+        embed.add_field(
+            name="◈ PRODUTIVIDADE POR CATEGORIA",
+            value="\n".join(linhas)[:1024] if linhas else "Nenhum protocolo no período selecionado.",
+            inline=False,
+        )
+        embed.add_field(
+            name="◈ CRITÉRIOS DE AUDITORIA",
+            value=(
+                "O período filtra pela data de envio da evidência. Protocolos sem data confiável "
+                "só aparecem em Todo o histórico. XP contabilizado apenas em aprovações com "
+                "recompensa persistida; a exportação detalha a divisão de 60%/40% quando há auxiliar."
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="NÊMESIS • EXPORTAÇÃO CSV DISPONÍVEL • ACESSO EXCLUSIVO À LIDERANÇA")
+        return embed
 
     async def _montar_embed_inteligencia(
         self, guild: discord.Guild, pagina: int = 0
