@@ -236,13 +236,17 @@ def _resumir_desempenho_missoes(revisoes: list, user_id: int, limite: int = 5) -
         and str(item.get("tipo", "")).lower() in {"missao", "contribuicao", "especial", "pve"}
         and item.get("status") in {"aprovada", "rejeitada", "pendente"}
     ]
-    registros.sort(
-        key=lambda item: float(
-            item.get("aprovado_em") or item.get("rejeitada_em")
-            or item.get("atualizado_em") or item.get("timestamp") or 0
-        ),
-        reverse=True,
-    )
+    def _data_ordenacao(item):
+        for campo in ("aprovado_em", "rejeitada_em", "atualizado_em", "timestamp"):
+            try:
+                valor = item.get(campo)
+                if valor is not None:
+                    return float(valor)
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return 0.0
+
+    registros.sort(key=_data_ordenacao, reverse=True)
     xp_rastreavel = 0
     xp_registros = 0
     for item in registros:
