@@ -1,47 +1,35 @@
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-import discord
-
 from utils import auditoria
 
 
 class TestResilienciaAuditoria(unittest.IsolatedAsyncioTestCase):
-    async def test_publica_embed_sem_mencoes(self):
-        canal = Mock()
-        canal.send = AsyncMock()
+    async def test_delega_para_topico_global_de_administracao(self):
         guild = Mock()
-        guild.id = 123
-        guild.get_channel.return_value = canal
-
-        with patch.object(auditoria, "get_config", new=AsyncMock(return_value={"canal_auditoria_id": 456})):
+        guild.id = 1563995879981981817
+        with patch("utils.registro_global.registrar", new=AsyncMock(return_value=True)) as registrar:
             resultado = await auditoria.registrar(guild, "Teste", "Detalhes <@999>")
-
         self.assertTrue(resultado)
-        canal.send.assert_awaited_once()
-        kwargs = canal.send.await_args.kwargs
-        self.assertIsInstance(kwargs["embed"], discord.Embed)
-        self.assertIsNotNone(kwargs["embed"].timestamp)
-        self.assertIsNotNone(kwargs["allowed_mentions"])
+        registrar.assert_awaited_once_with(
+            guild, "administracao", "Teste", "Detalhes <@999>", cor=0x99AAB5,
+        )
 
-    async def test_canal_indisponivel_nao_derruba_fluxo(self):
+    async def test_permite_especificar_categoria(self):
         guild = Mock()
-        guild.id = 123
-        guild.get_channel.return_value = None
-        guild.fetch_channel = AsyncMock(side_effect=discord.NotFound(Mock(), "not found"))
+        guild.id = 1563995879981981817
+        with patch("utils.registro_global.registrar", new=AsyncMock(return_value=True)) as registrar:
+            resultado = await auditoria.registrar(
+                guild, "Revisão aprovada", "Detalhes", categoria="sistemas",
+            )
+        self.assertTrue(resultado)
+        self.assertEqual(registrar.await_args.args[1], "sistemas")
 
-        with patch.object(auditoria, "get_config", new=AsyncMock(return_value={"canal_auditoria_id": 456})):
-            resultado = await auditoria.registrar(guild, "Teste", "Detalhes")
-
-        self.assertFalse(resultado)
-
-    async def test_auditoria_desativada_retorna_false(self):
+    async def test_retorna_false_quando_registro_global_falha(self):
         guild = Mock()
-        guild.id = 123
-
-        with patch.object(auditoria, "get_config", new=AsyncMock(return_value={"canal_auditoria_id": None})):
+        guild.id = 1563995879981981817
+        with patch("utils.registro_global.registrar", new=AsyncMock(return_value=False)):
             resultado = await auditoria.registrar(guild, "Teste", "Detalhes")
-
         self.assertFalse(resultado)
 
 

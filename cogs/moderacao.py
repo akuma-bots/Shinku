@@ -16,31 +16,17 @@ class Moderacao(commands.Cog):
         self.bot = bot
 
     async def _log(self, interaction: discord.Interaction, texto: str):
-        """Registra a ação sem transformar uma falha de log em falha do comando."""
-        from utils.guild_config import get_config
-
+        """Registra ações de moderação no tópico central, sem interromper comandos."""
         if interaction.guild is None:
             return
-
-        try:
-            config = await get_config(interaction.guild.id)
-            log_id = config.get("log_channel_id") or 1545838386944938024
-            if not log_id:
-                return
-
-            canal = interaction.guild.get_channel(int(log_id))
-            if canal is None:
-                canal = await interaction.guild.fetch_channel(int(log_id))
-
-            if not callable(getattr(canal, "send", None)):
-                logging.warning("Canal de logs %s não aceita mensagens.", log_id)
-                return
-
-            await canal.send(texto, allowed_mentions=discord.AllowedMentions.none())
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
-            logging.exception("Não foi possível registrar a ação de moderação no canal de logs.")
-        except Exception:
-            logging.exception("Falha inesperada ao registrar ação de moderação.")
+        from utils.registro_global import registrar
+        await registrar(
+            interaction.guild,
+            "moderacao",
+            "Ação de moderação",
+            texto,
+            cor=0xB3132B,
+        )
 
     async def _carregar_regras_oficiais(self, guild: discord.Guild):
         """

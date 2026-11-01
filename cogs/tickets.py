@@ -11,6 +11,7 @@ from utils.apresentacao import criar_embed
 from utils.storage import carregar_config
 from utils.guild_config import get_config, set_config, membro_tem_lideranca
 from utils import tickets
+from utils.registro_global import obter_topico, registrar as registrar_global
 
 
 log = logging.getLogger(__name__)
@@ -265,19 +266,16 @@ async def _montar_embed_painel(guild_id: int, guild: discord.Guild | None = None
 
 CANAL_AVALIACOES_TICKET_ID = 1563995881806758056
 
-CANAL_HISTORICO_TICKETS_ID = 1563995882540498997
 
 async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
     if ticket.get("historico_publicado"):
         return True
-    destino = canal.guild.get_channel(CANAL_HISTORICO_TICKETS_ID)
-    if destino is None:
-        try:
-            destino = await canal.guild.fetch_channel(CANAL_HISTORICO_TICKETS_ID)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            logging.error("Canal de histórico de tickets indisponível: %s", CANAL_HISTORICO_TICKETS_ID)
-            return False
-    if not callable(getattr(destino, "send", None)):
+    try:
+        destino = await obter_topico(canal.guild, "atendimento")
+        if destino.archived:
+            await destino.edit(archived=False, reason="Preservar transcrição de atendimento")
+    except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+        logging.exception("Tópico permanente de Atendimento indisponível.")
         return False
     usuario_id = int(ticket.get("usuario_id") or 0)
     atendente_id = int(ticket.get("atendido_por_id") or 0)
@@ -349,6 +347,19 @@ async def _publicar_historico_ticket(canal, ticket, motivo, fechado_por_id):
                     bloco = candidato
             if bloco:
                 await destino.send(f"Transcrição #{ticket.get('id')} — parte {parte}\n{bloco}", allowed_mentions=discord.AllowedMentions.none())
+        descricao_fechamento = f"Cliente: <@{usuario_id}> (`{usuario_id}`)\n"
+        descricao_fechamento += (
+            f"Responsável: <@{atendente_id}> (`{atendente_id}`)"
+            if atendente_id else "Responsável: Não atribuído"
+        )
+        descricao_fechamento += f"\nMotivo: {motivo}\nFechado por: {fechado_por_id or 'sistema'}"
+        await registrar_global(
+            canal.guild,
+            "atendimento",
+            f"Ticket #{ticket.get('id', '—')} encerrado",
+            descricao_fechamento,
+            cor=0xB3132B,
+        )
         await tickets.atualizar_ticket(
             canal.guild.id,
             ticket["id"],
@@ -452,6 +463,19 @@ class FeedbackTicketModal(discord.ui.Modal):
             )
             try:
                 await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                descricao_avaliacao = f"Cliente: <@{self.owner_id}> (`{self.owner_id}`)\n"
+                descricao_avaliacao += (
+                    f"Responsável: <@{self.atendente_id}> (`{self.atendente_id}`)"
+                    if self.atendente_id else "Responsável: Não identificado"
+                )
+                descricao_avaliacao += f"\nNota: **{self.nota}/5 — {rotulo}**\nComentário: {comentario or 'Não informado'}"
+                await registrar_global(
+                    guild,
+                    "atendimento",
+                    f"Avaliação do ticket #{self.ticket_id}",
+                    descricao_avaliacao,
+                    cor=0xB3132B,
+                )
             except (discord.Forbidden, discord.HTTPException):
                 logging.exception(
                     "Avaliação do ticket %s salva, mas não publicada no canal %s.",
@@ -1373,6 +1397,15 @@ class Tickets(commands.Cog):
             raise
 
         ULTIMA_ATIVIDADE[canal.id] = time.time()
+        await registrar_global(
+            guild,
+            "atendimento",
+            f"Ticket #{ticket_salvo.get('id', '—')} aberto",
+            f"Solicitante: {user.mention} (`{user.id}`)\n"
+            f"Categoria: **{tipo.get('label', tipo.get('valor', 'Atendimento'))}**\n"
+            f"Canal: {canal.mention} (`{canal.id}`)\nStatus: **Aguardando responsável**",
+            cor=0x57F287,
+        )
 
         if not tipo["usa_ia"] and cargo_suporte:
             await canal.send(
@@ -1588,11 +1621,21 @@ class Tickets(commands.Cog):
         )
 
         if ticket_atual and eh_suporte and not ticket_atual.get("atendido_por_id"):
-            await tickets.registrar_atendimento(
+            assumido = await tickets.registrar_atendimento(
                 message.guild.id,
                 ticket_atual["id"],
                 message.author.id,
             )
+            if assumido:
+                await registrar_global(
+                    message.guild,
+                    "atendimento",
+                    f"Ticket #{ticket_atual.get('id', '—')} atribuído",
+                    f"Responsável: {message.author.mention} (`{message.author.id}`)\n"
+                    f"Solicitante: <@{ticket_atual.get('usuario_id')}>\n"
+                    f"Canal: {message.channel.mention}",
+                    cor=0xFEE75C,
+                )
 
         texto = _normalizar(
             message.content

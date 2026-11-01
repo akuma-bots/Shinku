@@ -734,6 +734,22 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                     except discord.HTTPException:
                         logging.exception("Falha ao enviar candidatura %s por DM ao membro %s.", resposta.get("id"), membro.id)
                         break
+        try:
+            from utils.registro_global import obter_topico
+            topico = await obter_topico(guild, "formularios")
+            if topico.archived or topico.locked:
+                await topico.edit(archived=False, locked=False, reason="Registrar nova candidatura")
+            # Preserva no Fórum o dossiê completo, incluindo todas as respostas,
+            # não apenas um aviso resumido da existência da candidatura.
+            for embed_dossie in embeds:
+                copia = embed_dossie.copy()
+                copia.set_footer(text=f"NÊMESIS • Cópia restrita do Registro Global • {guild.name}")
+                await topico.send(
+                    embed=copia,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+        except Exception:
+            logging.exception("Falha ao arquivar o dossiê da candidatura %s no Registro Global.", resposta.get("id"))
         return canal_enviado
 
     @app_commands.command(name="criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
@@ -1039,6 +1055,17 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 inline=False,
             )
             await interaction.response.edit_message(embed=embed, view=None)
+
+            from utils.registro_global import registrar
+            await registrar(
+                guild_encontrada,
+                "formularios",
+                f"Candidatura {novo_status}",
+                f"Protocolo: `{resposta_id}`\nFormulário: **{(formulario_resposta or {}).get('nome', 'Formulário')}**\n"
+                f"Candidato: <@{resposta.get('autor_id')}> (`{resposta.get('autor_id')}`)\n"
+                f"Revisor: {interaction.user.mention} (`{interaction.user.id}`)",
+                cor=0x57F287 if aprovado else 0xED4245,
+            )
 
             status_texto = "APROVADA" if aprovado else "RECUSADA"
             nome_formulario = (formulario_resposta or {}).get("nome", "Formulário")

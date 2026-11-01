@@ -12,11 +12,10 @@ from discord.ext import commands, tasks
 from utils.punicoes import historico_punicoes, registrar_punicao
 from utils.storage import carregar, salvar
 from utils.guild_config import get_config, set_config, lideranca_only
+from utils.registro_global import registrar as registrar_global
 
 
 CANAL_REGRAS_ID = 1563995880833421508
-CANAL_INFRACOES_ID = 1563995882234450006
-CANAL_AUDITORIA_ID = 1563995882234450005
 CACHE_REGRAS_SEGUNDOS = 1
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
 
@@ -1509,38 +1508,6 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"{erro}"
             )
 
-    async def resolver_canal_registros(self, guild: discord.Guild, canal_id: int, finalidade: str):
-        """Resolve um canal de texto da própria guild e valida as permissões de publicação."""
-        try:
-            canal = guild.get_channel(int(canal_id))
-            if canal is None:
-                canal = await self.bot.fetch_channel(int(canal_id))
-            if not isinstance(canal, discord.TextChannel) or canal.guild.id != guild.id:
-                raise ValueError(
-                    f"Destino inválido para {finalidade}: canal={canal_id}, guild={guild.id}."
-                )
-
-            bot_member = guild.me
-            if bot_member is not None:
-                permissoes = canal.permissions_for(bot_member)
-                ausentes = [
-                    nome for nome in ("view_channel", "send_messages", "embed_links")
-                    if not getattr(permissoes, nome, False)
-                ]
-                if ausentes:
-                    raise PermissionError(
-                        f"Sem permissões {', '.join(ausentes)} em #{canal.name} "
-                        f"({canal.id}) para {finalidade}."
-                    )
-            return canal
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, PermissionError):
-            import logging
-            logging.getLogger(__name__).exception(
-                "Destino de registro do AutoMod indisponível (guild=%s, canal=%s, finalidade=%s).",
-                guild.id, canal_id, finalidade,
-            )
-            return None
-
     # ========================================================
     # AVISO
     # ========================================================
@@ -1597,15 +1564,9 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         try:
 
-            canal = await self.resolver_canal_registros(
-                message.guild, CANAL_INFRACOES_ID, "infrações e decisões"
-            )
-            if canal is None:
-                return
-            await canal.send(
-                embed=embed,
-                view=PainelPunicao(self.bot),
-                allowed_mentions=discord.AllowedMentions.none(),
+            await registrar_global(
+                message.guild, "seguranca", "AutoMod — Infração detectada",
+                embed=embed, view=PainelPunicao(self.bot),
             )
 
         except Exception as erro:
@@ -1781,11 +1742,9 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         try:
-            canal = await self.resolver_canal_registros(
-                guild, CANAL_INFRACOES_ID, "punições automáticas"
+            await registrar_global(
+                guild, "seguranca", "AutoMod — Punição automática aplicada", embed=embed,
             )
-            if canal is not None:
-                await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException as erro:
             print(f"[AUTOMOD][ERRO] Falha ao publicar registro automático: {erro}")
 
@@ -1832,30 +1791,16 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             color=discord.Color.orange(),
         )
         try:
-            canal = await self.resolver_canal_registros(
-                message.guild, CANAL_INFRACOES_ID, "falhas de punição"
+            await registrar_global(
+                message.guild, "seguranca", "AutoMod — Punição não aplicada", embed=embed,
             )
-            if canal is not None:
-                await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
             pass
 
     async def enviar_auditoria(self, guild: discord.Guild, embed: discord.Embed):
-        try:
-            config = await get_config(guild.id)
-            canal_configurado = config.get("canal_auditoria_id")
-            canal_id = int(canal_configurado or CANAL_AUDITORIA_ID)
-            canal = await self.resolver_canal_registros(
-                guild, canal_id, "auditoria do AutoMod"
-            )
-            if canal is None and canal_id != CANAL_AUDITORIA_ID:
-                canal = await self.resolver_canal_registros(
-                    guild, CANAL_AUDITORIA_ID, "fallback de auditoria do AutoMod"
-                )
-            if canal is not None:
-                await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-        except Exception as erro:
-            print(f"[AUTOMOD][AUDITORIA] Não foi possível enviar log: {erro}")
+        await registrar_global(
+            guild, "seguranca", embed.title or "Auditoria AutoMod", embed=embed,
+        )
 
     async def registrar_decisao(self, guild_id: int, alvo_id: int, tipo: str, nivel: int, motivo: str, moderador_id: int, infracao: str):
         arquivo = "automod_decisoes.json"

@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
-from utils.guild_config import get_config
 from utils.guia_servidores import (
     GuiaServidoresView,
     CARGO_VISITANTES_ID,
@@ -12,6 +11,7 @@ from utils.guia_servidores import (
     TAG_ORG_NEMESIS,
 )
 from utils.storage import carregar
+from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, garantir_topicos, registrar as registrar_global
 
 
 logger = logging.getLogger(__name__)
@@ -21,49 +21,59 @@ CANAL_ENTRADAS_ID = 1563995880623841331
 
 class Logs(commands.Cog):
     """Registra eventos do servidor (entradas, saídas, edições e exclusões de mensagem)
-    no canal de logs configurado por cada servidor via /configurar."""
+    no Fórum central de Registro Global da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._topicos_prontos = False
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._topicos_prontos:
+            return
+        guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+        if guild is None:
+            logger.error("Guild NÊMESIS não está em cache; tópicos do Registro Global aguardam conexão.")
+            return
+        try:
+            topicos = await garantir_topicos(guild)
+            self._topicos_prontos = len(topicos) == 8
+            logger.info("Registro Global pronto: %s tópicos permanentes verificados.", len(topicos))
+        except Exception:
+            logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
 
     async def _canal_logs(self, guild: discord.Guild):
+        """Resolve exclusivamente o Fórum central de registros da NÊMESIS."""
+        if guild.id != GUILD_NEMESIS_ID:
+            return None
         try:
-            config = await get_config(guild.id)
-            log_id = config.get("log_channel_id")
-            if not log_id:
-                logger.debug("Canal de logs não configurado (guild=%s).", guild.id)
-                return None
-            canal = guild.get_channel(int(log_id))
+            canal = guild.get_channel(CANAL_REGISTRO_GLOBAL_ID)
             if canal is None:
-                try:
-                    canal = await self.bot.fetch_channel(int(log_id))
-                except (discord.NotFound, discord.Forbidden):
-                    logger.warning("Canal de logs indisponível (guild=%s, channel=%s).", guild.id, log_id)
-                    return None
-            if not hasattr(canal, "send"):
-                logger.warning("Destino de logs não aceita mensagens (guild=%s, channel=%s).", guild.id, log_id)
+                canal = await self.bot.fetch_channel(CANAL_REGISTRO_GLOBAL_ID)
+            if not isinstance(canal, discord.ForumChannel):
+                logger.error("O Registro Global configurado não é um Fórum (%s).", CANAL_REGISTRO_GLOBAL_ID)
                 return None
             return canal
-        except Exception:
-            logger.exception("Não foi possível resolver o canal de logs (guild=%s).", guild.id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.exception("Fórum de Registro Global indisponível (guild=%s).", guild.id)
             return None
 
-    async def _enviar_log(self, canal, embed: discord.Embed, view: discord.ui.View | None = None):
-        """Falhas no canal de auditoria não podem derrubar listeners do bot."""
+    async def _enviar_log(self, canal, embed: discord.Embed, view: discord.ui.View | None = None, categoria: str = "membros"):
+        """Envia eventos ao tópico fixo; mantém o canal de boas-vindas separado."""
         try:
             if embed.timestamp is None:
                 embed.timestamp = datetime.now(timezone.utc)
             if not embed.footer.text:
-                embed.set_footer(text="NÊMESIS • Registro de auditoria")
+                embed.set_footer(text="NÊMESIS • Registro Global")
+            if isinstance(canal, discord.ForumChannel):
+                return await registrar_global(
+                    canal.guild, categoria, embed.title or "Registro", embed=embed,
+                )
             await canal.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
             return True
-        except discord.Forbidden:
-            logger.warning("Sem permissão para publicar log (channel=%s).", getattr(canal, "id", "desconhecido"))
-        except discord.HTTPException:
-            logger.exception("Falha HTTP ao publicar log (channel=%s).", getattr(canal, "id", "desconhecido"))
         except Exception:
-            logger.exception("Erro inesperado ao publicar log (channel=%s).", getattr(canal, "id", "desconhecido"))
-        return False
+            logger.exception("Falha ao publicar registro (channel=%s).", getattr(canal, "id", "desconhecido"))
+            return False
 
     async def _convidador_do_membro(self, guild_id: int, member_id: int):
         try:
@@ -161,6 +171,23 @@ class Logs(commands.Cog):
         else:
             logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
                          member.guild.id, member.id, canal.id)
+            return
+        await registrar_global(
+            member.guild,
+            "membros",
+            "Novo membro na NÊMESIS",
+            (
+                f"Membro: {member.mention} (`{member.id}`)\n"
+                f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
+                f"Efetivo após entrada: {total_membros}\n"
+                f"Convidador: <@{convidador_id}>"
+                if convidador_id else
+                f"Membro: {member.mention} (`{member.id}`)\n"
+                f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
+                f"Efetivo após entrada: {total_membros}\nConvidador: Não identificado"
+            ),
+            cor=0x57F287,
+        )
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -169,7 +196,7 @@ class Logs(commands.Cog):
             return
         embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
         embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="membros")
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -201,7 +228,7 @@ class Logs(commands.Cog):
             color=0xED4245,
             timestamp=datetime.now(timezone.utc),
         )
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="mensagens")
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
@@ -229,7 +256,7 @@ class Logs(commands.Cog):
         embed.add_field(name="ID da mensagem", value=str(antes.id), inline=True)
         canal = await self._canal_logs(antes.guild)
         if canal and canal.id != antes.channel.id:
-            await self._enviar_log(canal, embed)
+            await self._enviar_log(canal, embed, categoria="mensagens")
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
@@ -238,7 +265,7 @@ class Logs(commands.Cog):
             return
         embed = criar_embed(description=f"🔨 {user.mention} (`{user}`) foi banido do servidor.", color=0xED4245)
         embed.set_thumbnail(url=user.display_avatar.url)
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="moderacao")
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User):
@@ -246,7 +273,7 @@ class Logs(commands.Cog):
         if not canal:
             return
         embed = criar_embed(description=f"⚖️ {user.mention} (`{user}`) foi desbanido do servidor.", color=0x57F287)
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="moderacao")
 
     @commands.Cog.listener()
     async def on_member_update(self, antes: discord.Member, depois: discord.Member):
@@ -264,7 +291,7 @@ class Logs(commands.Cog):
                 ),
                 color=0xFEE75C,
             )
-            await self._enviar_log(canal, embed)
+            await self._enviar_log(canal, embed, categoria="membros")
 
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
@@ -288,7 +315,7 @@ class Logs(commands.Cog):
                     value=" ".join(cargo.mention for cargo in perdidos)[:1024],
                     inline=False,
                 )
-            await self._enviar_log(canal, embed)
+            await self._enviar_log(canal, embed, categoria="membros")
 
         # Compatível com versões de discord.py em que o atributo não está
         # disponível no objeto Member. A comparação não pode derrubar o listener.
@@ -312,21 +339,21 @@ class Logs(commands.Cog):
                 if timeout_depois else "Sem timeout",
                 inline=True,
             )
-            await self._enviar_log(canal, embed)
+            await self._enviar_log(canal, embed, categoria="moderacao")
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
         canal = await self._canal_logs(channel.guild)
         if not canal:
             return
-        await self._enviar_log(canal, criar_embed(description=f"📁 Canal criado: **{channel.name}** ({channel.type}).", color=0x57F287))
+        await self._enviar_log(canal, criar_embed(description=f"📁 Canal criado: **{channel.name}** ({channel.type}).", color=0x57F287), categoria="administracao")
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
         canal = await self._canal_logs(channel.guild)
         if not canal:
             return
-        await self._enviar_log(canal, criar_embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245))
+        await self._enviar_log(canal, criar_embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245), categoria="administracao")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, antes: discord.VoiceState, depois: discord.VoiceState):
@@ -334,11 +361,11 @@ class Logs(commands.Cog):
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287))
+            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="membros")
         elif antes.channel is not None and depois.channel is None:
-            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245))
+            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="membros")
         elif antes.channel != depois.channel:
-            await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C))
+            await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C), categoria="membros")
 
 
     @commands.Cog.listener()
@@ -368,7 +395,7 @@ class Logs(commands.Cog):
                 value="\n".join(linhas)[:1024] or "Sem conteúdo textual.",
                 inline=False,
             )
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="mensagens")
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, antes: discord.abc.GuildChannel, depois: discord.abc.GuildChannel):
@@ -386,6 +413,8 @@ class Logs(commands.Cog):
                 mudancas.append(f"Modo lento: {antes.slowmode_delay}s → {depois.slowmode_delay}s")
             if antes.nsfw != depois.nsfw:
                 mudancas.append(f"NSFW: {antes.nsfw} → {depois.nsfw}")
+        if antes.overwrites != depois.overwrites:
+            mudancas.append("As permissões e sobrescritas de acesso do canal foram alteradas.")
         if not mudancas:
             return
         canal = await self._canal_logs(depois.guild)
@@ -396,7 +425,7 @@ class Logs(commands.Cog):
             description=f"Canal: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
             color=0xFEE75C,
         )
-        await self._enviar_log(canal, embed)
+        await self._enviar_log(canal, embed, categoria="administracao")
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role):
@@ -406,7 +435,7 @@ class Logs(commands.Cog):
                 title="Cargo criado",
                 description=f"Cargo: {role.name} ({role.id})\nCor: {role.color}",
                 color=0x57F287,
-            ))
+            ), categoria="administracao")
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role):
@@ -416,7 +445,7 @@ class Logs(commands.Cog):
                 title="Cargo excluído",
                 description=f"Cargo: {role.name} ({role.id})",
                 color=0xED4245,
-            ))
+            ), categoria="administracao")
 
     @commands.Cog.listener()
     async def on_guild_role_update(self, antes: discord.Role, depois: discord.Role):
@@ -439,7 +468,169 @@ class Logs(commands.Cog):
                 title="Cargo atualizado",
                 description=f"Cargo: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
                 color=0xFEE75C,
-            ))
+            ), categoria="administracao")
+
+
+    @commands.Cog.listener()
+    async def on_thread_create(self, thread: discord.Thread):
+        if thread.guild.id != GUILD_NEMESIS_ID or thread.parent_id == CANAL_REGISTRO_GLOBAL_ID:
+            return
+        await registrar_global(
+            thread.guild, "administracao", "Tópico criado",
+            f"Tópico: **{thread.name}** (`{thread.id}`)\nCanal pai: <#{thread.parent_id}>",
+            cor=0x57F287,
+        )
+
+    @commands.Cog.listener()
+    async def on_thread_delete(self, thread: discord.Thread):
+        if thread.guild.id != GUILD_NEMESIS_ID or thread.parent_id == CANAL_REGISTRO_GLOBAL_ID:
+            return
+        await registrar_global(
+            thread.guild, "administracao", "Tópico excluído",
+            f"Tópico: **{thread.name}** (`{thread.id}`)\nCanal pai: `{thread.parent_id}`",
+            cor=0xED4245,
+        )
+
+    @commands.Cog.listener()
+    async def on_thread_update(self, antes: discord.Thread, depois: discord.Thread):
+        if depois.guild.id != GUILD_NEMESIS_ID or depois.parent_id == CANAL_REGISTRO_GLOBAL_ID:
+            return
+        mudancas = []
+        if antes.name != depois.name:
+            mudancas.append(f"Nome: {antes.name} → {depois.name}")
+        if antes.archived != depois.archived:
+            mudancas.append(f"Arquivado: {antes.archived} → {depois.archived}")
+        if antes.locked != depois.locked:
+            mudancas.append(f"Bloqueado: {antes.locked} → {depois.locked}")
+        if mudancas:
+            await registrar_global(
+                depois.guild, "administracao", "Tópico atualizado",
+                f"Tópico: **{depois.name}** (`{depois.id}`)\n" + "\n".join(mudancas),
+                cor=0xFEE75C,
+            )
+
+    @commands.Cog.listener()
+    async def on_invite_create(self, invite: discord.Invite):
+        if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
+            return
+        await registrar_global(
+            invite.guild, "seguranca", "Convite criado",
+            f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}\n"
+            f"Criado por: {invite.inviter.mention if invite.inviter else 'Não identificado'}\n"
+            f"Usos máximos: {invite.max_uses or 'Ilimitado'}",
+            cor=0x57F287,
+        )
+
+    @commands.Cog.listener()
+    async def on_invite_delete(self, invite: discord.Invite):
+        if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
+            return
+        await registrar_global(
+            invite.guild, "seguranca", "Convite removido",
+            f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}",
+            cor=0xED4245,
+        )
+
+    @commands.Cog.listener()
+    async def on_webhooks_update(self, channel: discord.abc.GuildChannel):
+        if channel.guild.id != GUILD_NEMESIS_ID:
+            return
+        await registrar_global(
+            channel.guild, "seguranca", "Webhooks atualizados",
+            f"Canal afetado: {channel.mention if hasattr(channel, 'mention') else channel.name} (`{channel.id}`)\n"
+            "O Discord notificou uma alteração na configuração de webhooks deste canal.",
+            cor=0xFEE75C,
+        )
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_create(self, event: discord.ScheduledEvent):
+        if event.guild.id != GUILD_NEMESIS_ID:
+            return
+        descricao = (
+            f"Evento: **{event.name}** (`{event.id}`)\n"
+            f"Início: {discord.utils.format_dt(event.start_time, style='F')}\n"
+            f"Término: {discord.utils.format_dt(event.end_time, style='F') if event.end_time else 'Não definido'}\n"
+            f"Criado por: <@{event.creator_id}>" if event.creator_id else
+            f"Evento: **{event.name}** (`{event.id}`)\n"
+            f"Início: {discord.utils.format_dt(event.start_time, style='F')}\n"
+            f"Término: {discord.utils.format_dt(event.end_time, style='F') if event.end_time else 'Não definido'}"
+        )
+        await registrar_global(
+            event.guild, "sistemas", "Evento agendado criado", descricao,
+            cor=0x57F287,
+        )
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_delete(self, event: discord.ScheduledEvent):
+        if event.guild.id != GUILD_NEMESIS_ID:
+            return
+        await registrar_global(
+            event.guild, "sistemas", "Evento agendado removido",
+            f"Evento: **{event.name}** (`{event.id}`)\nStatus final: {event.status}",
+            cor=0xED4245,
+        )
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_update(self, antes: discord.ScheduledEvent, depois: discord.ScheduledEvent):
+        if depois.guild.id != GUILD_NEMESIS_ID:
+            return
+        mudancas = []
+        for atributo, rotulo in (("name", "Nome"), ("description", "Descrição"), ("start_time", "Início"), ("end_time", "Término"), ("status", "Status"), ("location", "Local")):
+            valor_antes = getattr(antes, atributo, None)
+            valor_depois = getattr(depois, atributo, None)
+            if valor_antes != valor_depois:
+                mudancas.append(f"{rotulo}: {valor_antes} → {valor_depois}")
+        if mudancas:
+            await registrar_global(
+                depois.guild, "sistemas", "Evento agendado atualizado",
+                f"Evento: **{depois.name}** (`{depois.id}`)\n" + "\n".join(mudancas),
+                cor=0xFEE75C,
+            )
+
+    @commands.Cog.listener()
+    async def on_guild_update(self, antes: discord.Guild, depois: discord.Guild):
+        if depois.id != GUILD_NEMESIS_ID:
+            return
+        mudancas = []
+        for atributo, rotulo in (("name", "Nome"), ("description", "Descrição"), ("verification_level", "Verificação"), ("explicit_content_filter", "Filtro de conteúdo"), ("default_notifications", "Notificações padrão"), ("afk_timeout", "Timeout AFK")):
+            if getattr(antes, atributo, None) != getattr(depois, atributo, None):
+                mudancas.append(f"{rotulo}: {getattr(antes, atributo, None)} → {getattr(depois, atributo, None)}")
+        if mudancas:
+            await registrar_global(
+                depois, "administracao", "Configurações do servidor alteradas",
+                "\n".join(mudancas), cor=0xFEE75C,
+            )
+
+    @commands.Cog.listener()
+    async def on_guild_emojis_update(self, guild: discord.Guild, antes, depois):
+        if guild.id != GUILD_NEMESIS_ID:
+            return
+        ids_antes = {item.id: item for item in antes}
+        ids_depois = {item.id: item for item in depois}
+        criados = [item.name for key, item in ids_depois.items() if key not in ids_antes]
+        removidos = [item.name for key, item in ids_antes.items() if key not in ids_depois]
+        if criados or removidos:
+            await registrar_global(
+                guild, "administracao", "Emojis do servidor alterados",
+                f"Criados: {', '.join(criados) or 'Nenhum'}\nRemovidos: {', '.join(removidos) or 'Nenhum'}",
+                cor=0xFEE75C,
+            )
+
+    @commands.Cog.listener()
+    async def on_guild_stickers_update(self, guild: discord.Guild, antes, depois):
+        if guild.id != GUILD_NEMESIS_ID:
+            return
+        ids_antes = {item.id: item for item in antes}
+        ids_depois = {item.id: item for item in depois}
+        criados = [item.name for key, item in ids_depois.items() if key not in ids_antes]
+        removidos = [item.name for key, item in ids_antes.items() if key not in ids_depois]
+        if criados or removidos:
+            await registrar_global(
+                guild, "administracao", "Figurinhas do servidor alteradas",
+                f"Criadas: {', '.join(criados) or 'Nenhuma'}\nRemovidas: {', '.join(removidos) or 'Nenhuma'}",
+                cor=0xFEE75C,
+            )
+
 
 
 async def setup(bot: commands.Bot):
