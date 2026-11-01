@@ -588,9 +588,21 @@ class Missoes(commands.Cog):
             and str(item.get("tipo") or "missao").strip().lower() == categoria
             and not str(item.get("id") or "").startswith(("SHI-", "GAK-", "FIS-"))
         ]
-        atividades.sort(key=lambda item: (item.get("ativa", True) is False, str(item.get("id") or "")))
+        atividades.sort(key=lambda item: (
+            item.get("ativa", True) is False,
+            str(item.get("titulo") or "").casefold(),
+            str(item.get("id") or ""),
+        ))
         abertas = [item for item in atividades if item.get("ativa", True) is not False]
         encerradas = len(atividades) - len(abertas)
+
+        def recompensa_da(atividade: dict) -> int:
+            try:
+                return max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
+            except (TypeError, ValueError, OverflowError):
+                return 0
+
+        xp_disponivel = sum(recompensa_da(item) for item in abertas)
         # Oito atividades por página mantêm a embed legível e abaixo dos
         # limites de campos/caracteres do Discord, mesmo com catálogos grandes.
         itens_por_pagina = 8
@@ -607,8 +619,9 @@ class Missoes(commands.Cog):
                 "Um catálogo unificado de operações da **NÊMESIS**. "
                 "Todas as atividades são válidas para qualquer jogo compatível com a organização. "
                 "Não existe divisão de missões por título de jogo.\n\n"
-                "**✧ Envio de evidências**  Selecione uma atividade no menu, envie a imagem e informe um auxiliar, se houver.\n"
-                "**✧ Progressão**  As recompensas são concedidas exclusivamente em XP após aprovação.\n"
+                f"**✧ XP em recompensas abertas**  {xp_disponivel:,} XP\n".replace(",", ".")
+                + "**✧ Envio de evidências**  Escolha uma atividade no botão de envio, anexe a imagem e informe um auxiliar, se houver.\n"
+                "**✧ Progressão**  O XP é liberado somente após aprovação da equipe.\n"
                 "**✧ Integridade**  Uma prova pendente por membro e atividade; envios repetidos são bloqueados."
             ),
             cor=tipo["cor"], rodape=None,
@@ -625,23 +638,34 @@ class Missoes(commands.Cog):
             )
         exibidas = atividades[inicio:inicio + itens_por_pagina]
         for indice, item in enumerate(exibidas, start=inicio + 1):
-            try:
-                recompensa = max(0, int(item.get("recompensa_xp", item.get("pontos", 0)) or 0))
-            except (TypeError, ValueError, OverflowError):
-                recompensa = 0
+            recompensa = recompensa_da(item)
             ativa = item.get("ativa", True) is not False
             titulo = str(item.get("titulo") or "Operação sem título").strip()
             descricao = str(item.get("descricao") or "Objetivo não informado.").strip()
             identificador = str(item.get("id") or "—")
-            dificuldade = str(item.get("dificuldade") or "Não definida").strip()
-            valor = (
-                f"{descricao[:145]}\n\n"
-                f"**IDENTIFICAÇÃO**  `{identificador[:32]}`\n"
-                f"**NÍVEL**  {dificuldade[:36]}\n"
-                f"**RECOMPENSA**  {recompensa:,} XP\n"
-                f"**SITUAÇÃO**  {'✦ EM OPERAÇÃO' if ativa else '◈ ARQUIVADA'}"
-            ).replace(",", ".")[:1024]
-            embed.add_field(name=f"〔 {indice:02d} 〕  {titulo[:58]}"[:256], value=valor, inline=False)
+            dificuldade = str(item.get("dificuldade") or "").strip()
+            if not dificuldade:
+                if categoria == "especial" or recompensa >= 60:
+                    dificuldade = "Alta"
+                elif recompensa >= 25:
+                    dificuldade = "Intermediária"
+                else:
+                    dificuldade = "Moderada"
+
+            linhas = [
+                descricao[:145],
+                "",
+                f"**Código**  `{identificador[:32]}`  ·  **Nível**  {dificuldade[:36]}",
+                f"**Recompensa**  {recompensa:,} XP  ·  **Situação**  {'◉ DISPONÍVEL' if ativa else '■ ARQUIVADA'}".replace(",", "."),
+            ]
+            requisitos = str(item.get("requisitos") or "").strip()
+            prazo = str(item.get("prazo") or "").strip()
+            if requisitos:
+                linhas.append(f"**Requisitos**  {requisitos[:180]}")
+            if prazo:
+                linhas.append(f"**Prazo**  {prazo[:80]}")
+            valor = "\n".join(linhas)[:1024]
+            embed.add_field(name=f"◈ {indice:02d}  /  {titulo[:58]}"[:256], value=valor, inline=False)
         if len(atividades) > len(exibidas):
             embed.add_field(
                 name="✧ NAVEGAÇÃO DO CATÁLOGO",
