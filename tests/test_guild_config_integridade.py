@@ -32,10 +32,21 @@ class TestIntegridadeGuildConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(config["contadores"][0]["canal_id"], 123)
         self.assertEqual(config["contadores"][0]["cargo_id"], 456)
 
+    async def test_ids_dos_paineis_sao_normalizados_para_inteiros(self):
+        config = guild_config._normalizar_config({
+            "ticket_painel_canal_id": "123",
+            "ticket_painel_mensagem_id": "456",
+            "ranking_mensagem_id": "789",
+        })
+        self.assertEqual(config["ticket_painel_canal_id"], 123)
+        self.assertEqual(config["ticket_painel_mensagem_id"], 456)
+        self.assertEqual(config["ranking_mensagem_id"], 789)
+
     async def test_set_config_recupera_storage_raiz_invalido(self):
-        with patch.object(guild_config, "carregar", new=AsyncMock(return_value=[])), patch.object(
-            guild_config, "salvar", new=AsyncMock()
-        ) as salvar:
+        async def atualizar(_arquivo, _padrao, transformador):
+            return transformador([])
+
+        with patch.object(guild_config, "atualizar_json", new=AsyncMock(side_effect=atualizar)) as salvar:
             config = await guild_config.set_config(123, desafio_cooldown_minutos=30)
 
         self.assertEqual(config["desafio_cooldown_minutos"], 30)

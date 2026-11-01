@@ -1,11 +1,9 @@
-import asyncio
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 
 ARQUIVO = "guild_configs.json"
 
 # Evita que atualizações simultâneas sobrescrevam campos umas das outras.
-_CONFIG_LOCK = asyncio.Lock()
 
 
 # ============================================================
@@ -88,6 +86,9 @@ CAMPOS_ID = (
     "canal_lutas_id",
     "canal_provas_pvp_id",
     "canal_ranking_id",
+    "ranking_mensagem_id",
+    "ticket_painel_canal_id",
+    "ticket_painel_mensagem_id",
 
     "canal_missoes_missao_id",
     "canal_provas_missao_id",
@@ -229,50 +230,59 @@ async def get_config(
 # SALVAR CONFIGURAÇÃO
 # ============================================================
 
+async def _atualizar_config(guild_id: int, transformador):
+    chave = str(guild_id)
+
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        atual = _normalizar_config(dados.get(chave, {}))
+        transformador(atual)
+        dados[chave] = _normalizar_config(atual)
+        return dados
+
+    dados = await atualizar_json(ARQUIVO, {}, aplicar)
+    return _normalizar_config(dados.get(chave, {}))
+
+
 async def set_config(
     guild_id: int,
     **campos,
 ) -> dict:
-    async with _CONFIG_LOCK:
-        dados = await _tudo()
-        atual = _normalizar_config(dados.get(str(guild_id), {}))
-
+    def aplicar(atual):
         for chave, valor in campos.items():
             if valor is not None:
                 if chave in CAMPOS_ID:
                     valor = _normalizar_id(valor)
                 atual[chave] = valor
 
-        dados[str(guild_id)] = atual
-        await salvar(ARQUIVO, dados)
-        return atual
+    return await _atualizar_config(guild_id, aplicar)
+
 
 async def definir_canal_cargo_automatico(
     guild_id: int,
     canal_id: int,
     cargo_id: int,
 ):
-    async with _CONFIG_LOCK:
-        dados = await _tudo()
-        atual = _normalizar_config(dados.get(str(guild_id), {}))
+    def aplicar(atual):
         mapa = atual.setdefault("canais_cargo_automatico", {})
         mapa[str(canal_id)] = int(cargo_id)
-        dados[str(guild_id)] = atual
-        await salvar(ARQUIVO, dados)
-        return mapa
+
+    atual = await _atualizar_config(guild_id, aplicar)
+    return atual["canais_cargo_automatico"]
+
 
 async def remover_canal_cargo_automatico(
     guild_id: int,
     canal_id: int,
 ):
-    async with _CONFIG_LOCK:
-        dados = await _tudo()
-        atual = _normalizar_config(dados.get(str(guild_id), {}))
+    def aplicar(atual):
         mapa = atual.setdefault("canais_cargo_automatico", {})
         mapa.pop(str(canal_id), None)
-        dados[str(guild_id)] = atual
-        await salvar(ARQUIVO, dados)
-        return mapa
+
+    atual = await _atualizar_config(guild_id, aplicar)
+    return atual["canais_cargo_automatico"]
+
 
 async def adicionar_contador(
     guild_id: int,
@@ -280,39 +290,35 @@ async def adicionar_contador(
     canal_id: int,
     cargo_id: int = None,
 ):
-    async with _CONFIG_LOCK:
-        dados = await _tudo()
-        atual = _normalizar_config(dados.get(str(guild_id), {}))
+    def aplicar(atual):
         lista = atual.setdefault("contadores", [])
         lista[:] = [
             contador for contador in lista
-            if contador.get("canal_id") != canal_id
+            if contador.get("canal_id") != int(canal_id)
         ]
         lista.append({
-            "tipo": tipo,
+            "tipo": str(tipo or "").strip(),
             "canal_id": int(canal_id),
             "cargo_id": int(cargo_id) if cargo_id is not None else None,
         })
-        dados[str(guild_id)] = atual
-        await salvar(ARQUIVO, dados)
-        return lista
+
+    atual = await _atualizar_config(guild_id, aplicar)
+    return atual["contadores"]
+
 
 async def remover_contador(
     guild_id: int,
     canal_id: int,
 ):
-    async with _CONFIG_LOCK:
-        dados = await _tudo()
-        atual = _normalizar_config(dados.get(str(guild_id), {}))
+    def aplicar(atual):
         lista = atual.setdefault("contadores", [])
         lista[:] = [
             contador for contador in lista
-            if contador.get("canal_id") != canal_id
+            if contador.get("canal_id") != int(canal_id)
         ]
-        dados[str(guild_id)] = atual
-        await salvar(ARQUIVO, dados)
-        return lista
 
+    atual = await _atualizar_config(guild_id, aplicar)
+    return atual["contadores"]
 
 
 # ============================================================
