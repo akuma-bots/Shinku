@@ -151,3 +151,9 @@ class TestTemporadasMissoes(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCentralTemporadasSemComandos(unittest.TestCase):
+    def test_cog_de_temporadas_nao_registra_comandos_slash(self):
+        from cogs.temporadas_missoes import TemporadasMissoes
+        self.assertEqual(TemporadasMissoes.__cog_app_commands__, [])

@@ -531,6 +531,23 @@ class NavegacaoMissoesView(discord.ui.View):
         await self.cog.abrir_seletor_prova(interaction, categoria)
 
     @discord.ui.button(
+        label="Temporada atual",
+        emoji="🏆",
+        style=discord.ButtonStyle.secondary,
+        custom_id="nemesis:missoes:temporada",
+        row=2,
+    )
+    async def temporada_atual(self, interaction: discord.Interaction, button: discord.ui.Button):
+        central = self.cog.bot.get_cog("TemporadasMissoes")
+        if central is None:
+            await interaction.response.send_message(
+                "O módulo de temporadas está temporariamente indisponível.",
+                ephemeral=True,
+            )
+            return
+        await central.abrir_status_publico(interaction)
+
+    @discord.ui.button(
         label="Meu desempenho",
         emoji="📊",
         style=discord.ButtonStyle.secondary,

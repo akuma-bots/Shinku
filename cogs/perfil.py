@@ -11,6 +11,7 @@ from utils.competitivo_sync import ARQUIVO_COMPETITIVO
 from cogs.progressao_gangue import ARQUIVO as ARQUIVO_PROGRESSAO, rank_por_xp, proximo_rank, barra_progresso
 from utils import revisoes as revisoes_storage
 from utils import conquistas as conquistas_storage
+from utils import temporadas_missoes as temporadas_missoes_storage
 
 
 ARQUIVO_VINCULOS_ROBLOX = "roblox_vinculos.json"
@@ -60,6 +61,19 @@ def _posicao_progressao(membros: dict, user_id: int):
         (posicao for posicao, item in enumerate(ordenados, start=1) if item[0] == str(user_id)),
         None,
     )
+
+
+def _formatar_distincoes_sazonais(registros: list, limite: int = 6) -> str:
+    medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+    linhas = []
+    for item in registros[:max(0, int(limite))]:
+        posicao = int(item.get("posicao", 0) or 0)
+        icone = medalhas.get(posicao, "🏅")
+        recompensa = str(item.get("recompensa") or "Distinção sazonal").strip()
+        linhas.append(
+            f"{icone} **Temporada #{int(item.get('temporada', 0) or 0)}** · {recompensa[:90]}"
+        )
+    return "\n".join(linhas) if linhas else "Nenhuma distinção sazonal conquistada ainda."
 
 
 def _resumo_historico_missoes(revisoes: list, user_id: int, limite: int = 5) -> dict:
@@ -120,6 +134,9 @@ class Perfil(commands.Cog):
         )
         conquistas_desbloqueadas = await conquistas_storage.listar_desbloqueadas(
             interaction.guild.id, alvo.id
+        )
+        distincoes_sazonais = await temporadas_missoes_storage.listar_recompensas_usuario(
+            interaction.guild.id, alvo.id, limite=20
         )
         patentes = await get_patentes(interaction.guild.id)
         vinculos_roblox = await carregar(ARQUIVO_VINCULOS_ROBLOX, {})
@@ -313,7 +330,17 @@ class Perfil(commands.Cog):
             value="\n".join(linhas_conquistas) if linhas_conquistas else "Nenhuma conquista desbloqueada. Use /conquistas para consultar os próximos marcos.",
             inline=False,
         )
-        embed.add_field(name="◈ MEDALHAS", value="\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda", inline=False)
+        medalhas_permanentes = "\n".join(p["medalhas"]) if p["medalhas"] else "Nenhuma ainda"
+        medalhas_e_distincoes = (
+            f"**MEDALHAS PERMANENTES**\n{medalhas_permanentes}\n\n"
+            f"**DISTINÇÕES SAZONAIS ({len(distincoes_sazonais)})**\n"
+            f"{_formatar_distincoes_sazonais(distincoes_sazonais)}"
+        )
+        embed.add_field(
+            name="◈ MEDALHAS & DISTINÇÕES",
+            value=medalhas_e_distincoes[:1024],
+            inline=False,
+        )
 
         await interaction.response.send_message(embed=embed)
 

@@ -417,6 +417,19 @@ class CentralMissoesView(discord.ui.View):
             await missoes._salvar_guild(self.guild_id, dados)
         await self.atualizar(interaction)
 
+    @discord.ui.button(label="Temporadas", style=discord.ButtonStyle.primary, emoji="🏆", row=3)
+    async def abrir_temporadas(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        central = interaction.client.get_cog("TemporadasMissoes")
+        if central is None:
+            await interaction.response.send_message(
+                "O módulo de temporadas está temporariamente indisponível.",
+                ephemeral=True,
+            )
+            return
+        await central.abrir_central(interaction, self.owner_id)
+
     @discord.ui.button(label="Atualizar painel", style=discord.ButtonStyle.success, emoji="🔄", row=2)
     async def atualizar_painel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
