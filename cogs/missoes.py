@@ -268,6 +268,7 @@ def _resumir_desempenho_missoes(revisoes: list, user_id: int, limite: int = 5) -
         "xp_missoes": xp_rastreavel,
         "registros_com_xp": xp_registros,
         "recentes": registros[:max(0, int(limite))],
+        "historico": registros,
     }
 
 
@@ -336,6 +337,56 @@ class NavegacaoMissoesView(discord.ui.View):
     )
     async def meu_desempenho(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.cog.enviar_painel_desempenho(interaction)
+
+
+
+class HistoricoDesempenhoView(discord.ui.View):
+    """Paginação privada do histórico completo de evidências de um integrante."""
+
+    def __init__(self, cog, owner_id: int, registros: list, pagina: int = 0):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = int(owner_id)
+        self.registros = list(registros)
+        self.total_paginas = max(1, (len(self.registros) + 4) // 5)
+        self.pagina = max(0, min(int(pagina), self.total_paginas - 1))
+        self.anterior.disabled = self.pagina == 0
+        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "Este histórico pertence a outro integrante.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def _navegar(self, interaction: discord.Interaction, delta: int):
+        self.pagina = max(0, min(self.total_paginas - 1, self.pagina + delta))
+        embed = self.cog._montar_embed_historico_desempenho(
+            interaction.guild, self.owner_id, self.registros, self.pagina
+        )
+        nova_view = HistoricoDesempenhoView(
+            self.cog, self.owner_id, self.registros, self.pagina
+        )
+        await interaction.response.edit_message(embed=embed, view=nova_view)
+
+    @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary)
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._navegar(interaction, -1)
+
+    @discord.ui.button(label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary)
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._navegar(interaction, 1)
+
+    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="Histórico encerrado.",
+            embed=None,
+            view=None,
+        )
 
 
 class RankingJogoSelect(discord.ui.Select):
@@ -1245,6 +1296,82 @@ class Missoes(commands.Cog):
         )
 
 
+
+    def _montar_embed_historico_desempenho(
+        self, guild: discord.Guild, user_id: int, registros: list, pagina: int
+    ) -> discord.Embed:
+        """Monta uma página do histórico completo com motivo de rejeição."""
+        inicio = pagina * 5
+        itens = registros[inicio:inicio + 5]
+        membro = guild.get_member(int(user_id)) if guild else None
+        nome = membro.mention if membro else f"<@{user_id}>"
+        embed = criar_embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  HISTÓRICO DE EVIDÊNCIAS",
+            description=(
+                f"**INTEGRANTE** · {nome}\n"
+                "Registro cronológico de protocolos enviados para validação."
+            ),
+            cor=0x9F2035,
+            rodape=f"NÊMESIS • HISTÓRICO PRIVADO • Página {pagina + 1}/{max(1, (len(registros) + 4) // 5)}",
+        )
+        aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
+        if membro:
+            embed.set_thumbnail(url=membro.display_avatar.url)
+        if not itens:
+            embed.description += "\n\nNenhuma evidência foi registrada para este integrante."
+            return embed
+
+        rotulos = {
+            "missao": "Missão",
+            "contribuicao": "Contribuição",
+            "especial": "Operação especial",
+            "pve": "PvE",
+        }
+        for indice, registro in enumerate(itens, start=inicio + 1):
+            status = str(registro.get("status") or "desconhecido").lower()
+            status_texto = {
+                "aprovada": "✓ APROVADA",
+                "rejeitada": "✕ REJEITADA",
+                "pendente": "◷ EM ANÁLISE",
+            }.get(status, status.upper())
+            autor_id = str(registro.get("autor_id") or "")
+            auxiliar_id = str(registro.get("auxiliar_id") or "")
+            papel = "Auxiliar" if auxiliar_id == str(user_id) and autor_id != str(user_id) else "Responsável"
+            titulo = str(registro.get("titulo") or "Atividade sem título").strip()[:100]
+            protocolo = str(registro.get("id") or "—")[:24]
+            tipo = rotulos.get(str(registro.get("tipo") or "").lower(), "Atividade")
+            data = (
+                registro.get("aprovado_em") if status == "aprovada"
+                else registro.get("rejeitada_em") if status == "rejeitada"
+                else registro.get("timestamp")
+            )
+            try:
+                data_texto = f"<t:{int(float(data))}:f>" if data else "Data não registrada"
+            except (TypeError, ValueError, OverflowError):
+                data_texto = "Data não registrada"
+            linhas = [
+                f"**{status_texto}** · {tipo} · {papel}",
+                f"Protocolo: `{protocolo}` · {data_texto}",
+            ]
+            if auxiliar_id and autor_id != auxiliar_id:
+                outro_id = autor_id if papel == "Auxiliar" else auxiliar_id
+                linhas.append(f"Participante vinculado: <@{outro_id}>")
+            recompensa = registro.get("recompensa_xp")
+            if recompensa is not None:
+                try:
+                    linhas.append(f"Recompensa registrada: **{max(0, int(recompensa)):,} XP**".replace(",", "."))
+                except (TypeError, ValueError, OverflowError):
+                    pass
+            motivo = str(registro.get("motivo_rejeicao") or "").strip()
+            if status == "rejeitada":
+                linhas.append(f"Justificativa: {motivo[:500]}" if motivo else "Justificativa: não registrada no histórico legado.")
+            embed.add_field(
+                name=f"{indice:02d} · {titulo}",
+                value="\n".join(linhas)[:1024],
+                inline=False,
+            )
+        return embed
+
     async def enviar_painel_desempenho(self, interaction: discord.Interaction) -> None:
         """Abre um dossiê privado de desempenho sem adicionar comando slash."""
         guild = interaction.guild
@@ -1360,7 +1487,11 @@ class Missoes(commands.Cog):
                 inline=False,
             )
         embed.set_footer(text="NÊMESIS • XP de missões calculado apenas com recompensas persistidas")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(
+            embed=embed,
+            view=HistoricoDesempenhoView(self, interaction.user.id, resumo["historico"]),
+            ephemeral=True,
+        )
 
     async def processar_aprovacao(self, guild: discord.Guild, revisao: dict) -> str:
         atividade = await missoes.get(guild.id, revisao.get("referencia_id", ""))
