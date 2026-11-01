@@ -1710,45 +1710,6 @@ class Missoes(commands.Cog):
                 ),
                 inline=False,
             )
-        else:
-            nomes = {
-                "missao": "Missões",
-                "contribuicao": "Contribuições",
-                "especial": "Missões especiais",
-                "pve": "PvE",
-            }
-            linhas = []
-            for tipo, dados in sorted(metricas["categorias"].items()):
-                linhas.append(
-                    f"**{nomes.get(tipo, tipo.title())}**\n"
-                    f"Aprovadas: {dados['aprovadas']} · Rejeitadas: {dados['rejeitadas']} · Pendentes: {dados['pendentes']}"
-                )
-            embed.add_field(
-                name="◈ DESEMPENHO POR CATEGORIA",
-                value="\n\n".join(linhas)[:1024] if linhas else "Nenhuma evidência de missão registrada.",
-                inline=False,
-            )
-            ranking = metricas["ranking"]
-            if ranking:
-                medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
-                linhas_ranking = [
-                    f"{medalhas.get(pos, f'#{pos:02d}')} <@{uid}> · **{xp:,} XP**".replace(",", ".")
-                    for pos, (uid, xp) in enumerate(ranking, start=1)
-                ]
-                embed.add_field(
-                    name="◈ MAIORES CONTRIBUINTES",
-                    value="\n".join(linhas_ranking),
-                    inline=False,
-                )
-            embed.add_field(
-                name="◈ CRITÉRIOS DE APURAÇÃO",
-                value=(
-                    "Participante ativo: integrante vinculado a uma evidência enviada nos últimos 7 dias. "
-                    "Contribuições com auxiliar seguem a divisão oficial de 60%/40%. "
-                    "Registros antigos sem recompensa persistida não são estimados."
-                ),
-                inline=False,
-            )
         embed.set_footer(text="NÊMESIS • DADOS DE REVISÕES OFICIAIS • ACESSO EXCLUSIVO À LIDERANÇA")
         return embed
 
