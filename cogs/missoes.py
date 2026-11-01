@@ -22,7 +22,7 @@ from utils.guild_config import get_config, lideranca_only, membro_tem_lideranca
 from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
-    _salvar_perfil,
+    atualizar_perfil,
     calcular_patente_atual,
     definir_patente,
 )
@@ -2446,26 +2446,34 @@ class Missoes(commands.Cog):
         resultados = []
         async with self._reward_lock:
             for usuario_id, quantidade in distribuicao:
-                perfil = await get_perfil(guild.id, usuario_id)
-                eventos_aplicados = list(perfil.get("recompensas_missoes_aplicadas", []))
                 evento_perfil = (
                     f"{revisao_id}:{usuario_id}"
                     if auxiliar_id
                     else revisao_id
                 )
-                marcador_novo = evento_perfil not in eventos_aplicados
-                recompensa_aplicada = (
-                    marcador_novo
-                    and (bool(auxiliar_id) or not atividade_ja_aplicada)
-                )
+                estado_aplicacao = {"aplicada": False}
 
-                if marcador_novo:
-                    eventos_aplicados.append(evento_perfil)
-                    perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
-                if recompensa_aplicada:
-                    perfil["xp"] = int(perfil.get("xp", 0) or 0) + quantidade
-                if recompensa_aplicada or marcador_novo:
-                    await _salvar_perfil(guild.id, usuario_id, perfil)
+                def aplicar_recompensa(perfil):
+                    eventos_aplicados = list(
+                        perfil.get("recompensas_missoes_aplicadas", [])
+                    )
+                    marcador_novo = evento_perfil not in eventos_aplicados
+                    recompensa_aplicada = (
+                        marcador_novo
+                        and (bool(auxiliar_id) or not atividade_ja_aplicada)
+                    )
+                    if marcador_novo:
+                        eventos_aplicados.append(evento_perfil)
+                        perfil["recompensas_missoes_aplicadas"] = eventos_aplicados[-1000:]
+                    if recompensa_aplicada:
+                        perfil["xp"] = int(perfil.get("xp", 0) or 0) + quantidade
+                    estado_aplicacao["aplicada"] = bool(recompensa_aplicada)
+                    return perfil
+
+                perfil = await atualizar_perfil(
+                    guild.id, usuario_id, aplicar_recompensa
+                )
+                recompensa_aplicada = estado_aplicacao["aplicada"]
 
                 resultados.append({
                     "user_id": usuario_id,

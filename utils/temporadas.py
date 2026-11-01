@@ -5,8 +5,7 @@ from utils.storage import carregar, salvar
 from utils.guild_config import get_config
 from utils.perfis import (
     ARQUIVO_PERFIS,
-    get_perfil,
-    _salvar_perfil,
+    atualizar_perfil,
 )
 
 
@@ -295,16 +294,17 @@ async def encerrar_temporada(
                 continue
             user_id = int(vencedor["user_id"])
             bonus_xp = max(0, int(vencedor.get("bonus_xp", 0) or 0))
-            perfil = await get_perfil(guild_id, user_id)
-            eventos = perfil.get("temporadas_bonus_aplicados", [])
-            if not isinstance(eventos, list):
-                eventos = []
+            def aplicar_bonus(perfil):
+                eventos = perfil.get("temporadas_bonus_aplicados", [])
+                if not isinstance(eventos, list):
+                    eventos = []
+                if evento_id not in eventos:
+                    perfil["xp"] = int(perfil.get("xp", 0) or 0) + bonus_xp
+                    eventos.append(evento_id)
+                    perfil["temporadas_bonus_aplicados"] = eventos[-500:]
+                return perfil
 
-            if evento_id not in eventos:
-                perfil["xp"] = int(perfil.get("xp", 0) or 0) + bonus_xp
-                eventos.append(evento_id)
-                perfil["temporadas_bonus_aplicados"] = eventos[-500:]
-                await _salvar_perfil(guild_id, user_id, perfil)
+            await atualizar_perfil(guild_id, user_id, aplicar_bonus)
 
         historico = estado.get("historico", [])
         if not isinstance(historico, list):

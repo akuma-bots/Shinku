@@ -1,4 +1,4 @@
-from utils.storage import carregar, salvar
+from utils.storage import carregar, salvar, atualizar_json
 
 ARQUIVO_COMPETITIVO = "competitivo.json"
 
@@ -202,72 +202,66 @@ async def somar_pontos_competitivo(
     vitorias: int | None = None,
     derrotas: int | None = None,
     evento_id: str = "",
+    campos_extra: dict = None,
 ) -> dict:
-    """
-    Atualiza o registro competitivo privado da NÊMESIS.
-
-    O delta é somado à pontuação existente, preservando os pontos já registrados.
-    """
-
-    dados = await carregar(
-        ARQUIVO_COMPETITIVO,
-        PADRAO_COMPETITIVO.copy(),
-    )
-
-    dados.setdefault("catalogo", [])
-    dados.setdefault("perfis", {})
-
+    """Atualiza o perfil competitivo atomicamente e evita reaplicar eventos."""
     chave = str(user_id)
-
-    perfil = dados["perfis"].get(chave) or {
-        "discordId": chave,
-        "nome": nome or "",
-        "pontos": 0,
-        "elo": 1000,
-        "vitorias": 0,
-        "derrotas": 0,
-    }
-
-    perfil["discordId"] = chave
-
-    if nome:
-        perfil["nome"] = nome
-
-    eventos = perfil.get("eventos_pontos_aplicados", [])
-    if not isinstance(eventos, list):
-        eventos = []
     evento_id = str(evento_id or "").strip()
-    delta_efetivo = int(delta)
-    if evento_id:
-        if evento_id in eventos:
-            delta_efetivo = 0
-        else:
-            eventos.append(evento_id)
+    delta = int(delta)
+
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"catalogo": [], "perfis": {}}
+        if not isinstance(dados.get("catalogo"), list):
+            dados["catalogo"] = []
+        if not isinstance(dados.get("perfis"), dict):
+            dados["perfis"] = {}
+
+        perfil = dados["perfis"].get(chave)
+        if not isinstance(perfil, dict):
+            perfil = {
+                "discordId": chave, "nome": nome or "", "pontos": 0,
+                "elo": 1000, "vitorias": 0, "derrotas": 0,
+            }
+        perfil["discordId"] = chave
+        if nome:
+            perfil["nome"] = nome
+
+        eventos = perfil.get("eventos_pontos_aplicados", [])
+        if isinstance(eventos, str):
+            eventos = [eventos] if eventos.strip() else []
+        elif not isinstance(eventos, list):
+            eventos = []
+        delta_efetivo = delta
+        if evento_id:
+            if evento_id in eventos:
+                delta_efetivo = 0
+            else:
+                eventos.append(evento_id)
             perfil["eventos_pontos_aplicados"] = eventos[-1000:]
 
-    pontos_anteriores = int(perfil.get("pontos", 0) or 0)
-    perfil["pontos"] = pontos_anteriores + delta_efetivo
-    perfil["pontos_temporada"] = (
-        int(perfil.get("pontos_temporada", pontos_anteriores) or 0)
-        + delta_efetivo
+        pontos_anteriores = int(perfil.get("pontos", 0) or 0)
+        pontos_temporada = int(
+            perfil.get("pontos_temporada", pontos_anteriores) or 0
+        )
+        perfil["pontos"] = pontos_anteriores + delta_efetivo
+        perfil["pontos_temporada"] = pontos_temporada + delta_efetivo
+        perfil.setdefault("tempo_top_global_segundos", 0)
+        perfil.setdefault("em_top_global", False)
+        if vitorias is not None:
+            perfil["vitorias"] = int(vitorias)
+        if derrotas is not None:
+            perfil["derrotas"] = int(derrotas)
+        if isinstance(campos_extra, dict):
+            perfil.update(campos_extra)
+
+        dados["perfis"][chave] = perfil
+        return dados
+
+    dados = await atualizar_json(
+        ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar
     )
-    perfil.setdefault("tempo_top_global_segundos", 0)
-    perfil.setdefault("em_top_global", False)
-
-    if vitorias is not None:
-        perfil["vitorias"] = int(vitorias)
-
-    if derrotas is not None:
-        perfil["derrotas"] = int(derrotas)
-
-    dados["perfis"][chave] = perfil
-
-    await salvar(
-        ARQUIVO_COMPETITIVO,
-        dados,
-    )
-
-    return perfil
+    return dados["perfis"][chave]
 
 
 async def migrar_perfil_se_necessario(
@@ -275,54 +269,39 @@ async def migrar_perfil_se_necessario(
     nome: str,
     perfil_bot: dict,
 ) -> dict:
-    """
-    Migra um perfil antigo do perfis.json para competitivo.json
-    somente se ele ainda não existir no ranking competitivo interno.
-
-    Se o usuário já tiver perfil competitivo, nada é sobrescrito.
-    """
-
-    dados = await carregar(
-        ARQUIVO_COMPETITIVO,
-        PADRAO_COMPETITIVO.copy(),
-    )
-
-    dados.setdefault("catalogo", [])
-    dados.setdefault("perfis", {})
-
+    """Migra perfil legado apenas se o registro ainda não existir, usando CAS."""
     chave = str(user_id)
 
-    if chave in dados["perfis"]:
-        return dados["perfis"][chave]
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"catalogo": [], "perfis": {}}
+        if not isinstance(dados.get("catalogo"), list):
+            dados["catalogo"] = []
+        if not isinstance(dados.get("perfis"), dict):
+            dados["perfis"] = {}
+        if chave in dados["perfis"]:
+            return dados
 
-    pontos = (
-        int(perfil_bot.get("xp", 0) or 0)
-        + int(perfil_bot.get("vitorias", 0) or 0) * 10
-        + int(perfil_bot.get("mvps", 0) or 0) * 20
+        pontos = (
+            int(perfil_bot.get("xp", 0) or 0)
+            + int(perfil_bot.get("vitorias", 0) or 0) * 10
+            + int(perfil_bot.get("mvps", 0) or 0) * 20
+        )
+        dados["perfis"][chave] = {
+            "discordId": chave,
+            "nome": nome or "",
+            "pontos": pontos,
+            "elo": 1000,
+            "vitorias": int(perfil_bot.get("vitorias", 0) or 0),
+            "derrotas": int(perfil_bot.get("derrotas", 0) or 0),
+            "xp": int(perfil_bot.get("xp", 0) or 0),
+            "pontos_temporada": pontos,
+            "tempo_top_global_segundos": 0,
+            "em_top_global": False,
+        }
+        return dados
+
+    dados = await atualizar_json(
+        ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar
     )
-
-    perfil = {
-        "discordId": chave,
-        "nome": nome or "",
-        "pontos": pontos,
-        "elo": 1000,
-        "vitorias": int(
-            perfil_bot.get("vitorias", 0) or 0
-        ),
-        "derrotas": int(
-            perfil_bot.get("derrotas", 0) or 0
-        ),
-        "xp": int(perfil_bot.get("xp", 0) or 0),
-        "pontos_temporada": pontos,
-        "tempo_top_global_segundos": 0,
-        "em_top_global": False,
-    }
-
-    dados["perfis"][chave] = perfil
-
-    await salvar(
-        ARQUIVO_COMPETITIVO,
-        dados,
-    )
-
-    return perfil
+    return dados["perfis"][chave]

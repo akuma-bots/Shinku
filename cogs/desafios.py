@@ -7,7 +7,7 @@ from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 
 from utils import desafios
 from utils.guild_config import get_config, set_config, lideranca_only
-from utils.perfis import get_perfil, calcular_patente_atual, definir_patente, _salvar_perfil
+from utils.perfis import get_perfil, atualizar_perfil, calcular_patente_atual, definir_patente
 
 XP_VITORIA_PVP = 50
 COOLDOWN_PADRAO_MINUTOS = 15
@@ -60,57 +60,65 @@ async def _atualizar_stats_pvp(
     xp_extra_vencedor: int = 0,
     desafio_id: str = "",
 ):
-    """
-    Aplica as estatísticas uma vez por desafio e por perfil.
-    O marcador é salvo junto com as estatísticas para que uma falha parcial
-    possa ser retomada sem duplicar a recompensa já persistida.
-    """
+    """Aplica estatísticas e XP de cada participante por chave idempotente."""
     evento_id = f"pvp:{desafio_id}" if desafio_id else ""
+    estado = {"patente_antiga": None}
 
-    pv = await get_perfil(guild_id, vencedor_id)
-    patente_antiga = pv.get("patente")
-    eventos_vitoria = pv.get("resultados_pvp_aplicados", [])
-    if not isinstance(eventos_vitoria, list):
-        eventos_vitoria = []
-    if not evento_id or evento_id not in eventos_vitoria:
-        pv["vitorias"] = int(pv.get("vitorias", 0) or 0) + 1
-        pv["kills"] = int(pv.get("kills", 0) or 0) + 1
-        pv["sequencia_atual"] = int(pv.get("sequencia_atual", 0) or 0) + 1
-        pv["maior_sequencia"] = max(int(pv.get("maior_sequencia", 0) or 0), pv["sequencia_atual"])
-        pv["xp"] = int(pv.get("xp", 0) or 0) + XP_VITORIA_PVP + xp_extra_vencedor
+    def aplicar_vitoria(perfil):
+        estado["patente_antiga"] = perfil.get("patente")
+        eventos = perfil.setdefault("resultados_pvp_aplicados", [])
+        if evento_id and evento_id in eventos:
+            return perfil
+        perfil["vitorias"] = int(perfil.get("vitorias", 0) or 0) + 1
+        perfil["kills"] = int(perfil.get("kills", 0) or 0) + 1
+        perfil["sequencia_atual"] = int(perfil.get("sequencia_atual", 0) or 0) + 1
+        perfil["maior_sequencia"] = max(
+            int(perfil.get("maior_sequencia", 0) or 0),
+            perfil["sequencia_atual"],
+        )
+        perfil["xp"] = int(perfil.get("xp", 0) or 0) + XP_VITORIA_PVP + xp_extra_vencedor
         if evento_id:
-            eventos_vitoria.append(evento_id)
-            pv["resultados_pvp_aplicados"] = eventos_vitoria[-1000:]
-        await _salvar_perfil(guild_id, vencedor_id, pv)
-    pp = await get_perfil(guild_id, perdedor_id)
-    eventos_derrota = pp.get("resultados_pvp_aplicados", [])
-    if not isinstance(eventos_derrota, list):
-        eventos_derrota = []
-    if not evento_id or evento_id not in eventos_derrota:
-        pp["derrotas"] = int(pp.get("derrotas", 0) or 0) + 1
-        pp["deaths"] = int(pp.get("deaths", 0) or 0) + 1
-        pp["sequencia_atual"] = 0
-        if evento_id:
-            eventos_derrota.append(evento_id)
-            pp["resultados_pvp_aplicados"] = eventos_derrota[-1000:]
-        await _salvar_perfil(guild_id, perdedor_id, pp)
-    return pv, patente_antiga
+            eventos.append(evento_id)
+            perfil["resultados_pvp_aplicados"] = eventos[-1000:]
+        return perfil
 
+    def aplicar_derrota(perfil):
+        eventos = perfil.setdefault("resultados_pvp_aplicados", [])
+        if evento_id and evento_id in eventos:
+            return perfil
+        perfil["derrotas"] = int(perfil.get("derrotas", 0) or 0) + 1
+        perfil["deaths"] = int(perfil.get("deaths", 0) or 0) + 1
+        perfil["sequencia_atual"] = 0
+        if evento_id:
+            eventos.append(evento_id)
+            perfil["resultados_pvp_aplicados"] = eventos[-1000:]
+        return perfil
+
+    pv = await atualizar_perfil(guild_id, vencedor_id, aplicar_vitoria)
+    await atualizar_perfil(guild_id, perdedor_id, aplicar_derrota)
+    return pv, estado["patente_antiga"]
 
 async def _remover_xp(guild_id: int, user_id: int, quantidade: int) -> bool:
-    perfil = await get_perfil(guild_id, user_id)
-    if perfil["xp"] < quantidade:
-        return False
-    perfil["xp"] -= quantidade
-    await _salvar_perfil(guild_id, user_id, perfil)
-    return True
+    resultado = {"removido": False}
+    quantidade = max(0, int(quantidade))
 
+    def aplicar(perfil):
+        if perfil["xp"] < quantidade:
+            resultado["removido"] = False
+            return perfil
+        perfil["xp"] -= quantidade
+        resultado["removido"] = True
+        return perfil
+
+    await atualizar_perfil(guild_id, user_id, aplicar)
+    return resultado["removido"]
 
 async def _devolver_xp(guild_id: int, user_id: int, quantidade: int):
-    perfil = await get_perfil(guild_id, user_id)
-    perfil["xp"] += quantidade
-    await _salvar_perfil(guild_id, user_id, perfil)
-
+    quantidade = max(0, int(quantidade))
+    return await atualizar_perfil(
+        guild_id, user_id,
+        lambda perfil: {**perfil, "xp": perfil["xp"] + quantidade},
+    )
 
 class Desafios(commands.Cog):
     """Duelo PvP casual: /desafiar posta em Desafios com botões Aceitar/

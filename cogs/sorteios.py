@@ -1333,16 +1333,20 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                     if cargo not in membro.roles:
                         await membro.add_roles(cargo, reason=f"Prêmio do sorteio NÊMESIS {sorteio.get('id')}")
                 elif tipo == "xp_perfil":
-                    from utils.perfis import get_perfil, _salvar_perfil, _atualizar_ranking_competitivo
+                    from utils.perfis import atualizar_perfil, _atualizar_ranking_competitivo
 
-                    perfil = await get_perfil(guild.id, membro.id)
-                    eventos = perfil.setdefault("sorteios_recompensados", [])
                     evento_id = str(sorteio.get("id"))
-                    if evento_id not in eventos:
-                        perfil["xp"] = max(0, int(perfil.get("xp", 0) or 0)) + max(1, int(sorteio.get("xp_recompensa", 0) or 0))
-                        eventos.append(evento_id)
-                        perfil["sorteios_recompensados"] = eventos[-500:]
-                        await _salvar_perfil(guild.id, membro.id, perfil)
+                    quantidade_xp = max(1, int(sorteio.get("xp_recompensa", 0) or 0))
+
+                    def aplicar_recompensa(perfil):
+                        eventos = perfil.setdefault("sorteios_recompensados", [])
+                        if evento_id not in eventos:
+                            perfil["xp"] = max(0, int(perfil.get("xp", 0) or 0)) + quantidade_xp
+                            eventos.append(evento_id)
+                            perfil["sorteios_recompensados"] = eventos[-500:]
+                        return perfil
+
+                    perfil = await atualizar_perfil(guild.id, membro.id, aplicar_recompensa)
                     # Também repara a atualização do ranking interno se o processo caiu após salvar o perfil.
                     await _atualizar_ranking_competitivo(user_id=membro.id, perfil=perfil, nome=membro.display_name, delta_pontos=0)
                 elif tipo == "xp_gangue":

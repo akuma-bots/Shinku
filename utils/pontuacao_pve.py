@@ -1,7 +1,7 @@
 import asyncio
 
 from utils.storage import carregar
-from utils.perfis import get_perfil, _salvar_perfil, ARQUIVO_PERFIS
+from utils.perfis import atualizar_perfil, ARQUIVO_PERFIS
 
 
 _PVE_LOCK = asyncio.Lock()
@@ -16,13 +16,15 @@ async def adicionar_pontos(guild_id: int, user_id: int, pontos: int) -> int:
         raise ValueError("A pontuação PvE não pode ser negativa.")
 
     async with _PVE_LOCK:
-        perfil = await get_perfil(guild_id, user_id)
-        try:
-            atual = max(0, int(perfil.get("pontos_pve", 0) or 0))
-        except (TypeError, ValueError, OverflowError):
-            atual = 0
-        perfil["pontos_pve"] = atual + pontos
-        await _salvar_perfil(guild_id, user_id, perfil)
+        def aplicar(perfil):
+            try:
+                atual = max(0, int(perfil.get("pontos_pve", 0) or 0))
+            except (TypeError, ValueError, OverflowError):
+                atual = 0
+            perfil["pontos_pve"] = atual + pontos
+            return perfil
+
+        perfil = await atualizar_perfil(guild_id, user_id, aplicar)
         return perfil["pontos_pve"]
 
 

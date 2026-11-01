@@ -6,24 +6,25 @@ from utils import pontuacao_pve
 
 class TestIntegridadePontuacaoPve(unittest.IsolatedAsyncioTestCase):
     async def test_rejeita_pontos_negativos(self):
-        with patch.object(pontuacao_pve, "get_perfil", new=AsyncMock(return_value={"pontos_pve": 10})), patch.object(
-            pontuacao_pve, "_salvar_perfil", new=AsyncMock()
-        ) as salvar:
+        with patch.object(pontuacao_pve, "atualizar_perfil", new=AsyncMock()) as atualizar:
             with self.assertRaisesRegex(ValueError, "não pode ser negativa"):
                 await pontuacao_pve.adicionar_pontos(123, 456, -5)
 
-        salvar.assert_not_awaited()
+        atualizar.assert_not_awaited()
 
     async def test_adiciona_pontos_ao_total_normalizado(self):
         perfil = {"pontos_pve": "inválido", "xp": 100}
-        with patch.object(pontuacao_pve, "get_perfil", new=AsyncMock(return_value=perfil)), patch.object(
-            pontuacao_pve, "_salvar_perfil", new=AsyncMock()
-        ) as salvar:
+
+        async def atualizar(_guild_id, _user_id, transformador):
+            transformador(perfil)
+            return perfil
+
+        with patch.object(pontuacao_pve, "atualizar_perfil", new=AsyncMock(side_effect=atualizar)) as mock:
             total = await pontuacao_pve.adicionar_pontos(123, 456, 15)
 
         self.assertEqual(total, 15)
         self.assertEqual(perfil["xp"], 100)
-        salvar.assert_awaited_once()
+        mock.assert_awaited_once()
 
     async def test_ranking_ignora_perfis_invalidos_e_ordena_empates(self):
         dados = {

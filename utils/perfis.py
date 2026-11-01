@@ -1,4 +1,4 @@
-from utils.storage import carregar, salvar
+from utils.storage import carregar, salvar, atualizar_json
 from utils.competitivo_sync import somar_pontos_competitivo
 
 
@@ -78,6 +78,7 @@ def _normalizar_perfil(perfil) -> dict:
         "sorteios_recompensados",
         "temporadas_bonus_aplicados",
         "eventos_recompensa",
+        "resultados_guerra_aplicados",
     ):
         eventos = normalizado.get(campo, [])
         if isinstance(eventos, str):
@@ -126,26 +127,45 @@ async def get_perfil(
     return _normalizar_perfil(perfil)
 
 
+async def atualizar_perfil(
+    guild_id: int,
+    user_id: int,
+    transformador,
+    perfil_inicial: dict = None,
+) -> dict:
+    """Atualiza um perfil na versão mais recente do documento, com CAS no Redis."""
+    chave_guild = str(guild_id)
+    chave_usuario = str(user_id)
+    if perfil_inicial is None:
+        # Preserva perfis migrados do ranking competitivo quando ainda não
+        # existe um registro local em perfis.json.
+        perfil_inicial = await get_perfil(guild_id, user_id)
+
+    def aplicar(documento):
+        if not isinstance(documento, dict):
+            documento = {}
+        guild = documento.get(chave_guild)
+        if not isinstance(guild, dict):
+            guild = {}
+        atual = _normalizar_perfil(guild.get(chave_usuario, perfil_inicial or {}))
+        novo = transformador(atual)
+        guild[chave_usuario] = _normalizar_perfil(novo if isinstance(novo, dict) else atual)
+        documento[chave_guild] = guild
+        return documento
+
+    atualizado = await atualizar_json(ARQUIVO_PERFIS, {}, aplicar)
+    guild = atualizado.get(chave_guild, {})
+    perfil = guild.get(chave_usuario, {}) if isinstance(guild, dict) else {}
+    return _normalizar_perfil(perfil)
+
+
 async def _salvar_perfil(
     guild_id: int,
     user_id: int,
     perfil: dict,
 ):
-    todos = await carregar(
-        ARQUIVO_PERFIS,
-        {},
-    )
-
-    guild_dados = todos.setdefault(
-        str(guild_id),
-        {},
-    )
-
-    guild_dados[str(user_id)] = perfil
-
-    await salvar(
-        ARQUIVO_PERFIS,
-        todos,
+    return await atualizar_perfil(
+        guild_id, user_id, lambda _atual: perfil
     )
 
 
@@ -156,140 +176,29 @@ async def _atualizar_ranking_competitivo(
     delta_pontos: int = 0,
     evento_id: str = "",
 ) -> dict:
-    """
-    Atualiza o ranking competitivo privado do próprio bot.
-
-    Os dados ficam no namespace exclusivo NÊMESIS do armazenamento. Esta
-    função não faz chamadas nem sincronizações com o site.
-    """
-
-    competitivo = await somar_pontos_competitivo(
+    """Sincroniza o perfil competitivo no mesmo commit atômico da pontuação."""
+    kills = int(perfil.get("kills", 0) or 0)
+    deaths = int(perfil.get("deaths", 0) or 0)
+    campos_extra = {
+        "xp": int(perfil.get("xp", 0) or 0),
+        "kills": kills,
+        "deaths": deaths,
+        "mvps": int(perfil.get("mvps", 0) or 0),
+        "sequencia_atual": int(perfil.get("sequencia_atual", 0) or 0),
+        "maior_sequencia": int(perfil.get("maior_sequencia", 0) or 0),
+        "patente": perfil.get("patente"),
+        "medalhas": list(perfil.get("medalhas", [])),
+        "kdr": round(kills / deaths, 2) if deaths > 0 else float(kills),
+    }
+    return await somar_pontos_competitivo(
         user_id=user_id,
         nome=nome,
         delta=delta_pontos,
-        vitorias=perfil.get(
-            "vitorias",
-            0,
-        ),
-        derrotas=perfil.get(
-            "derrotas",
-            0,
-        ),
+        vitorias=perfil.get("vitorias", 0),
+        derrotas=perfil.get("derrotas", 0),
         evento_id=evento_id,
+        campos_extra=campos_extra,
     )
-
-    competitivo["xp"] = int(
-        perfil.get(
-            "xp",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["kills"] = int(
-        perfil.get(
-            "kills",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["deaths"] = int(
-        perfil.get(
-            "deaths",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["mvps"] = int(
-        perfil.get(
-            "mvps",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["sequencia_atual"] = int(
-        perfil.get(
-            "sequencia_atual",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["maior_sequencia"] = int(
-        perfil.get(
-            "maior_sequencia",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["patente"] = perfil.get(
-        "patente"
-    )
-
-    competitivo["medalhas"] = list(
-        perfil.get(
-            "medalhas",
-            [],
-        )
-    )
-
-    kills = int(
-        perfil.get(
-            "kills",
-            0,
-        )
-        or 0
-    )
-
-    deaths = int(
-        perfil.get(
-            "deaths",
-            0,
-        )
-        or 0
-    )
-
-    competitivo["kdr"] = (
-        round(
-            kills / deaths,
-            2,
-        )
-        if deaths > 0
-        else float(kills)
-    )
-
-    dados = await carregar(
-        ARQUIVO_COMPETITIVO,
-        {
-            "catalogo": [],
-            "perfis": {},
-        },
-    )
-
-    dados.setdefault(
-        "catalogo",
-        [],
-    )
-
-    dados.setdefault(
-        "perfis",
-        {},
-    )
-
-    dados["perfis"][
-        str(user_id)
-    ] = competitivo
-
-    await salvar(
-        ARQUIVO_COMPETITIVO,
-        dados,
-    )
-
-    return competitivo
 
 
 async def get_patentes(
@@ -378,171 +287,144 @@ async def registrar_resultado_guerra(
     user_id: int,
     venceu: bool,
     foi_mvp: bool = False,
+    evento_id: str = "",
 ) -> dict:
+    """Registra o resultado uma única vez quando recebe uma chave de evento."""
+    estado = {"patente_antiga": None, "medalhas_novas": []}
+    evento_id = str(evento_id or "").strip()
 
-    perfil = await get_perfil(
-        guild_id,
-        user_id,
-    )
+    def aplicar(perfil):
+        estado["patente_antiga"] = perfil.get("patente")
+        eventos = perfil.setdefault("resultados_guerra_aplicados", [])
+        if evento_id and evento_id in eventos:
+            estado["medalhas_novas"] = []
+            return perfil
+        if evento_id:
+            eventos.append(evento_id)
+            perfil["resultados_guerra_aplicados"] = eventos[-1000:]
 
-    patente_antiga = perfil["patente"]
+        if venceu:
+            perfil["vitorias"] += 1
+            perfil["sequencia_atual"] += 1
+            perfil["maior_sequencia"] = max(
+                perfil["maior_sequencia"], perfil["sequencia_atual"]
+            )
+            perfil["xp"] += XP_VITORIA
+        else:
+            perfil["derrotas"] += 1
+            perfil["sequencia_atual"] = 0
+            perfil["xp"] += XP_DERROTA
+        if foi_mvp:
+            perfil["mvps"] += 1
+            perfil["xp"] += XP_BONUS_MVP
 
-    if venceu:
+        novas = _checar_novas_medalhas(perfil)
+        perfil["medalhas"].extend(novas)
+        estado["medalhas_novas"] = novas
+        return perfil
 
-        perfil["vitorias"] += 1
-
-        perfil["sequencia_atual"] += 1
-
-        perfil["maior_sequencia"] = max(
-            perfil["maior_sequencia"],
-            perfil["sequencia_atual"],
-        )
-
-        perfil["xp"] += XP_VITORIA
-
-    else:
-
-        perfil["derrotas"] += 1
-
-        perfil["sequencia_atual"] = 0
-
-        perfil["xp"] += XP_DERROTA
-
-    if foi_mvp:
-
-        perfil["mvps"] += 1
-
-        perfil["xp"] += XP_BONUS_MVP
-
-    medalhas_novas = _checar_novas_medalhas(
-        perfil
-    )
-
-    perfil["medalhas"].extend(
-        medalhas_novas
-    )
-
-    await _salvar_perfil(
-        guild_id,
-        user_id,
-        perfil,
-    )
-
+    perfil = await atualizar_perfil(guild_id, user_id, aplicar)
     delta_pontos = (
-        (
-            XP_VITORIA
-            if venceu
-            else XP_DERROTA
-        )
-        + (
-            10
-            if venceu
-            else 0
-        )
-        + (
-            XP_BONUS_MVP
-            if foi_mvp
-            else 0
-        )
+        (XP_VITORIA if venceu else XP_DERROTA)
+        + (10 if venceu else 0)
+        + (XP_BONUS_MVP if foi_mvp else 0)
     )
-
     competitivo = await _atualizar_ranking_competitivo(
         user_id=user_id,
         perfil=perfil,
         delta_pontos=delta_pontos,
+        evento_id=evento_id,
     )
-
     return {
         "perfil": perfil,
         "competitivo": competitivo,
-        "medalhas_novas": medalhas_novas,
-        "patente_antiga": patente_antiga,
+        "medalhas_novas": estado["medalhas_novas"],
+        "patente_antiga": estado["patente_antiga"],
     }
-
 
 async def registrar_empate_guerra(
     guild_id: int,
     user_id: int,
     foi_mvp: bool = False,
+    evento_id: str = "",
 ) -> dict:
-    """Registra empate sem contabilizar vitória ou derrota."""
-    perfil = await get_perfil(guild_id, user_id)
-    patente_antiga = perfil["patente"]
-    perfil["empates"] = int(perfil.get("empates", 0) or 0) + 1
-    perfil["sequencia_atual"] = 0
-    perfil["xp"] += 15
+    """Registra empate de forma atômica e idempotente quando há evento_id."""
+    estado = {"patente_antiga": None, "medalhas_novas": []}
+    evento_id = str(evento_id or "").strip()
 
-    if foi_mvp:
-        perfil["mvps"] += 1
-        perfil["xp"] += XP_BONUS_MVP
+    def aplicar(perfil):
+        estado["patente_antiga"] = perfil.get("patente")
+        eventos = perfil.setdefault("resultados_guerra_aplicados", [])
+        if evento_id and evento_id in eventos:
+            estado["medalhas_novas"] = []
+            return perfil
+        if evento_id:
+            eventos.append(evento_id)
+            perfil["resultados_guerra_aplicados"] = eventos[-1000:]
+        perfil["empates"] += 1
+        perfil["sequencia_atual"] = 0
+        perfil["xp"] += 15
+        if foi_mvp:
+            perfil["mvps"] += 1
+            perfil["xp"] += XP_BONUS_MVP
+        novas = _checar_novas_medalhas(perfil)
+        perfil["medalhas"].extend(novas)
+        estado["medalhas_novas"] = novas
+        return perfil
 
-    medalhas_novas = _checar_novas_medalhas(perfil)
-    perfil["medalhas"].extend(medalhas_novas)
-    await _salvar_perfil(guild_id, user_id, perfil)
-
-    delta_pontos = 15 + (XP_BONUS_MVP if foi_mvp else 0)
+    perfil = await atualizar_perfil(guild_id, user_id, aplicar)
     competitivo = await _atualizar_ranking_competitivo(
         user_id=user_id,
         perfil=perfil,
-        delta_pontos=delta_pontos,
+        delta_pontos=15 + (XP_BONUS_MVP if foi_mvp else 0),
+        evento_id=evento_id,
     )
     return {
         "perfil": perfil,
         "competitivo": competitivo,
-        "medalhas_novas": medalhas_novas,
-        "patente_antiga": patente_antiga,
+        "medalhas_novas": estado["medalhas_novas"],
+        "patente_antiga": estado["patente_antiga"],
     }
-
 
 async def registrar_pvp(
     guild_id: int,
     vencedor_id: int,
     perdedor_id: int,
+    evento_id: str = "",
 ) -> tuple:
+    evento_id = str(evento_id or "").strip()
 
-    perfil_vencedor = await get_perfil(
-        guild_id,
-        vencedor_id,
-    )
+    def aplicar_vitoria(perfil):
+        eventos = perfil.setdefault("resultados_pvp_aplicados", [])
+        chave = f"{evento_id}:vitoria" if evento_id else ""
+        if chave and chave in eventos:
+            return perfil
+        perfil["kills"] += 1
+        if chave:
+            eventos.append(chave)
+            perfil["resultados_pvp_aplicados"] = eventos[-1000:]
+        return perfil
 
-    perfil_vencedor["kills"] += 1
+    def aplicar_derrota(perfil):
+        eventos = perfil.setdefault("resultados_pvp_aplicados", [])
+        chave = f"{evento_id}:derrota" if evento_id else ""
+        if chave and chave in eventos:
+            return perfil
+        perfil["deaths"] += 1
+        if chave:
+            eventos.append(chave)
+            perfil["resultados_pvp_aplicados"] = eventos[-1000:]
+        return perfil
 
-    await _salvar_perfil(
-        guild_id,
-        vencedor_id,
-        perfil_vencedor,
-    )
-
-    perfil_perdedor = await get_perfil(
-        guild_id,
-        perdedor_id,
-    )
-
-    perfil_perdedor["deaths"] += 1
-
-    await _salvar_perfil(
-        guild_id,
-        perdedor_id,
-        perfil_perdedor,
-    )
-
+    perfil_vencedor = await atualizar_perfil(guild_id, vencedor_id, aplicar_vitoria)
+    perfil_perdedor = await atualizar_perfil(guild_id, perdedor_id, aplicar_derrota)
     await _atualizar_ranking_competitivo(
-        user_id=vencedor_id,
-        perfil=perfil_vencedor,
-        delta_pontos=0,
+        user_id=vencedor_id, perfil=perfil_vencedor, delta_pontos=0
     )
-
     await _atualizar_ranking_competitivo(
-        user_id=perdedor_id,
-        perfil=perfil_perdedor,
-        delta_pontos=0,
+        user_id=perdedor_id, perfil=perfil_perdedor, delta_pontos=0
     )
-
-    return (
-        perfil_vencedor,
-        perfil_perdedor,
-    )
-
+    return perfil_vencedor, perfil_perdedor
 
 async def calcular_patente_atual(
     guild_id: int,
@@ -568,41 +450,17 @@ async def definir_patente(
     user_id: int,
     nome_patente: str,
 ):
-
-    perfil = await get_perfil(
-        guild_id,
-        user_id,
+    perfil = await atualizar_perfil(
+        guild_id, user_id,
+        lambda atual: {**atual, "patente": nome_patente},
     )
-
-    perfil["patente"] = nome_patente
-
-    await _salvar_perfil(
-        guild_id,
-        user_id,
-        perfil,
-    )
-
     await _atualizar_ranking_competitivo(
-        user_id=user_id,
-        perfil=perfil,
-        delta_pontos=0,
+        user_id=user_id, perfil=perfil, delta_pontos=0,
     )
-
     return perfil
 
 
-def kdr(
-    perfil: dict,
-) -> float:
-
+def kdr(perfil: dict) -> float:
     if perfil["deaths"] > 0:
-
-        return round(
-            perfil["kills"]
-            / perfil["deaths"],
-            2,
-        )
-
-    return float(
-        perfil["kills"]
-    )
+        return round(perfil["kills"] / perfil["deaths"], 2)
+    return float(perfil["kills"])
