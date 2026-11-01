@@ -70,7 +70,7 @@ class TestInteligenciaParticipantes(unittest.TestCase):
         )
         self.assertEqual(dados["total"], 1)
         self.assertEqual(dados["perfis"]["606"]["ultima_atividade"], None)
-        self.assertEqual(dados["inativos_14d"][0]["user_id"], "606")
+        self.assertEqual(dados["inativos"][0]["user_id"], "606")
 
 
 if __name__ == "__main__":
