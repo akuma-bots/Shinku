@@ -59,7 +59,31 @@ class TestGeracaoNotasRelease(unittest.TestCase):
             MOD.arquivos_alterados = lambda before, after: [("M", "cogs/missoes.py")]
             release = MOD.gerar("a" * 40, "b" * 40)
             self.assertIsNotNone(release)
-            self.assertFalse(release["habilitada"])
+            self.assertTrue(release["habilitada"])
+        finally:
+            MOD.git = original_git
+            MOD.arquivos_alterados = original_arquivos
+
+
+    def test_reconhece_commits_funcionais_em_portugues(self):
+        assuntos = [
+            "Reforça autorização administrativa e cargos protegidos",
+            "Migra persistência de sistemas críticos para CAS",
+            "Torna formulários e candidaturas resistentes a concorrência",
+            "Protege entrega automática de notas contra duplicações",
+            "Protege encerramento e configuração de temporadas",
+        ]
+        self.assertEqual(MOD.commits_relevantes(assuntos), assuntos)
+
+    def test_gera_nota_ativa_para_commit_funcional_em_portugues(self):
+        original_git = MOD.git
+        original_arquivos = MOD.arquivos_alterados
+        try:
+            MOD.git = lambda *args: "Protege entrega automática de notas contra duplicações"
+            MOD.arquivos_alterados = lambda before, after: [("M", "cogs/novidades.py")]
+            release = MOD.gerar("a" * 40, "b" * 40)
+            self.assertIsNotNone(release)
+            self.assertTrue(release["habilitada"])
         finally:
             MOD.git = original_git
             MOD.arquivos_alterados = original_arquivos
