@@ -9,6 +9,133 @@ ARQUIVO_REVISOES = "revisoes.json"
 _REVISOES_LOCK = asyncio.Lock()
 
 
+
+def _adicionar_evento_auditoria(revisao: dict, evento: str, ator_id: int = None, **detalhes) -> None:
+    """Acrescenta evento à trilha sem alterar eventos anteriores."""
+    trilha = revisao.get("trilha_auditoria")
+    if not isinstance(trilha, list):
+        trilha = []
+        revisao["trilha_auditoria"] = trilha
+    registro = {"evento": str(evento)[:60], "ator_id": int(ator_id) if ator_id else None, "em": time.time()}
+    for chave, valor in detalhes.items():
+        if valor is not None:
+            registro[str(chave)[:60]] = str(valor)[:800] if isinstance(valor, str) else valor
+    trilha.append(registro)
+
+
+def analisar_integridade(revisoes: list, guild_id: int = None, agora: float = None) -> dict:
+    """Inspeciona protocolos de missão sem alterar os dados persistidos."""
+    agora = float(agora if agora is not None else time.time())
+    tipos = {"missao", "contribuicao", "especial", "pve"}
+    status_validos = {"pendente", "aprovada", "rejeitada"}
+    ocorrencias, ids = [], {}
+    total, sem_trilha = 0, 0
+
+    def apontar(item, codigo, nivel, descricao):
+        ocorrencias.append({
+            "protocolo": str(item.get("id") or "SEM-ID"),
+            "titulo": str(item.get("titulo") or "Protocolo sem título")[:100],
+            "codigo": codigo, "severidade": nivel, "descricao": descricao,
+            "tipo": str(item.get("tipo") or "—"), "autor_id": item.get("autor_id"),
+        })
+
+    for item in revisoes:
+        if not isinstance(item, dict) or str(item.get("tipo") or "").lower() not in tipos:
+            continue
+        total += 1
+        protocolo = str(item.get("id") or "").strip()
+        if not protocolo:
+            apontar(item, "id_ausente", "critica", "Protocolo sem identificador.")
+        elif protocolo in ids:
+            apontar(item, "id_duplicado", "critica", "Identificador repetido em outro protocolo.")
+        else:
+            ids[protocolo] = True
+        if item.get("status") not in status_validos:
+            apontar(item, "status_invalido", "critica", "Situação ausente ou não reconhecida.")
+        if guild_id is not None and item.get("guild_id") is not None:
+            try:
+                if int(item["guild_id"]) != int(guild_id):
+                    apontar(item, "servidor_divergente", "critica", "Servidor registrado não corresponde ao analisado.")
+            except (TypeError, ValueError, OverflowError):
+                apontar(item, "servidor_invalido", "alta", "Identificador de servidor inválido.")
+        recompensa = item.get("recompensa_xp")
+        if recompensa is not None:
+            try:
+                numero = int(recompensa)
+                if numero < 0 or str(numero) != str(recompensa).strip():
+                    raise ValueError
+            except (TypeError, ValueError, OverflowError):
+                apontar(item, "recompensa_invalida", "alta", "Recompensa XP não é um inteiro não negativo.")
+
+        datas = {}
+        for chave in ("timestamp", "criado_em", "aprovado_em", "rejeitada_em", "atualizado_em"):
+            valor = item.get(chave)
+            if valor is None:
+                datas[chave] = None
+                continue
+            try:
+                numero = float(valor)
+                if numero <= 0 or numero > agora + 300:
+                    raise ValueError
+                datas[chave] = numero
+            except (TypeError, ValueError, OverflowError):
+                datas[chave] = None
+                apontar(item, "data_" + chave + "_invalida", "media", "Campo de data inválido: " + chave + ".")
+        if datas["timestamp"] and datas["criado_em"] and datas["criado_em"] + 300 < datas["timestamp"]:
+            apontar(item, "ordem_criacao_invalida", "media", "Criação antecede o envio da evidência.")
+        decisao = datas["aprovado_em"] if item.get("status") == "aprovada" else datas["rejeitada_em"]
+        if decisao and datas["atualizado_em"] and datas["atualizado_em"] + 300 < decisao:
+            apontar(item, "ordem_decisao_invalida", "media", "Atualização antecede a decisão.")
+        if item.get("status") == "aprovada":
+            if not datas["aprovado_em"]:
+                apontar(item, "aprovacao_sem_data", "alta", "Aprovação sem data válida.")
+            if not item.get("revisor_id"):
+                apontar(item, "aprovacao_sem_revisor", "alta", "Aprovação sem responsável.")
+        elif item.get("status") == "rejeitada":
+            if not datas["rejeitada_em"]:
+                apontar(item, "rejeicao_sem_data", "alta", "Rejeição sem data válida.")
+            if not item.get("revisor_id"):
+                apontar(item, "rejeicao_sem_revisor", "alta", "Rejeição sem responsável.")
+            if len(str(item.get("motivo_rejeicao") or "").strip()) < 8:
+                apontar(item, "rejeicao_sem_motivo", "alta", "Rejeição sem justificativa suficiente.")
+        elif item.get("status") == "pendente" and (datas["aprovado_em"] or datas["rejeitada_em"] or item.get("revisor_id")):
+            apontar(item, "pendencia_com_decisao", "alta", "Pendência contém metadados de decisão.")
+
+        trilha = item.get("trilha_auditoria")
+        if not isinstance(trilha, list) or not trilha:
+            sem_trilha += 1
+            continue
+        ultimo_status, ultimo_tempo = None, None
+        for evento in trilha:
+            if not isinstance(evento, dict) or not evento.get("evento"):
+                apontar(item, "evento_auditoria_invalido", "alta", "Evento sem estrutura válida na trilha.")
+                continue
+            try:
+                instante = float(evento.get("em"))
+                if instante <= 0 or instante > agora + 300:
+                    raise ValueError
+                if ultimo_tempo is not None and instante < ultimo_tempo:
+                    apontar(item, "ordem_trilha_invalida", "media", "Eventos fora da ordem cronológica.")
+                ultimo_tempo = instante
+            except (TypeError, ValueError, OverflowError):
+                apontar(item, "data_evento_invalida", "media", "Evento com data inválida.")
+            if evento.get("status_novo"):
+                ultimo_status = evento["status_novo"]
+        if ultimo_status and ultimo_status != item.get("status"):
+            apontar(item, "trilha_divergente", "critica", "Último status da trilha difere do status atual.")
+
+    niveis = ("critica", "alta", "media")
+    contagens = {nivel: sum(1 for o in ocorrencias if o["severidade"] == nivel) for nivel in niveis}
+    afetados = {o["protocolo"] for o in ocorrencias}
+    return {
+        "protocolos_analisados": total, "ocorrencias": ocorrencias,
+        "total_ocorrencias": len(ocorrencias), "criticas": contagens["critica"],
+        "altas": contagens["alta"], "medias": contagens["media"],
+        "sem_trilha": sem_trilha,
+        "integridade_percentual": round(max(0, (total - len(afetados)) / total * 100), 1) if total else 100.0,
+    }
+
+
 async def _tudo():
     dados = await carregar(ARQUIVO_REVISOES, {})
     return dados if isinstance(dados, dict) else {}
@@ -109,7 +236,11 @@ async def criar_pendencia(
             "hash_imagem": None,
             "criado_em": time.time(),
             "atualizado_em": time.time(),
+            "trilha_auditoria": [],
         }
+        _adicionar_evento_auditoria(revisao, "protocolo_criado", autor_id,
+            status_anterior=None, status_novo="pendente", categoria=tipo,
+            referencia_id=referencia_id)
 
         lista.append(revisao)
 
@@ -162,6 +293,8 @@ async def definir_mensagem(
         alvo["canal_id"] = canal_id
         alvo["mensagem_id"] = mensagem_id
         alvo["atualizado_em"] = time.time()
+        _adicionar_evento_auditoria(alvo, "mensagem_publicada",
+            status_novo=alvo.get("status"), canal_id=canal_id, mensagem_id=mensagem_id)
 
         await _salvar_guild(
             guild_id,
@@ -194,6 +327,8 @@ async def definir_hash(
 
         alvo["hash_imagem"] = hash_imagem
         alvo["atualizado_em"] = time.time()
+        _adicionar_evento_auditoria(alvo, "hash_evidencia_registrado",
+            status_novo=alvo.get("status"), hash_prefixo=str(hash_imagem)[:16])
 
         await _salvar_guild(
             guild_id,
@@ -247,10 +382,13 @@ async def aprovar(
         if alvo.get("status") != "pendente":
             return None
 
+        status_anterior = alvo.get("status")
         alvo["status"] = "aprovada"
         alvo["revisor_id"] = revisor_id
         alvo["aprovado_em"] = time.time()
         alvo["atualizado_em"] = time.time()
+        _adicionar_evento_auditoria(alvo, "protocolo_aprovado", revisor_id,
+            status_anterior=status_anterior, status_novo="aprovada")
 
         await _salvar_guild(
             guild_id,
@@ -289,11 +427,14 @@ async def rejeitar(
         if alvo.get("status") != "pendente":
             return None
 
+        status_anterior = alvo.get("status")
         alvo["status"] = "rejeitada"
         alvo["revisor_id"] = revisor_id
         alvo["motivo_rejeicao"] = motivo
         alvo["rejeitada_em"] = time.time()
         alvo["atualizado_em"] = time.time()
+        _adicionar_evento_auditoria(alvo, "protocolo_rejeitado", revisor_id,
+            status_anterior=status_anterior, status_novo="rejeitada", justificativa=motivo)
 
         await _salvar_guild(
             guild_id,
@@ -318,10 +459,13 @@ async def reabrir_apos_falha_aplicacao(
         if not alvo or alvo.get("status") != "aprovada":
             return None
 
+        status_anterior = alvo.get("status")
         alvo["status"] = "pendente"
         alvo["falha_aplicacao_tipo"] = str(erro_tipo)[:100]
         alvo["falha_aplicacao_em"] = time.time()
         alvo["atualizado_em"] = time.time()
+        _adicionar_evento_auditoria(alvo, "aplicacao_reaberta_apos_falha",
+            status_anterior=status_anterior, status_novo="pendente", erro_tipo=str(erro_tipo)[:100])
         await _salvar_guild(guild_id, lista)
         return alvo
 
