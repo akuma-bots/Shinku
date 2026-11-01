@@ -28,10 +28,18 @@ def analisar_integridade(revisoes: list, guild_id: int = None, agora: float = No
     agora = float(agora if agora is not None else time.time())
     tipos = {"missao", "contribuicao", "especial", "pve"}
     status_validos = {"pendente", "aprovada", "rejeitada"}
-    ocorrencias, ids = [], {}
+    ocorrencias = []
+    registros_afetados = set()
     total, sem_trilha = 0, 0
+    contagem_ids = {}
+    for registro in revisoes:
+        if isinstance(registro, dict) and str(registro.get("tipo") or "").lower() in tipos:
+            codigo = str(registro.get("id") or "").strip()
+            if codigo:
+                contagem_ids[codigo] = contagem_ids.get(codigo, 0) + 1
 
     def apontar(item, codigo, nivel, descricao):
+        registros_afetados.add(id(item))
         ocorrencias.append({
             "protocolo": str(item.get("id") or "SEM-ID"),
             "titulo": str(item.get("titulo") or "Protocolo sem título")[:100],
@@ -46,10 +54,8 @@ def analisar_integridade(revisoes: list, guild_id: int = None, agora: float = No
         protocolo = str(item.get("id") or "").strip()
         if not protocolo:
             apontar(item, "id_ausente", "critica", "Protocolo sem identificador.")
-        elif protocolo in ids:
+        elif contagem_ids.get(protocolo, 0) > 1:
             apontar(item, "id_duplicado", "critica", "Identificador repetido em outro protocolo.")
-        else:
-            ids[protocolo] = True
         if item.get("status") not in status_validos:
             apontar(item, "status_invalido", "critica", "Situação ausente ou não reconhecida.")
         if guild_id is not None and item.get("guild_id") is not None:
@@ -126,13 +132,12 @@ def analisar_integridade(revisoes: list, guild_id: int = None, agora: float = No
 
     niveis = ("critica", "alta", "media")
     contagens = {nivel: sum(1 for o in ocorrencias if o["severidade"] == nivel) for nivel in niveis}
-    afetados = {o["protocolo"] for o in ocorrencias}
     return {
         "protocolos_analisados": total, "ocorrencias": ocorrencias,
         "total_ocorrencias": len(ocorrencias), "criticas": contagens["critica"],
         "altas": contagens["alta"], "medias": contagens["media"],
         "sem_trilha": sem_trilha,
-        "integridade_percentual": round(max(0, (total - len(afetados)) / total * 100), 1) if total else 100.0,
+        "integridade_percentual": round(max(0, (total - len(registros_afetados)) / total * 100), 1) if total else 100.0,
     }
 
 
