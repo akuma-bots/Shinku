@@ -50,6 +50,17 @@ def _embed_revisao(revisao: dict, guild: discord.Guild = None, bot: commands.Bot
     embed.add_field(name="◈ REFERÊNCIA", value=f"`{revisao.get('referencia_id') or '—'}`", inline=True)
     if auxiliar_id:
         embed.add_field(name="◈ COLABORADOR", value=f"<@{int(auxiliar_id)}>", inline=True)
+    recompensa = revisao.get("recompensa_xp")
+    if recompensa is not None:
+        try:
+            recompensa = max(0, int(recompensa))
+        except (TypeError, ValueError, OverflowError):
+            recompensa = 0
+        embed.add_field(
+            name="◈ RECOMPENSA PREVISTA",
+            value=f"**+{recompensa:,} XP**".replace(",", "."),
+            inline=True,
+        )
     enviado = revisao.get("timestamp")
     if isinstance(enviado, (int, float)):
         embed.add_field(name="◈ RECEBIDO", value=f"<t:{int(enviado)}:F>\n<t:{int(enviado)}:R>", inline=True)
@@ -416,7 +427,8 @@ class Revisoes(commands.Cog):
     async def abrir_revisao(
         self, guild: discord.Guild, canal: discord.abc.Messageable, *,
         tipo: str, autor_id: int, referencia_id: str, print_url: str,
-        titulo: str, descricao: str = None, auxiliar_id: int = None
+        titulo: str, descricao: str = None, auxiliar_id: int = None,
+        recompensa_xp: int = None,
     ) -> dict:
         # Serializa o ciclo completo de localizar/criar/publicar a prova.
         # O lock no storage evita registros duplicados; este lock também evita
@@ -426,12 +438,14 @@ class Revisoes(commands.Cog):
                 guild, canal, tipo=tipo, autor_id=autor_id,
                 referencia_id=referencia_id, print_url=print_url,
                 titulo=titulo, descricao=descricao, auxiliar_id=auxiliar_id,
+                recompensa_xp=recompensa_xp,
             )
 
     async def _abrir_revisao_sem_lock(self, guild: discord.Guild, canal: discord.abc.Messageable, *,
                              tipo: str, autor_id: int, referencia_id: str, print_url: str,
                              titulo: str, descricao: str = None,
-                             auxiliar_id: int = None) -> dict:
+                             auxiliar_id: int = None,
+                             recompensa_xp: int = None) -> dict:
         # Um desafio PvP só pode gerar uma revisão ativa. Se a publicação
         # falhar depois de persistir a pendência, a nova tentativa reutiliza
         # o mesmo registro em vez de criar uma segunda prova para a mesma luta.
@@ -454,6 +468,7 @@ class Revisoes(commands.Cog):
             revisao = await revisoes.criar_pendencia(
                 guild.id, tipo, autor_id, referencia_id, print_url, titulo, descricao,
                 auxiliar_id=auxiliar_id,
+                recompensa_xp=recompensa_xp,
             )
 
         hash_imagem = await _hash_imagem(revisao.get("print_url") or print_url)
@@ -494,10 +509,39 @@ class Revisoes(commands.Cog):
             return
 
         partes = custom_id.split(":", 2)
-        if len(partes) != 3 or partes[1] not in {"aprovar", "rejeitar"} or not partes[2]:
+        if len(partes) != 3 or partes[1] not in {"aprovar", "rejeitar", "confirmar_aprovar", "cancelar_aprovar"} or not partes[2]:
             await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
             return
         _, acao, revisao_id = partes
+
+        if acao == "cancelar_aprovar":
+            await interaction.response.edit_message(
+                content="Aprovação cancelada. A evidência continua pendente.",
+                embed=None,
+                view=None,
+            )
+            return
+
+        if acao == "aprovar":
+            view = discord.ui.View(timeout=120)
+            view.add_item(discord.ui.Button(
+                label="Confirmar aprovação",
+                style=discord.ButtonStyle.success,
+                emoji="✅",
+                custom_id=f"revisao:confirmar_aprovar:{revisao_id}",
+            ))
+            view.add_item(discord.ui.Button(
+                label="Cancelar",
+                style=discord.ButtonStyle.secondary,
+                custom_id=f"revisao:cancelar_aprovar:{revisao_id}",
+            ))
+            await interaction.response.send_message(
+                f"**Confirmar aprovação da evidência?**\nProtocolo: {revisao_id}\n"
+                "A recompensa em XP será aplicada após a confirmação. Esta ação ficará registrada na auditoria.",
+                view=view,
+                ephemeral=True,
+            )
+            return
 
         if acao == "rejeitar":
             await interaction.response.send_modal(
@@ -526,7 +570,32 @@ class Revisoes(commands.Cog):
             await interaction.followup.send(f"Essa revisão já foi **{revisao['status']}**.", ephemeral=True)
             return
 
-        if acao == "aprovar":
+        mensagem_decisao = interaction.message
+        if acao == "confirmar_aprovar":
+            canal_id = int(revisao.get("canal_id") or 0)
+            mensagem_id = int(revisao.get("mensagem_id") or 0)
+            canal = interaction.guild.get_channel(canal_id) if canal_id else None
+            if canal is None and canal_id:
+                try:
+                    canal = await interaction.guild.fetch_channel(canal_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    canal = None
+            if canal is None or not mensagem_id:
+                await interaction.followup.send(
+                    "Não consegui localizar a mensagem original da evidência. Nenhuma decisão foi aplicada.",
+                    ephemeral=True,
+                )
+                return
+            try:
+                mensagem_decisao = await canal.fetch_message(mensagem_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                await interaction.followup.send(
+                    "A mensagem original da evidência não está acessível. Nenhuma decisão foi aplicada.",
+                    ephemeral=True,
+                )
+                return
+
+        if acao in {"aprovar", "confirmar_aprovar"}:
             revisao = await revisoes.aprovar(interaction.guild.id, revisao_id, interaction.user.id)
             if not revisao:
                 await interaction.followup.send(
@@ -577,7 +646,7 @@ class Revisoes(commands.Cog):
             embed.add_field(name="✅ Aprovado por", value=interaction.user.mention, inline=False)
             if resultado_texto:
                 embed.add_field(name="Resultado aplicado", value=resultado_texto, inline=False)
-            await interaction.message.edit(embed=embed, view=None)
+            await mensagem_decisao.edit(embed=embed, view=None)
 
             await auditoria.registrar(
                 interaction.guild, "📋 Revisão aprovada",
