@@ -15,6 +15,8 @@ from utils.storage import carregar, salvar
 from utils.guild_config import (
     get_config,
     set_config,
+    lideranca_only,
+    membro_tem_lideranca,
 )
 
 from utils.perfis import (
@@ -26,6 +28,7 @@ from utils.competitivo_sync import (
     migrar_perfil_se_necessario,
     registrar_tempo_top_global,
     reiniciar_temporada_global,
+    atualizar_temporada_global,
 )
 
 
@@ -86,6 +89,170 @@ def _negrito(
     return "".join(resultado)
 
 
+class SeletorCanalRanking(discord.ui.ChannelSelect):
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Selecionar canal do ranking geral",
+            min_values=1,
+            max_values=1,
+            channel_types=[discord.ChannelType.text],
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not await self.central.autorizar(interaction):
+            return
+        canal = self.values[0]
+        await set_config(
+            self.central.guild.id,
+            canal_ranking_id=canal.id,
+            ranking_mensagem_id=0,
+        )
+        cog_missoes = interaction.client.get_cog("Missoes")
+        if cog_missoes is not None:
+            await cog_missoes._atualizar_ranking_geral(self.central.guild)
+        await interaction.response.edit_message(
+            embed=await self.central.criar_embed(),
+            view=self.central,
+        )
+
+
+class ConfirmarTemporadaRankingView(discord.ui.View):
+    def __init__(self, central, numero_esperado: int):
+        super().__init__(timeout=90)
+        self.central = central
+        self.numero_esperado = int(numero_esperado)
+
+    @discord.ui.button(label="Confirmar encerramento", style=discord.ButtonStyle.danger, emoji="🏁", row=0)
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.central.autorizar(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        dados = await reiniciar_temporada_global(numero_esperado=self.numero_esperado)
+        if not dados.get("_reinicio_aplicado"):
+            await interaction.followup.send(
+                "A temporada já foi alterada por outra operação. Reabra a central para consultar o estado atual.",
+                ephemeral=True,
+            )
+            return
+        cog_missoes = interaction.client.get_cog("Missoes")
+        if cog_missoes is not None:
+            await cog_missoes._atualizar_ranking_geral(self.central.guild)
+        await interaction.followup.send(
+            f"Temporada **#{self.numero_esperado}** encerrada. "
+            f"A temporada **#{self.numero_esperado + 1}** foi iniciada; "
+            "os pontos permanentes e o histórico foram preservados.",
+            ephemeral=True,
+        )
+        for item in self.children:
+            item.disabled = True
+        try:
+            await interaction.message.edit(view=self)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary, emoji="↩️", row=0)
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.central.autorizar(interaction):
+            return
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="Encerramento da temporada cancelado.",
+            view=self,
+        )
+
+
+class CentralRankingGeralView(discord.ui.View):
+    def __init__(self, cog, guild: discord.Guild, owner_id: int):
+        super().__init__(timeout=600)
+        self.cog = cog
+        self.guild = guild
+        self.owner_id = int(owner_id)
+        self.add_item(SeletorCanalRanking(self))
+
+    async def autorizar(self, interaction: discord.Interaction) -> bool:
+        if (
+            interaction.guild is None
+            or interaction.guild.id != self.guild.id
+            or interaction.user.id != self.owner_id
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "Esta central pertence à liderança que a abriu ou seu acesso expirou.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    async def criar_embed(self) -> discord.Embed:
+        config = await get_config(self.guild.id)
+        dados = await atualizar_temporada_global()
+        estado = dados.get("temporada_global", {})
+        numero = int(estado.get("numero", 1) or 1)
+        inicio = float(estado.get("inicio_timestamp") or time.time())
+        duracao = max(1, int(estado.get("duracao_dias", 30) or 30)) * 86400
+        restante = max(0, int(inicio + duracao - time.time()))
+        dias, resto = divmod(restante, 86400)
+        horas = resto // 3600
+        canal_id = config.get("canal_ranking_id")
+        canal_texto = f"<#{canal_id}>" if canal_id else "Não configurado"
+        historico = estado.get("historico", [])
+        embed = criar_embed(
+            "Central de Ranking Competitivo",
+            "Gerencie o canal público e o ciclo sazonal do ranking global. "
+            "O encerramento preserva as estatísticas permanentes.",
+        )
+        embed.add_field(name="Temporada atual", value=f"**#{numero}**", inline=True)
+        embed.add_field(name="Tempo restante", value=f"**{dias}d {horas}h**", inline=True)
+        embed.add_field(
+            name="Histórico preservado",
+            value=f"**{len(historico) if isinstance(historico, list) else 0} temporadas**",
+            inline=True,
+        )
+        embed.add_field(name="Canal do ranking", value=canal_texto, inline=False)
+        embed.set_footer(text="Acesso exclusivo à liderança • NÊMESIS")
+        return embed
+
+    @discord.ui.button(label="Reiniciar temporada", style=discord.ButtonStyle.danger, emoji="🏁", row=1)
+    async def solicitar_reinicio(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        dados = await atualizar_temporada_global()
+        numero = int(dados.get("temporada_global", {}).get("numero", 1) or 1)
+        await interaction.response.send_message(
+            f"Confirme o encerramento da temporada **#{numero}**. "
+            "O Top 10 será arquivado e uma nova temporada começará.",
+            view=ConfirmarTemporadaRankingView(self, numero),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Atualizar ranking", style=discord.ButtonStyle.success, emoji="🔄", row=1)
+    async def atualizar_ranking(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        cog_missoes = interaction.client.get_cog("Missoes")
+        if cog_missoes is not None:
+            await cog_missoes._atualizar_ranking_geral(self.guild)
+        await interaction.response.edit_message(
+            embed=await self.criar_embed(),
+            view=self,
+        )
+
+    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="✕", row=1)
+    async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="Central de Ranking Competitivo encerrada.",
+            embed=None,
+            view=self,
+        )
+
+
 class RankingGeral(
     commands.Cog
 ):
@@ -104,6 +271,25 @@ class RankingGeral(
     def cog_unload(self):
 
         self.atualizar_ranking_automatico.cancel()
+
+
+    async def abrir_central(self, interaction: discord.Interaction, owner_id: int):
+        if (
+            interaction.guild is None
+            or interaction.user.id != int(owner_id)
+            or not membro_tem_lideranca(interaction.user)
+        ):
+            await interaction.response.send_message(
+                "A central de ranking é restrita à liderança autorizada.",
+                ephemeral=True,
+            )
+            return
+        view = CentralRankingGeralView(self, interaction.guild, owner_id)
+        await interaction.response.send_message(
+            embed=await view.criar_embed(),
+            view=view,
+            ephemeral=True,
+        )
 
 
     async def _sincronizar_migracao(
@@ -328,40 +514,6 @@ class RankingGeral(
             print(f"[RankingGeral] Referência do ranking antigo removida em {guild.id}.")
 
 
-    @app_commands.command(
-        name="ranking-canal",
-        description=(
-            "Define o canal do ranking automático."
-        ),
-    )
-    @app_commands.describe(
-        canal=(
-            "Canal onde o ranking "
-            "ficará publicado."
-        ),
-    )
-    @lideranca_only()
-    async def ranking_canal(
-        self,
-        interaction: discord.Interaction,
-        canal: discord.TextChannel,
-    ):
-
-        await set_config(
-            interaction.guild.id,
-            canal_ranking_id=canal.id,
-            ranking_mensagem_id=None,
-        )
-
-        await interaction.response.send_message(
-            f"Ranking automático configurado "
-            f"em {canal.mention}.",
-            ephemeral=True,
-        )
-
-        await self._atualizar_painel(
-            interaction.guild
-        )
 
 
     @app_commands.command(
@@ -494,34 +646,6 @@ class RankingGeral(
             f"Acesse {mention} para consultar o **Ranking Geral da NÊMESIS**, que soma as pontuações de missões em todos os jogos em uma única classificação.",
             ephemeral=True,
         )
-    @app_commands.command(
-        name="temporada-reiniciar",
-        description="Encerra a temporada atual e inicia outra sem apagar estatísticas acumuladas.",
-    )
-    @lideranca_only()
-    async def temporada_reiniciar(
-        self,
-        interaction: discord.Interaction,
-    ):
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            dados = await reiniciar_temporada_global()
-            estado = dados.get("temporada_global", {})
-            numero = int(estado.get("numero", 2) or 2)
-            await interaction.followup.send(
-                f"Temporada reiniciada. A nova temporada é **#{numero}** e dura 30 dias. "
-                "Pontos sazonais foram zerados; o histórico da temporada anterior, "
-                "P.C. acumulados, XP, vitórias, derrotas e tempo no Top 10 foram preservados.",
-                ephemeral=True,
-            )
-            if interaction.guild:
-                await self._atualizar_painel(interaction.guild)
-        except Exception as erro:
-            print(f"[RankingGeral] Falha ao reiniciar temporada: {erro}")
-            await interaction.followup.send(
-                "Não foi possível reiniciar a temporada. Verifique os logs do bot.",
-                ephemeral=True,
-            )
 
 
 async def setup(

@@ -111,6 +111,8 @@ async def reiniciar_temporada_global(
 
     agora = float(agora or time.time())
 
+    aplicado = {"valor": False}
+
     def aplicar(dados):
         if not isinstance(dados, dict):
             dados = {"catalogo": [], "perfis": {}}
@@ -123,8 +125,10 @@ async def reiniciar_temporada_global(
             estado = {}
         numero_atual = max(1, int(estado.get("numero", 1) or 1))
         if numero_esperado is not None and numero_atual != int(numero_esperado):
+            aplicado["valor"] = False
             return dados
 
+        aplicado["valor"] = True
         inicio = float(estado.get("inicio_timestamp") or agora)
         ordenados = sorted(
             (
@@ -173,7 +177,9 @@ async def reiniciar_temporada_global(
         dados["temporada_global"] = estado
         return dados
 
-    return await atualizar_json(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar)
+    dados = await atualizar_json(ARQUIVO_COMPETITIVO, PADRAO_COMPETITIVO, aplicar)
+    dados["_reinicio_aplicado"] = aplicado["valor"]
+    return dados
 
 
 async def registrar_tempo_top_global(

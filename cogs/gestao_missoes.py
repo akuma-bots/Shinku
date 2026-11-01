@@ -411,6 +411,19 @@ class CentralMissoesView(discord.ui.View):
             return
         await self.atualizar(interaction)
 
+    @discord.ui.button(label="Ranking geral", style=discord.ButtonStyle.primary, emoji="🏅", row=3)
+    async def abrir_ranking_geral(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.autorizar(interaction):
+            return
+        central = interaction.client.get_cog("RankingGeral")
+        if central is None:
+            await interaction.response.send_message(
+                "O módulo de ranking geral está temporariamente indisponível.",
+                ephemeral=True,
+            )
+            return
+        await central.abrir_central(interaction, self.owner_id)
+
     @discord.ui.button(label="Temporadas", style=discord.ButtonStyle.primary, emoji="🏆", row=3)
     async def abrir_temporadas(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
