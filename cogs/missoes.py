@@ -1382,9 +1382,20 @@ class Missoes(commands.Cog):
         if auxiliar_id == autor_id:
             auxiliar_id = 0
 
+        # A recompensa registrada na evidência é a referência imutável do protocolo.
+        # Missões editadas depois do envio não podem alterar o XP prometido ao participante.
+        recompensa_registrada = revisao.get("recompensa_xp")
         try:
-            recompensa = max(0, int(atividade.get("recompensa_xp", atividade.get("pontos", 0)) or 0))
-        except (TypeError, ValueError):
+            recompensa = max(
+                0,
+                int(
+                    recompensa_registrada
+                    if recompensa_registrada is not None
+                    else atividade.get("recompensa_xp", atividade.get("pontos", 0))
+                    or 0
+                ),
+            )
+        except (TypeError, ValueError, OverflowError):
             recompensa = 0
 
         # Sem auxiliar, mantém compatibilidade com o marcador histórico da revisão.
