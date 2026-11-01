@@ -225,6 +225,83 @@ class PaginaMissoesSelect(discord.ui.Select):
         )
 
 
+
+def _resumir_desempenho_missoes(revisoes: list, user_id: int, limite: int = 5) -> dict:
+    """Resume o histórico de missões do participante, inclusive como auxiliar."""
+    uid = str(user_id)
+    registros = [
+        item for item in revisoes
+        if isinstance(item, dict)
+        and (str(item.get("autor_id")) == uid or str(item.get("auxiliar_id")) == uid)
+        and str(item.get("tipo", "")).lower() in {"missao", "contribuicao", "especial", "pve"}
+        and item.get("status") in {"aprovada", "rejeitada", "pendente"}
+    ]
+    registros.sort(
+        key=lambda item: float(
+            item.get("aprovado_em") or item.get("rejeitada_em")
+            or item.get("atualizado_em") or item.get("timestamp") or 0
+        ),
+        reverse=True,
+    )
+    xp_rastreavel = 0
+    xp_registros = 0
+    for item in registros:
+        if item.get("status") != "aprovada" or item.get("recompensa_xp") is None:
+            continue
+        try:
+            recompensa = max(0, int(item.get("recompensa_xp") or 0))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        autor_id = str(item.get("autor_id") or "")
+        auxiliar_id = str(item.get("auxiliar_id") or "")
+        if auxiliar_id and auxiliar_id != autor_id:
+            parte_autor = (recompensa * 60 + 50) // 100
+            parte = parte_autor if uid == autor_id else recompensa - parte_autor
+        else:
+            parte = recompensa if uid == autor_id else 0
+        xp_rastreavel += parte
+        xp_registros += 1
+    return {
+        "aprovadas": sum(item.get("status") == "aprovada" for item in registros),
+        "rejeitadas": sum(item.get("status") == "rejeitada" for item in registros),
+        "pendentes": sum(item.get("status") == "pendente" for item in registros),
+        "xp_missoes": xp_rastreavel,
+        "registros_com_xp": xp_registros,
+        "recentes": registros[:max(0, int(limite))],
+    }
+
+
+def _ranking_xp_missoes(revisoes: list, limite: int = 5) -> list:
+    """Classifica XP de missões com recompensa persistida, sem estimar registros legados."""
+    totais = {}
+    for item in revisoes:
+        if not isinstance(item, dict) or item.get("status") != "aprovada":
+            continue
+        if str(item.get("tipo", "")).lower() not in {"missao", "contribuicao", "especial", "pve"}:
+            continue
+        try:
+            recompensa = max(0, int(item.get("recompensa_xp") or 0))
+        except (TypeError, ValueError, OverflowError):
+            continue
+        autor = str(item.get("autor_id") or "")
+        auxiliar = str(item.get("auxiliar_id") or "")
+        if not autor:
+            continue
+        if auxiliar and auxiliar != autor:
+            parte_autor = (recompensa * 60 + 50) // 100
+            distribuicao = ((autor, parte_autor), (auxiliar, recompensa - parte_autor))
+        else:
+            distribuicao = ((autor, recompensa),)
+        for uid, quantidade in distribuicao:
+            if uid and quantidade > 0:
+                totais[uid] = totais.get(uid, 0) + quantidade
+    try:
+        limite = max(0, int(limite))
+    except (TypeError, ValueError, OverflowError):
+        limite = 5
+    return sorted(totais.items(), key=lambda item: (-item[1], item[0]))[:limite]
+
+
 class NavegacaoMissoesView(discord.ui.View):
     """Navegação por seletores; mantém apenas a ação de envio de evidência como botão."""
     def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
@@ -249,6 +326,16 @@ class NavegacaoMissoesView(discord.ui.View):
             if match and match.group(1) in TIPOS:
                 categoria = match.group(1)
         await self.cog.abrir_seletor_prova(interaction, categoria)
+
+    @discord.ui.button(
+        label="Meu desempenho",
+        emoji="📊",
+        style=discord.ButtonStyle.secondary,
+        custom_id="nemesis:missoes:desempenho",
+        row=2,
+    )
+    async def meu_desempenho(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.enviar_painel_desempenho(interaction)
 
 
 class RankingJogoSelect(discord.ui.Select):
@@ -1156,6 +1243,124 @@ class Missoes(commands.Cog):
             f"Painel geral: **{'atualizado' if resultado.get('painel_atualizado') else 'não confirmado'}**.",
             ephemeral=True,
         )
+
+
+    async def enviar_painel_desempenho(self, interaction: discord.Interaction) -> None:
+        """Abre um dossiê privado de desempenho sem adicionar comando slash."""
+        guild = interaction.guild
+        if guild is None or not isinstance(interaction.user, discord.Member):
+            await interaction.response.send_message(
+                "Este painel só pode ser consultado dentro do servidor da NÊMESIS.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        from utils import revisoes as revisoes_storage
+        from cogs.progressao_gangue import rank_por_xp, proximo_rank, barra_progresso
+
+        revisoes = await revisoes_storage.listar(guild.id)
+        resumo = _resumir_desempenho_missoes(revisoes, interaction.user.id, limite=5)
+        progressao = self.bot.get_cog("ProgressaoGangue")
+        perfil_progressao = (
+            await progressao._perfil(guild.id, interaction.user.id)
+            if progressao is not None else {}
+        )
+        try:
+            xp_progressao = max(0, int(perfil_progressao.get("xp", 0) or 0))
+        except (TypeError, ValueError, OverflowError):
+            xp_progressao = 0
+        rank = rank_por_xp(xp_progressao)
+        proximo = proximo_rank(xp_progressao)
+        progresso = barra_progresso(xp_progressao, rank, proximo)
+        destino = (
+            f"**{proximo['nome']}** · faltam **{max(0, int(proximo['xp']) - xp_progressao):,} XP**".replace(",", ".")
+            if proximo else "**Posto máximo alcançado**"
+        )
+
+        embed = criar_embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  DOSSIÊ DE DESEMPENHO",
+            description=(
+                f"**INTEGRANTE** · {interaction.user.mention}\n"
+                "Acompanhamento individual de missões validadas, evidências e progressão organizacional."
+            ),
+            cor=0x9F2035,
+            rodape="NÊMESIS • CENTRAL DE DESEMPENHO • Dados de evidências oficiais",
+        )
+        aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        embed.add_field(
+            name="◈ RESULTADO DAS MISSÕES",
+            value=(
+                f"**{resumo['aprovadas']}** aprovadas\n"
+                f"**{resumo['rejeitadas']}** recusadas\n"
+                f"**{resumo['pendentes']}** em análise"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="◈ XP DE MISSÕES",
+            value=(
+                f"**+{resumo['xp_missoes']:,} XP** rastreáveis\n"
+                f"{resumo['registros_com_xp']} aprovações com recompensa registrada"
+            ).replace(",", "."),
+            inline=True,
+        )
+        embed.add_field(
+            name="◈ PROGRESSÃO ORGANIZACIONAL",
+            value=(
+                f"**Nº {rank['no']:02d} · {rank['nome']}**\n"
+                f"**{xp_progressao:,} XP totais**\n{progresso}\nPróximo posto: {destino}"
+            ).replace(",", "."),
+            inline=False,
+        )
+
+        recentes = resumo["recentes"]
+        if recentes:
+            linhas = []
+            for registro in recentes:
+                status = {
+                    "aprovada": "✓ Aprovada",
+                    "rejeitada": "✕ Recusada",
+                    "pendente": "◷ Em análise",
+                }[registro["status"]]
+                titulo = str(registro.get("titulo") or "Atividade")[:55]
+                protocolo = str(registro.get("id") or "—")[:12]
+                papel = "Auxiliar" if str(registro.get("auxiliar_id")) == str(interaction.user.id) else "Responsável"
+                data = registro.get("aprovado_em") or registro.get("rejeitada_em") or registro.get("timestamp")
+                data_texto = f" · <t:{int(float(data))}:d>" if data else ""
+                linhas.append(f"**{status}** · {titulo}\n{protocolo} · {papel}{data_texto}")
+            embed.add_field(name="◈ HISTÓRICO RECENTE", value="\n".join(linhas)[:1024], inline=False)
+
+        tipos_validos = {"missao", "contribuicao", "especial", "pve"}
+        aprovadas_gerais = sum(
+            1 for item in revisoes if isinstance(item, dict)
+            and item.get("status") == "aprovada"
+            and str(item.get("tipo", "")).lower() in tipos_validos
+        )
+        pendentes_gerais = sum(
+            1 for item in revisoes if isinstance(item, dict)
+            and item.get("status") == "pendente"
+            and str(item.get("tipo", "")).lower() in tipos_validos
+        )
+        embed.add_field(
+            name="◈ OPERAÇÃO DA COMUNIDADE",
+            value=f"**{aprovadas_gerais}** evidências aprovadas · **{pendentes_gerais}** aguardando análise",
+            inline=False,
+        )
+        ranking = _ranking_xp_missoes(revisoes, limite=5)
+        if ranking:
+            linhas_ranking = []
+            medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+            for posicao, (uid, xp) in enumerate(ranking, start=1):
+                selo = medalhas.get(posicao, f"#{posicao:02d}")
+                linhas_ranking.append(f"{selo} <@{uid}> · **{xp:,} XP**".replace(",", "."))
+            embed.add_field(
+                name="◈ CLASSIFICAÇÃO DE MISSÕES",
+                value="\n".join(linhas_ranking),
+                inline=False,
+            )
+        embed.set_footer(text="NÊMESIS • XP de missões calculado apenas com recompensas persistidas")
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
     async def processar_aprovacao(self, guild: discord.Guild, revisao: dict) -> str:
         atividade = await missoes.get(guild.id, revisao.get("referencia_id", ""))
