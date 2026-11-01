@@ -19,6 +19,7 @@ class TestDesempenhoMissoes(unittest.TestCase):
             {
                 "id": "REV-03", "tipo": "contribuicao", "status": "rejeitada",
                 "autor_id": 202, "titulo": "Contribuição recusada", "rejeitada_em": 300,
+                "motivo_rejeicao": "Evidência incompleta para validação.",
             },
             {
                 "id": "REV-04", "tipo": "missao", "status": "pendente",
@@ -79,7 +80,6 @@ class TestDesempenhoMissoes(unittest.TestCase):
             item for item in resumo["historico"]
             if item["status"] == "rejeitada"
         )
-        rejeitada["motivo_rejeicao"] = "Evidência incompleta para validação."
         self.assertEqual(
             rejeitada["motivo_rejeicao"],
             "Evidência incompleta para validação.",
