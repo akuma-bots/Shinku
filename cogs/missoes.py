@@ -456,9 +456,7 @@ def _calcular_inteligencia_participantes(
                 distribuicao = ((autor, parte_autor), (auxiliar, recompensa - parte_autor))
             else:
                 distribuicao = ((autor, recompensa),)
-            momento_aprovacao = _momento({
-                "timestamp": item.get("aprovado_em") or item.get("timestamp")
-            })
+            momento_aprovacao = _momento({"timestamp": item.get("aprovado_em")})
             for uid, xp in distribuicao:
                 if uid not in participantes:
                     continue
