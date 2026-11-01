@@ -56,7 +56,7 @@ class TestRelatoriosMissoes(unittest.TestCase):
         self.assertEqual(linha["protocolo"], "A1")
         self.assertEqual(linha["xp_responsavel"], "60")
         self.assertEqual(linha["xp_auxiliar"], "40")
-        self.assertEqual(linha["aprovado_em"], str(self.agora - 86400))
+        self.assertEqual(float(linha["aprovado_em"]), float(self.agora - 86400))
 
     def test_csv_nao_estima_recompensa_legada_ou_nao_aprovada(self):
         conteudo = _linhas_csv_relatorio_missoes([self.revisoes[1], self.revisoes[2], self.revisoes[3]])
