@@ -1687,14 +1687,16 @@ class Missoes(commands.Cog):
                 inline=False,
             )
             linhas_ativos = []
-            for pos, perfil in enumerate(participantes["mais_ativos"], start=1):
+            for pos, perfil in enumerate(participantes["mais_ativos"][:5], start=1):
                 membro = guild.get_member(int(perfil["user_id"]))
                 nome = membro.mention if membro else f"<@{perfil['user_id']}>"
                 linhas_ativos.append(
-                    f"**#{pos:02d}** {nome} · **{perfil['envios']}** envios · "
-                    f"**{perfil['xp_missoes']:,} XP** acumulados\\n"
-                    f"Últimos 30 dias: **{perfil['xp_ultimos_30d']:,} XP** · "
-                    f"30 dias anteriores: **{perfil['xp_30d_anteriores']:,} XP**".replace(",", ".")
+                    (
+                        f"**#{pos:02d}** {nome} · **{perfil['envios']}** envios · "
+                        f"**{perfil['xp_missoes']:,} XP** acumulados\\n"
+                        f"Últimos 30 dias: **{perfil['xp_ultimos_30d']:,} XP** · "
+                        f"30 dias anteriores: **{perfil['xp_30d_anteriores']:,} XP**"
+                    ).replace(",", ".")
                 )
             embed.add_field(
                 name="◈ PARTICIPANTES MAIS ATIVOS",
