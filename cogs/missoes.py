@@ -643,7 +643,7 @@ def _filtrar_relatorio_missoes(revisoes: list, periodo: str = "30", agora: float
         and item.get("status") in {"aprovada", "rejeitada", "pendente"}
     ]
     if duracao is None:
-        return sorted(validas, key=lambda item: _timestamp_relatorio(item), reverse=True)
+        return sorted(validas, key=lambda item: _timestamp_relatorio(item) or 0, reverse=True)
     limite = agora - duracao
     return sorted(
         [item for item in validas if (_timestamp_relatorio(item) is not None and _timestamp_relatorio(item) >= limite)],
@@ -1803,9 +1803,20 @@ class Missoes(commands.Cog):
             if recompensa is None:
                 continue
             try:
-                xp_total += max(0, int(recompensa))
+                recompensa = max(0, int(recompensa))
             except (TypeError, ValueError, OverflowError):
                 continue
+            autor = str(item.get("autor_id") or "")
+            auxiliar = str(item.get("auxiliar_id") or "")
+            if user_id:
+                uid = str(user_id)
+                if auxiliar and auxiliar != autor:
+                    parte_autor = (recompensa * 60 + 50) // 100
+                    xp_total += parte_autor if uid == autor else recompensa - parte_autor if uid == auxiliar else 0
+                elif uid == autor:
+                    xp_total += recompensa
+            else:
+                xp_total += recompensa
         nome_periodo = PERIODOS_RELATORIOS.get(periodo, PERIODOS_RELATORIOS["30"])[0]
         membro = guild.get_member(int(user_id)) if user_id else None
         titulo = "RELATÓRIO INDIVIDUAL" if user_id else "RELATÓRIO EXECUTIVO"
