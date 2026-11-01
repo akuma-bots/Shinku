@@ -1571,7 +1571,7 @@ class Missoes(commands.Cog):
 
         revisoes = await revisoes_storage.listar(guild.id)
         metricas = _calcular_inteligencia_missoes(revisoes, time.time())
-        pagina = max(0, min(int(pagina), 1))
+        pagina = max(0, min(int(pagina), 2))
         embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  ━  INTELIGÊNCIA DE OPERAÇÕES",
             description=(
@@ -1635,12 +1635,12 @@ class Missoes(commands.Cog):
             linhas = []
             for tipo, dados in sorted(metricas["categorias"].items()):
                 linhas.append(
-                    f"**{nomes.get(tipo, tipo.title())}**\\n"
+                    f"**{nomes.get(tipo, tipo.title())}**\n"
                     f"Aprovadas: {dados['aprovadas']} · Rejeitadas: {dados['rejeitadas']} · Pendentes: {dados['pendentes']}"
                 )
             embed.add_field(
                 name="◈ DESEMPENHO POR CATEGORIA",
-                value="\\n\\n".join(linhas)[:1024] if linhas else "Nenhuma evidência de missão registrada.",
+                value="\n\n".join(linhas)[:1024] if linhas else "Nenhuma evidência de missão registrada.",
                 inline=False,
             )
             ranking = metricas["ranking"]
@@ -1652,7 +1652,7 @@ class Missoes(commands.Cog):
                 ]
                 embed.add_field(
                     name="◈ MAIORES CONTRIBUINTES",
-                    value="\\n".join(linhas_ranking),
+                    value="\n".join(linhas_ranking),
                     inline=False,
                 )
             embed.add_field(
@@ -1669,8 +1669,8 @@ class Missoes(commands.Cog):
             embed.add_field(
                 name="◈ VISÃO DE PARTICIPANTES",
                 value=(
-                    f"**{participantes['total']}** integrantes com histórico de missões\\n"
-                    f"**{participantes['ativos_7d']}** com atividade nos últimos 7 dias\\n"
+                    f"**{participantes['total']}** integrantes com histórico de missões\n"
+                    f"**{participantes['ativos_7d']}** com atividade nos últimos 7 dias\n"
                     f"**{participantes['inativos_14d']}** sem envio há pelo menos 14 dias"
                 ),
                 inline=False,
@@ -1685,7 +1685,7 @@ class Missoes(commands.Cog):
                 )
             embed.add_field(
                 name="◈ PARTICIPANTES MAIS ATIVOS",
-                value="\\n".join(linhas_ativos)[:1024] if linhas_ativos else "Sem atividade nos últimos 7 dias.",
+                value="\n".join(linhas_ativos)[:1024] if linhas_ativos else "Sem atividade nos últimos 7 dias.",
                 inline=False,
             )
             linhas_inativos = []
@@ -1698,7 +1698,7 @@ class Missoes(commands.Cog):
                 )
             embed.add_field(
                 name="◈ ACOMPANHAMENTO DE INATIVIDADE",
-                value="\\n".join(linhas_inativos)[:1024] if linhas_inativos else "Nenhum participante com inatividade superior a 14 dias.",
+                value="\n".join(linhas_inativos)[:1024] if linhas_inativos else "Nenhum participante com inatividade superior a 14 dias.",
                 inline=False,
             )
             embed.add_field(
