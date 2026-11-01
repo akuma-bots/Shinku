@@ -940,47 +940,6 @@ class HistoricoDesempenhoView(discord.ui.View):
         )
 
 
-class RankingJogoSelect(discord.ui.Select):
-    """Alternador por menu entre rankings independentes de cada jogo."""
-    def __init__(self, cog, jogo_atual="shigaku"):
-        self.cog = cog
-        jogos = ranking_missoes_jogos.JOGOS
-        opcoes = [
-            discord.SelectOption(
-                label=info["nome"][:100],
-                value=slug,
-                description=f"Ver classificação de {info['nome']}"[:100],
-                default=slug == jogo_atual,
-            )
-            for slug, info in jogos.items()
-        ]
-        super().__init__(
-            placeholder="◈ Selecionar ranking por jogo",
-            min_values=1,
-            max_values=1,
-            options=opcoes[:25],
-            custom_id="nemesis:ranking_jogos:seletor",
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        if interaction.guild is None:
-            await interaction.response.send_message("Este painel só pode ser utilizado no servidor.", ephemeral=True)
-            return
-        jogo = self.values[0]
-        embed = await self.cog._montar_painel_ranking(interaction.guild, jogo)
-        await interaction.response.edit_message(
-            embed=embed, view=NavegacaoRankingJogosView(self.cog, jogo)
-        )
-
-
-class NavegacaoRankingJogosView(discord.ui.View):
-    """Navegação persistente dos rankings por seletor."""
-    def __init__(self, cog, jogo="shigaku"):
-        super().__init__(timeout=None)
-        self.cog = cog
-        self.add_item(RankingJogoSelect(cog, jogo))
-
-
 TIPOS = {
     "missao": {
         "nome": "Missão",
@@ -1028,7 +987,6 @@ class Missoes(commands.Cog):
         # O custom_id fixo mantém o botão funcional mesmo após reinícios do bot.
         self.bot.add_view(EnviarProvaMissaoView(self))
         self.bot.add_view(NavegacaoMissoesView(self))
-        self.bot.add_view(NavegacaoRankingJogosView(self))
         if not hasattr(bot, "processadores_revisao"):
             bot.processadores_revisao = {}
         for tipo in ("missao", "contribuicao", "especial"):
@@ -1530,27 +1488,32 @@ class Missoes(commands.Cog):
             log.exception("Não foi possível atualizar o painel de missões.")
             raise
 
-    async def _montar_painel_ranking(self, guild: discord.Guild, jogo: str) -> discord.Embed:
-        """Classificação competitiva com cartões por jogador e métricas resumidas."""
-        jogo = jogo if jogo in ranking_missoes_jogos.JOGOS else "shigaku"
-        nome_jogo = ranking_missoes_jogos.JOGOS[jogo]["nome"]
-        linhas = await ranking_missoes_jogos.obter_ranking(guild.id, jogo, limite=10)
-        pagina = list(ranking_missoes_jogos.JOGOS).index(jogo) + 1
+    async def _montar_painel_ranking(self, guild: discord.Guild) -> discord.Embed:
+        """Classificação única da NÊMESIS, somando XP de missões em todos os jogos."""
+        linhas = await ranking_missoes_jogos.obter_ranking_geral(guild.id, limite=10)
         embed = criar_embed(
-            f"🏆 RANKING {nome_jogo.upper()} · CIRCUITO COMPETITIVO",
-            f"**JOGO SELECIONADO** · {nome_jogo}\n**QUADRO OFICIAL DE CLASSIFICAÇÃO**\n"
-            "A classificação considera o XP obtido em missões aprovadas. "
-            "As métricas adicionais ajudam a comparar desempenho, consistência e participação.",
+            "🏆 RANKING GERAL · NÊMESIS",
+            "**CLASSIFICAÇÃO OFICIAL DA ORGANIZAÇÃO**\n"
+            "Pontuação consolidada de missões, contribuições e operações especiais em todos os jogos. "
+            "A classificação não possui filtros ou categorias separadas por jogo.",
             cor=0x9F2035, rodape=None,
         )
-        embed.set_author(name="NÊMESIS  /  DIVISÃO COMPETITIVA")
-        aplicar_identidade_servidor(embed, guild, getattr(self, 'bot', None))
+        embed.set_author(name="NÊMESIS  /  CLASSIFICAÇÃO GERAL")
+        aplicar_identidade_servidor(embed, guild, getattr(self, "bot", None))
+        embed.add_field(name="ESCOPO", value="**Todos os jogos**", inline=True)
+        embed.add_field(name="CLASSIFICADOS", value=f"**{len(linhas)}**", inline=True)
+        embed.add_field(name="CRITÉRIO", value="**XP acumulado**", inline=True)
+
         if not linhas:
-            embed.description += "\n\nAinda não há jogadores classificados neste quadro. Conclua missões e atividades oficiais e aguarde a validação das provas. Utilize o seletor abaixo para alternar entre jogos."
-            embed.add_field(name="AINDA SEM CLASSIFICADOS", value="Conclua missões e atividades oficiais e aguarde a validação das provas. O seletor permite consultar a classificação de cada jogo.", inline=False)
+            embed.description += "\n\nAinda não há participantes classificados. Conclua missões e atividades oficiais e aguarde a validação das evidências."
+            embed.add_field(
+                name="QUADRO AINDA VAZIO",
+                value="As recompensas aprovadas serão somadas automaticamente, independentemente do jogo em que foram conquistadas.",
+                inline=False,
+            )
         else:
             estatisticas = await ranking_missoes_jogos.obter_estatisticas_jogadores(
-                guild.id, [uid for uid, _, _ in linhas], jogo=jogo
+                guild.id, [uid for uid, _, _ in linhas], jogo=None
             )
             medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
             for posicao, (uid, nome, pontos) in enumerate(linhas, start=1):
@@ -1567,25 +1530,17 @@ class Missoes(commands.Cog):
                         f"<@{uid}>\n"
                         f"**V / E / D**  `{stats.get('vitorias', 0)} / {stats.get('empates', 0)} / {stats.get('derrotas', 0)}`  ·  "
                         f"**K/D**  `{stats.get('kills', 0)}/{stats.get('deaths', 0)}` ({stats.get('kdr', 0):.2f})\n"
-                        f"**XP**  `{int(stats.get('xp', 0)):,}`  ·  **MVP**  `{stats.get('mvps', 0)}`  ·  "
+                        f"**XP DE PERFIL**  `{int(stats.get('xp', 0)):,}`  ·  **MVP**  `{stats.get('mvps', 0)}`  ·  "
                         f"**Patente**  `{str(stats.get('patente', '—'))[:40]}`\n"
-                        f"**Tempo no Top 10**  `{tempo}`  ·  **Sequência**  `{stats.get('sequencia', 0)}/{stats.get('maior_sequencia', 0)}`"
+                        f"**Tempo no Top 10 geral**  `{tempo}`  ·  **Sequência**  `{stats.get('sequencia', 0)}/{stats.get('maior_sequencia', 0)}`"
                     ).replace(",", ".")[:1024],
                     inline=False,
                 )
-        embed.set_footer(text=f"PÁGINA:{jogo} • RANKING {pagina}/{len(ranking_missoes_jogos.JOGOS)} • NÊMESIS / SELETOR DE JOGOS")
+        embed.set_footer(text="NÊMESIS • RANKING GERAL • TODOS OS JOGOS • ATUALIZAÇÃO AUTOMÁTICA")
         return embed
 
-    async def navegar_painel_ranking(self, interaction: discord.Interaction, delta: int) -> None:
-        jogos = list(ranking_missoes_jogos.JOGOS)
-        atual = self._slug_da_mensagem(interaction.message, "PÁGINA", "shigaku")
-        indice = jogos.index(atual) if atual in jogos else 0
-        alvo = jogos[(indice + delta) % len(jogos)]
-        embed = await self._montar_painel_ranking(interaction.guild, alvo)
-        await interaction.response.edit_message(embed=embed, view=NavegacaoRankingJogosView(self, alvo))
-
-    async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str) -> None:
-        """Atualiza o painel único de ranking sem criar canais por jogo."""
+    async def _atualizar_ranking_geral(self, guild: discord.Guild) -> None:
+        """Atualiza o painel único de ranking geral sem seletor por jogo."""
         config = await get_config(guild.id)
         canal_id = config.get("canal_ranking_id") or 1545834182406574241
         canal = await self._resolver_canal(guild, int(canal_id))
@@ -1600,63 +1555,42 @@ class Missoes(commands.Cog):
             except discord.NotFound:
                 mensagem = None
             except (discord.Forbidden, discord.HTTPException) as erro:
-                log.warning("Não foi possível buscar o painel de ranking: %s", erro)
+                log.warning("Não foi possível buscar o painel de ranking geral: %s", erro)
                 return
-        pagina = self._slug_da_mensagem(mensagem, "PÁGINA", jogo)
-        embed = await self._montar_painel_ranking(guild, pagina)
+        embed = await self._montar_painel_ranking(guild)
         try:
             if mensagem is None:
-                mensagem = await canal.send(embed=embed, view=NavegacaoRankingJogosView(self))
+                mensagem = await canal.send(embed=embed)
                 await ranking_missoes_jogos.salvar_painel(guild.id, "ranking", mensagem.id)
                 try:
-                    await mensagem.pin(reason="Painel de ranking por jogo NÊMESIS")
+                    await mensagem.pin(reason="Painel de ranking geral NÊMESIS")
                 except discord.HTTPException:
                     pass
             else:
-                await mensagem.edit(embed=embed, view=NavegacaoRankingJogosView(self))
+                await mensagem.edit(embed=embed, view=None)
         except (discord.Forbidden, discord.HTTPException) as erro:
-            # O Discord rejeita edições após a mensagem atingir o limite de edições
-            # (código 30046). Nesse caso, publica uma mensagem nova e troca o ID
-            # persistido para que as próximas sincronizações não fiquem presas nela.
             if getattr(erro, "code", None) == 30046 and mensagem is not None:
                 try:
-                    nova_mensagem = await canal.send(
-                        embed=embed,
-                        view=NavegacaoRankingJogosView(self),
-                    )
-                    await ranking_missoes_jogos.salvar_painel(
-                        guild.id, "ranking", nova_mensagem.id
-                    )
+                    nova_mensagem = await canal.send(embed=embed)
+                    await ranking_missoes_jogos.salvar_painel(guild.id, "ranking", nova_mensagem.id)
                 except Exception:
-                    log.exception(
-                        "O limite de edições do ranking foi atingido, mas não foi "
-                        "possível publicar e registrar o painel substituto."
-                    )
+                    log.exception("Não foi possível substituir o painel de ranking geral após o limite de edições.")
                     return
-
                 try:
-                    await nova_mensagem.pin(reason="Painel de ranking por jogo NÊMESIS")
+                    await nova_mensagem.pin(reason="Painel de ranking geral NÊMESIS")
                 except discord.HTTPException:
-                    log.warning("Não foi possível fixar o novo painel de ranking.")
-
+                    log.warning("Não foi possível fixar o novo painel de ranking geral.")
                 try:
-                    await mensagem.delete(
-                        reason="Substituição do painel após limite de edições do Discord"
-                    )
+                    await mensagem.delete(reason="Substituição do painel após limite de edições do Discord")
                 except (discord.Forbidden, discord.HTTPException):
-                    log.warning(
-                        "O painel antigo de ranking %s não pôde ser removido.",
-                        getattr(mensagem, "id", "desconhecido"),
-                    )
+                    log.warning("O painel antigo de ranking geral não pôde ser removido.")
+            else:
+                log.exception("Falha ao atualizar o painel de ranking geral.")
 
-                log.warning(
-                    "Painel de ranking substituído após o limite de edições do Discord "
-                    "(mensagem nova: %s).",
-                    nova_mensagem.id,
-                )
-                return
+    # Compatibilidade temporária para chamadas legadas que ainda passam o slug do jogo.
+    async def _atualizar_ranking_jogo(self, guild: discord.Guild, jogo: str = "") -> None:
+        await self._atualizar_ranking_geral(guild)
 
-            log.exception("Não foi possível atualizar o painel de ranking.")
     @staticmethod
     def _expandir_catalogo_por_jogo(catalogo: list) -> list:
         """Compatibilidade histórica: o catálogo agora é único e global."""
@@ -1811,7 +1745,7 @@ class Missoes(commands.Cog):
                 resultado["falhas"] += 1
                 log.exception("Falha ao atualizar o painel único ou limpar mensagens antigas de missões.")
             try:
-                await self._atualizar_ranking_jogo(guild, "shigaku")
+                await self._atualizar_ranking_geral(guild)
             except Exception:
                 resultado["falhas"] += 1
                 log.exception("Falha ao atualizar o ranking de missões.")
@@ -2539,23 +2473,20 @@ class Missoes(commands.Cog):
                 else f"missao:{revisao_id}"
             )
 
-            jogo_slug = str(atividade.get("jogo") or "").strip().lower()
-            if jogo_slug and resultado["aplicada"] and quantidade > 0:
+            if resultado["aplicada"] and quantidade > 0:
                 membro_ranking = guild.get_member(usuario_id)
                 try:
-                    await ranking_missoes_jogos.registrar_pontos(
+                    await ranking_missoes_jogos.registrar_pontos_gerais(
                         guild_id=guild.id,
-                        jogo=jogo_slug,
                         user_id=usuario_id,
                         nome=membro_ranking.display_name if membro_ranking else "",
                         pontos=quantidade,
                         evento_id=f"missao:{revisao_id}:{usuario_id}",
                     )
-                    await self._atualizar_ranking_jogo(guild, jogo_slug)
+                    await self._atualizar_ranking_geral(guild)
                 except Exception as erro:
                     log.exception(
-                        "Falha ao atualizar ranking de %s para %s: %s",
-                        jogo_slug,
+                        "Falha ao atualizar ranking geral para %s: %s",
                         usuario_id,
                         erro,
                     )

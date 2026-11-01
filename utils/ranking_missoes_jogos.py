@@ -150,6 +150,93 @@ async def obter_ranking(guild_id: int, jogo: str, limite: int = 10) -> list:
     except (TypeError, ValueError, OverflowError):
         limite = 10
     return sorted(linhas, key=lambda item: (-item[2], item[1].casefold(), item[0]))[:limite]
+async def registrar_pontos_gerais(
+    guild_id: int, user_id: int, nome: str, pontos: int, evento_id: str
+) -> bool:
+    """Registra XP de missão no ranking geral, sem exigir jogo associado."""
+    try:
+        pontos = int(pontos)
+    except (TypeError, ValueError, OverflowError):
+        return False
+    evento = str(evento_id or "").strip()
+    if pontos <= 0 or not evento:
+        return False
+
+    todos = await carregar(ARQUIVO, {})
+    if not isinstance(todos, dict):
+        todos = {}
+    registro = todos.setdefault(str(guild_id), {})
+    geral = registro.setdefault("ranking_geral", {"pontuacao": {}, "eventos_aplicados": []})
+    if not isinstance(geral, dict):
+        geral = {"pontuacao": {}, "eventos_aplicados": []}
+        registro["ranking_geral"] = geral
+    eventos = geral.setdefault("eventos_aplicados", [])
+    if not isinstance(eventos, list):
+        eventos = []
+    if evento in eventos:
+        return False
+    pontuacao = geral.setdefault("pontuacao", {})
+    if not isinstance(pontuacao, dict):
+        pontuacao = {}
+        geral["pontuacao"] = pontuacao
+    uid = str(user_id)
+    perfil = pontuacao.setdefault(uid, {"nome": nome or "", "pontos": 0})
+    if not isinstance(perfil, dict):
+        perfil = {"nome": nome or "", "pontos": 0}
+        pontuacao[uid] = perfil
+    if nome:
+        perfil["nome"] = str(nome)
+    try:
+        atual = max(0, int(perfil.get("pontos", 0) or 0))
+    except (TypeError, ValueError, OverflowError):
+        atual = 0
+    perfil["pontos"] = atual + pontos
+    eventos.append(evento)
+    geral["eventos_aplicados"] = eventos[-10000:]
+    await salvar(ARQUIVO, todos)
+    return True
+
+
+async def obter_ranking_geral(guild_id: int, limite: int = 10) -> list:
+    """Soma o legado por jogo e os novos registros em uma classificação única."""
+    registro = await obter_dados(guild_id)
+    jogos = registro.get("jogos", {})
+    acumulado = {}
+
+    def acumular(pontuacoes):
+        if not isinstance(pontuacoes, dict):
+            return
+        for uid, perfil in pontuacoes.items():
+            if not isinstance(perfil, dict):
+                continue
+            try:
+                pontos = max(0, int(perfil.get("pontos", 0) or 0))
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if pontos <= 0:
+                continue
+            chave = str(uid)
+            atual = acumulado.setdefault(chave, {"nome": str(perfil.get("nome") or ""), "pontos": 0})
+            atual["pontos"] += pontos
+            if perfil.get("nome"):
+                atual["nome"] = str(perfil["nome"])
+
+    if isinstance(jogos, dict):
+        for dados_jogo in jogos.values():
+            if isinstance(dados_jogo, dict):
+                acumular(dados_jogo.get("pontuacao", {}))
+    geral = registro.get("ranking_geral", {})
+    if isinstance(geral, dict):
+        acumular(geral.get("pontuacao", {}))
+
+    try:
+        limite = max(0, int(limite))
+    except (TypeError, ValueError, OverflowError):
+        limite = 10
+    linhas = [(uid, dados["nome"], dados["pontos"]) for uid, dados in acumulado.items()]
+    return sorted(linhas, key=lambda item: (-item[2], item[1].casefold(), item[0]))[:limite]
+
+
 async def obter_paineis(guild_id: int) -> dict:
     todos = await carregar(ARQUIVO, {})
     registro = todos.get(str(guild_id), {})
@@ -203,7 +290,10 @@ async def obter_estatisticas_jogadores(guild_id: int, user_ids: list[str], jogo:
             "mvps": int(local.get("mvps", global_.get("mvps", 0)) or 0),
             "sequencia": int(local.get("sequencia_atual", global_.get("sequencia_atual", 0)) or 0),
             "maior_sequencia": int(local.get("maior_sequencia", global_.get("maior_sequencia", 0)) or 0),
-            "tempo_top": int(perfil_jogo.get("tempo_top_segundos", 0) or 0),
+            "tempo_top": int((
+                perfil_jogo.get("tempo_top_segundos", 0)
+                if jogo else global_.get("tempo_top_global_segundos", 0)
+            ) or 0),
             "patente": str(local.get("patente", global_.get("patente", "")) or "—"),
             "kdr": round(kills / deaths, 2) if deaths > 0 else float(kills),
         }
@@ -217,6 +307,7 @@ async def resetar_pontuacoes_jogos(guild_id: int) -> int:
         todos = {}
     registro = todos.setdefault(str(guild_id), {})
     jogos = registro.setdefault("jogos", {})
+    registro["ranking_geral"] = {"pontuacao": {}, "eventos_aplicados": []}
     alterados = 0
     for slug in JOGOS:
         atual = jogos.setdefault(slug, {"pontuacao": {}, "eventos_aplicados": []})

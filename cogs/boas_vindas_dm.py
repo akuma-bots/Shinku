@@ -1,7 +1,7 @@
 from utils.apresentacao import criar_embed
 from utils.preferencias_notificacoes import obter_preferencias, definir_preferencia
 from utils.guia_servidores import (
-    adicionar_botoes_guia,
+    adicionar_seletor_guia,
     CARGO_VISITANTES_ID,
     NOME_CARGO_VISITANTES,
     TAG_ORG_NEMESIS,
@@ -51,11 +51,11 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
     embed.add_field(name="PRIMEIROS PASSOS", value=(
         "01. Leia as regras e os comunicados oficiais.\n"
         "02. Ao entrar, você recebe automaticamente o cargo Visitantes.\n"
-        "03. Explore os canais pelos botões de navegação abaixo.\n"
+        "03. Explore os canais pelo seletor de navegação abaixo.\n"
         "04. Abra #Sistemas e consulte o guia Começando na NÊMESIS.\n"
         "05. Use /help para localizar os comandos liberados ao seu cargo."
     ), inline=False)
-    embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="Os botões abaixo levam diretamente às áreas essenciais. Comece por Regras, Como funciona, Divisões e Sistemas; depois explore missões, progressão e atividades.", inline=False)
+    embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="O seletor abaixo reúne as áreas essenciais em um único menu. Comece por Regras, Como funciona, Divisões e Sistemas; depois explore missões, progressão e atividades.", inline=False)
     embed.add_field(name="CONVITE DO SERVIDOR", value=f"[Entrar na NÊMESIS]({CONVITE_NEMESIS})", inline=False)
     embed.add_field(name="CÓDIGOS DOS JOGOS", value=(
         "Use o menu abaixo para abrir as abas de Shigaku, Gakuran ou Fistborn. "
@@ -164,7 +164,7 @@ class OptOutView(discord.ui.View):
 class BoasVindasView(discord.ui.View):
     def __init__(self, autor_id: int, selecionado: str = "inicio"):
         super().__init__(timeout=900)
-        adicionar_botoes_guia(self)
+        adicionar_seletor_guia(self)
         self.add_item(SeletorBoasVindas(autor_id, selecionado))
         self.add_item(AlternarAvisosButton())
 

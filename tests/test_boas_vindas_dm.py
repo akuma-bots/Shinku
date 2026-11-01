@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM, CARGO_VISITANTES_ID
-from utils.guia_servidores import TAG_ORG_NEMESIS, NOME_CARGO_VISITANTES
+from utils.guia_servidores import TAG_ORG_NEMESIS, NOME_CARGO_VISITANTES, GuiaServidoresView, CANAIS_GUIA_SERVIDORES
 
 
 def test_welcome_codes_catalog_has_all_games_and_requirements():
@@ -50,3 +50,14 @@ def test_weekly_catalog_period_is_monday_through_sunday():
 
 def test_interactive_codes_slash_command_is_registered():
     assert BoasVindasDM.consultar_codigos.name == "codigos"
+
+
+def test_entry_navigation_uses_one_select_instead_of_link_buttons():
+    import discord
+
+    view = GuiaServidoresView()
+    assert len(view.children) == 1
+    seletor = view.children[0]
+    assert isinstance(seletor, discord.ui.Select)
+    assert len(seletor.options) == len(CANAIS_GUIA_SERVIDORES) == 12
+    assert seletor.placeholder == "◈ Selecione uma área da NÊMESIS"

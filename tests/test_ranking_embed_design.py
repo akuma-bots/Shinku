@@ -13,8 +13,8 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(
                 ranking_missoes_jogos,
-                "obter_ranking",
-                new=AsyncMock(return_value=[(123, "Jogador", 385)]),
+                "obter_ranking_geral",
+                new=AsyncMock(return_value=[("123", "Jogador", 385)]),
             ),
             patch.object(
                 ranking_missoes_jogos,
@@ -37,15 +37,15 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
                 }),
             ),
         ):
-            embed = await cog._montar_painel_ranking(guild, "shigaku")
+            embed = await cog._montar_painel_ranking(guild)
 
-        self.assertIn("RANKING SHIGAKU", embed.title)
-        self.assertIn("JOGO SELECIONADO", embed.description)
+        self.assertIn("RANKING GERAL", embed.title)
+        self.assertIn("todos os jogos", embed.description)
         self.assertIn("🥇 <@123>", embed.description)
         self.assertIn("385 XP", embed.description)
         self.assertTrue(any("K/D" in field.value and "2/1" in field.value for field in embed.fields))
         self.assertTrue(any("Tenente" in field.value for field in embed.fields))
-        self.assertIn("PÁGINA:shigaku", embed.footer.text)
+        self.assertIn("TODOS OS JOGOS", embed.footer.text)
         self.assertEqual(embed.color.value, 0x9F2035)
 
     async def test_ranking_vazio_mostra_mensagem_curta(self):
@@ -53,13 +53,13 @@ class TestRankingEmbedDesign(unittest.IsolatedAsyncioTestCase):
         cog = Missoes.__new__(Missoes)
         with patch.object(
             ranking_missoes_jogos,
-            "obter_ranking",
+            "obter_ranking_geral",
             new=AsyncMock(return_value=[]),
         ):
-            embed = await cog._montar_painel_ranking(guild, "shigaku")
+            embed = await cog._montar_painel_ranking(guild)
 
-        self.assertIn("Ainda não há jogadores classificados", embed.description)
-        self.assertIn("Utilize o seletor abaixo", embed.description)
+        self.assertIn("Ainda não há participantes classificados", embed.description)
+        self.assertIn("independentemente do jogo", embed.fields[-1].value)
 
 
 if __name__ == "__main__":

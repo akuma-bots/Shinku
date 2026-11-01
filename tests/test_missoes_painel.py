@@ -49,7 +49,7 @@ class TestRankingPanelEditLimit(unittest.IsolatedAsyncioTestCase):
                 ranking_missoes_jogos, "salvar_painel", new=AsyncMock()
             ) as salvar_painel,
         ):
-            await cog._atualizar_ranking_jogo(guild, "shigaku")
+            await cog._atualizar_ranking_geral(guild)
 
         canal.send.assert_awaited_once()
         salvar_painel.assert_awaited_once_with(guild.id, "ranking", 222)

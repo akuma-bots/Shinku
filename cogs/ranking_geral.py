@@ -32,7 +32,7 @@ from utils.competitivo_sync import (
 # O cálculo de tempo no Top 10 roda a cada minuto, mas o painel do Discord
 # não deve ser editado com essa frequência: mensagens antigas têm limite de edições.
 INTERVALO_RANKING_MINUTOS = 1
-INTERVALO_PAINEL_JOGOS_SEGUNDOS = 20 * 60
+INTERVALO_PAINEL_GERAL_SEGUNDOS = 20 * 60
 
 
 def _negrito(
@@ -96,7 +96,7 @@ class RankingGeral(
     ):
 
         self.bot = bot
-        self._ultima_atualizacao_painel_jogos = {}
+        self._ultima_atualizacao_painel_geral = {}
 
         self.atualizar_ranking_automatico.start()
 
@@ -253,19 +253,15 @@ class RankingGeral(
 
                 # O tempo de permanência no Top 10 precisa ser contabilizado por minuto.
                 # A edição da mensagem pública é limitada separadamente para evitar 429/30046.
-                from utils import ranking_missoes_jogos
-                await ranking_missoes_jogos.atualizar_tempo_top_jogos(guild.id)
-
                 cog_missoes = self.bot.get_cog("Missoes")
                 if cog_missoes is not None:
                     agora = time.monotonic()
-                    ultima = self._ultima_atualizacao_painel_jogos.get(guild.id)
+                    ultima = self._ultima_atualizacao_painel_geral.get(guild.id)
                     if ultima is None:
-                        # A sincronização inicial do cog Missoes publica/atualiza o painel.
-                        self._ultima_atualizacao_painel_jogos[guild.id] = agora
-                    elif agora - ultima >= INTERVALO_PAINEL_JOGOS_SEGUNDOS:
-                        await cog_missoes._atualizar_ranking_jogo(guild, "shigaku")
-                        self._ultima_atualizacao_painel_jogos[guild.id] = agora
+                        self._ultima_atualizacao_painel_geral[guild.id] = agora
+                    elif agora - ultima >= INTERVALO_PAINEL_GERAL_SEGUNDOS:
+                        await cog_missoes._atualizar_ranking_geral(guild)
+                        self._ultima_atualizacao_painel_geral[guild.id] = agora
 
             except Exception as erro:
 
@@ -469,8 +465,7 @@ class RankingGeral(
         )
         cog_missoes = interaction.client.get_cog("Missoes")
         if cog_missoes is not None:
-            for slug in ranking_missoes_jogos.JOGOS:
-                await cog_missoes._atualizar_ranking_jogo(interaction.guild, slug)
+            await cog_missoes._atualizar_ranking_geral(interaction.guild)
 
         await interaction.followup.send(
             "RESET COMPLETO EXECUTADO.\n"
@@ -478,14 +473,14 @@ class RankingGeral(
             f"Perfis do ranking competitivo zerados: **{quantidade_global}**.\n"
             "P.C., XP, vitórias, derrotas, K/D, MVPs, sequências, medalhas e "
             "tempo no Top 10 foram zerados. Os rankings de Shigaku, Gakuran e Fistborn "
-            f"também foram limpos ({quantidade_rankings_jogo} rankings). O histórico sazonal "
+            f"também foram limpos ({quantidade_rankings_jogo} registros legados por jogo). O histórico sazonal "
             "foi limpo e uma nova temporada de 30 dias foi iniciada. O catálogo de missões foi preservado.",
             ephemeral=True,
         )
 
     @app_commands.command(
         name="ranking-geral",
-        description="Mostra onde acessar o novo ranking por jogo.",
+        description="Mostra onde acessar o ranking geral da NÊMESIS.",
     )
     async def ranking_geral(
         self,
@@ -496,8 +491,7 @@ class RankingGeral(
         canal = interaction.guild.get_channel(int(canal_id))
         mention = canal.mention if canal is not None else f"<#{canal_id}>"
         await interaction.response.send_message(
-            f"O ranking global antigo foi substituído. Acesse {mention} e use os botões "
-            "**Ranking anterior** e **Próximo ranking** para alternar entre Shigaku, Gakuran e Fistborn.",
+            f"Acesse {mention} para consultar o **Ranking Geral da NÊMESIS**, que soma as pontuações de missões em todos os jogos em uma única classificação.",
             ephemeral=True,
         )
     @app_commands.command(
