@@ -141,6 +141,95 @@ def analisar_integridade(revisoes: list, guild_id: int = None, agora: float = No
     }
 
 
+def analisar_qualidade(revisoes: list, agora: float = None, janela_dias: int = 30) -> dict:
+    """Gera indicadores de qualidade sem classificar automaticamente uma prova como fraude."""
+    from collections import defaultdict
+    from math import isfinite
+    from statistics import median
+
+    agora = float(agora if agora is not None else time.time())
+    janela_dias = max(1, min(int(janela_dias), 3650))
+    tipos = {"missao", "contribuicao", "especial", "pve"}
+    validas = [r for r in revisoes if isinstance(r, dict) and str(r.get("tipo") or "").lower() in tipos]
+    limite = agora - janela_dias * 86400
+    recentes = []
+    for item in validas:
+        envio = None
+        for campo in ("timestamp", "criado_em"):
+            try:
+                valor = item.get(campo)
+                if valor is not None:
+                    candidato = float(valor)
+                    if isfinite(candidato) and candidato > 0:
+                        envio = candidato
+                        break
+            except (TypeError, ValueError, OverflowError):
+                continue
+        if envio is not None and envio <= agora + 300 and envio >= limite:
+            recentes.append((item, envio))
+
+    hashes = defaultdict(list)
+    for item in validas:
+        digest = str(item.get("hash_imagem") or "").strip().lower()
+        if len(digest) == 64 and all(c in "0123456789abcdef" for c in digest):
+            hashes[digest].append(item)
+    duplicadas = []
+    for digest, grupo in hashes.items():
+        if len(grupo) < 2:
+            continue
+        autores = {str(x.get("autor_id") or "") for x in grupo}
+        duplicadas.append({
+            "hash_prefixo": digest[:12], "protocolos": [str(x.get("id") or "—") for x in grupo[:8]],
+            "participantes": sorted(x for x in autores if x), "quantidade": len(grupo),
+            "entre_participantes": len(autores - {""}) > 1,
+        })
+
+    por_autor = defaultdict(list)
+    for item, envio in recentes:
+        autor = str(item.get("autor_id") or "")
+        if autor:
+            por_autor[autor].append(envio)
+    padroes = []
+    for autor, momentos in por_autor.items():
+        momentos.sort()
+        maior = inicio = 0
+        for fim in range(len(momentos)):
+            while momentos[fim] - momentos[inicio] > 600:
+                inicio += 1
+            maior = max(maior, fim - inicio + 1)
+        if maior >= 3:
+            padroes.append({"autor_id": autor, "envios_10min": maior, "descricao": "Três ou mais evidências enviadas em uma janela de 10 minutos."})
+    padroes.sort(key=lambda x: (-x["envios_10min"], x["autor_id"]))
+
+    por_revisor = defaultdict(lambda: {"decisoes": 0, "aprovadas": 0, "rejeitadas": 0, "tempos_min": []})
+    for item, envio in recentes:
+        if item.get("status") not in {"aprovada", "rejeitada"} or not item.get("revisor_id"):
+            continue
+        revisor = str(item["revisor_id"]); dados = por_revisor[revisor]
+        decisao_chave = "aprovado_em" if item["status"] == "aprovada" else "rejeitada_em"
+        try:
+            decisao = float(item.get(decisao_chave))
+            if not isfinite(decisao) or decisao <= 0 or decisao > agora + 300 or decisao < envio:
+                continue
+        except (TypeError, ValueError, OverflowError):
+            continue
+        dados["decisoes"] += 1
+        dados["aprovadas" if item["status"] == "aprovada" else "rejeitadas"] += 1
+        dados["tempos_min"].append((decisao - envio) / 60)
+    revisores = []
+    for uid, dados in por_revisor.items():
+        tempos = dados.pop("tempos_min")
+        dados["mediana_minutos"] = round(median(tempos), 1) if tempos else None
+        dados["taxa_rejeicao"] = round(dados["rejeitadas"] / dados["decisoes"] * 100, 1) if dados["decisoes"] else 0
+        dados["alerta_amostra"] = dados["decisoes"] >= 5 and dados["taxa_rejeicao"] >= 80
+        dados["revisor_id"] = uid
+        revisores.append(dados)
+    revisores.sort(key=lambda x: (-x["decisoes"], x["revisor_id"]))
+    return {"janela_dias": janela_dias, "evidencias_analisadas": len(recentes),
+            "duplicidades": duplicadas, "padroes_envio": padroes, "revisores": revisores,
+            "decisoes_com_tempo": sum(x["decisoes"] for x in revisores)}
+
+
 async def _tudo():
     dados = await carregar(ARQUIVO_REVISOES, {})
     return dados if isinstance(dados, dict) else {}
