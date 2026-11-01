@@ -29,7 +29,7 @@ class TestRelatoriosMissoes(unittest.TestCase):
             },
             {
                 "id": "LEG", "tipo": "missao", "status": "aprovada",
-                "autor_id": 505, "recompensa_xp": 900, "timestamp": "inválida",
+                "autor_id": 505, "timestamp": "inválida",
             },
             {
                 "id": "PVP", "tipo": "pvp", "status": "aprovada",
