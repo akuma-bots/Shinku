@@ -393,6 +393,107 @@ def _calcular_inteligencia_missoes(revisoes: list, agora: float = None) -> dict:
     }
 
 
+
+def _calcular_inteligencia_participantes(
+    revisoes: list, agora: float = None, limite: int = 8
+) -> dict:
+    """Resume atividade individual usando apenas evidências oficiais de missões."""
+    import time
+
+    agora = float(agora if agora is not None else time.time())
+    limite = max(1, min(int(limite), 25))
+    tipos = {"missao", "contribuicao", "especial", "pve"}
+    participantes = {}
+
+    def _momento(item):
+        for campo in ("timestamp", "criado_em"):
+            try:
+                valor = item.get(campo)
+                if valor is not None:
+                    return float(valor)
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return None
+
+    for item in revisoes:
+        if (
+            not isinstance(item, dict)
+            or str(item.get("tipo", "")).lower() not in tipos
+            or item.get("status") not in {"aprovada", "rejeitada", "pendente"}
+        ):
+            continue
+        autor = str(item.get("autor_id") or "")
+        auxiliar = str(item.get("auxiliar_id") or "")
+        envolvidos = [uid for uid in dict.fromkeys((autor, auxiliar)) if uid]
+        if not envolvidos:
+            continue
+        momento = _momento(item)
+        status = item["status"]
+        recompensa = None
+        if status == "aprovada" and item.get("recompensa_xp") is not None:
+            try:
+                recompensa = max(0, int(item.get("recompensa_xp") or 0))
+            except (TypeError, ValueError, OverflowError):
+                recompensa = None
+
+        for uid in envolvidos:
+            perfil = participantes.setdefault(uid, {
+                "user_id": uid, "envios": 0, "aprovadas": 0,
+                "rejeitadas": 0, "pendentes": 0, "xp_missoes": 0,
+                "ultima_atividade": None,
+            })
+            perfil["envios"] += 1
+            perfil[{"aprovada": "aprovadas", "rejeitada": "rejeitadas", "pendente": "pendentes"}[status]] += 1
+            if momento is not None and (
+                perfil["ultima_atividade"] is None or momento > perfil["ultima_atividade"]
+            ):
+                perfil["ultima_atividade"] = momento
+
+        if recompensa is not None and autor:
+            if auxiliar and auxiliar != autor:
+                parte_autor = (recompensa * 60 + 50) // 100
+                distribuicao = ((autor, parte_autor), (auxiliar, recompensa - parte_autor))
+            else:
+                distribuicao = ((autor, recompensa),)
+            for uid, xp in distribuicao:
+                if uid in participantes:
+                    participantes[uid]["xp_missoes"] += xp
+
+    ordenados = list(participantes.values())
+    for perfil in ordenados:
+        ultima = perfil["ultima_atividade"]
+        perfil["dias_sem_atividade"] = (
+            max(0, int((agora - ultima) // 86400)) if ultima is not None else None
+        )
+    ativos_7d = [
+        p for p in ordenados
+        if p["ultima_atividade"] is not None
+        and p["ultima_atividade"] >= agora - 7 * 86400
+    ]
+    inativos_14d = [
+        p for p in ordenados
+        if p["ultima_atividade"] is None
+        or p["ultima_atividade"] < agora - 14 * 86400
+    ]
+    ativos_7d.sort(
+        key=lambda p: (-p["envios"], -p["xp_missoes"], p["user_id"])
+    )
+    inativos_14d.sort(
+        key=lambda p: (
+            p["ultima_atividade"] if p["ultima_atividade"] is not None else 0,
+            p["user_id"],
+        )
+    )
+    return {
+        "total": len(ordenados),
+        "ativos_7d": len(ativos_7d),
+        "inativos_14d": len(inativos_14d),
+        "mais_ativos": ativos_7d[:limite],
+        "inativos": inativos_14d[:limite],
+        "perfis": {p["user_id"]: p for p in ordenados},
+    }
+
+
 class NavegacaoMissoesView(discord.ui.View):
     """Navegação por seletores; mantém apenas a ação de envio de evidência como botão."""
     def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
@@ -448,9 +549,9 @@ class InteligenciaMissoesView(discord.ui.View):
         super().__init__(timeout=300)
         self.cog = cog
         self.owner_id = int(owner_id)
-        self.pagina = max(0, min(int(pagina), 1))
+        self.pagina = max(0, min(int(pagina), 2))
         self.anterior.disabled = self.pagina == 0
-        self.proxima.disabled = self.pagina == 1
+        self.proxima.disabled = self.pagina == 2
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if (
@@ -472,7 +573,7 @@ class InteligenciaMissoesView(discord.ui.View):
         return True
 
     async def _navegar(self, interaction: discord.Interaction, delta: int):
-        self.pagina = max(0, min(1, self.pagina + delta))
+        self.pagina = max(0, min(2, self.pagina + delta))
         embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
         await interaction.response.edit_message(
             embed=embed,
@@ -1478,7 +1579,7 @@ class Missoes(commands.Cog):
                 "Visão consolidada da execução, validação e distribuição de recompensas das missões."
             ),
             cor=0x9F2035,
-            rodape=f"NÊMESIS • INTELIGÊNCIA ADMINISTRATIVA • Página {pagina + 1}/2",
+            rodape=f"NÊMESIS • INTELIGÊNCIA ADMINISTRATIVA • Página {pagina + 1}/3",
         )
         aplicar_identidade_servidor(embed, guild, self.bot, banner=True)
         embed.set_thumbnail(url=guild.icon.url if guild.icon else self.bot.user.display_avatar.url)
@@ -1521,6 +1622,91 @@ class Missoes(commands.Cog):
                     "A taxa de aprovação considera apenas decisões concluídas. "
                     "Evidências pendentes não entram no denominador. "
                     "O XP considera exclusivamente recompensas persistidas em protocolos aprovados."
+                ),
+                inline=False,
+            )
+        elif pagina == 1:
+            nomes = {
+                "missao": "Missões",
+                "contribuicao": "Contribuições",
+                "especial": "Missões especiais",
+                "pve": "PvE",
+            }
+            linhas = []
+            for tipo, dados in sorted(metricas["categorias"].items()):
+                linhas.append(
+                    f"**{nomes.get(tipo, tipo.title())}**\\n"
+                    f"Aprovadas: {dados['aprovadas']} · Rejeitadas: {dados['rejeitadas']} · Pendentes: {dados['pendentes']}"
+                )
+            embed.add_field(
+                name="◈ DESEMPENHO POR CATEGORIA",
+                value="\\n\\n".join(linhas)[:1024] if linhas else "Nenhuma evidência de missão registrada.",
+                inline=False,
+            )
+            ranking = metricas["ranking"]
+            if ranking:
+                medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
+                linhas_ranking = [
+                    f"{medalhas.get(pos, f'#{pos:02d}')} <@{uid}> · **{xp:,} XP**".replace(",", ".")
+                    for pos, (uid, xp) in enumerate(ranking, start=1)
+                ]
+                embed.add_field(
+                    name="◈ MAIORES CONTRIBUINTES",
+                    value="\\n".join(linhas_ranking),
+                    inline=False,
+                )
+            embed.add_field(
+                name="◈ CRITÉRIOS DE APURAÇÃO",
+                value=(
+                    "Participante ativo: integrante vinculado a uma evidência enviada nos últimos 7 dias. "
+                    "Contribuições com auxiliar seguem a divisão oficial de 60%/40%. "
+                    "Registros antigos sem recompensa persistida não são estimados."
+                ),
+                inline=False,
+            )
+        else:
+            participantes = _calcular_inteligencia_participantes(revisoes, time.time())
+            embed.add_field(
+                name="◈ VISÃO DE PARTICIPANTES",
+                value=(
+                    f"**{participantes['total']}** integrantes com histórico de missões\\n"
+                    f"**{participantes['ativos_7d']}** com atividade nos últimos 7 dias\\n"
+                    f"**{participantes['inativos_14d']}** sem envio há pelo menos 14 dias"
+                ),
+                inline=False,
+            )
+            linhas_ativos = []
+            for pos, perfil in enumerate(participantes["mais_ativos"], start=1):
+                membro = guild.get_member(int(perfil["user_id"]))
+                nome = membro.mention if membro else f"<@{perfil['user_id']}>"
+                linhas_ativos.append(
+                    f"**#{pos:02d}** {nome} · **{perfil['envios']}** envios · "
+                    f"**{perfil['xp_missoes']:,} XP**".replace(",", ".")
+                )
+            embed.add_field(
+                name="◈ PARTICIPANTES MAIS ATIVOS",
+                value="\\n".join(linhas_ativos)[:1024] if linhas_ativos else "Sem atividade nos últimos 7 dias.",
+                inline=False,
+            )
+            linhas_inativos = []
+            for perfil in participantes["inativos"]:
+                nome = f"<@{perfil['user_id']}>"
+                dias = perfil["dias_sem_atividade"]
+                detalhe = f"{dias} dias sem envio" if dias is not None else "Data de atividade indisponível"
+                linhas_inativos.append(
+                    f"{nome} · {perfil['envios']} envios históricos · {detalhe}"
+                )
+            embed.add_field(
+                name="◈ ACOMPANHAMENTO DE INATIVIDADE",
+                value="\\n".join(linhas_inativos)[:1024] if linhas_inativos else "Nenhum participante com inatividade superior a 14 dias.",
+                inline=False,
+            )
+            embed.add_field(
+                name="◈ NOTA DE LEITURA",
+                value=(
+                    "A análise considera somente participantes que já enviaram evidências oficiais. "
+                    "Inatividade é medida desde o último envio de evidência, não desde mensagens gerais do servidor. "
+                    "XP apresentado é exclusivo de missões e não substitui a progressão organizacional."
                 ),
                 inline=False,
             )
