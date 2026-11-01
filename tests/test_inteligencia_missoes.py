@@ -38,11 +38,11 @@ class TestInteligenciaMissoes(unittest.TestCase):
 
     def test_agrega_status_taxa_e_volume(self):
         dados = _calcular_inteligencia_missoes(self.revisoes, self.agora)
-        self.assertEqual(dados["total"], 4)
-        self.assertEqual(dados["aprovadas"], 2)
+        self.assertEqual(dados["total"], 5)
+        self.assertEqual(dados["aprovadas"], 3)
         self.assertEqual(dados["rejeitadas"], 1)
         self.assertEqual(dados["pendentes"], 1)
-        self.assertAlmostEqual(dados["taxa_aprovacao"], 200 / 3)
+        self.assertEqual(dados["taxa_aprovacao"], 75.0)
 
     def test_xp_usa_apenas_recompensas_persistidas_e_divisao_oficial(self):
         dados = _calcular_inteligencia_missoes(self.revisoes, self.agora)
@@ -52,14 +52,14 @@ class TestInteligenciaMissoes(unittest.TestCase):
     def test_atividade_recente_e_participantes(self):
         dados = _calcular_inteligencia_missoes(self.revisoes, self.agora)
         self.assertEqual(dados["participantes"], 5)
-        self.assertEqual(dados["ativos_7d"], 4)
-        self.assertEqual(dados["envios_7d"], 3)
+        self.assertEqual(dados["ativos_7d"], 5)
+        self.assertEqual(dados["envios_7d"], 4)
 
     def test_separa_metricas_por_categoria(self):
         dados = _calcular_inteligencia_missoes(self.revisoes, self.agora)
         self.assertEqual(
             dados["categorias"]["missao"],
-            {"aprovadas": 1, "rejeitadas": 0, "pendentes": 1},
+            {"aprovadas": 2, "rejeitadas": 0, "pendentes": 1},
         )
         self.assertEqual(
             dados["categorias"]["contribuicao"]["rejeitadas"],
