@@ -1578,6 +1578,7 @@ class Missoes(commands.Cog):
                     )
                 ),
                 auxiliar_id=auxiliar_id,
+                recompensa_xp=recompensa,
             )
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Falha ao criar revisão da missão %s.", atividade.get("id"))
