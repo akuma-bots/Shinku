@@ -180,7 +180,7 @@ async def _obter_topico(
                     await _salvar_id(forum.guild.id, categoria, thread.id)
                 return thread
 
-        # A geração V2 é uma reconstrução intencional: nunca reaproveita nem
+        # A geração V3 é uma reconstrução intencional: nunca reaproveita nem
         # renomeia os tópicos legados. Cria um destino novo e deixa o antigo
         # fora do mapa canônico para ser arquivado/bloqueado na limpeza.
         thread_salva = None
