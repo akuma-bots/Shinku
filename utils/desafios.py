@@ -132,6 +132,18 @@ async def definir_status(guild_id: int, desafio_id: str, status: str):
         return alvo
 
 
+async def marcar_registro_global(guild_id: int, desafio_id: str) -> bool:
+    """Marca a trilha global apenas depois da publicação bem-sucedida."""
+    async with _DESAFIOS_TRANSICAO_LOCK:
+        lista = await _lista_guild(guild_id)
+        alvo = next((d for d in lista if str(d.get("id")) == str(desafio_id)), None)
+        if not alvo or alvo.get("registro_global_enviado"):
+            return False
+        alvo["registro_global_enviado"] = True
+        await _salvar_guild(guild_id, lista)
+        return True
+
+
 async def definir_resultado(
     guild_id: int,
     desafio_id: str,
