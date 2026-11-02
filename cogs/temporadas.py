@@ -1,4 +1,5 @@
 from utils.apresentacao import criar_embed
+import logging
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
@@ -7,6 +8,7 @@ from utils import temporadas
 from utils.guild_config import lideranca_only
 
 POSICAO_EMOJI = {1: "🥇", 2: "🥈", 3: "🥉"}
+_LOG = logging.getLogger(__name__)
 
 
 class Temporadas(commands.GroupCog, group_name="temporadas", group_description="Gerenciamento das temporadas competitivas da NÊMESIS."):
@@ -51,13 +53,24 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
                     if not membro or outro.id != membro.id:
                         try:
                             await outro.remove_roles(cargo, reason="Fim da temporada — cargo passa pro novo campeão")
-                        except discord.Forbidden:
-                            pass
+                        except discord.HTTPException:
+                            _LOG.exception(
+                                "Não foi possível retirar o cargo de campeão do membro %s (guild=%s, cargo=%s).",
+                                outro.id, guild.id, cargo.id,
+                            )
                 if membro:
                     try:
                         await membro.add_roles(cargo, reason="Campeão da temporada")
-                    except discord.Forbidden:
-                        pass
+                    except discord.HTTPException:
+                        _LOG.exception(
+                            "Não foi possível atribuir o cargo de campeão ao vencedor %s (guild=%s, cargo=%s).",
+                            membro.id, guild.id, cargo.id,
+                        )
+                else:
+                    _LOG.warning(
+                        "Vencedor da temporada não está no cache do servidor; cargo não atribuído (guild=%s, membro=%s, cargo=%s).",
+                        guild.id, campeao_id, cargo.id,
+                    )
 
     @tasks.loop(hours=1)
     async def verificar_temporadas(self):
@@ -70,8 +83,7 @@ class Temporadas(commands.GroupCog, group_name="temporadas", group_description="
                     resultado = await temporadas.encerrar_temporada(guild.id)
                     await self._anunciar(guild, resultado)
             except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
+                _LOG.exception(
                     "Falha ao verificar temporada (guild=%s); será reavaliada no próximo ciclo.",
                     guild.id,
                 )
