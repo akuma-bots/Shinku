@@ -85,6 +85,17 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
     @lideranca_only()
     async def diagnostico(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
+        if UPSTASH_CONFIG_INCOMPLETA:
+            await interaction.followup.send(
+                embed=criar_embed(
+                    "✕ CONFIGURAÇÃO DO UPSTASH INCOMPLETA",
+                    "As variáveis de conexão do Upstash estão configuradas parcialmente. O bot não fará fallback silencioso para armazenamento local. Revise a URL e o token nas variáveis do Render, sem compartilhar seus valores.",
+                    cor=COR_ERRO, rodape="NÊMESIS • Diagnóstico", timestamp=True,
+                ),
+                ephemeral=True,
+            )
+            return
+
         if not USANDO_UPSTASH:
             await interaction.followup.send(
                 embed=criar_embed(
