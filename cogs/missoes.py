@@ -18,7 +18,7 @@ from utils.catalogo_missoes import (
     salvar_mensagem_discord,
     obter_mensagem_discord,
 )
-from utils.guild_config import get_config, lideranca_only, membro_tem_lideranca
+from utils.guild_config import get_config, octogono_only, membro_tem_octogono
 from utils import ranking_missoes_jogos
 from utils.perfis import (
     get_perfil,
@@ -585,10 +585,10 @@ class InteligenciaMissoesView(discord.ui.View):
         if (
             interaction.guild is None
             or not isinstance(interaction.user, discord.Member)
-            or not membro_tem_lideranca(interaction.user)
+            or not membro_tem_octogono(interaction.user)
         ):
             await interaction.response.send_message(
-                "A Central de Inteligência é restrita à liderança do OCTÓGONO.",
+                "A Central de Inteligência é restrita à cargo OCTÓGONO.",
                 ephemeral=True,
             )
             return False
@@ -772,10 +772,10 @@ class RelatoriosMissoesView(discord.ui.View):
         if (
             interaction.guild is None
             or not isinstance(interaction.user, discord.Member)
-            or not membro_tem_lideranca(interaction.user)
+            or not membro_tem_octogono(interaction.user)
         ):
             await interaction.response.send_message(
-                "Os relatórios administrativos são exclusivos da liderança do OCTÓGONO.",
+                "Os relatórios administrativos são exclusivos da cargo OCTÓGONO.",
                 ephemeral=True,
             )
             return False
@@ -863,10 +863,10 @@ class AuditoriaIntegridadeView(discord.ui.View):
         if (
             interaction.guild is None
             or not isinstance(interaction.user, discord.Member)
-            or not membro_tem_lideranca(interaction.user)
+            or not membro_tem_octogono(interaction.user)
         ):
             await interaction.response.send_message(
-                "A auditoria de integridade é exclusiva da liderança do OCTÓGONO.",
+                "A auditoria de integridade é exclusiva da cargo OCTÓGONO.",
                 ephemeral=True,
             )
             return False
@@ -1775,7 +1775,7 @@ class Missoes(commands.Cog):
         name="missoes-sincronizar",
         description="Publica ou atualiza as missões padrão nos canais oficiais.",
     )
-    @lideranca_only()
+    @octogono_only()
     async def missoes_sincronizar(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         if interaction.guild is None:
@@ -1804,10 +1804,10 @@ class Missoes(commands.Cog):
         if (
             interaction.guild is None
             or not isinstance(interaction.user, discord.Member)
-            or not membro_tem_lideranca(interaction.user)
+            or not membro_tem_octogono(interaction.user)
         ):
             await interaction.response.send_message(
-                "Os relatórios administrativos são exclusivos da liderança do OCTÓGONO.",
+                "Os relatórios administrativos são exclusivos da cargo OCTÓGONO.",
                 ephemeral=True,
             )
             return
@@ -2185,10 +2185,10 @@ class Missoes(commands.Cog):
         if (
             interaction.guild is None
             or not isinstance(interaction.user, discord.Member)
-            or not membro_tem_lideranca(interaction.user)
+            or not membro_tem_octogono(interaction.user)
         ):
             await interaction.response.send_message(
-                "A Central de Inteligência é restrita à liderança do OCTÓGONO.",
+                "A Central de Inteligência é restrita à cargo OCTÓGONO.",
                 ephemeral=True,
             )
             return
