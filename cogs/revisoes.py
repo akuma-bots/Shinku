@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
-from utils.guild_config import lideranca_only, membro_tem_lideranca
+from utils.guild_config import lideranca_only, membro_tem_lideranca, membro_pode_revisar_categoria
 
 CORES = {"pvp": 0x9F2035, "pve": 0x8B6A35, "missao": 0x9F2035, "contribuicao": 0x8B6A35, "especial": 0x754A9E}
 _ABRIR_REVISAO_LOCK = asyncio.Lock()
@@ -329,6 +329,13 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            revisao_atual = await revisoes.get(self.guild.id, self.revisao_id)
+            if not revisao_atual:
+                await interaction.followup.send("Esta prova já foi processada ou não está mais disponível.", ephemeral=True)
+                return
+            if not membro_pode_revisar_categoria(interaction.user, revisao_atual.get("tipo")):
+                await interaction.followup.send("Somente o OCTÓGONO pode decidir sobre provas de missão.", ephemeral=True)
+                return
             motivo = str(self.motivo.value).strip()
             revisao = await revisoes.rejeitar(self.guild.id, self.revisao_id, self.revisor.id, motivo)
             if not revisao:
@@ -539,6 +546,19 @@ class Revisoes(commands.Cog):
             await interaction.response.send_message("Ação de revisão inválida.", ephemeral=True)
             return
         _, acao, revisao_id = partes
+
+        try:
+            revisao_permissao = await revisoes.get(interaction.guild.id, revisao_id)
+        except Exception:
+            logging.getLogger(__name__).exception("Falha ao validar permissões da revisão %s.", revisao_id)
+            await interaction.response.send_message("Não consegui validar esta revisão. Nenhuma decisão foi aplicada.", ephemeral=True)
+            return
+        if not revisao_permissao:
+            await interaction.response.send_message("Essa revisão não existe mais.", ephemeral=True)
+            return
+        if not membro_pode_revisar_categoria(interaction.user, revisao_permissao.get("tipo")):
+            await interaction.response.send_message("Somente o OCTÓGONO pode decidir sobre provas de missão.", ephemeral=True)
+            return
 
         if acao == "cancelar_aprovar":
             await interaction.response.edit_message(
