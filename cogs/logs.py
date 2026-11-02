@@ -443,6 +443,45 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, criar_embed(description=f"🔀 {detalhe}", color=0xFEE75C), categoria="voz")
             await registrar_global(member.guild, "historico_membros", "Movimentação em chamada", detalhe, cor=0xFEE75C)
 
+        alteracoes_estado = []
+        for atributo, rotulo in (
+            ("mute", "Silenciado pelo servidor"),
+            ("deaf", "Ensurdecido pelo servidor"),
+            ("self_mute", "Silenciado pelo próprio membro"),
+            ("self_deaf", "Ensurdecido pelo próprio membro"),
+            ("self_stream", "Transmissão ao vivo"),
+            ("self_video", "Câmera"),
+        ):
+            valor_antes = bool(getattr(antes, atributo, False))
+            valor_depois = bool(getattr(depois, atributo, False))
+            if valor_antes != valor_depois:
+                estado = "Ativado" if valor_depois else "Desativado"
+                alteracoes_estado.append(f"**{rotulo}:** {estado}")
+
+        if alteracoes_estado:
+            canal_atual = depois.channel or antes.channel
+            detalhe = (
+                f"**Membro:** {member.mention} ({member.id})\n"
+                f"**Canal:** {canal_atual.mention if canal_atual else 'Desconectado'}\n"
+                + "\n".join(alteracoes_estado)
+            )
+            await self._enviar_log(
+                canal,
+                criar_embed(
+                    title="Estado de chamada alterado",
+                    description=detalhe,
+                    color=0xFEE75C,
+                ),
+                categoria="voz",
+            )
+            await registrar_global(
+                member.guild,
+                "historico_membros",
+                "Estado de chamada alterado",
+                detalhe,
+                cor=0xFEE75C,
+            )
+
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):
