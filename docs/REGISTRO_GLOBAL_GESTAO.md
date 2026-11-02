@@ -1,6 +1,6 @@
 # Registro Global de Gestão — NÊMESIS
 
-O Fórum `1566579335966498926` mantém 29 tópicos permanentes da geração **V2**. Todos têm o prefixo `🆕 NÊMESIS V2` e numeração `01` a `29`, tornando-os fáceis de distinguir dos antigos. O Shinku cria tópicos V2 novos, salva seus IDs e aposenta os tópicos antigos/duplicados arquivando-os e bloqueando-os, sem apagar mensagens históricas. Cada ocorrência é uma mensagem dentro do tópico correspondente; não se cria um tópico por evento.
+O Fórum `1566579335966498926` mantém 29 tópicos permanentes da geração **V3**. Todos têm o prefixo `🆕 NÊMESIS V3` e numeração `01` a `29`, tornando-os fáceis de distinguir dos antigos. O Shinku executa uma reconstrução total única: exclui todos os tópicos existentes no Fórum (ativos e arquivados), cria 29 tópicos V3 novos e salva seus IDs. Essa operação remove também as mensagens antigas dentro dos tópicos excluídos. Cada ocorrência é uma mensagem dentro do tópico correspondente; não se cria um tópico por evento.
 
 ## Áreas de registro
 
@@ -35,12 +35,12 @@ O Fórum `1566579335966498926` mantém 29 tópicos permanentes da geração **V2
 | Administração | Permissões, estrutura e decisões administrativas |
 | Sistemas | Compatibilidade para registros legados ainda não migrados |
 
-## Identificação e organização V2
+## Identificação e organização V3
 
-- O prefixo `🆕 NÊMESIS V2` identifica exclusivamente a estrutura atual.
+- O prefixo `🆕 NÊMESIS V3` identifica exclusivamente a estrutura atual.
 - O número de dois dígitos indica a ordem fixa do tópico e facilita a localização no celular.
-- Tópicos sem o prefixo V2 são legados; após a sincronização ficam arquivados e bloqueados, preservando o histórico.
-- Não excluir tópicos antigos automaticamente: mensagens e evidências históricas permanecem consultáveis.
+- A exclusão total é executada uma única vez, protegida por marcador persistente no Upstash.
+- Depois da reconstrução, inicializações normais não apagam os tópicos V3.
 
 ## Regras de integridade
 
