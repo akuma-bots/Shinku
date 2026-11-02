@@ -50,6 +50,18 @@ class TestIntegridadeDesafios(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(lista), 1)
         self.assertIsNone(ultimo)
 
+    async def test_registro_global_de_duelo_so_e_marcado_uma_vez(self):
+        dados = {"123": [{"id": "duelo-1", "status": "concluido"}]}
+        with patch.object(desafios, "carregar", new=AsyncMock(return_value=dados)), patch.object(
+            desafios, "salvar", new=AsyncMock()
+        ) as salvar:
+            primeiro = await desafios.marcar_registro_global(123, "duelo-1")
+            segundo = await desafios.marcar_registro_global(123, "duelo-1")
+
+        self.assertTrue(primeiro)
+        self.assertFalse(segundo)
+        salvar.assert_awaited_once()
+
     async def test_resultado_so_aceita_participantes_do_duelo(self):
         dados = {
             "123": [{
