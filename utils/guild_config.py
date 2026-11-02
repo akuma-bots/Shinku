@@ -367,11 +367,36 @@ def membro_tem_octogono(membro) -> bool:
     )
 
 
+CARGOS_AUTORIZADOS_HIERARQUIA_IDS = CARGOS_ACIMA_ELITE_IDS | CARGOS_LIDERANCA_IDS
+
+
 def membro_pode_promover_rebaixar_banir(membro) -> bool:
     return bool(
         _membro_nemesis(membro)
-        and any(cargo.id in CARGOS_ACIMA_ELITE_IDS for cargo in membro.roles)
+        and any(cargo.id in CARGOS_AUTORIZADOS_HIERARQUIA_IDS for cargo in membro.roles)
     )
+
+
+def membro_pode_gerenciar_membro(autor, alvo) -> bool:
+    """Impede ações hierárquicas contra membros de cargo igual ou superior."""
+    if not _membro_nemesis(autor) or not _membro_nemesis(alvo):
+        return False
+    if autor.guild.id != alvo.guild.id or autor.id == alvo.id:
+        return False
+    if autor.id == autor.guild.owner_id:
+        return alvo.id != alvo.guild.owner_id
+    cargos_autorizados = [
+        cargo for cargo in autor.roles
+        if cargo.id in CARGOS_AUTORIZADOS_HIERARQUIA_IDS
+    ]
+    if not cargos_autorizados:
+        return False
+    maior_autoridade = max(cargo.position for cargo in cargos_autorizados)
+    maior_cargo_alvo = max(
+        (cargo.position for cargo in alvo.roles if cargo.id != alvo.guild.default_role.id),
+        default=0,
+    )
+    return maior_autoridade > maior_cargo_alvo
 
 
 def membro_pode_revisar_categoria(membro, tipo: str) -> bool:
