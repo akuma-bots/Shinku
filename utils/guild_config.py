@@ -327,21 +327,50 @@ from discord import app_commands
 GUILD_NEMESIS_ID = 1563995879981981817
 CARGO_ACESSO_NEMESIS_ID = 1563995879990624372
 
-# Somente liderança organizacional. Os cargos competitivos e a staff
-# operacional não recebem autorização administrativa por progressão.
+# Administração: somente cargos acima de Supervisor Staff.
+CARGO_OCTOGONO_ID = 1563995880007139425
 CARGOS_LIDERANCA_IDS = frozenset({
-    1563995880007139425,  # OCTÓGONO
+    CARGO_OCTOGONO_ID,
     1563995880007139424,  # Diretor Staff
     1563995880007139423,  # Vice-Diretor Staff
-    1563995880007139422,  # Supervisor Staff
 })
+
+# Cargos acima de Elite podem promover, rebaixar e banir.
+CARGOS_ACIMA_ELITE_IDS = frozenset({
+    1563995879998754938,  # Veterano
+    1563995879998754939,  # Treinador
+    1563995879998754940,  # Comandante
+    1563995879998754941,  # Vice Capitão
+    1563995879998754942,  # Capitão
+    1563995879998754943,  # Capitão Geral
+})
+
+
+def _membro_nemesis(membro) -> bool:
+    return bool(
+        isinstance(membro, discord.Member)
+        and membro.guild.id == GUILD_NEMESIS_ID
+    )
 
 
 def membro_tem_lideranca(membro) -> bool:
     return bool(
-        isinstance(membro, discord.Member)
-        and membro.guild.id == GUILD_NEMESIS_ID
+        _membro_nemesis(membro)
         and any(cargo.id in CARGOS_LIDERANCA_IDS for cargo in membro.roles)
+    )
+
+
+def membro_tem_octogono(membro) -> bool:
+    return bool(
+        _membro_nemesis(membro)
+        and any(cargo.id == CARGO_OCTOGONO_ID for cargo in membro.roles)
+    )
+
+
+def membro_pode_promover_rebaixar_banir(membro) -> bool:
+    return bool(
+        _membro_nemesis(membro)
+        and any(cargo.id in CARGOS_ACIMA_ELITE_IDS for cargo in membro.roles)
     )
 
 
@@ -360,6 +389,24 @@ async def verificar_lideranca(interaction: discord.Interaction) -> bool:
     return membro_tem_lideranca(interaction.user)
 
 
+async def verificar_octogono(interaction: discord.Interaction) -> bool:
+    return membro_tem_octogono(interaction.user)
+
+
+async def verificar_hierarquia(interaction: discord.Interaction) -> bool:
+    return membro_pode_promover_rebaixar_banir(interaction.user)
+
+
 def lideranca_only():
-    """Restringe comandos administrativos aos cargos de liderança autorizados."""
+    """Restringe administração aos cargos acima de Supervisor Staff."""
     return app_commands.check(verificar_lideranca)
+
+
+def octogono_only():
+    """Restringe gestão de missões ao cargo OCTÓGONO."""
+    return app_commands.check(verificar_octogono)
+
+
+def hierarquia_only():
+    """Autoriza ações hierárquicas apenas aos cargos acima de Elite."""
+    return app_commands.check(verificar_hierarquia)
