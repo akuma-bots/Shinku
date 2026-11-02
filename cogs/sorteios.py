@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, COR_PRIMARIA, COR_SUCESSO, COR_ERRO
 import asyncio
 import time
 import uuid
@@ -17,9 +17,6 @@ from utils.storage import carregar, salvar
 
 ARQUIVO = "sorteios.json"
 
-COR_SORTEIO = 0x5865F2
-COR_SUCESSO = 0x57F287
-COR_ERRO = 0xED4245
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +315,7 @@ class BotaoParticipar(discord.ui.View):
         embed = criar_embed(
             title="👥 Participantes",
             description="\n".join(linhas),
-            color=COR_SORTEIO,
+            color=COR_PRIMARIA,
         )
 
         embed.set_footer(
@@ -456,7 +453,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         embed = criar_embed(
             title="🎁 SORTEIO",
             description=descricao,
-            color=COR_SORTEIO,
+            color=COR_PRIMARIA,
         )
 
         embed.set_author(
@@ -686,7 +683,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 description="\n".join(
                     linhas
                 ),
-                color=COR_SORTEIO,
+                color=COR_PRIMARIA,
             )
 
             embed.set_footer(
@@ -1191,7 +1188,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             description="\n\n".join(
                 linhas
             ),
-            color=COR_SORTEIO,
+            color=COR_PRIMARIA,
         )
 
         embed.set_footer(
