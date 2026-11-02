@@ -54,6 +54,17 @@ class TestHierarquiaNemesis(unittest.TestCase):
         self.assertTrue(guild_config.membro_pode_gerenciar_membro(autor, alvo_inferior))
         self.assertFalse(guild_config.membro_pode_gerenciar_membro(autor, alvo_superior))
 
+    def test_nao_pode_atribuir_cargo_acima_da_propria_autoridade(self):
+        veterano_id = 1563995879998754938
+        comandante_id = 1563995879998754940
+        elite_id = 1563995879998754937
+        autor = FakeMember([veterano_id], user_id=1)
+        cargo_comandante = SimpleNamespace(id=comandante_id, position=30)
+        cargo_elite = SimpleNamespace(id=elite_id, position=10)
+        autor.roles[0].position = 20
+        self.assertFalse(guild_config.membro_pode_atribuir_cargo_hierarquico(autor, cargo_comandante))
+        self.assertTrue(guild_config.membro_pode_atribuir_cargo_hierarquico(autor, cargo_elite))
+
     def test_octogono_e_o_unico_cargo_autorizado_a_gerir_missoes(self):
         membro = self._member([guild_config.CARGO_OCTOGONO_ID])
         self.assertTrue(guild_config.membro_tem_lideranca(membro))
