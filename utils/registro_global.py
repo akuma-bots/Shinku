@@ -418,6 +418,8 @@ async def registrar(
             description=str(descricao or "Sem detalhes.")[:4096],
             cor=cor,
         )
+        if not registro.title:
+            registro.title = str(titulo or "Registro")[:256]
         if registro.timestamp is None:
             registro.timestamp = datetime.now(timezone.utc)
         if not registro.author.name:
