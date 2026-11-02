@@ -9,6 +9,7 @@ from discord.ext import commands
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
 from utils.guild_config import lideranca_only
+from utils.registro_global import CATEGORIAS
 
 
 class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
@@ -47,7 +48,9 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         else:
             armazenamento_estado = "Local • Persistência limitada"
 
-        estado_ok = self.bot.is_ready() and not falhas and armazenamento_ok
+        cog_logs = self.bot.get_cog("Logs")
+        registros_ok = bool(getattr(cog_logs, "_topicos_prontos", False))
+        estado_ok = self.bot.is_ready() and not falhas and armazenamento_ok and registros_ok
         embed = criar_embed(
             "✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE SISTEMA ・✦",
             "Diagnóstico operacional da conexão, armazenamento e módulos carregados.",
@@ -59,6 +62,15 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         embed.add_field(name="◈ LATÊNCIA", value=f"{latencia_ms} ms" if latencia_ms is not None else "Indisponível", inline=True)
         embed.add_field(name="◈ TEMPO ATIVO", value=f"{horas}h {minutos}m {segundos}s", inline=True)
         embed.add_field(name="◈ ARMAZENAMENTO", value=armazenamento_estado, inline=False)
+        embed.add_field(
+            name="◈ REGISTRO GLOBAL",
+            value=(
+                f"🟢 {len(CATEGORIAS)}/{len(CATEGORIAS)} destinos sincronizados"
+                if registros_ok else
+                f"🟡 Aguardando sincronização dos {len(CATEGORIAS)} destinos"
+            ),
+            inline=False,
+        )
         embed.add_field(name="◈ MÓDULOS ATIVOS", value=str(len(self.bot.cogs)), inline=True)
         embed.add_field(name="◈ COMANDOS DO SERVIDOR", value=str(len(comandos)), inline=True)
         if falhas:
