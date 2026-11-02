@@ -101,9 +101,9 @@ class Conquistas(commands.Cog):
             from utils.registro_global import registrar as registrar_global
             for conquista in novos:
                 detalhe = (
-                    f"**Membro:** {membro.mention} (ID: {membro.id})\\n"
-                    f"**Conquista:** {conquista['icone']} {conquista['nome']}\\n"
-                    f"**Raridade:** {conquista['raridade']}\\n"
+                    f"**Membro:** {membro.mention} (ID: {membro.id})\n"
+                    f"**Conquista:** {conquista['icone']} {conquista['nome']}\n"
+                    f"**Raridade:** {conquista['raridade']}\n"
                     f"**Recompensa:** +{conquista['recompensa_xp']} XP"
                 )
                 await registrar_global(
