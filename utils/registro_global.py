@@ -25,35 +25,35 @@ CARGOS_ACESSO_IDS = {
 }
 
 CATEGORIAS = {
-    "mensagens": ("🆕 NÊMESIS V2・01・Mensagens", "Exclusões, edições e remoções em massa de mensagens."),
-    "atendimento": ("🆕 NÊMESIS V2・02・Atendimento", "Abertura, atribuição, encerramento, avaliações e transcrições de tickets."),
-    "moderacao": ("🆕 NÊMESIS V2・03・Moderação", "Advertências, timeouts, expulsões, banimentos e ações da equipe."),
-    "membros": ("🆕 NÊMESIS V2・04・Membros", "Entradas, saídas, alterações de cargos e dados de membros."),
-    "sistemas": ("🆕 NÊMESIS V2・05・Sistemas", "Missões, contribuições, temporadas, rankings, guerras e eventos operacionais."),
-    "administracao": ("🆕 NÊMESIS V2・06・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
-    "seguranca": ("🆕 NÊMESIS V2・07・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
-    "formularios": ("🆕 NÊMESIS V2・08・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
-    "progressao": ("🆕 NÊMESIS V2・09・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
-    "missoes": ("🆕 NÊMESIS V2・10・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
-    "competicoes": ("🆕 NÊMESIS V2・11・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
-    "eventos": ("🆕 NÊMESIS V2・12・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
-    "parcerias": ("🆕 NÊMESIS V2・13・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
-    "integracoes": ("🆕 NÊMESIS V2・14・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
-    "infraestrutura": ("🆕 NÊMESIS V2・15・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
-    "configuracoes": ("🆕 NÊMESIS V2・16・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
-    "entradas": ("🆕 NÊMESIS V2・17・Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
-    "historico_membros": ("🆕 NÊMESIS V2・18・Histórico Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
-    "cargos": ("🆕 NÊMESIS V2・19・Histórico Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
-    "convites": ("🆕 NÊMESIS V2・20・Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
-    "voz": ("🆕 NÊMESIS V2・21・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
-    "anexos": ("🆕 NÊMESIS V2・22・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
-    "atividade": ("🆕 NÊMESIS V2・23・Atividade", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
-    "conquistas": ("🆕 NÊMESIS V2・24・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
-    "sorteios": ("🆕 NÊMESIS V2・25・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
-    "sugestoes": ("🆕 NÊMESIS V2・26・Sugestões", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
-    "relatorios": ("🆕 NÊMESIS V2・27・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
-    "roblox": ("🆕 NÊMESIS V2・28・Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
-    "automod": ("🆕 NÊMESIS V2・29・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
+    "mensagens": ("🆕 NÊMESIS V3・01・Mensagens", "Exclusões, edições e remoções em massa de mensagens."),
+    "atendimento": ("🆕 NÊMESIS V3・02・Atendimento", "Abertura, atribuição, encerramento, avaliações e transcrições de tickets."),
+    "moderacao": ("🆕 NÊMESIS V3・03・Moderação", "Advertências, timeouts, expulsões, banimentos e ações da equipe."),
+    "membros": ("🆕 NÊMESIS V3・04・Membros", "Entradas, saídas, alterações de cargos e dados de membros."),
+    "sistemas": ("🆕 NÊMESIS V3・05・Sistemas", "Missões, contribuições, temporadas, rankings, guerras e eventos operacionais."),
+    "administracao": ("🆕 NÊMESIS V3・06・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
+    "seguranca": ("🆕 NÊMESIS V3・07・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
+    "formularios": ("🆕 NÊMESIS V3・08・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
+    "progressao": ("🆕 NÊMESIS V3・09・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
+    "missoes": ("🆕 NÊMESIS V3・10・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
+    "competicoes": ("🆕 NÊMESIS V3・11・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
+    "eventos": ("🆕 NÊMESIS V3・12・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
+    "parcerias": ("🆕 NÊMESIS V3・13・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
+    "integracoes": ("🆕 NÊMESIS V3・14・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
+    "infraestrutura": ("🆕 NÊMESIS V3・15・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
+    "configuracoes": ("🆕 NÊMESIS V3・16・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
+    "entradas": ("🆕 NÊMESIS V3・17・Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
+    "historico_membros": ("🆕 NÊMESIS V3・18・Histórico Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
+    "cargos": ("🆕 NÊMESIS V3・19・Histórico Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
+    "convites": ("🆕 NÊMESIS V3・20・Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
+    "voz": ("🆕 NÊMESIS V3・21・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
+    "anexos": ("🆕 NÊMESIS V3・22・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
+    "atividade": ("🆕 NÊMESIS V3・23・Atividade", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
+    "conquistas": ("🆕 NÊMESIS V3・24・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
+    "sorteios": ("🆕 NÊMESIS V3・25・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
+    "sugestoes": ("🆕 NÊMESIS V3・26・Sugestões", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
+    "relatorios": ("🆕 NÊMESIS V3・27・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
+    "roblox": ("🆕 NÊMESIS V3・28・Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
+    "automod": ("🆕 NÊMESIS V3・29・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
 }
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 
@@ -82,6 +82,48 @@ async def _ler_ids(guild_id: int) -> dict:
     dados = await carregar(ARQUIVO, {})
     servidor = dados.get(str(guild_id), {}) if isinstance(dados, dict) else {}
     return servidor if isinstance(servidor, dict) else {}
+
+
+async def _limpeza_v3_concluida(guild_id: int) -> bool:
+    ids = await _ler_ids(guild_id)
+    return ids.get("_limpeza_total_v3_concluida") is True
+
+
+async def _marcar_limpeza_v3_concluida(guild_id: int) -> None:
+    chave = str(guild_id)
+    def atualizar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        servidor = dados.get(chave)
+        if not isinstance(servidor, dict):
+            servidor = {}
+        servidor["_limpeza_total_v3_concluida"] = True
+        dados[chave] = servidor
+        return dados
+    await atualizar_json(ARQUIVO, {}, atualizar)
+
+
+async def _excluir_todos_topicos(forum: discord.ForumChannel) -> int:
+    """Exclusão única e intencional de todos os tópicos do fórum dedicado."""
+    encontrados: dict[int, discord.Thread] = {t.id: t for t in forum.threads}
+    async for thread in forum.archived_threads(limit=None):
+        encontrados[thread.id] = thread
+
+    excluidos = 0
+    for thread in encontrados.values():
+        try:
+            await thread.delete(
+                reason="Reconstrução total autorizada do Registro Global NÊMESIS: remoção de todos os tópicos antigos"
+            )
+            excluidos += 1
+            _LOG.info("Tópico antigo excluído na reconstrução V3: %s (%s)", thread.name, thread.id)
+        except discord.NotFound:
+            continue
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.exception("Não foi possível excluir o tópico %s; a reconstrução foi interrompida.", thread.id)
+            raise
+    _LOG.warning("Limpeza total do Registro Global concluída: %s tópicos excluídos.", excluidos)
+    return excluidos
 
 
 async def _obter_topico(
@@ -144,13 +186,13 @@ async def _obter_topico(
 
         inicial = discord.Embed(
             title=nome,
-            description=(f"**REGISTRO PERMANENTE — NÊMESIS V2**\n\n{descricao}\n\n"
+            description=(f"**REGISTRO PERMANENTE — NÊMESIS V3**\n\n{descricao}\n\n"
                          "As ocorrências desta área serão adicionadas aqui em sequência. "
                          "Este tópico é fixo; não será criado um tópico por evento."),
             color=0xB3132B,
             timestamp=datetime.now(timezone.utc),
         )
-        inicial.set_footer(text="NÊMESIS • REGISTRO GLOBAL V2")
+        inicial.set_footer(text="NÊMESIS • REGISTRO GLOBAL V3")
         criado = await forum.create_thread(
             name=nome,
             embed=inicial,
@@ -277,8 +319,18 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
         raise TypeError("O destino configurado não é o Fórum de Registro Global da NÊMESIS.")
     await configurar_permissoes(canal)
     validar_privacidade(canal)
-    # Faz uma única leitura dos tópicos ativos e arquivados; evita 29 varreduras
-    # completas do histórico do Fórum durante o mesmo ciclo de sincronização.
+    # Reconstrução V3: executa a exclusão total uma única vez. O marcador só
+    # é gravado depois que os 29 destinos novos foram criados; se houver falha
+    # no meio, a próxima inicialização repete a limpeza dos tópicos parciais.
+    reconstruindo = not await _limpeza_v3_concluida(guild.id)
+    if reconstruindo:
+        await _excluir_todos_topicos(canal)
+        await atualizar_json(ARQUIVO, {}, lambda dados: {
+            **(dados if isinstance(dados, dict) else {}),
+            str(guild.id): {"_limpeza_total_v3_concluida": False},
+        })
+
+    # Faz uma única leitura dos tópicos ativos e arquivados.
     topicos_existentes: list[discord.Thread] = list(canal.threads)
     try:
         async for thread in canal.archived_threads(limit=None):
@@ -316,6 +368,12 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
             continue
         except (discord.Forbidden, discord.HTTPException):
             _LOG.exception("Falha ao aposentar tópico legado (%s).", thread.id)
+    if reconstruindo:
+        await _marcar_limpeza_v3_concluida(guild.id)
+        _LOG.warning(
+            "RECONSTRUÇÃO TOTAL V3 CONCLUÍDA: %s tópicos novos criados após exclusão de todos os tópicos anteriores.",
+            len(resultado),
+        )
     _LOG.info(
         "Sincronização do Registro Global concluída: %s destinos canônicos; %s tópicos legados arquivados e bloqueados.",
         len(resultado), aposentados,
