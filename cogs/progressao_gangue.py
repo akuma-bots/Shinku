@@ -402,7 +402,8 @@ class ProgressaoGangue(commands.Cog):
             description=(
                 "**SUA EVOLUÇÃO É CONQUISTADA EM ATIVIDADE REAL.**\n"
                 "A progressão registra participação legítima, missões e guerras. "
-                "Ao cumprir os requisitos, o sistema atualiza seu posto e anuncia a promoção."
+                "Missões são validadas pelo OCTÓGONO; promoções e rebaixamentos manuais exigem justificativa "
+                "e respeito à autoridade hierárquica."
             ),
             cor=0x9F1239,
             rodape=None,
@@ -415,7 +416,7 @@ class ProgressaoGangue(commands.Cog):
         )
         embed.add_field(
             name="02  /  ATIVIDADES OFICIAIS",
-            value="Missões, contribuições e guerras podem gerar registros de progressão mediante validação da liderança.",
+            value="Missões, contribuições e guerras geram registros mediante validação do OCTÓGONO e dos fluxos oficiais.",
             inline=True,
         )
         hierarquia = "\n".join(
@@ -424,7 +425,7 @@ class ProgressaoGangue(commands.Cog):
         )
         hierarquia += "\n00  **Liderança**  ·  atribuição exclusiva da direção"
         embed.add_field(name="03  /  ESCALA DE PATENTES", value=hierarquia[:1024], inline=False)
-        embed.set_footer(text="NÊMESIS • PROGRESSÃO OFICIAL • XP de progressão separado do XP competitivo")
+        embed.set_footer(text="NÊMESIS • PROGRESSÃO OFICIAL • XP separado do competitivo • Ações manuais auditadas")
         msg_id = config.get("painel_mensagem_id")
         if msg_id:
             try:
