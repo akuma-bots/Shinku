@@ -108,6 +108,10 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         canonico.name = registro_global.CATEGORIAS["mensagens"][0]
         canonico.archived = False
         canonico.locked = False
+        starter = Mock()
+        starter.embeds = []
+        starter.edit = AsyncMock()
+        canonico.fetch_message = AsyncMock(return_value=starter)
         forum.threads = [canonico]
         async def sem_arquivados(limit=None):
             if False:
@@ -118,6 +122,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
         self.assertIs(resultado, canonico)
+        starter.edit.assert_awaited_once()
         legado.edit.assert_not_called()
         salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 790)
         forum.create_thread.assert_not_called()
