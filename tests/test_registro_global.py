@@ -65,7 +65,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PermissionError):
             registro_global.validar_privacidade(forum)
 
-    async def test_reconstrucao_v2_cria_topico_novo_sem_reutilizar_id_legado(self):
+    async def test_reconstrucao_v3_cria_topico_novo_sem_reutilizar_id_legado(self):
         forum = Mock()
         forum.id = 456
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
@@ -94,7 +94,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         legado.edit.assert_not_called()
         salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 900)
 
-    async def test_topico_v2_existente_prevalece_sobre_id_legado(self):
+    async def test_topico_v3_existente_prevalece_sobre_id_legado(self):
         forum = Mock()
         forum.id = 456
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
