@@ -196,13 +196,22 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
+        agora = datetime.now(timezone.utc)
         canal = await self._canal_logs(member.guild)
-        if not canal:
-            return
-        embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
-        embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed, categoria="entradas")
-        await registrar_global(member.guild, "historico_membros", "Saída do membro", f"Membro: {member} (ID: {member.id})\nSaída registrada: {discord.utils.format_dt(datetime.now(timezone.utc), style='F')}", cor=0xED4245)
+        if canal:
+            embed = criar_embed(
+                title="Saída de membro",
+                description=f"📤 {member} (ID: {member.id}) saiu da NÊMESIS.",
+                color=0xED4245,
+                timestamp=agora,
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            await self._enviar_log(canal, embed, categoria="entradas")
+        await registrar_global(
+            member.guild, "historico_membros", "Saída do membro",
+            f"Membro: {member} (ID: {member.id})\\nSaída registrada: {discord.utils.format_dt(agora, style='F')}",
+            cor=0xED4245,
+        )
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
