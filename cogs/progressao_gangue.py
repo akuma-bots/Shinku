@@ -457,6 +457,8 @@ class ProgressaoGangue(commands.Cog):
     async def on_ready(self):
         guild = self.bot.get_guild(GUILD_ID)
         if guild:
+            # Inicializa os vínculos oficiais sem alterar cargos já atribuídos.
+            await self._config(guild.id)
             await self._garantir_painel(guild)
 
     @commands.Cog.listener()
