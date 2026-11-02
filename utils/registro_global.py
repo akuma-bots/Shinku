@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import discord
 
+from utils.apresentacao import criar_embed
 from utils.storage import atualizar_json
 
 _LOG = logging.getLogger(__name__)
@@ -407,15 +408,20 @@ async def registrar(
         thread = await _obter_topico(canal, categoria)
         if thread.archived or thread.locked:
             await thread.edit(archived=False, locked=False, reason="Reabrir tópico permanente para novos registros")
-        registro = embed.copy() if embed is not None else discord.Embed(
+        if categoria not in CATEGORIAS:
+            raise ValueError(f"Categoria de registro desconhecida: {categoria}")
+
+        registro = embed.copy() if embed is not None else criar_embed(
             title=str(titulo or "Registro")[:256],
             description=str(descricao or "Sem detalhes.")[:4096],
-            color=cor,
+            cor=cor,
         )
         if registro.timestamp is None:
             registro.timestamp = datetime.now(timezone.utc)
+        if not registro.author.name:
+            registro.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  |  CENTRAL DE REGISTROS")
         if not registro.footer.text:
-            registro.set_footer(text=f"NÊMESIS • Registro Global • {CATEGORIAS[categoria][0]}")
+            registro.set_footer(text=f"◈ NÊMESIS • REGISTRO GLOBAL • {CATEGORIAS[categoria][0]}")
         await thread.send(
             content=content,
             embed=registro,
