@@ -142,7 +142,7 @@ class ConfirmarTemporadaRankingView(discord.ui.View):
         await interaction.followup.send(
             f"Temporada **#{self.numero_esperado}** encerrada. "
             f"A temporada **#{self.numero_esperado + 1}** foi iniciada; "
-            "os pontos permanentes e o histórico foram preservados.",
+            "o XP total, as estatísticas permanentes e o histórico foram preservados.",
             ephemeral=True,
         )
         for item in self.children:
@@ -288,7 +288,7 @@ class CentralRankingGeralView(discord.ui.View):
         numero = int(dados.get("temporada_global", {}).get("numero", 1) or 1)
         await interaction.response.send_message(
             f"Confirme o encerramento da temporada **#{numero}**. "
-            "O Top 10 será arquivado e uma nova temporada começará.",
+            "O Top 10 será arquivado e uma nova temporada começará. O XP total permanece; apenas o XP sazonal reinicia.",
             view=ConfirmarTemporadaRankingView(self, numero),
             ephemeral=True,
         )
