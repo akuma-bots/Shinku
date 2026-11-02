@@ -127,6 +127,67 @@ async def _excluir_todos_topicos(forum: discord.ForumChannel) -> int:
     return excluidos
 
 
+def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
+    embed = discord.Embed(
+        title=nome,
+        description=(
+            "**CENTRAL OFICIAL DE AUDITORIA**\n"
+            "Área permanente de registros operacionais da NÊMESIS. "
+            "As ocorrências são organizadas por assunto neste mesmo tópico."
+        ),
+        color=0xB3132B,
+    )
+    embed.add_field(name="ESCOPO DESTE TÓPICO", value=descricao[:1024], inline=False)
+    embed.add_field(
+        name="PADRÃO DE AUDITORIA",
+        value=(
+            "Quando disponível, cada registro identifica responsável, membro relacionado, "
+            "ação, canal/protocolo, data e resultado. Dados não observáveis pelo Discord "
+            "não são presumidos."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="ORGANIZAÇÃO",
+        value=(
+            "Os eventos desta categoria são adicionados em sequência aqui. "
+            "Não é criado um tópico por ocorrência e os registros não devem ser misturados "
+            "com assuntos de outras categorias."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="ACESSO E INTEGRIDADE",
+        value=(
+            "Fórum restrito aos cargos autorizados da NÊMESIS. "
+            "O cabeçalho é mantido pelo Shinku; as ocorrências são acrescentadas abaixo."
+        ),
+        inline=False,
+    )
+    embed.set_footer(text="NÊMESIS • REGISTRO GLOBAL V3 • TÓPICO PERMANENTE")
+    return embed
+
+
+async def _atualizar_cabecalho_topico(
+    thread: discord.Thread,
+    nome: str,
+    descricao: str,
+) -> None:
+    if thread.archived or thread.locked:
+        return
+    embed = _embed_cabecalho_topico(nome, descricao)
+    try:
+        mensagem = await thread.fetch_message(thread.id)
+        atual = mensagem.embeds[0].to_dict() if mensagem.embeds else None
+        if atual != embed.to_dict():
+            await mensagem.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            _LOG.info("Cabeçalho do tópico atualizado: %s (%s)", nome, thread.id)
+    except discord.NotFound:
+        _LOG.warning("Tópico sem mensagem inicial recuperável: %s (%s).", nome, thread.id)
+    except (discord.Forbidden, discord.HTTPException):
+        _LOG.exception("Não foi possível atualizar o cabeçalho do tópico %s (%s).", nome, thread.id)
+
+
 async def _obter_topico(
     forum: discord.ForumChannel,
     categoria: str,
@@ -178,6 +239,7 @@ async def _obter_topico(
                     )
                 if ids.get(categoria) != thread.id:
                     await _salvar_id(forum.guild.id, categoria, thread.id)
+                await _atualizar_cabecalho_topico(thread, nome, descricao)
                 return thread
 
         # A geração V3 é uma reconstrução intencional: nunca reaproveita nem
@@ -185,15 +247,7 @@ async def _obter_topico(
         # fora do mapa canônico para ser arquivado/bloqueado na limpeza.
         thread_salva = None
 
-        inicial = discord.Embed(
-            title=nome,
-            description=(f"**REGISTRO PERMANENTE — NÊMESIS V3**\n\n{descricao}\n\n"
-                         "As ocorrências desta área serão adicionadas aqui em sequência. "
-                         "Este tópico é fixo; não será criado um tópico por evento."),
-            color=0xB3132B,
-            timestamp=datetime.now(timezone.utc),
-        )
-        inicial.set_footer(text="NÊMESIS • REGISTRO GLOBAL V3")
+        inicial = _embed_cabecalho_topico(nome, descricao)
         criado = await forum.create_thread(
             name=nome,
             embed=inicial,
