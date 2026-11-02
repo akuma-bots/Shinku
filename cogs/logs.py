@@ -174,7 +174,7 @@ class Logs(commands.Cog):
             return
         await registrar_global(
             member.guild,
-            "membros",
+            "entradas",
             "Novo membro na NÊMESIS",
             (
                 f"Membro: {member.mention} (`{member.id}`)\n"
@@ -196,7 +196,7 @@ class Logs(commands.Cog):
             return
         embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
         embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed, categoria="membros")
+        await self._enviar_log(canal, embed, categoria="cargos")
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -514,7 +514,7 @@ class Logs(commands.Cog):
         if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            invite.guild, "seguranca", "Convite criado",
+            invite.guild, "convites", "Convite criado",
             f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}\n"
             f"Criado por: {invite.inviter.mention if invite.inviter else 'Não identificado'}\n"
             f"Usos máximos: {invite.max_uses or 'Ilimitado'}",
@@ -526,7 +526,7 @@ class Logs(commands.Cog):
         if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            invite.guild, "seguranca", "Convite removido",
+            invite.guild, "convites", "Convite removido",
             f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}",
             cor=0xED4245,
         )
