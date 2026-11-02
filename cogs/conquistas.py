@@ -98,6 +98,29 @@ class Conquistas(commands.Cog):
                     )
 
         if novos and anunciar:
+            from utils.registro_global import registrar as registrar_global
+            for conquista in novos:
+                detalhe = (
+                    f"**Membro:** {membro.mention} (ID: {membro.id})\\n"
+                    f"**Conquista:** {conquista['icone']} {conquista['nome']}\\n"
+                    f"**Raridade:** {conquista['raridade']}\\n"
+                    f"**Recompensa:** +{conquista['recompensa_xp']} XP"
+                )
+                await registrar_global(
+                    guild,
+                    "conquistas",
+                    "Conquista desbloqueada",
+                    detalhe,
+                    cor=COR_NEMESIS,
+                )
+                await registrar_global(
+                    guild,
+                    "historico_membros",
+                    "Conquista pessoal desbloqueada",
+                    detalhe,
+                    cor=COR_NEMESIS,
+                )
+
             canal = guild.get_channel(CANAL_CONQUISTAS_ID)
             if isinstance(canal, discord.TextChannel):
                 embed = criar_embed(
