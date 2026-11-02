@@ -251,6 +251,9 @@ class ProgressaoGangue(commands.Cog):
             log.error("Cargo configurado para o rank %s não existe mais: %s", rank["nome"], cargo_alvo_id)
             return False
         ids_progressao = {int(cid) for cid in cargos.values() if str(cid).isdigit()}
+        legados = config.get("cargos_legados", [])
+        if isinstance(legados, list):
+            ids_progressao.update(int(cid) for cid in legados if str(cid).isdigit())
         remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != adicionar.id]
         cargo_adicionado = False
         try:
@@ -283,12 +286,21 @@ class ProgressaoGangue(commands.Cog):
     ) -> tuple[dict, dict, dict]:
         async with self._lock:
             dados = await self._dados()
-            guild = dados.setdefault(str(guild_id), {})
-            membros = guild.setdefault("membros", {})
-            perfil = membros.setdefault(str(user_id), {
-                "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
-                "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
-            })
+            chave_guild = str(guild_id)
+            guild = dados.get(chave_guild)
+            if not isinstance(guild, dict):
+                guild = {}
+                dados[chave_guild] = guild
+            membros = guild.get("membros")
+            if not isinstance(membros, dict):
+                membros = {}
+                guild["membros"] = membros
+            perfil = membros.get(str(user_id))
+            if not isinstance(perfil, dict):
+                perfil = {
+                    "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
+                    "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
+                }
             xp_anterior = max(0, int(perfil.get("xp", 0) or 0))
             rank_anterior = rank_por_xp(xp_anterior)
             perfil["xp"] = max(0, int(novo_xp))
@@ -648,8 +660,15 @@ class ProgressaoGangue(commands.Cog):
         rank_no = int(rank.value)
         async with self._lock:
             dados = await self._dados()
-            guild_data = dados.setdefault(str(interaction.guild.id), {})
-            cargos = guild_data.setdefault("cargos", {})
+            chave_guild = str(interaction.guild.id)
+            guild_data = dados.get(chave_guild)
+            if not isinstance(guild_data, dict):
+                guild_data = {}
+                dados[chave_guild] = guild_data
+            cargos = guild_data.get("cargos")
+            if not isinstance(cargos, dict):
+                cargos = {}
+                guild_data["cargos"] = cargos
             duplicado = next(
                 (numero for numero, cargo_id in cargos.items()
                  if str(cargo_id) == str(cargo.id) and str(numero) != str(rank_no)),
@@ -661,6 +680,14 @@ class ProgressaoGangue(commands.Cog):
                     ephemeral=True,
                 )
                 return
+            cargo_anterior = cargos.get(str(rank_no))
+            if cargo_anterior and str(cargo_anterior) != str(cargo.id):
+                legados = guild_data.get("cargos_legados")
+                if not isinstance(legados, list):
+                    legados = []
+                if str(cargo_anterior).isdigit() and int(cargo_anterior) not in legados:
+                    legados.append(int(cargo_anterior))
+                guild_data["cargos_legados"] = legados[-100:]
             cargos[str(rank_no)] = cargo.id
             await self._salvar_dados(dados)
         await interaction.response.send_message(
