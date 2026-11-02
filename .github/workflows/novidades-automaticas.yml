@@ -28,7 +28,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11.9"
 
       - name: Gerar manifesto de atualização
         env:
@@ -46,4 +46,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add config/novidades.json
           git commit -m "chore(releases): publicar notas automáticas da NÊMESIS"
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
