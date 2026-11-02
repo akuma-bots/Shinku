@@ -33,6 +33,14 @@ CATEGORIAS = {
     "administracao": ("🏛️・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
     "seguranca": ("🚨・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
     "formularios": ("📋・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
+    "progressao": ("📈・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
+    "missoes": ("🎯・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
+    "competicoes": ("⚔️・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
+    "eventos": ("🏆・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
+    "parcerias": ("🤝・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
+    "integracoes": ("🔗・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
+    "infraestrutura": ("🖥️・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
+    "configuracoes": ("⚙️・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
 }
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 
