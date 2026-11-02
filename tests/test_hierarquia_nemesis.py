@@ -43,7 +43,7 @@ class TestHierarquiaNemesis(unittest.TestCase):
 
     def test_hierarquia_impede_acao_contra_cargo_igual_ou_superior(self):
         veterano_id = 1563995879998754938
-        elite_id = 1563995879998754937
+        elite_id = 1563995879995874937
         comandante_id = 1563995879998754940
         autor = FakeMember([veterano_id], user_id=1)
         alvo_inferior = FakeMember([elite_id], user_id=2)
@@ -57,7 +57,7 @@ class TestHierarquiaNemesis(unittest.TestCase):
     def test_nao_pode_atribuir_cargo_acima_da_propria_autoridade(self):
         veterano_id = 1563995879998754938
         comandante_id = 1563995879998754940
-        elite_id = 1563995879998754937
+        elite_id = 1563995879995874937
         autor = FakeMember([veterano_id], user_id=1)
         cargo_comandante = SimpleNamespace(id=comandante_id, position=30)
         cargo_elite = SimpleNamespace(id=elite_id, position=10)
@@ -73,7 +73,7 @@ class TestHierarquiaNemesis(unittest.TestCase):
         self.assertTrue(guild_config.membro_pode_revisar_categoria(membro, "missao"))
 
     def test_cargos_acima_de_elite_podem_executar_acoes_hierarquicas(self):
-        elite = self._member([1563995879998754937])
+        elite = self._member([1563995879995874937])
         self.assertFalse(guild_config.membro_pode_promover_rebaixar_banir(elite))
         for role_id in guild_config.CARGOS_ACIMA_ELITE_IDS:
             with self.subTest(role_id=role_id):
