@@ -45,9 +45,9 @@ class TestHierarquiaNemesis(unittest.TestCase):
         veterano_id = 1563995879998754938
         elite_id = 1563995879998754937
         comandante_id = 1563995879998754940
-        autor = self._member([veterano_id])
-        alvo_inferior = self._member([elite_id])
-        alvo_superior = self._member([comandante_id])
+        autor = FakeMember([veterano_id], user_id=1)
+        alvo_inferior = FakeMember([elite_id], user_id=2)
+        alvo_superior = FakeMember([comandante_id], user_id=3)
         autor.roles[0].position = 20
         alvo_inferior.roles[0].position = 10
         alvo_superior.roles[0].position = 30
@@ -58,6 +58,7 @@ class TestHierarquiaNemesis(unittest.TestCase):
         membro = self._member([guild_config.CARGO_OCTOGONO_ID])
         self.assertTrue(guild_config.membro_tem_lideranca(membro))
         self.assertTrue(guild_config.membro_tem_octogono(membro))
+        self.assertTrue(guild_config.membro_pode_promover_rebaixar_banir(membro))
         self.assertTrue(guild_config.membro_pode_revisar_categoria(membro, "missao"))
 
     def test_cargos_acima_de_elite_podem_executar_acoes_hierarquicas(self):
