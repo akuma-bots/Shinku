@@ -703,7 +703,7 @@ class Parcerias(commands.Cog):
             f"**Parceria:** {alvo.get('nome', nome)}\n"
             f"**Responsável pela remoção:** {interaction.user.mention} (ID: {interaction.user.id})\n"
             f"**Criada por:** <@{alvo.get('criado_por_id')}>\n"
-            f"**Status:** Inativa\\n"
+            f"**Status:** Inativa\n"
             f"**Cargo:** {'Removido' if cargo_id and not erro_cargo else 'Falha ao remover' if erro_cargo else 'Não havia cargo vinculado'}"
         )
         await registrar_global(
