@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.guild_config import lideranca_only
+from utils.guild_config import lideranca_only, hierarquia_only, membro_pode_gerenciar_membro
 
 from utils.apresentacao import criar_embed
 from utils.storage import carregar
@@ -379,8 +379,14 @@ class Perfil(commands.Cog):
 
     @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
     @app_commands.describe(membro="Quem promover", patente="Nome exato da patente configurada")
-    @lideranca_only()
+    @hierarquia_only()
     async def patente_promover(self, interaction: discord.Interaction, membro: discord.Member, patente: str):
+        if not membro_pode_gerenciar_membro(interaction.user, membro):
+            await interaction.response.send_message(
+                "Você só pode alterar a patente de membros abaixo da sua posição hierárquica.",
+                ephemeral=True,
+            )
+            return
         patentes = await get_patentes(interaction.guild.id)
         alvo = next((p for p in patentes if p["nome"].lower() == patente.lower()), None)
         if not alvo:
