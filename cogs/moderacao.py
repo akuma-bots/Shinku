@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils.punicoes import historico_punicoes
+from utils.guild_config import hierarquia_only, membro_pode_gerenciar_membro
 
 
 CANAL_REGRAS_ID = 1563995880833421508
@@ -157,6 +158,64 @@ class Moderacao(commands.Cog):
             f"🧹 **/clear** — {interaction.user.mention} apagou "
             f"**{len(apagadas)}** mensagens em {canal.mention} "
             f"(limite solicitado: {quantidade})."
+        )
+
+    @app_commands.command(
+        name="banir",
+        description="Bane um membro abaixo da sua posição hierárquica."
+    )
+    @app_commands.describe(
+        membro="Membro que será banido",
+        motivo="Motivo do banimento para o registro de auditoria",
+    )
+    @hierarquia_only()
+    @app_commands.checks.bot_has_permissions(ban_members=True)
+    async def banir(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+        motivo: app_commands.Range[str, 5, 500],
+    ):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        if membro.id == interaction.guild.owner_id or membro.bot:
+            await interaction.response.send_message("Este membro não pode ser banido por este comando.", ephemeral=True)
+            return
+        if not membro_pode_gerenciar_membro(interaction.user, membro):
+            await interaction.response.send_message(
+                "A ação foi bloqueada: o alvo possui cargo igual ou superior ao seu, ou está fora da hierarquia autorizada.",
+                ephemeral=True,
+            )
+            return
+        motivo_seguro = discord.utils.escape_markdown(motivo.strip())[:500]
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await interaction.guild.ban(
+                membro,
+                reason=f"Banimento hierárquico por {interaction.user} ({interaction.user.id}): {motivo_seguro}",
+                delete_message_seconds=0,
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                "O Discord recusou o banimento. Verifique a permissão Banir membros e a hierarquia do cargo do bot.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException:
+            logging.exception("Falha ao banir membro por comando hierárquico.")
+            await interaction.followup.send(
+                "O Discord não concluiu o banimento. Confira o histórico de auditoria antes de repetir.",
+                ephemeral=True,
+            )
+            return
+        await self._log(
+            interaction,
+            f"🔨 **/banir** — {interaction.user.mention} baniu {membro.mention}. Motivo: {motivo_seguro}",
+        )
+        await interaction.followup.send(
+            f"Banimento aplicado a **{discord.utils.escape_markdown(membro.display_name)}**. O histórico de mensagens não foi apagado.",
+            ephemeral=True,
         )
 
     @app_commands.command(
