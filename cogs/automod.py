@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, COR_PRIMARIA, COR_AVISO, COR_ERRO, COR_SUCESSO
 import asyncio
 import datetime
 import re
@@ -1556,7 +1556,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"**Mensagem:** "
                 f"{discord.utils.escape_markdown(message.content[:700] or '[sem texto]')}"
             ),
-            color=discord.Color.orange(),
+            color=COR_AVISO,
             timestamp=datetime.datetime.now(
                 datetime.timezone.utc
             ),
@@ -1738,7 +1738,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"**Canal:** <#{message.channel.id}>\n"
                 f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
             ),
-            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            color=COR_ERRO if nivel >= 3 else COR_AVISO,
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         try:
@@ -1771,7 +1771,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"**Medida:** {nomes[medida]}\n**Responsável:** Sistema AutoMod\n"
                 f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
             ),
-            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            color=COR_ERRO if nivel >= 3 else COR_AVISO,
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         await self.enviar_auditoria(guild, auditoria)
@@ -1788,7 +1788,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 "A ação foi detectada, mas o Discord recusou a punição. "
                 "Verifique as permissões e a hierarquia de cargos."
             ),
-            color=discord.Color.orange(),
+            color=COR_AVISO,
         )
         try:
             await registrar_global(
@@ -1886,7 +1886,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             ),
             inline=False,
         )
-        embed.color = discord.Color.red() if nivel >= 3 else discord.Color.gold()
+        embed.color = COR_ERRO if nivel >= 3 else COR_AVISO
         await mensagem.edit(embed=embed, view=None)
 
         try:
@@ -1908,7 +1908,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}\n"
                 f"**Registro:** [Abrir infração]({mensagem.jump_url})"
             ),
-            color=discord.Color.red() if nivel >= 3 else discord.Color.gold(),
+            color=COR_ERRO if nivel >= 3 else COR_AVISO,
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         await self.enviar_auditoria(guild, log)
@@ -1929,7 +1929,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             ),
             inline=False,
         )
-        embed.color = discord.Color.green()
+        embed.color = COR_SUCESSO
         await mensagem.edit(embed=embed, view=None)
         log = criar_embed(
             title="🛡️ Auditoria — AutoMod",
@@ -1939,7 +1939,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"**Motivo:** {discord.utils.escape_markdown(motivo[:700])}\n"
                 f"**Registro:** [Abrir infração]({mensagem.jump_url})"
             ),
-            color=discord.Color.green(),
+            color=COR_SUCESSO,
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         await self.enviar_auditoria(guild, log)
@@ -2243,7 +2243,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 uid = str(r.get("membro_id"))
                 reincidentes[uid] = reincidentes.get(uid, 0) + 1
         repetidos = sum(1 for total in reincidentes.values() if total >= 2)
-        embed = criar_embed(title="📊 NÊMESIS — Estatísticas da moderação", color=discord.Color.blurple())
+        embed = criar_embed(title="📊 NÊMESIS — Estatísticas da moderação", color=COR_PRIMARIA)
         embed.add_field(name="Últimos 7 dias", value=f"Decisões: **{len(ultimos_7)}**", inline=True)
         embed.add_field(name="Últimos 30 dias", value=f"Decisões: **{len(ultimos_30)}**", inline=True)
         embed.add_field(name="Punições / Não punidos", value=f"**{punidos}** / **{nao_punidos}**", inline=True)
@@ -2305,7 +2305,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         embed = criar_embed(
             title="📋 Histórico AutoMod",
             description=f"**Membro:** {membro.mention}\n**Decisões registradas:** {len([x for x in decisoes.get(str(interaction.guild.id), []) if int(x.get('membro_id', 0)) == membro.id])}",
-            color=discord.Color.blurple(),
+            color=COR_PRIMARIA,
         )
         if not registros:
             embed.add_field(name="Histórico", value="Nenhuma decisão registrada pelo novo sistema.", inline=False)
@@ -2364,7 +2364,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 f"Fonte: <#{CANAL_REGRAS_ID}>\n"
                 f"Seções: **{len(regras)}**"
             ),
-            color=discord.Color.blurple(),
+            color=COR_PRIMARIA,
         )
 
         for numero, regra in list(
@@ -2455,7 +2455,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         embed = criar_embed(
             title="⚙️ AutoMod — Status",
-            color=discord.Color.green(),
+            color=COR_SUCESSO,
         )
 
         embed.add_field(
