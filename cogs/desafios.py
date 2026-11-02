@@ -389,7 +389,7 @@ class Desafios(commands.Cog):
                     await desafios.transicionar_status(interaction.guild.id, desafio_id, "processando_aceite", "recusado")
                     await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
                     embed = interaction.message.embeds[0]
-                    embed.color = 0x99AAB5
+                    embed.color = COR_NEUTRA
                     embed.add_field(name="🚫 Cancelado", value=f"{interaction.user.mention} não tem XP suficiente pra cobrir a aposta.", inline=False)
                     await interaction.message.edit(embed=embed, view=None)
                     await interaction.followup.send(
@@ -407,7 +407,7 @@ class Desafios(commands.Cog):
                 await interaction.followup.send("Não foi possível confirmar o aceite; a aposta foi devolvida se havia sido debitada.", ephemeral=True)
                 return
             embed = interaction.message.embeds[0]
-            embed.color = 0x57F287
+            embed.color = COR_SUCESSO
             embed.add_field(name="✅ Aceito!", value="A luta pode acontecer agora.", inline=False)
             await interaction.message.edit(embed=embed, view=None)
             await interaction.followup.send(
@@ -443,7 +443,7 @@ class Desafios(commands.Cog):
             if desafio["aposta_xp"] > 0:
                 await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
             embed = interaction.message.embeds[0]
-            embed.color = 0x99AAB5
+            embed.color = COR_NEUTRA
             embed.add_field(name="🚫 Recusado", value="O desafio foi recusado.", inline=False)
             await interaction.message.edit(embed=embed, view=None)
             await interaction.followup.send(
