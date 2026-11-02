@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import octogono_only
+from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +34,11 @@ RANKS = [
     {"no": 3, "nome": "Vice Capitão", "xp": 41000},
     {"no": 2, "nome": "Capitão", "xp": 54000},
     {"no": 1, "nome": "Capitão Geral", "xp": 70000},
+]
+
+RANK_CHOICES = [
+    app_commands.Choice(name=f"No. {rank['no']:02d} — {rank['nome']}", value=str(rank["no"]))
+    for rank in RANKS
 ]
 
 
@@ -234,25 +239,78 @@ class ProgressaoGangue(commands.Cog):
         guild.setdefault("cargos", {})
         return guild
 
-    async def _aplicar_cargo_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict):
+    async def _aplicar_cargo_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict) -> bool:
         config = await self._config(guild.id)
         cargos = config.get("cargos", {})
         cargo_alvo_id = cargos.get(str(rank["no"]))
         # Não mexe nos cargos atuais enquanto este rank não tiver cargo configurado.
         if not cargo_alvo_id:
-            return
-        ids_progressao = {int(cid) for cid in cargos.values() if str(cid).isdigit()}
-        remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != int(cargo_alvo_id)]
+            return True
         adicionar = guild.get_role(int(cargo_alvo_id))
+        if adicionar is None:
+            log.error("Cargo configurado para o rank %s não existe mais: %s", rank["nome"], cargo_alvo_id)
+            return False
+        ids_progressao = {int(cid) for cid in cargos.values() if str(cid).isdigit()}
+        remover = [cargo for cargo in membro.roles if cargo.id in ids_progressao and cargo.id != adicionar.id]
+        cargo_adicionado = False
         try:
+            # Adiciona o novo cargo antes de remover o anterior para evitar
+            # deixar o membro sem rank caso a atribuição seja recusada.
+            if adicionar not in membro.roles:
+                await membro.add_roles(adicionar, reason="Atualização da progressão da NÊMESIS")
+                cargo_adicionado = True
             if remover:
-                await membro.remove_roles(*remover, reason="Atualização automática da progressão da NÊMESIS")
-            if adicionar and adicionar not in membro.roles:
-                await membro.add_roles(adicionar, reason="Rank alcançado na progressão da NÊMESIS")
-        except discord.Forbidden:
-            log.warning("Sem hierarquia/permissão para atualizar cargo de progressão do membro %s.", membro.id)
-        except discord.HTTPException:
+                await membro.remove_roles(*remover, reason="Atualização da progressão da NÊMESIS")
+            return True
+        except (discord.Forbidden, discord.HTTPException):
+            if cargo_adicionado:
+                try:
+                    await membro.remove_roles(adicionar, reason="Reversão após falha na atualização de rank")
+                except (discord.Forbidden, discord.HTTPException):
+                    log.exception("Falha ao reverter o novo cargo de rank do membro %s.", membro.id)
             log.exception("Falha ao atualizar cargo de progressão do membro %s.", membro.id)
+            return False
+
+    async def _definir_rank_atomico(
+        self,
+        guild_id: int,
+        user_id: int,
+        novo_xp: int,
+        *,
+        responsavel_id: int,
+        motivo: str,
+        acao: str,
+    ) -> tuple[dict, dict, dict]:
+        async with self._lock:
+            dados = await self._dados()
+            guild = dados.setdefault(str(guild_id), {})
+            membros = guild.setdefault("membros", {})
+            perfil = membros.setdefault(str(user_id), {
+                "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
+                "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
+            })
+            xp_anterior = max(0, int(perfil.get("xp", 0) or 0))
+            rank_anterior = rank_por_xp(xp_anterior)
+            perfil["xp"] = max(0, int(novo_xp))
+            rank_novo = rank_por_xp(perfil["xp"])
+            perfil["rank_no"] = rank_novo["no"]
+            historico = perfil.get("historico_ranks", [])
+            if not isinstance(historico, list):
+                historico = []
+            historico.append({
+                "acao": acao,
+                "de": rank_anterior["nome"],
+                "para": rank_novo["nome"],
+                "xp_anterior": xp_anterior,
+                "xp_novo": perfil["xp"],
+                "responsavel_id": str(responsavel_id),
+                "motivo": str(motivo)[:300],
+                "timestamp": int(time.time()),
+            })
+            perfil["historico_ranks"] = historico[-200:]
+            membros[str(user_id)] = perfil
+            await self._salvar_dados(dados)
+            return dict(perfil), rank_anterior, rank_novo
 
     async def _anunciar_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict, xp: int):
         canal = guild.get_channel(CANAL_PROGRESSAO_ID)
@@ -561,6 +619,176 @@ class ProgressaoGangue(commands.Cog):
                 )
             except (discord.Forbidden, discord.HTTPException):
                 log.warning("Transferência salva, mas não foi possível publicar o registro bancário.")
+
+    @app_commands.command(name="gangue-configurar-cargo", description="Vincula um cargo do Discord a um rank de progressão.")
+    @app_commands.describe(rank="Rank que receberá o cargo", cargo="Cargo que será atribuído ao alcançar o rank")
+    @app_commands.choices(rank=RANK_CHOICES)
+    @octogono_only()
+    async def gangue_configurar_cargo(
+        self,
+        interaction: discord.Interaction,
+        rank: app_commands.Choice[str],
+        cargo: discord.Role,
+    ):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        bot_member = interaction.guild.me
+        if bot_member is None or cargo >= bot_member.top_role or cargo.managed:
+            await interaction.response.send_message(
+                "O cargo escolhido precisa estar abaixo do cargo mais alto do bot e não pode ser gerenciado por integração.",
+                ephemeral=True,
+            )
+            return
+        rank_no = int(rank.value)
+        async with self._lock:
+            dados = await self._dados()
+            guild_data = dados.setdefault(str(interaction.guild.id), {})
+            cargos = guild_data.setdefault("cargos", {})
+            duplicado = next(
+                (numero for numero, cargo_id in cargos.items()
+                 if str(cargo_id) == str(cargo.id) and str(numero) != str(rank_no)),
+                None,
+            )
+            if duplicado is not None:
+                await interaction.response.send_message(
+                    "Esse cargo já está vinculado a outro rank. Remova ou altere o vínculo anterior antes de reutilizá-lo.",
+                    ephemeral=True,
+                )
+                return
+            cargos[str(rank_no)] = cargo.id
+            await self._salvar_dados(dados)
+        await interaction.response.send_message(
+            f"Vínculo salvo: No. {rank_no:02d} — {rank.name} → {cargo.mention}.",
+            ephemeral=True,
+        )
+
+    async def _ajustar_rank_manual(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+        rank: app_commands.Choice[str],
+        motivo: str,
+        acao: str,
+    ):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
+            return
+        if membro.bot or membro.id == interaction.guild.owner_id:
+            await interaction.response.send_message("Este membro não pode receber uma alteração manual de rank.", ephemeral=True)
+            return
+        if not membro_pode_gerenciar_membro(interaction.user, membro):
+            await interaction.response.send_message(
+                "Você só pode alterar o rank de membros abaixo da sua posição hierárquica.",
+                ephemeral=True,
+            )
+            return
+        if len(motivo.strip()) < 5 or len(motivo) > 300:
+            await interaction.response.send_message("Informe um motivo entre 5 e 300 caracteres.", ephemeral=True)
+            return
+
+        rank_alvo = next((item for item in RANKS if item["no"] == int(rank.value)), None)
+        if rank_alvo is None:
+            await interaction.response.send_message("Rank inválido.", ephemeral=True)
+            return
+        config = await self._config(interaction.guild.id)
+        cargo_id = config.get("cargos", {}).get(str(rank_alvo["no"]))
+        cargo_alvo = interaction.guild.get_role(int(cargo_id)) if cargo_id else None
+        if cargo_alvo is None:
+            await interaction.response.send_message(
+                f"O cargo do rank {rank_alvo['nome']} ainda não está configurado. O OCTÓGONO deve usar /gangue-configurar-cargo antes da alteração.",
+                ephemeral=True,
+            )
+            return
+        bot_member = interaction.guild.me
+        maior_cargo_alvo = max(membro.roles, key=lambda item: item.position, default=None)
+        if bot_member is None or (maior_cargo_alvo and bot_member.top_role <= maior_cargo_alvo):
+            await interaction.response.send_message(
+                "O cargo do bot precisa estar acima dos cargos do membro para executar a alteração com segurança.",
+                ephemeral=True,
+            )
+            return
+
+        perfil_atual = await self._perfil(interaction.guild.id, membro.id)
+        xp_atual = max(0, int(perfil_atual.get("xp", 0) or 0))
+        rank_atual = rank_por_xp(xp_atual)
+        if acao == "Promoção" and rank_alvo["no"] >= rank_atual["no"]:
+            await interaction.response.send_message("O rank escolhido não é superior ao rank atual.", ephemeral=True)
+            return
+        if acao == "Rebaixamento" and rank_alvo["no"] <= rank_atual["no"]:
+            await interaction.response.send_message("O rank escolhido não é inferior ao rank atual.", ephemeral=True)
+            return
+
+        xp_novo = max(xp_atual, int(rank_alvo["xp"])) if acao == "Promoção" else int(rank_alvo["xp"])
+        perfil, rank_anterior, rank_novo = await self._definir_rank_atomico(
+            interaction.guild.id,
+            membro.id,
+            xp_novo,
+            responsavel_id=interaction.user.id,
+            motivo=motivo.strip(),
+            acao=acao,
+        )
+        aplicado = await self._aplicar_cargo_rank(interaction.guild, membro, rank_novo)
+        if not aplicado:
+            await self._definir_rank_atomico(
+                interaction.guild.id,
+                membro.id,
+                xp_atual,
+                responsavel_id=interaction.user.id,
+                motivo="Reversão automática: o Discord não aceitou a atualização do cargo.",
+                acao="Reversão",
+            )
+            await interaction.response.send_message(
+                "A alteração foi revertida porque o Discord não aceitou a troca do cargo. Nenhum rank ficou parcialmente aplicado.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            from utils.registro_global import registrar
+            await registrar(
+                interaction.guild,
+                "progressao",
+                f"{acao} manual de rank",
+                f"**Membro:** {membro.mention}\n**Responsável:** {interaction.user.mention}\n"
+                f"**Rank anterior:** {rank_anterior['nome']}\n**Novo rank:** {rank_novo['nome']}\n"
+                f"**XP anterior:** {xp_atual:,}\n**XP atual:** {int(perfil['xp']):,}\n"
+                f"**Motivo:** {discord.utils.escape_markdown(motivo.strip())}".replace(",", "."),
+                cor=0x9F1239,
+            )
+        except Exception:
+            log.exception("Não foi possível registrar a alteração manual de rank no Registro Global.")
+        await interaction.response.send_message(
+            f"{acao} concluída. {membro.mention}: {rank_anterior['nome']} → {rank_novo['nome']} · "
+            f"{int(perfil['xp']):,} XP".replace(",", "."),
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="gangue-promover", description="Promove um membro para um rank superior da NÊMESIS.")
+    @app_commands.describe(membro="Membro que será promovido", rank="Novo rank", motivo="Justificativa da promoção")
+    @app_commands.choices(rank=RANK_CHOICES)
+    @hierarquia_only()
+    async def gangue_promover(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+        rank: app_commands.Choice[str],
+        motivo: app_commands.Range[str, 5, 300],
+    ):
+        await self._ajustar_rank_manual(interaction, membro, rank, motivo, "Promoção")
+
+    @app_commands.command(name="gangue-rebaixar", description="Rebaixa um membro para um rank inferior da NÊMESIS.")
+    @app_commands.describe(membro="Membro que será rebaixado", rank="Novo rank", motivo="Justificativa do rebaixamento")
+    @app_commands.choices(rank=RANK_CHOICES)
+    @hierarquia_only()
+    async def gangue_rebaixar(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+        rank: app_commands.Choice[str],
+        motivo: app_commands.Range[str, 5, 300],
+    ):
+        await self._ajustar_rank_manual(interaction, membro, rank, motivo, "Rebaixamento")
 
     @app_commands.command(name="gangue-registrar-atividade", description="Registra missão, contribuição ou guerra concluída para a progressão.")
     @app_commands.describe(membro="Membro reconhecido", atividade="Tipo de atividade", quantidade="XP de recompensa", motivo="Prova ou motivo do registro")
