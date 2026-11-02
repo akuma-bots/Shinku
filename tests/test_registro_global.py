@@ -104,7 +104,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         canonico.locked = False
         forum.threads = [canonico]
         forum.guild.get_thread.return_value = legado
-        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \\
+        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
         self.assertIs(resultado, canonico)
