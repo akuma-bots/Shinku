@@ -113,7 +113,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(thread.edit.await_args.kwargs["name"], registro_global.CATEGORIAS["mensagens"][0])
         self.assertFalse(thread.edit.await_args.kwargs["archived"])
         self.assertFalse(thread.edit.await_args.kwargs["locked"])
-        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 789)
+        salvar.assert_not_awaited()
 
 
 if __name__ == "__main__":
