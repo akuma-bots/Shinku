@@ -106,7 +106,7 @@ class ProgressaoGangue(commands.Cog):
             if not isinstance(perfil, dict):
                 perfil = {
                     "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
-                    "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+                    "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
                 }
                 membros[chave_usuario] = perfil
                 mudou = True
@@ -116,7 +116,7 @@ class ProgressaoGangue(commands.Cog):
                 "mensagens": 0,
                 "missoes": 0,
                 "guerras": 0,
-                "rank_no": 10,
+                "rank_no": 12,
                 "ultimo_xp": 0,
                 "historico_ranks": [],
             }
@@ -154,13 +154,13 @@ class ProgressaoGangue(commands.Cog):
             membros = guild.setdefault("membros", {})
             perfil = membros.setdefault(str(user_id), {
                 "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
-                "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+                "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
             })
             perfil.setdefault("xp", 0)
             perfil.setdefault("mensagens", 0)
             perfil.setdefault("missoes", 0)
             perfil.setdefault("guerras", 0)
-            perfil.setdefault("rank_no", 10)
+            perfil.setdefault("rank_no", 12)
             perfil.setdefault("eventos_recompensa", [])
             eventos = perfil["eventos_recompensa"]
             if evento_id and evento_id in eventos:
@@ -198,13 +198,13 @@ class ProgressaoGangue(commands.Cog):
             def obter(uid: int) -> dict:
                 perfil = membros.setdefault(str(uid), {
                     "xp": 0, "mensagens": 0, "missoes": 0, "guerras": 0,
-                    "rank_no": 10, "ultimo_xp": 0, "historico_ranks": [],
+                    "rank_no": 12, "ultimo_xp": 0, "historico_ranks": [],
                 })
                 perfil.setdefault("xp", 0)
                 perfil.setdefault("mensagens", 0)
                 perfil.setdefault("missoes", 0)
                 perfil.setdefault("guerras", 0)
-                perfil.setdefault("rank_no", 10)
+                perfil.setdefault("rank_no", 12)
                 perfil.setdefault("ultimo_xp", 0)
                 perfil.setdefault("historico_ranks", [])
                 return perfil
