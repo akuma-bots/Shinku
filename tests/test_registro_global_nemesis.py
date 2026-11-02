@@ -21,6 +21,14 @@ class TestRegistroGlobalNemesis(unittest.TestCase):
         nomes = [nome for nome, _descricao in CATEGORIAS.values()]
         self.assertEqual(len(nomes), len(set(nomes)))
 
+    def test_topicos_novos_sao_identificados_com_versao_e_numero(self):
+        nomes = [nome for nome, _descricao in CATEGORIAS.values()]
+        self.assertEqual(len(nomes), 29)
+        for numero, nome in enumerate(nomes, start=1):
+            with self.subTest(topico=nome):
+                self.assertTrue(nome.startswith("🆕 NÊMESIS V2・"))
+                self.assertIn(f"・{numero:02d}・", nome)
+
     def test_todas_as_categorias_possuem_descricao(self):
         for chave, valor in CATEGORIAS.items():
             with self.subTest(categoria=chave):
