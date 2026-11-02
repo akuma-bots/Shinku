@@ -206,6 +206,9 @@ async def _obter_topico(
             topicos_existentes.append(thread)
         await _salvar_id(forum.guild.id, categoria, thread.id)
         _LOG.info("Tópico permanente criado: %s (%s)", nome, thread.id)
+        # A criação de threads usa a mesma rota do Fórum; espaçar as operações
+        # evita rajadas de 429 durante a primeira sincronização de 29 destinos.
+        await asyncio.sleep(1.1)
         return thread
 
 
@@ -345,10 +348,9 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
         thread = await _obter_topico(canal, categoria, topicos_existentes)
         resultado[categoria] = thread.id
 
-    # O Fórum é dedicado ao Registro Global. Depois de garantir todos os destinos
-    # canônicos, aposenta tópicos antigos/duplicados sem apagar suas mensagens.
-    # Assim o histórico legado continua consultável, mas deixa de competir com
-    # a nova organização. Nunca arquiva um dos tópicos apontados pelo mapa atual.
+    # Após a reconstrução V3, o Fórum deve conter apenas os destinos canônicos.
+    # Em sincronizações normais, tópicos extras são arquivados/bloqueados sem
+    # interferir nos 29 destinos oficiais.
     canonicos = set(resultado.values())
     aposentados = 0
     legados: dict[int, discord.Thread] = {
