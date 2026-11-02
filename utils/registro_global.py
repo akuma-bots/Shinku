@@ -25,35 +25,35 @@ CARGOS_ACESSO_IDS = {
 }
 
 CATEGORIAS = {
-    "mensagens": ("📝・Mensagens", "Exclusões, edições e remoções em massa de mensagens."),
-    "atendimento": ("🎫・Atendimento", "Abertura, atribuição, encerramento, avaliações e transcrições de tickets."),
-    "moderacao": ("🛡️・Moderação", "Advertências, timeouts, expulsões, banimentos e ações da equipe."),
-    "membros": ("👥・Membros", "Entradas, saídas, alterações de cargos e dados de membros."),
-    "sistemas": ("⚙️・Sistemas", "Missões, contribuições, temporadas, rankings, guerras e eventos operacionais."),
-    "administracao": ("🏛️・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
-    "seguranca": ("🚨・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
-    "formularios": ("📋・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
-    "progressao": ("📈・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
-    "missoes": ("🎯・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
-    "competicoes": ("⚔️・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
-    "eventos": ("🏆・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
-    "parcerias": ("🤝・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
-    "integracoes": ("🔗・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
-    "infraestrutura": ("🖥️・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
-    "configuracoes": ("⚙️・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
-    "entradas": ("📥・Histórico de Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
-    "historico_membros": ("🧾・Histórico dos Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
-    "cargos": ("🎖️・Histórico de Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
-    "convites": ("🔗・Histórico de Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
-    "voz": ("🎙️・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
-    "anexos": ("📎・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
-    "atividade": ("📊・Atividade dos Membros", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
-    "conquistas": ("🏅・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
-    "sorteios": ("🎁・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
-    "sugestoes": ("💡・Sugestões e Votações", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
-    "relatorios": ("📑・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
-    "roblox": ("🧩・Integração Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
-    "automod": ("🤖・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
+    "mensagens": ("🆕 NÊMESIS V2・01・Mensagens", "Exclusões, edições e remoções em massa de mensagens."),
+    "atendimento": ("🆕 NÊMESIS V2・02・Atendimento", "Abertura, atribuição, encerramento, avaliações e transcrições de tickets."),
+    "moderacao": ("🆕 NÊMESIS V2・03・Moderação", "Advertências, timeouts, expulsões, banimentos e ações da equipe."),
+    "membros": ("🆕 NÊMESIS V2・04・Membros", "Entradas, saídas, alterações de cargos e dados de membros."),
+    "sistemas": ("🆕 NÊMESIS V2・05・Sistemas", "Missões, contribuições, temporadas, rankings, guerras e eventos operacionais."),
+    "administracao": ("🆕 NÊMESIS V2・06・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
+    "seguranca": ("🆕 NÊMESIS V2・07・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
+    "formularios": ("🆕 NÊMESIS V2・08・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
+    "progressao": ("🆕 NÊMESIS V2・09・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
+    "missoes": ("🆕 NÊMESIS V2・10・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
+    "competicoes": ("🆕 NÊMESIS V2・11・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
+    "eventos": ("🆕 NÊMESIS V2・12・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
+    "parcerias": ("🆕 NÊMESIS V2・13・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
+    "integracoes": ("🆕 NÊMESIS V2・14・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
+    "infraestrutura": ("🆕 NÊMESIS V2・15・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
+    "configuracoes": ("🆕 NÊMESIS V2・16・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
+    "entradas": ("🆕 NÊMESIS V2・17・Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
+    "historico_membros": ("🆕 NÊMESIS V2・18・Histórico Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
+    "cargos": ("🆕 NÊMESIS V2・19・Histórico Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
+    "convites": ("🆕 NÊMESIS V2・20・Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
+    "voz": ("🆕 NÊMESIS V2・21・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
+    "anexos": ("🆕 NÊMESIS V2・22・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
+    "atividade": ("🆕 NÊMESIS V2・23・Atividade", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
+    "conquistas": ("🆕 NÊMESIS V2・24・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
+    "sorteios": ("🆕 NÊMESIS V2・25・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
+    "sugestoes": ("🆕 NÊMESIS V2・26・Sugestões", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
+    "relatorios": ("🆕 NÊMESIS V2・27・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
+    "roblox": ("🆕 NÊMESIS V2・28・Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
+    "automod": ("🆕 NÊMESIS V2・29・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
 }
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 
@@ -170,13 +170,13 @@ async def _obter_topico(
 
         inicial = discord.Embed(
             title=nome,
-            description=(f"**REGISTRO PERMANENTE — NÊMESIS**\n\n{descricao}\n\n"
+            description=(f"**REGISTRO PERMANENTE — NÊMESIS V2**\n\n{descricao}\n\n"
                          "As ocorrências desta área serão adicionadas aqui em sequência. "
                          "Este tópico é fixo; não será criado um tópico por evento."),
             color=0xB3132B,
             timestamp=datetime.now(timezone.utc),
         )
-        inicial.set_footer(text="NÊMESIS • Registro Global")
+        inicial.set_footer(text="NÊMESIS • REGISTRO GLOBAL V2")
         criado = await forum.create_thread(
             name=nome,
             embed=inicial,
