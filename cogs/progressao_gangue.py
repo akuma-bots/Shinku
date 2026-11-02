@@ -264,7 +264,7 @@ class ProgressaoGangue(commands.Cog):
                 guild["cargos"] = cargos
             alterado = False
             for rank_no, cargo_id in CARGOS_PROGRESSAO_PADRAO.items():
-                if rank_no not in cargos:
+                if not str(cargos.get(rank_no, "")).isdigit():
                     cargos[rank_no] = cargo_id
                     alterado = True
             if alterado:
@@ -278,6 +278,9 @@ class ProgressaoGangue(commands.Cog):
         # Não mexe nos cargos atuais enquanto este rank não tiver cargo configurado.
         if not cargo_alvo_id:
             return True
+        if not str(cargo_alvo_id).isdigit():
+            log.error("ID inválido configurado para o rank %s: %r", rank["nome"], cargo_alvo_id)
+            return False
         adicionar = guild.get_role(int(cargo_alvo_id))
         if adicionar is None:
             log.error("Cargo configurado para o rank %s não existe mais: %s", rank["nome"], cargo_alvo_id)
@@ -705,7 +708,8 @@ class ProgressaoGangue(commands.Cog):
                 cargos = {}
                 guild_data["cargos"] = cargos
             for numero, cargo_padrao in CARGOS_PROGRESSAO_PADRAO.items():
-                cargos.setdefault(numero, cargo_padrao)
+                if not str(cargos.get(numero, "")).isdigit():
+                    cargos[numero] = cargo_padrao
             duplicado = next(
                 (numero for numero, cargo_id in cargos.items()
                  if str(cargo_id) == str(cargo.id) and str(numero) != str(rank_no)),
