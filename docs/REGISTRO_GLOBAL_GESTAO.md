@@ -1,6 +1,6 @@
 # Registro Global de Gestão — NÊMESIS
 
-O Fórum `1566579335966498926` mantém tópicos permanentes. O Shinku reutiliza os tópicos pelo ID persistido e, se necessário, procura tópicos ativos e arquivados antes de criar outro. Cada ocorrência é uma mensagem dentro do tópico correspondente; não se cria um tópico por evento.
+O Fórum `1566579335966498926` mantém 29 tópicos permanentes da geração **V2**. Todos têm o prefixo `🆕 NÊMESIS V2` e numeração `01` a `29`, tornando-os fáceis de distinguir dos antigos. O Shinku cria tópicos V2 novos, salva seus IDs e aposenta os tópicos antigos/duplicados arquivando-os e bloqueando-os, sem apagar mensagens históricas. Cada ocorrência é uma mensagem dentro do tópico correspondente; não se cria um tópico por evento.
 
 ## Áreas de registro
 
@@ -34,6 +34,13 @@ O Fórum `1566579335966498926` mantém tópicos permanentes. O Shinku reutiliza 
 | Configurações | Parâmetros e ajustes operacionais |
 | Administração | Permissões, estrutura e decisões administrativas |
 | Sistemas | Compatibilidade para registros legados ainda não migrados |
+
+## Identificação e organização V2
+
+- O prefixo `🆕 NÊMESIS V2` identifica exclusivamente a estrutura atual.
+- O número de dois dígitos indica a ordem fixa do tópico e facilita a localização no celular.
+- Tópicos sem o prefixo V2 são legados; após a sincronização ficam arquivados e bloqueados, preservando o histórico.
+- Não excluir tópicos antigos automaticamente: mensagens e evidências históricas permanecem consultáveis.
 
 ## Regras de integridade
 
