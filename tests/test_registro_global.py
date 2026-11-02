@@ -98,6 +98,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         thread.name = "📌・Registros Antigos"
         thread.archived = True
         thread.locked = True
+        thread.edit = AsyncMock()
         forum.threads = []
         async def sem_arquivados(limit=None):
             if False:
