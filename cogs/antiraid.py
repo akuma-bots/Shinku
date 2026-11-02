@@ -93,6 +93,19 @@ class AntiRaid(commands.Cog):
             f"🛡️ **Revisão recomendada:** <@{member.id}> (ID: `{member.id}`) entrou durante um pico suspeito e a conta tem menos de {IDADE_MINIMA_CONTA_HORAS}h. Nenhuma punição automática foi aplicada; a equipe deve verificar o contexto.",
             mencionar_suporte=True,
         )
+        from utils.registro_global import registrar
+        await registrar(
+            member.guild,
+            "historico_membros",
+            "Conta sinalizada pelo Anti-Raid",
+            (
+                f"**Membro:** <@{member.id}> (ID: {member.id})\n"
+                f"**Idade da conta:** {idade_conta:.2f} hora(s)\n"
+                f"**Contexto:** Entrada durante um pico suspeito de membros.\n"
+                "**Decisão:** Revisão manual recomendada; nenhuma punição automática foi aplicada."
+            ),
+            cor=0xED4245,
+        )
         logger.warning(
             "Conta recente sinalizada para revisão manual (guild=%s, member=%s, idade_horas=%.2f).",
             guild_id, member.id, idade_conta,
