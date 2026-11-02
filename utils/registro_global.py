@@ -84,7 +84,7 @@ async def _ler_ids(guild_id: int) -> dict:
     return servidor if isinstance(servidor, dict) else {}
 
 
-async def _obter_topico(forum: discord.ForumChannel, categoria: str) -> discord.Thread:
+async def _obter_topico(\n    forum: discord.ForumChannel,\n    categoria: str,\n    topicos_existentes: list[discord.Thread] | None = None,\n) -> discord.Thread:
     if categoria not in CATEGORIAS:
         raise ValueError(f"Categoria de registro desconhecida: {categoria}")
     nome, descricao = CATEGORIAS[categoria]
@@ -105,10 +105,12 @@ async def _obter_topico(forum: discord.ForumChannel, categoria: str) -> discord.
             if thread_salva is not None and thread_salva.parent_id != forum.id:
                 thread_salva = None
 
-        existentes = list(forum.threads)
-        async for thread in forum.archived_threads(limit=None):
-            if all(item.id != thread.id for item in existentes):
-                existentes.append(thread)
+        existentes = topicos_existentes
+        if existentes is None:
+            existentes = list(forum.threads)
+            async for thread in forum.archived_threads(limit=None):
+                if all(item.id != thread.id for item in existentes):
+                    existentes.append(thread)
 
         # Se o tópico canônico já existe, ele prevalece sobre qualquer ID legado.
         for thread in existentes:
@@ -147,6 +149,8 @@ async def _obter_topico(forum: discord.ForumChannel, categoria: str) -> discord.
             allowed_mentions=discord.AllowedMentions.none(),
         )
         thread = criado.thread
+        if topicos_existentes is not None:
+            topicos_existentes.append(thread)
         await _salvar_id(forum.guild.id, categoria, thread.id)
         _LOG.info("Tópico permanente criado: %s (%s)", nome, thread.id)
         return thread
@@ -263,9 +267,19 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
         raise TypeError("O destino configurado não é o Fórum de Registro Global da NÊMESIS.")
     await configurar_permissoes(canal)
     validar_privacidade(canal)
+    # Faz uma única leitura dos tópicos ativos e arquivados; evita 29 varreduras
+    # completas do histórico do Fórum durante o mesmo ciclo de sincronização.
+    topicos_existentes: list[discord.Thread] = list(canal.threads)
+    try:
+        async for thread in canal.archived_threads(limit=None):
+            if all(item.id != thread.id for item in topicos_existentes):
+                topicos_existentes.append(thread)
+    except (discord.Forbidden, discord.HTTPException):
+        _LOG.exception("Não foi possível listar todos os tópicos arquivados do Registro Global.")
+
     resultado = {}
     for categoria in CATEGORIAS:
-        thread = await _obter_topico(canal, categoria)
+        thread = await _obter_topico(canal, categoria, topicos_existentes)
         resultado[categoria] = thread.id
 
     # O Fórum é dedicado ao Registro Global. Depois de garantir todos os destinos
@@ -275,16 +289,8 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
     canonicos = set(resultado.values())
     aposentados = 0
     legados: dict[int, discord.Thread] = {
-        thread.id: thread for thread in canal.threads
+        thread.id: thread for thread in topicos_existentes
     }
-    # canal.threads contém apenas threads ativas/em cache. Inclui também
-    # threads arquivadas para que os tópicos antigos não continuem aparecendo
-    # como destinos históricos desbloqueados no Fórum.
-    try:
-        async for thread in canal.archived_threads(limit=None):
-            legados[thread.id] = thread
-    except (discord.Forbidden, discord.HTTPException):
-        _LOG.exception("Não foi possível listar todos os tópicos arquivados do Registro Global.")
 
     for thread in legados.values():
         if thread.id in canonicos or (thread.archived and thread.locked):
