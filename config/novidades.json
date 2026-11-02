@@ -1,11 +1,11 @@
 {
-  "release_id": "20261102-053038",
+  "release_id": "20261102-053642",
   "habilitada": true,
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Foram aplicadas melhorias em sistemas e comandos.",
-  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Foram aplicadas melhorias em sistemas e comandos.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Foram aplicadas melhorias em núcleo e inicialização do bot.",
+  "mensagem": "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n• Foram aplicadas melhorias em núcleo e inicialização do bot.\n\n**Áreas envolvidas:** núcleo e inicialização do bot.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "02/11/2026",
-  "hora_atualizacao": "05:30",
+  "hora_atualizacao": "05:36",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-02T05:30:38.534001-03:00"
+  "gerado_em": "2026-11-02T05:36:42.752557-03:00"
 }
