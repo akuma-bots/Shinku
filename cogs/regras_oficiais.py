@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, COR_PRIMARIA
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -7,7 +7,7 @@ from utils.guild_config import lideranca_only, membro_tem_lideranca
 
 GUILD_NEMESIS_ID = 1563995879981981817
 CANAL_REGRAS_ID = 1563995880833421508
-COR = 0xB3132B
+COR = COR_PRIMARIA
 
 REGRAS = [
 """╭━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╮
