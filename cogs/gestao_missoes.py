@@ -6,7 +6,7 @@ from discord.ext import commands
 
 from utils import missoes, revisoes
 from utils.apresentacao import criar_embed, aplicar_identidade_servidor
-from utils.guild_config import lideranca_only, membro_tem_lideranca
+from utils.guild_config import octogono_only, membro_tem_octogono
 
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ def _administrador(interaction: discord.Interaction) -> bool:
     return bool(
         interaction.guild
         and isinstance(interaction.user, discord.Member)
-        and membro_tem_lideranca(interaction.user)
+        and membro_tem_octogono(interaction.user)
     )
 
 
@@ -466,7 +466,7 @@ class GestaoMissoes(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="central-missoes", description="Abrir a central administrativa de gestão de missões.")
-    @lideranca_only()
+    @octogono_only()
     async def central_missoes(self, interaction: discord.Interaction):
         if interaction.guild is None or not _administrador(interaction):
             await interaction.response.send_message("A central é restrita aos administradores autorizados da NÊMESIS.", ephemeral=True)
