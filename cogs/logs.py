@@ -196,7 +196,8 @@ class Logs(commands.Cog):
             return
         embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
         embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed, categoria="cargos")
+        await self._enviar_log(canal, embed, categoria="entradas")
+        await registrar_global(member.guild, "historico_membros", "Saída do membro", f"Membro: {member} (ID: {member.id})\\nSaída registrada: {discord.utils.format_dt(datetime.now(timezone.utc), style='F')}", cor=0xED4245)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -291,7 +292,7 @@ class Logs(commands.Cog):
                 ),
                 color=0xFEE75C,
             )
-            await self._enviar_log(canal, embed, categoria="membros")
+            await self._enviar_log(canal, embed, categoria="historico_membros")
 
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
@@ -315,7 +316,7 @@ class Logs(commands.Cog):
                     value=" ".join(cargo.mention for cargo in perdidos)[:1024],
                     inline=False,
                 )
-            await self._enviar_log(canal, embed, categoria="membros")
+            await self._enviar_log(canal, embed, categoria="cargos")
 
         # Compatível com versões de discord.py em que o atributo não está
         # disponível no objeto Member. A comparação não pode derrubar o listener.
@@ -361,7 +362,7 @@ class Logs(commands.Cog):
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="membros")
+            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="voz")
         elif antes.channel is not None and depois.channel is None:
             await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="membros")
         elif antes.channel != depois.channel:
