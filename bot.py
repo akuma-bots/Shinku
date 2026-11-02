@@ -361,69 +361,46 @@ async def on_ready():
 
     async with SINCRONIZACAO_COMANDOS_LOCK:
         cache = _carregar_cache_comandos()
-    
         assinatura_atual = _assinatura_comandos(servidor)
-    
-    
-        # Remove registros globais antigos.
+
+        # Remove registros globais antigos apenas uma vez. Se a API falhar,
+        # a flag permanece falsa e a próxima conexão tenta novamente.
         if not cache.get("globais_limpos"):
-    
             try:
                 await bot.http.bulk_upsert_global_commands(
                     bot.application_id,
                     [],
                 )
                 cache["globais_limpos"] = True
-                print("Comandos globais antigos removidos.")
-    
+                logging.info("Comandos globais antigos removidos.")
             except Exception:
-                # Não marcar como concluído: a próxima inicialização deve
-                # tentar novamente em vez de deixar comandos globais órfãos.
                 cache["globais_limpos"] = False
                 logging.exception("Erro ao limpar comandos globais antigos.")
-    
-    
+
         precisa_sincronizar = (
-            cache.get("assinatura")
-            != assinatura_atual
-            or cache.get("guild_id")
-            != NEMESIS_GUILD_ID
+            cache.get("assinatura") != assinatura_atual
+            or cache.get("guild_id") != NEMESIS_GUILD_ID
         )
-    
-    
+
         if precisa_sincronizar:
-    
             try:
-    
                 # Os comandos já foram registrados no escopo da NÊMESIS
                 # por NemesisBot.add_cog; não copie comandos globais para cá.
                 sincronizados = await bot.tree.sync(guild=servidor)
-    
-                print(
-                    f"{len(sincronizados)} comandos "
-                    "sincronizados na NÊMESIS."
+                logging.info(
+                    "%s comandos sincronizados na NÊMESIS.",
+                    len(sincronizados),
                 )
-    
                 cache["assinatura"] = assinatura_atual
                 cache["guild_id"] = NEMESIS_GUILD_ID
-    
-            except Exception as erro:
-    
-                print(
-                    "Erro ao sincronizar comandos "
-                    f"da NÊMESIS: {erro}"
-                )
-    
+            except Exception:
+                # Não grava a nova assinatura em caso de falha: a próxima
+                # conexão repetirá a sincronização em vez de marcar sucesso.
+                logging.exception("Erro ao sincronizar comandos da NÊMESIS.")
         else:
-    
-            print(
-                "Comandos da NÊMESIS já estão "
-                "atualizados. Sync ignorado."
-            )
-    
-    
-        _salvar_cache_comandos(cache)
+            logging.info("Comandos da NÊMESIS já estão atualizados; sync ignorado.")
 
+        _salvar_cache_comandos(cache)
 
 # ============================================================
 # HEALTH CHECK — RENDER
