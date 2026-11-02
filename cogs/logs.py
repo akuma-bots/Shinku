@@ -72,8 +72,9 @@ class Logs(commands.Cog):
             if not embed.footer.text:
                 embed.set_footer(text="NÊMESIS • Registro Global")
             if isinstance(canal, discord.ForumChannel):
+                titulo = embed.title or f"Registro • {categoria.replace('_', ' ').title()}"
                 return await registrar_global(
-                    canal.guild, categoria, embed.title or "Registro", embed=embed,
+                    canal.guild, categoria, titulo, embed=embed,
                 )
             await canal.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
             return True
