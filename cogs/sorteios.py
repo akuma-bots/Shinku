@@ -979,10 +979,10 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         )
         from utils.registro_global import registrar as registrar_global
         detalhe_criacao = (
-            f"**Sorteio:** {sorteio_id}\\n"
-            f"**Prêmio:** {premio[:700]}\\n"
-            f"**Criado por:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
-            f"**Participação:** {vencedores} vencedor(es) · {duracao_minutos} minuto(s)\\n"
+            f"**Sorteio:** {sorteio_id}\n"
+            f"**Prêmio:** {premio[:700]}\n"
+            f"**Criado por:** {interaction.user.mention} (ID: {interaction.user.id})\n"
+            f"**Participação:** {vencedores} vencedor(es) · {duracao_minutos} minuto(s)\n"
             f"**Canal:** {canal_destino.mention}"
         )
         await registrar_global(
@@ -1527,7 +1527,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                     canal.guild,
                     "sorteios",
                     "Sorteio encerrado sem participantes",
-                    f"**Sorteio:** {sorteio_id}\\n**Prêmio:** {sorteio.get('premio', 'Não informado')}\\n**Participantes:** 0",
+                    f"**Sorteio:** {sorteio_id}\n**Prêmio:** {sorteio.get('premio', 'Não informado')}\n**Participantes:** 0",
                     cor=COR_ERRO,
                 )
             except (discord.Forbidden, discord.HTTPException) as erro:
@@ -1578,9 +1578,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             await self._marcar_anuncio_enviado(sorteio)
             from utils.registro_global import registrar as registrar_global
             detalhe_resultado = (
-                f"**Sorteio:** {sorteio_id}\\n"
-                f"**Prêmio:** {sorteio.get('premio', 'Não informado')}\\n"
-                f"**Participantes:** {len(participantes)}\\n"
+                f"**Sorteio:** {sorteio_id}\n"
+                f"**Prêmio:** {sorteio.get('premio', 'Não informado')}\n"
+                f"**Participantes:** {len(participantes)}\n"
                 f"**Vencedores:** {', '.join(str(uid) for uid in vencedores_ids) if vencedores_ids else 'Nenhum selecionado'}"
             )
             await registrar_global(
@@ -1595,7 +1595,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                     canal.guild,
                     "historico_membros",
                     "Membro venceu um sorteio",
-                    f"**Membro:** <@{usuario_id}> (ID: {usuario_id})\\n{detalhe_resultado}",
+                    f"**Membro:** <@{usuario_id}> (ID: {usuario_id})\n{detalhe_resultado}",
                     cor=COR_SUCESSO,
                 )
         except (discord.Forbidden, discord.HTTPException) as erro:
