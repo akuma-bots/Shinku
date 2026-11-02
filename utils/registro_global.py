@@ -182,6 +182,7 @@ async def _atualizar_cabecalho_topico(
         if atual != embed.to_dict():
             await mensagem.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
             _LOG.info("Cabeçalho do tópico atualizado: %s (%s)", nome, thread.id)
+            await asyncio.sleep(0.2)
     except discord.NotFound:
         _LOG.warning("Tópico sem mensagem inicial recuperável: %s (%s).", nome, thread.id)
     except (discord.Forbidden, discord.HTTPException):
