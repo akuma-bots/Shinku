@@ -377,6 +377,16 @@ def membro_pode_promover_rebaixar_banir(membro) -> bool:
     )
 
 
+def membro_pode_atribuir_cargo_hierarquico(autor, cargo) -> bool:
+    if not _membro_nemesis(autor) or cargo is None:
+        return False
+    autoridades = [
+        role.position for role in autor.roles
+        if role.id in CARGOS_AUTORIZADOS_HIERARQUIA_IDS
+    ]
+    return bool(autoridades and max(autoridades) > cargo.position)
+
+
 def membro_pode_gerenciar_membro(autor, alvo) -> bool:
     """Impede ações hierárquicas contra membros de cargo igual ou superior."""
     if not _membro_nemesis(autor) or not _membro_nemesis(alvo):
