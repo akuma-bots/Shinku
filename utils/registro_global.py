@@ -137,36 +137,10 @@ async def _obter_topico(
                     await _salvar_id(forum.guild.id, categoria, thread.id)
                 return thread
 
-        # Sem tópico canônico, preserva o histórico renomeando o tópico salvo.
-        # Se o Discord negar a migração, cria o destino canônico e deixa o legado
-        # na lista para que a rotina de limpeza tente arquivá-lo sem apagar mensagens.
-        if thread_salva is not None:
-            try:
-                if thread_salva.name != nome or thread_salva.archived or thread_salva.locked:
-                    nome_antigo = thread_salva.name
-                    await thread_salva.edit(
-                        name=nome,
-                        archived=False,
-                        locked=False,
-                        reason="Migração não destrutiva para o tópico canônico do Registro Global NÊMESIS",
-                    )
-                    _LOG.info(
-                        "Tópico legado migrado sem apagar histórico: %s (%s) -> %s",
-                        nome_antigo,
-                        thread_salva.id,
-                        nome,
-                    )
-            except (discord.Forbidden, discord.HTTPException):
-                _LOG.exception(
-                    "Não foi possível renomear o tópico legado %s (%s); será criado o tópico canônico.",
-                    thread_salva.name,
-                    thread_salva.id,
-                )
-                thread_salva = None
-            if thread_salva is not None:
-                if ids.get(categoria) != thread_salva.id:
-                    await _salvar_id(forum.guild.id, categoria, thread_salva.id)
-                return thread_salva
+        # A geração V2 é uma reconstrução intencional: nunca reaproveita nem
+        # renomeia os tópicos legados. Cria um destino novo e deixa o antigo
+        # fora do mapa canônico para ser arquivado/bloqueado na limpeza.
+        thread_salva = None
 
         inicial = discord.Embed(
             title=nome,
