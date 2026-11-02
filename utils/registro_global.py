@@ -108,6 +108,12 @@ async def _obter_topico(
                     thread_salva = None
             if thread_salva is not None and thread_salva.parent_id != forum.id:
                 thread_salva = None
+            if (
+                thread_salva is not None
+                and topicos_existentes is not None
+                and all(item.id != thread_salva.id for item in topicos_existentes)
+            ):
+                topicos_existentes.append(thread_salva)
 
         existentes = topicos_existentes
         if existentes is None:
@@ -119,6 +125,14 @@ async def _obter_topico(
         # Se o tópico canônico já existe, ele prevalece sobre qualquer ID legado.
         for thread in existentes:
             if thread.name == nome:
+                if thread_salva is not None and thread_salva.id != thread.id:
+                    _LOG.info(
+                        "Tópico legado %s (%s) substituído pelo canônico %s (%s); será aposentado na limpeza.",
+                        thread_salva.name,
+                        thread_salva.id,
+                        nome,
+                        thread.id,
+                    )
                 if ids.get(categoria) != thread.id:
                     await _salvar_id(forum.guild.id, categoria, thread.id)
                 return thread
@@ -127,10 +141,6 @@ async def _obter_topico(
         # Se o Discord negar a migração, cria o destino canônico e deixa o legado
         # na lista para que a rotina de limpeza tente arquivá-lo sem apagar mensagens.
         if thread_salva is not None:
-            if topicos_existentes is not None and all(
-                item.id != thread_salva.id for item in topicos_existentes
-            ):
-                topicos_existentes.append(thread_salva)
             try:
                 if thread_salva.name != nome or thread_salva.archived or thread_salva.locked:
                     nome_antigo = thread_salva.name
