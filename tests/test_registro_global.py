@@ -88,6 +88,30 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         forum.create_thread.assert_not_called()
         salvar.assert_not_awaited()
 
+    async def test_topico_canonico_prevalece_sobre_id_legado(self):
+        forum = Mock()
+        forum.id = 456
+        forum.guild.id = registro_global.GUILD_NEMESIS_ID
+        legado = Mock()
+        legado.id = 789
+        legado.parent_id = forum.id
+        legado.name = "📌・Registros Antigos"
+        canonico = Mock()
+        canonico.id = 790
+        canonico.parent_id = forum.id
+        canonico.name = registro_global.CATEGORIAS["mensagens"][0]
+        canonico.archived = False
+        canonico.locked = False
+        forum.threads = [canonico]
+        forum.guild.get_thread.return_value = legado
+        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \\
+             patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
+            resultado = await registro_global._obter_topico(forum, "mensagens")
+        self.assertIs(resultado, canonico)
+        legado.edit.assert_not_awaited()
+        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 790)
+        forum.create_thread.assert_not_called()
+
     async def test_renomeia_topico_legado_salvo_sem_perder_historico(self):
         forum = Mock()
         forum.id = 456
