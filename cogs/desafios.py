@@ -204,6 +204,42 @@ class Desafios(commands.Cog):
             await recordes_cog.anunciar_se_recorde(guild, "vitorias_pvp", desafio["vencedor_id"], pv["vitorias"])
             await recordes_cog.anunciar_se_recorde(guild, "xp_total", desafio["vencedor_id"], pv["xp"])
 
+        if not desafio.get("registro_global_enviado"):
+            from utils.registro_global import registrar as registrar_global
+            detalhe = (
+                f"**Desafio:** {desafio['id']}\\n"
+                f"**Vencedor:** <@{desafio['vencedor_id']}> (ID: {desafio['vencedor_id']})\\n"
+                f"**Perdedor:** <@{desafio['perdedor_id']}> (ID: {desafio['perdedor_id']})\\n"
+                f"**Recompensa:** +{XP_VITORIA_PVP} XP e +1 vitória\\n"
+                f"**Aposta:** {desafio['aposta_xp']} XP por participante"
+                + (f" · vencedor recebeu +{xp_extra} XP" if xp_extra else "")
+            )
+            resultados = [
+                await registrar_global(
+                    guild,
+                    "competicoes",
+                    "Desafio PvP concluído",
+                    detalhe,
+                    cor=0xB3132B,
+                ),
+                await registrar_global(
+                    guild,
+                    "historico_membros",
+                    "Vitória em desafio PvP",
+                    f"**Membro:** <@{desafio['vencedor_id']}>\\n{detalhe}",
+                    cor=0x57F287,
+                ),
+                await registrar_global(
+                    guild,
+                    "historico_membros",
+                    "Derrota em desafio PvP",
+                    f"**Membro:** <@{desafio['perdedor_id']}>\\n{detalhe}",
+                    cor=0xED4245,
+                ),
+            ]
+            if all(resultados):
+                await desafios.marcar_registro_global(guild.id, desafio["id"])
+
         return texto
 
     # ---------------- Configuração ----------------
