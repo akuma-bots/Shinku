@@ -518,6 +518,18 @@ class Revisoes(commands.Cog):
                 f"Prova original: {msg.jump_url}",
                 cor=0xFEE75C,
             )
+            await registrar(
+                guild,
+                "historico_membros",
+                "Membro enviou evidência de missão",
+                (
+                    f"**Membro:** <@{revisao.get('autor_id')}> (ID: {revisao.get('autor_id')})\n"
+                    f"**Atividade:** {revisao.get('titulo', 'Atividade')}\n"
+                    f"**Protocolo:** {revisao.get('id', '—')}\n"
+                    "**Situação:** Pendente de revisão."
+                ),
+                cor=0xFEE75C,
+            )
         except Exception:
             logging.getLogger(__name__).exception(
                 "Falha ao arquivar evidência %s no Registro Global.", revisao.get("id")
@@ -707,6 +719,22 @@ class Revisoes(commands.Cog):
                 categoria="sistemas",
             )
 
+            from utils.registro_global import registrar as registrar_global
+            for membro_id in {int(revisao["autor_id"]), int(revisao.get("auxiliar_id") or 0)} - {0}:
+                await registrar_global(
+                    interaction.guild,
+                    "historico_membros",
+                    "Evidência de missão aprovada",
+                    (
+                        f"**Membro:** <@{membro_id}> (ID: {membro_id})\n"
+                        f"**Atividade:** {revisao.get('titulo', 'Atividade')}\n"
+                        f"**Revisor:** {interaction.user.mention}\n"
+                        f"**Protocolo:** {revisao['id']}\n"
+                        f"**Resultado:** {resultado_texto or 'Aprovação registrada.'}"
+                    ),
+                    cor=0x57F287,
+                )
+
             destinatarios = {
                 int(membro_id)
                 for membro_id in (revisao.get("autor_id"), revisao.get("auxiliar_id"))
@@ -754,6 +782,20 @@ class Revisoes(commands.Cog):
                 f"Rejeitado por: {interaction.user.mention}\nID: `{revisao['id']}`",
                 cor=0xED4245,
                 categoria="sistemas",
+            )
+
+            from utils.registro_global import registrar as registrar_global
+            await registrar_global(
+                interaction.guild,
+                "historico_membros",
+                "Evidência de missão rejeitada",
+                (
+                    f"**Membro:** <@{revisao['autor_id']}> (ID: {revisao['autor_id']})\n"
+                    f"**Atividade:** {revisao.get('titulo', 'Atividade')}\n"
+                    f"**Revisor:** {interaction.user.mention}\n"
+                    f"**Protocolo:** {revisao['id']}"
+                ),
+                cor=0xED4245,
             )
 
             autor = interaction.guild.get_member(revisao["autor_id"])
