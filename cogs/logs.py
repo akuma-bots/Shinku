@@ -188,6 +188,11 @@ class Logs(commands.Cog):
             ),
             cor=0x57F287,
         )
+        await registrar_global(
+            member.guild, "historico_membros", "Entrada no histórico do membro",
+            f"Membro: {member} (ID: {member.id})\\nEntrada: {discord.utils.format_dt(agora, style='F')}\\nConta criada: {discord.utils.format_dt(member.created_at, style='F')}",
+            cor=0x57F287,
+        )
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
@@ -364,7 +369,7 @@ class Logs(commands.Cog):
         if antes.channel is None and depois.channel is not None:
             await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="voz")
         elif antes.channel is not None and depois.channel is None:
-            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="membros")
+            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="voz")
         elif antes.channel != depois.channel:
             await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C), categoria="membros")
 
