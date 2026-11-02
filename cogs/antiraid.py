@@ -31,6 +31,11 @@ class AntiRaid(commands.Cog):
             or membro_pode_promover_rebaixar_banir(member)
         ):
             return False
+        # Permissões administrativas explícitas continuam protegidas como
+        # último recurso, mesmo quando o cargo ainda não foi sincronizado.
+        permissoes = member.guild_permissions
+        if permissoes.administrator or permissoes.manage_guild:
+            return False
         return True
 
     async def _avisar(self, guild: discord.Guild, texto: str, mencionar_suporte: bool = False):
