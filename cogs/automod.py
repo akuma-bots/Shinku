@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 
 from utils.punicoes import historico_punicoes, registrar_punicao
 from utils.storage import carregar, salvar
-from utils.guild_config import get_config, set_config, lideranca_only
+from utils.guild_config import get_config, set_config, lideranca_only, membro_pode_promover_rebaixar_banir
 from utils.registro_global import registrar as registrar_global
 
 
@@ -437,7 +437,7 @@ def membro_pode_moderar(membro, canal=None) -> bool:
         return False
 
     guild = membro.guild
-    if membro.id == guild.owner_id:
+    if membro.id == guild.owner_id or membro_pode_promover_rebaixar_banir(membro):
         return True
 
     def normalizar_nome(valor: str) -> str:
