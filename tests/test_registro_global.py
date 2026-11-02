@@ -65,38 +65,43 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PermissionError):
             registro_global.validar_privacidade(forum)
 
-    async def test_reutiliza_topico_salvo_sem_criar_outro(self):
-        forum = Mock()
-        forum.id = 456
-        forum.guild.id = registro_global.GUILD_NEMESIS_ID
-        thread = Mock()
-        thread.id = 789
-        thread.parent_id = forum.id
-        thread.name = registro_global.CATEGORIAS["mensagens"][0]
-        thread.archived = False
-        thread.locked = False
-        forum.threads = []
-        async def sem_arquivados(limit=None):
-            if False:
-                yield None
-        forum.archived_threads.side_effect = sem_arquivados
-        forum.guild.get_thread.return_value = thread
-        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
-             patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
-            resultado = await registro_global._obter_topico(forum, "mensagens")
-        self.assertIs(resultado, thread)
-        forum.create_thread.assert_not_called()
-        salvar.assert_not_awaited()
-
-    async def test_topico_canonico_prevalece_sobre_id_legado(self):
+    async def test_reconstrucao_v2_cria_topico_novo_sem_reutilizar_id_legado(self):
         forum = Mock()
         forum.id = 456
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
         legado = Mock()
         legado.id = 789
         legado.parent_id = forum.id
-        legado.name = "📌・Registros Antigos"
-        legado.edit = AsyncMock()
+        legado.name = "📝・Mensagens"
+        legado.archived = True
+        legado.locked = True
+        novo = Mock()
+        novo.id = 900
+        novo.parent_id = forum.id
+        novo.name = registro_global.CATEGORIAS["mensagens"][0]
+        forum.threads = []
+        async def sem_arquivados(limit=None):
+            if False:
+                yield None
+        forum.archived_threads.side_effect = sem_arquivados
+        forum.guild.get_thread.return_value = legado
+        forum.create_thread = AsyncMock(return_value=SimpleNamespace(thread=novo))
+        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
+             patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
+            resultado = await registro_global._obter_topico(forum, "mensagens")
+        self.assertIs(resultado, novo)
+        forum.create_thread.assert_awaited_once()
+        legado.edit.assert_not_awaited()
+        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 900)
+
+    async def test_topico_v2_existente_prevalece_sobre_id_legado(self):
+        forum = Mock()
+        forum.id = 456
+        forum.guild.id = registro_global.GUILD_NEMESIS_ID
+        legado = Mock()
+        legado.id = 789
+        legado.parent_id = forum.id
+        legado.name = "📝・Mensagens"
         canonico = Mock()
         canonico.id = 790
         canonico.parent_id = forum.id
@@ -116,33 +121,6 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         legado.edit.assert_not_awaited()
         salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 790)
         forum.create_thread.assert_not_called()
-
-    async def test_renomeia_topico_legado_salvo_sem_perder_historico(self):
-        forum = Mock()
-        forum.id = 456
-        forum.guild.id = registro_global.GUILD_NEMESIS_ID
-        thread = Mock()
-        thread.id = 789
-        thread.parent_id = forum.id
-        thread.name = "📌・Registros Antigos"
-        thread.archived = True
-        thread.locked = True
-        thread.edit = AsyncMock()
-        forum.threads = []
-        async def sem_arquivados(limit=None):
-            if False:
-                yield None
-        forum.archived_threads.side_effect = sem_arquivados
-        forum.guild.get_thread.return_value = thread
-        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
-             patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
-            resultado = await registro_global._obter_topico(forum, "mensagens")
-        self.assertIs(resultado, thread)
-        thread.edit.assert_awaited_once()
-        self.assertEqual(thread.edit.await_args.kwargs["name"], registro_global.CATEGORIAS["mensagens"][0])
-        self.assertFalse(thread.edit.await_args.kwargs["archived"])
-        self.assertFalse(thread.edit.await_args.kwargs["locked"])
-        salvar.assert_not_awaited()
 
 
 if __name__ == "__main__":
