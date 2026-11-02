@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico, CARGOS_RESERVADOS_PROGRESSAO_IDS
+from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico, CARGOS_RESERVADOS_PROGRESSAO_IDS, CARGO_ELITE_ID
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ CARGOS_PROGRESSAO_PADRAO = {
     "10": 1563995879990624375,  # Tenente
     "9": 1563995879990624376,   # Executor
     "8": 1563995879990624377,   # Especialista
-    "7": 1563995879995874937,   # Elite
+    "7": CARGO_ELITE_ID,            # Elite
     "6": 1563995879998754938,   # Veterano
     "5": 1563995879998754939,   # Treinador
     "4": 1563995879998754940,   # Comandante
