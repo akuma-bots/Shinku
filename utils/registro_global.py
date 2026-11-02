@@ -255,8 +255,20 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
     # a nova organização. Nunca arquiva um dos tópicos apontados pelo mapa atual.
     canonicos = set(resultado.values())
     aposentados = 0
-    for thread in list(canal.threads):
-        if thread.id in canonicos or thread.locked:
+    legados: dict[int, discord.Thread] = {
+        thread.id: thread for thread in canal.threads
+    }
+    # canal.threads contém apenas threads ativas/em cache. Inclui também
+    # threads arquivadas para que os tópicos antigos não continuem aparecendo
+    # como destinos históricos desbloqueados no Fórum.
+    try:
+        async for thread in canal.archived_threads(limit=None):
+            legados[thread.id] = thread
+    except (discord.Forbidden, discord.HTTPException):
+        _LOG.exception("Não foi possível listar todos os tópicos arquivados do Registro Global.")
+
+    for thread in legados.values():
+        if thread.id in canonicos or (thread.archived and thread.locked):
             continue
         try:
             await thread.edit(
