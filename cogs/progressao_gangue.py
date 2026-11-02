@@ -710,6 +710,7 @@ class ProgressaoGangue(commands.Cog):
             )
             return
         rank_no = int(rank.value)
+        await self._config(interaction.guild.id)
         async with self._lock:
             dados = await self._dados()
             chave_guild = str(interaction.guild.id)
@@ -721,9 +722,6 @@ class ProgressaoGangue(commands.Cog):
             if not isinstance(cargos, dict):
                 cargos = {}
                 guild_data["cargos"] = cargos
-            for numero, cargo_padrao in CARGOS_PROGRESSAO_PADRAO.items():
-                if not str(cargos.get(numero, "")).isdigit():
-                    cargos[numero] = cargo_padrao
             duplicado = next(
                 (numero for numero, cargo_id in cargos.items()
                  if str(cargo_id) == str(cargo.id) and str(numero) != str(rank_no)),
