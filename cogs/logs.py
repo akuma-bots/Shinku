@@ -95,13 +95,16 @@ class Logs(commands.Cog):
             try:
                 canal = await self.bot.fetch_channel(CANAL_ENTRADAS_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logger.exception("Entrada não publicada: canal de entradas indisponível (guild=%s, channel=%s, member=%s).",
-                                 member.guild.id, CANAL_ENTRADAS_ID, member.id)
-                return
-        if not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID:
-            logger.error("Entrada não publicada: destino não é um canal de texto válido da NÊMESIS (channel=%s).",
-                         CANAL_ENTRADAS_ID)
-            return
+                logger.exception(
+                    "Canal de boas-vindas indisponível (guild=%s, channel=%s, member=%s).",
+                    member.guild.id, CANAL_ENTRADAS_ID, member.id,
+                )
+                canal = None
+        if canal is not None and (
+            not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID
+        ):
+            logger.error("Destino de boas-vindas inválido (channel=%s).", CANAL_ENTRADAS_ID)
+            canal = None
 
         # Dá tempo ao rastreador para persistir a atribuição deste evento.
         import asyncio
@@ -164,14 +167,14 @@ class Logs(commands.Cog):
             inline=False,
         )
         embed.set_footer(text="NÊMESIS • TAG DA ORG: NΞM • Sistema oficial de integração")
-        enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
-        if enviado:
-            logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
-                        member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
-        else:
-            logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
-                         member.guild.id, member.id, canal.id)
-            return
+        if canal is not None:
+            enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
+            if enviado:
+                logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
+                            member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
+            else:
+                logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
+                             member.guild.id, member.id, canal.id)
         await registrar_global(
             member.guild,
             "entradas",
