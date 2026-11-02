@@ -11,7 +11,7 @@ from utils.guia_servidores import (
     TAG_ORG_NEMESIS,
 )
 from utils.storage import carregar
-from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, garantir_topicos, registrar as registrar_global
+from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, CATEGORIAS, garantir_topicos, registrar as registrar_global
 
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,8 @@ class Logs(commands.Cog):
             return
         try:
             topicos = await garantir_topicos(guild)
-            self._topicos_prontos = len(topicos) == 8
-            logger.info("Registro Global pronto: %s tópicos permanentes verificados.", len(topicos))
+            self._topicos_prontos = len(topicos) == len(CATEGORIAS)
+            logger.info("Registro Global pronto: %s/%s tópicos permanentes verificados.", len(topicos), len(CATEGORIAS))
         except Exception:
             logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
 
@@ -556,7 +556,7 @@ class Logs(commands.Cog):
             f"Término: {discord.utils.format_dt(event.end_time, style='F') if event.end_time else 'Não definido'}"
         )
         await registrar_global(
-            event.guild, "sistemas", "Evento agendado criado", descricao,
+            event.guild, "eventos", "Evento agendado criado", descricao,
             cor=0x57F287,
         )
 
@@ -565,7 +565,7 @@ class Logs(commands.Cog):
         if event.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            event.guild, "sistemas", "Evento agendado removido",
+            event.guild, "eventos", "Evento agendado removido",
             f"Evento: **{event.name}** (`{event.id}`)\nStatus final: {event.status}",
             cor=0xED4245,
         )
@@ -582,7 +582,7 @@ class Logs(commands.Cog):
                 mudancas.append(f"{rotulo}: {valor_antes} → {valor_depois}")
         if mudancas:
             await registrar_global(
-                depois.guild, "sistemas", "Evento agendado atualizado",
+                depois.guild, "eventos", "Evento agendado atualizado",
                 f"Evento: **{depois.name}** (`{depois.id}`)\n" + "\n".join(mudancas),
                 cor=0xFEE75C,
             )
