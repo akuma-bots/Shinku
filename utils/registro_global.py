@@ -248,6 +248,31 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
     for categoria in CATEGORIAS:
         thread = await _obter_topico(canal, categoria)
         resultado[categoria] = thread.id
+
+    # O Fórum é dedicado ao Registro Global. Depois de garantir todos os destinos
+    # canônicos, aposenta tópicos antigos/duplicados sem apagar suas mensagens.
+    # Assim o histórico legado continua consultável, mas deixa de competir com
+    # a nova organização. Nunca arquiva um dos tópicos apontados pelo mapa atual.
+    canonicos = set(resultado.values())
+    aposentados = 0
+    for thread in list(canal.threads):
+        if thread.id in canonicos or thread.locked:
+            continue
+        try:
+            await thread.edit(
+                archived=True,
+                locked=True,
+                reason="Aposentação de tópico legado/duplicado após sincronização do Registro Global NÊMESIS",
+            )
+            aposentados += 1
+        except discord.NotFound:
+            continue
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.exception("Falha ao aposentar tópico legado (%s).", thread.id)
+    _LOG.info(
+        "Sincronização do Registro Global concluída: %s destinos canônicos; %s tópicos legados arquivados e bloqueados.",
+        len(resultado), aposentados,
+    )
     return resultado
 
 
