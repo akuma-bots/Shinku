@@ -29,7 +29,7 @@ Os cargos acima de Elite podem promover, rebaixar e banir:
 - Capitão — `1563995879998754942`
 - Capitão Geral — `1563995879998754943`
 
-Elite (`1563995879998754937`) e cargos inferiores não recebem essas ações por progressão. A ação sobre outro membro exige que o cargo de autoridade do responsável esteja acima do maior cargo do alvo. O dono do servidor permanece sujeito às proteções nativas do Discord.
+Elite (`1563995879998754937`) e cargos inferiores não recebem essas ações por progressão. A ação sobre outro membro exige que o cargo de autoridade do responsável esteja acima do maior cargo do alvo. O dono do servidor não pode ser banido; o bot continua sujeito às permissões e à hierarquia nativas do Discord.
 
 ## Auditoria e preservação
 
