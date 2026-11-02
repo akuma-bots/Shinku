@@ -103,6 +103,10 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         canonico.archived = False
         canonico.locked = False
         forum.threads = [canonico]
+        async def sem_arquivados(limit=None):
+            if False:
+                yield None
+        forum.archived_threads.side_effect = sem_arquivados
         forum.guild.get_thread.return_value = legado
         with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
