@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico
+from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico, CARGOS_RESERVADOS_PROGRESSAO_IDS
 
 log = logging.getLogger(__name__)
 
@@ -650,6 +650,8 @@ class ProgressaoGangue(commands.Cog):
             bot_member is None
             or cargo >= bot_member.top_role
             or cargo.managed
+            or cargo.is_default()
+            or cargo.id in CARGOS_RESERVADOS_PROGRESSAO_IDS
             or not membro_pode_atribuir_cargo_hierarquico(interaction.user, cargo)
         ):
             await interaction.response.send_message(
