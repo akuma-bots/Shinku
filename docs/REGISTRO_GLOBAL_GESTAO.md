@@ -1,39 +1,50 @@
-# Registro Global — Fórum de Gestão da NÊMESIS
+# Registro Global de Gestão — NÊMESIS
 
-O Shinku publica registros operacionais no fórum **GESTÃO → Registros** (`1566579335966498926`) do servidor NÊMESIS (`1563995879981981817`). O fórum deve permanecer restrito aos cargos autorizados e ao próprio bot.
+O Fórum `1566579335966498926` mantém tópicos permanentes. O Shinku reutiliza os tópicos pelo ID persistido e, se necessário, procura tópicos ativos e arquivados antes de criar outro. Cada ocorrência é uma mensagem dentro do tópico correspondente; não se cria um tópico por evento.
 
-## Organização dos tópicos permanentes
+## Áreas de registro
 
-Cada categoria possui um tópico fixo. O bot recupera o tópico salvo no Upstash e procura tópicos existentes (inclusive arquivados) antes de criar um novo. Assim, não abre um tópico por evento e evita duplicações.
+| Área | O que deve reunir |
+|---|---|
+| Mensagens | Edições, exclusões e alterações de anexos |
+| Atendimento | Tickets, atribuições, encerramentos, avaliações |
+| Moderação | Advertências, timeouts, expulsões, banimentos |
+| Membros | Histórico geral e alterações de dados |
+| Histórico de Entradas | Entradas, saídas, reentradas e integração inicial |
+| Histórico dos Membros | Linha do tempo por membro e ocorrências associadas |
+| Histórico de Cargos | Concessão, remoção e sincronização de cargos |
+| Convites | Criação, remoção, uso e atribuição de convites |
+| Atividade em Voz | Entradas, saídas e mudanças de sala |
+| Atividade dos Membros | Participação e métricas efetivamente coletadas |
+| Progressão | XP, níveis, patentes, promoções e rebaixamentos |
+| Conquistas | Desbloqueios, recordes e recompensas |
+| Missões | Criação, atribuição, conclusão, validação e recompensas |
+| Competições | Desafios, lutas, guerras, placares e resultados |
+| Eventos | Agenda, inscrições, atividades e resultados |
+| Sorteios | Criação, participação, vencedores e entrega de prêmios |
+| Sugestões e Votações | Sugestões, votos, decisões e resultados |
+| Formulários | Inscrições, candidaturas, aprovações e revisões |
+| Relatórios | Envio, revisão, aprovação e encaminhamentos |
+| Parcerias | Solicitações, aprovações e alterações |
+| Roblox | Vínculos, sincronizações e falhas da integração |
+| Integrações | APIs externas, dashboard e sincronizações |
+| AutoMod | Detecções, bloqueios, filtros e revisões |
+| Segurança | Anti-Raid, convites suspeitos e incidentes |
+| Infraestrutura | Conexões, Upstash, health checks e tarefas |
+| Configurações | Parâmetros e ajustes operacionais |
+| Administração | Permissões, estrutura e decisões administrativas |
+| Sistemas | Compatibilidade para registros legados ainda não migrados |
 
-| Chave | Tópico | Registros |
-|---|---|---|
-| mensagens | 📝 Mensagens | Edições e exclusões |
-| atendimento | 🎫 Atendimento | Tickets e atendimentos |
-| moderacao | 🛡️ Moderação | Advertências, timeouts, expulsões e banimentos |
-| membros | 👥 Membros | Entradas, saídas e alterações de cargos |
-| sistemas | ⚙️ Sistemas | Compatibilidade com registros antigos |
-| administracao | 🏛️ Administração | Mudanças estruturais e decisões |
-| seguranca | 🚨 Segurança | AutoMod, Anti-Raid, convites e incidentes |
-| formularios | 📋 Formulários | Candidaturas, análises e decisões |
-| progressao | 📈 Progressão | XP, níveis e patentes |
-| missoes | 🎯 Missões | Criação, conclusão e recompensas |
-| competicoes | ⚔️ Competições | Desafios, lutas, guerras e resultados |
-| eventos | 🏆 Eventos | Agenda, inscrições e campeonatos |
-| parcerias | 🤝 Parcerias | Solicitações e alterações |
-| integracoes | 🔗 Integrações | Roblox, dashboard e APIs |
-| infraestrutura | 🖥️ Infraestrutura | Storage, health checks e tarefas |
-| configuracoes | ⚙️ Configurações | Parâmetros e ajustes operacionais |
+## Regras de integridade
 
-## Regras de publicação
+- As categorias antigas permanecem válidas para compatibilidade com os cogs existentes.
+- Novas categorias não apagam nem reclassificam dados históricos já armazenados.
+- O registro deve incluir, quando disponível, autor da ação, membro afetado, horário, IDs do objeto e detalhes antes/depois.
+- Não mencionar usuários em massa nem permitir menções automáticas: `AllowedMentions.none()`.
+- Se o Discord não identificar com segurança o autor de um evento, o registro deve dizer isso explicitamente em vez de atribuir culpa por inferência.
+- Acesso ao Fórum deve continuar restrito e validado; nenhuma mudança de hierarquia é implícita nesta expansão.
+- A criação e publicação de tópicos ocorre apenas quando o bot inicializa ou quando um registro precisa ser gravado. O código não confirma que o Fórum ativo já recebeu as mudanças até o deploy e a validação no Discord.
 
-- O Shinku é exclusivo da NÊMESIS; o utilitário recusa outras guilds.
-- Menções não são disparadas por registros automáticos.
-- Falhas de publicação são registradas nos logs do processo e não devem derrubar o comando ou evento principal.
-- Tópicos arquivados são reabertos quando necessário.
-- As categorias antigas são mantidas para compatibilidade com registros existentes.
-- O fórum deve negar visualização a @everyone e conceder acesso apenas aos cargos definidos pela política administrativa.
+## Limites de cobertura
 
-## Limites da validação
-
-A alteração do código não publica mensagens retroativas nem modifica o fórum ativo imediatamente. O provisionamento dos novos tópicos ocorre quando o Shinku reinicia e consegue validar permissões e acesso ao fórum. A confirmação final exige deploy e teste no Discord.
+Um tópico existir não significa que todos os sistemas já enviam eventos para ele. Cada listener/fluxo precisa ser conectado e testado individualmente. A auditoria deve distinguir eventos disponíveis pela API do Discord, eventos produzidos pelos próprios cogs e eventos que não podem ser observados sem integração adicional.
