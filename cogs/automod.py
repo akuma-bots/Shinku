@@ -16,7 +16,7 @@ from utils.registro_global import registrar as registrar_global
 
 
 CANAL_REGRAS_ID = 1563995880833421508
-CACHE_REGRAS_SEGUNDOS = 1
+CACHE_REGRAS_SEGUNDOS = 300
 ARQUIVO_BANIMENTOS_TEMPORARIOS = "automod_banimentos.json"
 
 JANELA_SPAM, LIMITE_SPAM = 8, 6
@@ -681,6 +681,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         self.regras_cache = {}
 
         self.regras_cache_timestamp = 0
+        self._regras_lock = asyncio.Lock()
 
         self.punicoes_em_andamento = set()
         self.decisoes_em_andamento = set()
@@ -730,21 +731,20 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
     # CARREGAR REGRAS OFICIAIS
     # ========================================================
 
-    async def carregar_regras_oficiais(
-        self,
-    ):
-
+    async def carregar_regras_oficiais(self):
+        """Usa cache de cinco minutos e serializa atualizações concorrentes."""
         agora = time.time()
-
-        if (
-            self.regras_cache
-            and (
-                agora
-                - self.regras_cache_timestamp
-            )
-            < CACHE_REGRAS_SEGUNDOS
-        ):
+        if self.regras_cache_timestamp and agora - self.regras_cache_timestamp < CACHE_REGRAS_SEGUNDOS:
             return self.regras_cache
+
+        async with self._regras_lock:
+            agora = time.time()
+            if self.regras_cache_timestamp and agora - self.regras_cache_timestamp < CACHE_REGRAS_SEGUNDOS:
+                return self.regras_cache
+            return await self._atualizar_regras_oficiais()
+
+    async def _atualizar_regras_oficiais(self):
+        agora = time.time()
 
         canal = self.bot.get_channel(
             CANAL_REGRAS_ID
@@ -829,6 +829,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         ).strip()
 
         if not texto:
+            self.regras_cache_timestamp = time.time()
             return self.regras_cache
 
         padrao = re.compile(
@@ -868,7 +869,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
         self.regras_cache = secoes
 
-        self.regras_cache_timestamp = agora
+        self.regras_cache_timestamp = time.time()
 
         print(
             "[AUTOMOD] Regras oficiais "
