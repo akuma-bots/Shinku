@@ -84,7 +84,11 @@ async def _ler_ids(guild_id: int) -> dict:
     return servidor if isinstance(servidor, dict) else {}
 
 
-async def _obter_topico(\n    forum: discord.ForumChannel,\n    categoria: str,\n    topicos_existentes: list[discord.Thread] | None = None,\n) -> discord.Thread:
+async def _obter_topico(
+    forum: discord.ForumChannel,
+    categoria: str,
+    topicos_existentes: list[discord.Thread] | None = None,
+) -> discord.Thread:
     if categoria not in CATEGORIAS:
         raise ValueError(f"Categoria de registro desconhecida: {categoria}")
     nome, descricao = CATEGORIAS[categoria]
