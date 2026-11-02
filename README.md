@@ -24,6 +24,10 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Música por voz:** pesquisa por nome ou link, fila, reprodução atual, pausa, retomada, pular, volume e encerramento; controles limitados ao canal de voz da sessão.
 - **Recordes, eventos e parcerias:** registros e anúncios nos canais configurados.
 
+## Hierarquia e permissões
+
+A matriz oficial de cargos, permissões administrativas e ações de promoção/rebaixamento/banimento está documentada em [docs/HIERARQUIA_PERMISSOES_NEMESIS.md](docs/HIERARQUIA_PERMISSOES_NEMESIS.md). A gestão de missões e a configuração dos cargos de rank são exclusivas do OCTÓGONO.
+
 ## Armazenamento
 
 - O bot usa chaves privadas com prefixo `nemesis_bot:` no Upstash para isolar os dados operacionais da NÊMESIS.
