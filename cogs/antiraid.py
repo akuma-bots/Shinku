@@ -4,7 +4,7 @@ import time
 import discord
 from discord.ext import commands
 
-from utils.guild_config import get_config
+from utils.guild_config import get_config, membro_pode_promover_rebaixar_banir
 
 
 logger = logging.getLogger(__name__)
@@ -25,10 +25,11 @@ class AntiRaid(commands.Cog):
     @staticmethod
     def _alvo_elegivel(member: discord.Member) -> bool:
         """Ignora bots e membros com privilégios administrativos ao avaliar alertas."""
-        if member.bot or member.id == member.guild.owner_id:
-            return False
-        permissoes = member.guild_permissions
-        if permissoes.administrator or permissoes.manage_guild:
+        if (
+            member.bot
+            or member.id == member.guild.owner_id
+            or membro_pode_promover_rebaixar_banir(member)
+        ):
             return False
         return True
 
