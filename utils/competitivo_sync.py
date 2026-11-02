@@ -48,7 +48,7 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
                         if isinstance(perfil, dict)
                     ),
                     key=lambda item: (
-                        int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                        int(item[1].get("xp_temporada", item[1].get("xp", 0)) or 0),
                         int(item[1].get("vitorias", 0) or 0),
                     ),
                     reverse=True,
@@ -64,7 +64,7 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
                         {
                             "discordId": uid,
                             "nome": perfil.get("nome", ""),
-                            "pontos": int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0),
+                            "xp_temporada": int(perfil.get("xp_temporada", perfil.get("xp", 0)) or 0),
                             "xp": int(perfil.get("xp", 0) or 0),
                             "vitorias": int(perfil.get("vitorias", 0) or 0),
                             "derrotas": int(perfil.get("derrotas", 0) or 0),
@@ -81,14 +81,13 @@ async def atualizar_temporada_global(agora: float | None = None) -> dict:
                 for perfil in dados["perfis"].values():
                     if not isinstance(perfil, dict):
                         continue
-                    perfil["pontos_temporada"] = 0
-                    perfil["em_top_global"] = False
+                    perfil["pontos_temporada"] = 0  # legado preservado; não participa mais do ranking\n                    perfil["xp_base_temporada"] = int(perfil.get("xp", 0) or 0)\n                    perfil["xp_temporada"] = 0\n                    perfil["em_top_global"] = False
                     perfil["ultima_verificacao_top_global"] = agora
 
         for perfil in dados["perfis"].values():
             if not isinstance(perfil, dict):
                 continue
-            perfil.setdefault("pontos_temporada", int(perfil.get("pontos", 0) or 0))
+            perfil.setdefault("xp_base_temporada", 0)\n            perfil.setdefault("xp_temporada", max(0, int(perfil.get("xp", 0) or 0) - int(perfil.get("xp_base_temporada", 0) or 0)))\n            perfil.setdefault("pontos_temporada", int(perfil.get("pontos", 0) or 0))  # legado
             perfil.setdefault("tempo_top_global_segundos", 0)
             perfil.setdefault("em_top_global", False)
             perfil.setdefault("ultima_verificacao_top_global", agora)
@@ -137,7 +136,7 @@ async def reiniciar_temporada_global(
                 if isinstance(perfil, dict)
             ),
             key=lambda item: (
-                int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                int(item[1].get("xp_temporada", item[1].get("xp", 0)) or 0),
                 int(item[1].get("vitorias", 0) or 0),
             ),
             reverse=True,
@@ -153,7 +152,7 @@ async def reiniciar_temporada_global(
                 {
                     "discordId": uid,
                     "nome": perfil.get("nome", ""),
-                    "pontos": int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0),
+                    "xp_temporada": int(perfil.get("xp_temporada", perfil.get("xp", 0)) or 0),
                     "xp": int(perfil.get("xp", 0) or 0),
                     "vitorias": int(perfil.get("vitorias", 0) or 0),
                     "derrotas": int(perfil.get("derrotas", 0) or 0),
@@ -170,8 +169,7 @@ async def reiniciar_temporada_global(
         for perfil in dados["perfis"].values():
             if not isinstance(perfil, dict):
                 continue
-            perfil["pontos_temporada"] = 0
-            perfil["em_top_global"] = False
+            perfil["pontos_temporada"] = 0  # legado preservado\n            perfil["xp_base_temporada"] = int(perfil.get("xp", 0) or 0)\n            perfil["xp_temporada"] = 0\n            perfil["em_top_global"] = False
             perfil["ultima_verificacao_top_global"] = agora
             perfil.setdefault("tempo_top_global_segundos", 0)
         dados["temporada_global"] = estado
@@ -205,7 +203,7 @@ async def registrar_tempo_top_global(
                 if isinstance(perfil, dict)
             ),
             key=lambda item: (
-                int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                int(item[1].get("xp_temporada", item[1].get("xp", 0)) or 0),
                 int(item[1].get("vitorias", 0) or 0),
             ),
             reverse=True,
@@ -279,16 +277,14 @@ async def somar_pontos_competitivo(
         pontos_temporada = int(
             perfil.get("pontos_temporada", pontos_anteriores) or 0
         )
-        perfil["pontos"] = pontos_anteriores + delta_efetivo
-        perfil["pontos_temporada"] = pontos_temporada + delta_efetivo
+        # Campos de pontos ficam somente para compatibilidade com dados antigos.\n        # A classificação atual é baseada exclusivamente no XP real do perfil.\n        perfil["pontos"] = pontos_anteriores\n        perfil["pontos_temporada"] = pontos_temporada
         perfil.setdefault("tempo_top_global_segundos", 0)
         perfil.setdefault("em_top_global", False)
         if vitorias is not None:
             perfil["vitorias"] = int(vitorias)
         if derrotas is not None:
             perfil["derrotas"] = int(derrotas)
-        if isinstance(campos_extra, dict):
-            perfil.update(campos_extra)
+        if isinstance(campos_extra, dict):\n            perfil.update(campos_extra)\n        xp_atual = max(0, int(perfil.get("xp", 0) or 0))\n        xp_base = max(0, int(perfil.get("xp_base_temporada", 0) or 0))\n        perfil["xp_temporada"] = max(0, xp_atual - xp_base)
 
         dados["perfis"][chave] = perfil
         return dados
@@ -317,20 +313,16 @@ async def migrar_perfil_se_necessario(
         if chave in dados["perfis"]:
             return dados
 
-        pontos = (
-            int(perfil_bot.get("xp", 0) or 0)
-            + int(perfil_bot.get("vitorias", 0) or 0) * 10
-            + int(perfil_bot.get("mvps", 0) or 0) * 20
-        )
+        xp = max(0, int(perfil_bot.get("xp", 0) or 0))
         dados["perfis"][chave] = {
             "discordId": chave,
             "nome": nome or "",
-            "pontos": pontos,
+            "pontos": 0,  # legado; não é usado na classificação atual
             "elo": 1000,
             "vitorias": int(perfil_bot.get("vitorias", 0) or 0),
             "derrotas": int(perfil_bot.get("derrotas", 0) or 0),
             "xp": int(perfil_bot.get("xp", 0) or 0),
-            "pontos_temporada": pontos,
+            "pontos_temporada": 0,  # legado\n            "xp_base_temporada": 0,\n            "xp_temporada": xp,
             "tempo_top_global_segundos": 0,
             "em_top_global": False,
         }
