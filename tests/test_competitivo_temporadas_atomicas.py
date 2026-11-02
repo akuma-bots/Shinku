@@ -38,9 +38,9 @@ class TestCompetitivoTemporadasAtomicas(unittest.IsolatedAsyncioTestCase):
         estado = dados["temporada_global"]
         perfil = dados["perfis"]["10"]
         self.assertEqual(estado["numero"], 4)
-        self.assertEqual(estado["historico"][0]["top"][0]["discordId"], "10")
+        self.assertEqual(estado["historico"][0]["top"][0]["discordId"], "10")\n        self.assertEqual(estado["historico"][0]["top"][0]["xp_temporada"], 200)
         self.assertEqual(perfil["pontos"], 900)
-        self.assertEqual(perfil["pontos_temporada"], 0)
+        self.assertEqual(perfil["pontos_temporada"], 0)\n        self.assertEqual(perfil["xp_base_temporada"], 500)\n        self.assertEqual(perfil["xp_temporada"], 0)
         self.assertEqual(perfil["tempo_top_global_segundos"], 240)
 
     async def test_registro_top10_acumula_tempo_sem_gravacoes_perdidas(self):
@@ -49,7 +49,7 @@ class TestCompetitivoTemporadasAtomicas(unittest.IsolatedAsyncioTestCase):
             "perfis": {
                 str(uid): {
                     "discordId": str(uid), "pontos": 100 - uid,
-                    "pontos_temporada": 100 - uid, "vitorias": 0,
+                    "pontos_temporada": 100 - uid, "xp": 100 - uid,\n                    "xp_base_temporada": 0, "xp_temporada": 100 - uid, "vitorias": 0,
                     "tempo_top_global_segundos": 0, "em_top_global": False,
                     "ultima_verificacao_top_global": 1000,
                 }
@@ -68,7 +68,7 @@ class TestCompetitivoTemporadasAtomicas(unittest.IsolatedAsyncioTestCase):
     async def test_confirmacao_antiga_nao_reinicia_temporada_seguinte(self):
         await storage.salvar("competitivo.json", {
             "catalogo": [],
-            "perfis": {"10": {"discordId": "10", "pontos": 400, "pontos_temporada": 200}},
+            "perfis": {"10": {"discordId": "10", "pontos": 400, "pontos_temporada": 200, "xp": 450, "xp_base_temporada": 250, "xp_temporada": 200}},
             "temporada_global": {
                 "numero": 5, "inicio_timestamp": 1000,
                 "duracao_dias": 30, "historico": [],
@@ -86,7 +86,7 @@ class TestCompetitivoTemporadasAtomicas(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(dados["temporada_global"]["numero"], 6)
         self.assertEqual(len(dados["temporada_global"]["historico"]), 1)
         self.assertEqual(dados["perfis"]["10"]["pontos"], 400)
-        self.assertEqual(dados["perfis"]["10"]["pontos_temporada"], 0)
+        self.assertEqual(dados["perfis"]["10"]["pontos_temporada"], 0)\n        self.assertEqual(dados["perfis"]["10"]["xp_base_temporada"], 450)\n        self.assertEqual(dados["perfis"]["10"]["xp_temporada"], 0)
 
 
 if __name__ == "__main__":
