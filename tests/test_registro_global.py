@@ -91,7 +91,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             resultado = await registro_global._obter_topico(forum, "mensagens")
         self.assertIs(resultado, novo)
         forum.create_thread.assert_awaited_once()
-        legado.edit.assert_not_awaited()
+        legado.edit.assert_not_called()
         salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 900)
 
     async def test_topico_v2_existente_prevalece_sobre_id_legado(self):
@@ -118,7 +118,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
         self.assertIs(resultado, canonico)
-        legado.edit.assert_not_awaited()
+        legado.edit.assert_not_called()
         salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 790)
         forum.create_thread.assert_not_called()
 
