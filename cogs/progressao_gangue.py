@@ -692,6 +692,20 @@ class ProgressaoGangue(commands.Cog):
                 guild_data["cargos_legados"] = legados[-100:]
             cargos[str(rank_no)] = cargo.id
             await self._salvar_dados(dados)
+        try:
+            from utils.registro_global import registrar
+            await registrar(
+                interaction.guild,
+                "configuracoes",
+                "Vínculo de cargo de progressão alterado",
+                f"**Responsável:** {interaction.user.mention}\n"
+                f"**Rank:** No. {rank_no:02d} — {rank.name}\n"
+                f"**Cargo novo:** {cargo.mention}\n"
+                f"**Cargo anterior:** {cargo_anterior or 'Nenhum'}",
+                cor=0x9F1239,
+            )
+        except Exception:
+            log.exception("Não foi possível registrar a alteração de cargo de progressão.")
         await interaction.response.send_message(
             f"Vínculo salvo: No. {rank_no:02d} — {rank.name} → {cargo.mention}.",
             ephemeral=True,
