@@ -78,6 +78,17 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(perfil["xp"], 250)
         self.assertEqual(chamadas, 0)
 
+    async def test_config_inicializa_cargos_padrao_sem_substituir_personalizados(self):
+        self.dados = {"123": {"cargos": {"12": 999, "7": 111}}}
+
+        config = await self.cog._config(123)
+
+        self.assertEqual(config["cargos"]["12"], 999)
+        self.assertEqual(config["cargos"]["7"], 111)
+        self.assertEqual(config["cargos"]["11"], 1563995879990624374)
+        self.assertEqual(config["cargos"]["1"], 1563995879998754943)
+        self.assertEqual(self.dados["123"]["cargos"]["12"], 999)
+
     async def test_promocao_e_rebaixamento_manualmente_sao_atomicos_e_auditados(self):
         promovido, anterior, novo = await self.cog._definir_rank_atomico(
             123, 456, 16500,
