@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro
+from utils.guild_config import octogono_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico
 
 log = logging.getLogger(__name__)
 
@@ -700,6 +700,12 @@ class ProgressaoGangue(commands.Cog):
                 ephemeral=True,
             )
             return
+        if not membro_pode_atribuir_cargo_hierarquico(interaction.user, cargo_alvo):
+            await interaction.response.send_message(
+                "O rank escolhido está acima da sua autoridade hierárquica.",
+                ephemeral=True,
+            )
+            return
         bot_member = interaction.guild.me
         maior_cargo_alvo = max(membro.roles, key=lambda item: item.position, default=None)
         if bot_member is None or (maior_cargo_alvo and bot_member.top_role <= maior_cargo_alvo):
@@ -739,7 +745,7 @@ class ProgressaoGangue(commands.Cog):
                 acao="Reversão",
             )
             await interaction.response.send_message(
-                "A alteração foi revertida porque o Discord não aceitou a troca do cargo. Nenhum rank ficou parcialmente aplicado.",
+                "A alteração foi revertida porque o Discord não aceitou a troca do cargo. O XP foi revertido; confira o cargo do membro se o Discord também recusou a reversão do cargo.",
                 ephemeral=True,
             )
             return
