@@ -6,7 +6,7 @@ from discord.ext import commands, tasks
 
 from utils import temporadas_missoes
 from utils.apresentacao import criar_embed, aplicar_identidade_servidor
-from utils.guild_config import membro_tem_lideranca
+from utils.guild_config import membro_tem_octogono
 
 log = logging.getLogger(__name__)
 EMOJIS_POSICAO = {1: "🥇", 2: "🥈", 3: "🥉"}
@@ -28,7 +28,7 @@ def _data(valor):
 
 def _autorizado(interaction, owner_id=None):
     return bool(interaction.guild and isinstance(interaction.user, discord.Member)
-                and membro_tem_lideranca(interaction.user)
+                and membro_tem_octogono(interaction.user)
                 and (owner_id is None or interaction.user.id == int(owner_id)))
 
 
