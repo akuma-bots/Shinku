@@ -448,7 +448,7 @@ class RankingGeral(
             title="🏆 RANKING GLOBAL · TEMPORADA COMPETITIVA",
             description=(
                 "**CLASSIFICAÇÃO OFICIAL NÊMESIS**\n"
-                "A posição é definida pela XP acumulado na temporada. Vitórias, derrotas e permanência no Top 10 "
+                "A posição é definida pelo XP acumulado na temporada. Vitórias, derrotas e permanência no Top 10 "
                 "são métricas complementares; o histórico das temporadas concluídas é preservado."
             ),
             color=0x9F1239,
