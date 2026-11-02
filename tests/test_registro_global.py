@@ -1,4 +1,6 @@
 import unittest
+
+import discord
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -63,6 +65,23 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             manage_threads=True, create_public_threads=True,
         )
         with self.assertRaises(PermissionError):
+            registro_global.validar_privacidade(forum)
+
+    def test_privacidade_bloqueia_cargo_com_acesso_herdado(self):
+        guild = Mock()
+        guild.default_role = object()
+        guild.me = object()
+        role = Mock(spec=discord.Role)
+        role.id = 987654
+        role.name = "Cargo herdado"
+        guild.roles = [role]
+        forum = Mock()
+        forum.guild = guild
+        forum.overwrites = {}
+        forum.overwrites_for.return_value = SimpleNamespace(view_channel=False)
+        forum.permissions_for.return_value = SimpleNamespace(view_channel=True)
+
+        with self.assertRaisesRegex(PermissionError, "herda acesso"):
             registro_global.validar_privacidade(forum)
 
     async def test_reconstrucao_v3_cria_topico_novo_sem_reutilizar_id_legado(self):
