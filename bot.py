@@ -28,7 +28,7 @@ logging.basicConfig(
 CAMINHO_ENV = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=CAMINHO_ENV)
 
-from utils.storage import USANDO_UPSTASH, verificar_conexao_storage
+from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
 from utils.guild_config import membro_tem_acesso_nemesis
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -470,6 +470,11 @@ async def iniciar_servidor_web():
 async def main():
 
     # O armazenamento do bot é privado; não há heartbeat nem sincronização com site.
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise RuntimeError(
+            "Configuração parcial do Upstash: defina URL e token juntos no Render. "
+            "O bot não iniciará com armazenamento inconsistente."
+        )
     if USANDO_UPSTASH:
         await verificar_conexao_storage()
         logging.info("Conexão com o armazenamento privado confirmada.")
