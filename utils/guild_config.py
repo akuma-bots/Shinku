@@ -374,6 +374,14 @@ def membro_pode_promover_rebaixar_banir(membro) -> bool:
     )
 
 
+def membro_pode_revisar_categoria(membro, tipo: str) -> bool:
+    """Missões são exclusivas do OCTÓGONO; revisões competitivas seguem liderança."""
+    tipo = str(tipo or "").strip().lower()
+    if tipo in {"missao", "contribuicao", "especial", "pve"}:
+        return membro_tem_octogono(membro)
+    return membro_tem_lideranca(membro)
+
+
 def membro_tem_acesso_nemesis(membro) -> bool:
     return bool(
         isinstance(membro, discord.Member)
