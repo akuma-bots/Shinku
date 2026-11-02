@@ -6,15 +6,15 @@ from utils import registro_global
 
 
 class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
-    def test_define_oito_topicos_permanentes(self):
-        self.assertEqual(
-            set(registro_global.CATEGORIAS),
-            {
-                "mensagens", "atendimento", "moderacao", "membros",
-                "sistemas", "administracao", "seguranca", "formularios",
-            },
-        )
-        self.assertEqual(len({nome for nome, _ in registro_global.CATEGORIAS.values()}), 8)
+    def test_define_topicos_permanentes_configurados(self):
+        essenciais = {
+            "mensagens", "atendimento", "moderacao", "membros",
+            "sistemas", "administracao", "seguranca", "formularios",
+        }
+        self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
+        self.assertGreaterEqual(len(registro_global.CATEGORIAS), 28)
+        nomes = [nome for nome, _ in registro_global.CATEGORIAS.values()]
+        self.assertEqual(len(nomes), len(set(nomes)))
 
     def test_acesso_inclui_octogono_e_staff_sem_cargos_competitivos(self):
         esperados = {
