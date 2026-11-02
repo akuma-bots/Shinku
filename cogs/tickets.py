@@ -171,7 +171,13 @@ async def fechar_canal_ticket(
                         motivo=motivo,
                     )
         except Exception:
-            pass
+            logging.exception(
+                "Falha ao reconciliar o registro persistente do ticket após canal já removido "
+                "(guild=%s, canal=%s, ticket=%s).",
+                canal.guild.id,
+                canal.id,
+                (ticket or {}).get("id") if isinstance(ticket, dict) else "desconhecido",
+            )
 
     except Exception:
         raise
