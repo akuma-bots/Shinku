@@ -52,7 +52,9 @@ class TestCompetitivoSync(unittest.IsolatedAsyncioTestCase):
         with patch.object(competitivo_sync, 'atualizar_json', new=AsyncMock(side_effect=atualizar)):
             perfil = await competitivo_sync.migrar_perfil_se_necessario(789, 'Novo membro', {'xp': 50, 'vitorias': 3, 'mvps': 2, 'derrotas': 1})
         self.assertEqual(perfil['discordId'], '789')
-        self.assertEqual(perfil['pontos'], 0)\n        self.assertEqual(perfil['xp'], 50)\n        self.assertEqual(perfil['xp_temporada'], 50)
+        self.assertEqual(perfil['pontos'], 0)
+        self.assertEqual(perfil['xp'], 50)
+        self.assertEqual(perfil['xp_temporada'], 50)
 
 if __name__ == '__main__':
     unittest.main()
