@@ -78,6 +78,33 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(perfil["xp"], 250)
         self.assertEqual(chamadas, 0)
 
+    async def test_promocao_e_rebaixamento_manualmente_sao_atomicos_e_auditados(self):
+        promovido, anterior, novo = await self.cog._definir_rank_atomico(
+            123, 456, 16500,
+            responsavel_id=1,
+            motivo="Promoção aprovada",
+            acao="Promoção",
+        )
+        self.assertEqual(anterior["nome"], "Lutador")
+        self.assertEqual(novo["nome"], "Veterano")
+        self.assertEqual(promovido["xp"], 16500)
+        self.assertEqual(promovido["rank_no"], 6)
+        registro = promovido["historico_ranks"][-1]
+        self.assertEqual(registro["responsavel_id"], "1")
+        self.assertEqual(registro["motivo"], "Promoção aprovada")
+
+        rebaixado, anterior, novo = await self.cog._definir_rank_atomico(
+            123, 456, 11500,
+            responsavel_id=2,
+            motivo="Revisão disciplinar",
+            acao="Rebaixamento",
+        )
+        self.assertEqual(anterior["nome"], "Veterano")
+        self.assertEqual(novo["nome"], "Elite")
+        self.assertEqual(rebaixado["xp"], 11500)
+        self.assertEqual(len(rebaixado["historico_ranks"]), 2)
+        self.assertEqual(rebaixado["historico_ranks"][-1]["acao"], "Rebaixamento")
+
     async def test_perfil_legado_invalido_e_reparado(self):
         self.dados = {"123": {"membros": {"456": "dado-inválido"}}}
 
