@@ -212,7 +212,7 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, embed, categoria="entradas")
         await registrar_global(
             member.guild, "historico_membros", "Saída do membro",
-            f"Membro: {member} (ID: {member.id})\\nSaída registrada: {discord.utils.format_dt(agora, style='F')}",
+            f"Membro: {member} (ID: {member.id})\nSaída registrada: {discord.utils.format_dt(agora, style='F')}",
             cor=0xED4245,
         )
 
@@ -269,7 +269,7 @@ class Logs(commands.Cog):
                 f"• **{anexo.filename[:180]}** — {anexo.size:,} bytes"
                 + (f" — [abrir arquivo]({anexo.url})" if anexo.url else "")
             )
-        descricao = "\\n".join(linhas)[:3800]
+        descricao = "\n".join(linhas)[:3800]
         await registrar_global(
             message.guild, "anexos", "Anexos enviados", descricao, cor=0x57F287,
         )
@@ -319,7 +319,7 @@ class Logs(commands.Cog):
         await self._enviar_log(canal, embed, categoria="moderacao")
         await registrar_global(
             guild, "historico_membros", "Banimento de membro",
-            f"Membro: {user} (ID: {user.id})\\nAção: banimento\\nOrigem: evento do Discord; executor não identificado pelo gateway.",
+            f"Membro: {user} (ID: {user.id})\nAção: banimento\nOrigem: evento do Discord; executor não identificado pelo gateway.",
             cor=0xED4245,
         )
 
@@ -332,7 +332,7 @@ class Logs(commands.Cog):
         await self._enviar_log(canal, embed, categoria="moderacao")
         await registrar_global(
             guild, "historico_membros", "Desbanimento de membro",
-            f"Membro: {user} (ID: {user.id})\\nAção: desbanimento\\nOrigem: evento do Discord; executor não identificado pelo gateway.",
+            f"Membro: {user} (ID: {user.id})\nAção: desbanimento\nOrigem: evento do Discord; executor não identificado pelo gateway.",
             cor=0x57F287,
         )
 
