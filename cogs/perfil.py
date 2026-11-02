@@ -377,31 +377,122 @@ class Perfil(commands.Cog):
         embed = criar_embed("N̷ÊMESIS ━ HIERARQUIA DE PATENTES", "\n".join(linhas), rodape="NÊMESIS • Progressão e patentes")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="patente-promover", description="Define a patente de um membro manualmente (ignora o XP).")
-    @app_commands.describe(membro="Quem promover", patente="Nome exato da patente configurada")
+    async def _definir_patente_manual(
+        self,
+        interaction: discord.Interaction,
+        membro: discord.Member,
+        alvo: dict,
+        patentes: list,
+        acao: str,
+    ):
+        cargo_alvo = None
+        if alvo.get("cargo_id"):
+            cargo_alvo = interaction.guild.get_role(int(alvo["cargo_id"]))
+            if cargo_alvo is None:
+                await interaction.response.send_message(
+                    "O cargo configurado para esta patente não existe mais no servidor. Nenhuma alteração foi aplicada.",
+                    ephemeral=True,
+                )
+                return
+
+        ids_cargos_patentes = {
+            int(item["cargo_id"])
+            for item in patentes
+            if item.get("cargo_id") and str(item["cargo_id"]).isdigit()
+        }
+        remover = [
+            cargo for cargo in membro.roles
+            if cargo.id in ids_cargos_patentes and (cargo_alvo is None or cargo.id != cargo_alvo.id)
+        ]
+        try:
+            if remover:
+                await membro.remove_roles(
+                    *remover,
+                    reason=f"{acao} de patente por {interaction.user} ({interaction.user.id})",
+                )
+            if cargo_alvo and cargo_alvo not in membro.roles:
+                await membro.add_roles(
+                    cargo_alvo,
+                    reason=f"{acao} de patente por {interaction.user} ({interaction.user.id})",
+                )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "Não consegui atualizar os cargos da patente. Confira a hierarquia e as permissões do bot; o perfil não foi alterado.",
+                ephemeral=True,
+            )
+            return
+        except discord.HTTPException:
+            await interaction.response.send_message(
+                "O Discord não concluiu a troca de cargo. O perfil não foi alterado.",
+                ephemeral=True,
+            )
+            return
+
+        perfil_atual = await get_perfil(interaction.guild.id, membro.id)
+        patente_anterior = str(perfil_atual.get("patente") or "Sem patente")
+        await definir_patente(interaction.guild.id, membro.id, alvo["nome"])
+        try:
+            from utils.registro_global import registrar
+            await registrar(
+                interaction.guild,
+                "progressao",
+                "Alteração manual de patente",
+                f"**Ação:** {acao}\n**Membro:** {membro.mention}\n"
+                f"**Responsável:** {interaction.user.mention}\n"
+                f"**De:** {patente_anterior}\n**Para:** {alvo['nome']}",
+                cor=0x9F1239,
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("Não foi possível registrar a alteração manual de patente.")
+        await interaction.response.send_message(
+            f"✅ Patente de {membro.mention} atualizada: **{patente_anterior}** → **{alvo['nome']}**.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="patente-promover", description="Promove um membro para uma patente superior.")
+    @app_commands.describe(membro="Membro que será promovido", patente="Patente superior configurada")
     @hierarquia_only()
     async def patente_promover(self, interaction: discord.Interaction, membro: discord.Member, patente: str):
         if not membro_pode_gerenciar_membro(interaction.user, membro):
             await interaction.response.send_message(
-                "Você só pode alterar a patente de membros abaixo da sua posição hierárquica.",
+                "Você só pode promover membros abaixo da sua posição hierárquica.",
                 ephemeral=True,
             )
             return
         patentes = await get_patentes(interaction.guild.id)
         alvo = next((p for p in patentes if p["nome"].lower() == patente.lower()), None)
         if not alvo:
-            await interaction.response.send_message("Não achei essa patente configurada. Use `/patente-listar` pra ver as opções.", ephemeral=True)
+            await interaction.response.send_message("Não achei essa patente configurada. Use /patente-listar para consultar.", ephemeral=True)
             return
+        perfil_atual = await get_perfil(interaction.guild.id, membro.id)
+        atual = next((p for p in patentes if p["nome"].lower() == str(perfil_atual.get("patente") or "").lower()), None)
+        if atual and int(alvo["xp_minimo"]) <= int(atual["xp_minimo"]):
+            await interaction.response.send_message("A patente escolhida não é superior à patente atual. Use /patente-rebaixar para reduzir uma patente.", ephemeral=True)
+            return
+        await self._definir_patente_manual(interaction, membro, alvo, patentes, "Promoção")
 
-        await definir_patente(interaction.guild.id, membro.id, alvo["nome"])
-        if alvo.get("cargo_id"):
-            cargo = interaction.guild.get_role(alvo["cargo_id"])
-            if cargo:
-                try:
-                    await membro.add_roles(cargo, reason=f"Promovido manualmente por {interaction.user}")
-                except discord.Forbidden:
-                    pass
-        await interaction.response.send_message(f"✅ {membro.mention} agora é **{alvo['nome']}**.")
+    @app_commands.command(name="patente-rebaixar", description="Rebaixa um membro para uma patente inferior.")
+    @app_commands.describe(membro="Membro que será rebaixado", patente="Patente inferior configurada")
+    @hierarquia_only()
+    async def patente_rebaixar(self, interaction: discord.Interaction, membro: discord.Member, patente: str):
+        if not membro_pode_gerenciar_membro(interaction.user, membro):
+            await interaction.response.send_message(
+                "Você só pode rebaixar membros abaixo da sua posição hierárquica.",
+                ephemeral=True,
+            )
+            return
+        patentes = await get_patentes(interaction.guild.id)
+        alvo = next((p for p in patentes if p["nome"].lower() == patente.lower()), None)
+        if not alvo:
+            await interaction.response.send_message("Não achei essa patente configurada. Use /patente-listar para consultar.", ephemeral=True)
+            return
+        perfil_atual = await get_perfil(interaction.guild.id, membro.id)
+        atual = next((p for p in patentes if p["nome"].lower() == str(perfil_atual.get("patente") or "").lower()), None)
+        if not atual or int(alvo["xp_minimo"]) >= int(atual["xp_minimo"]):
+            await interaction.response.send_message("A patente escolhida não é inferior à patente atual do membro.", ephemeral=True)
+            return
+        await self._definir_patente_manual(interaction, membro, alvo, patentes, "Rebaixamento")
 
     # ---------------- Rankings ----------------
     @app_commands.command(name="ranking-jogadores", description="Top jogadores do servidor por uma métrica.")
