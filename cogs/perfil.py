@@ -159,7 +159,7 @@ class Perfil(commands.Cog):
                 if isinstance(dados, dict)
             ),
             key=lambda item: (
-                int(item[1].get("pontos_temporada", item[1].get("pontos", 0)) or 0),
+                int(item[1].get("xp_temporada", item[1].get("xp", 0)) or 0),
                 int(item[1].get("vitorias", 0) or 0),
             ),
             reverse=True,
@@ -168,8 +168,8 @@ class Perfil(commands.Cog):
             (i for i, (uid, _) in enumerate(ordenados, start=1) if uid == str(alvo.id)),
             None,
         )
-        pontos_temporada = int(
-            perfil_global.get("pontos_temporada", perfil_global.get("pontos", 0)) or 0
+        xp_temporada = int(
+            perfil_global.get("xp_temporada", perfil_global.get("xp", 0)) or 0
         )
         tempo_top = max(0, int(perfil_global.get("tempo_top_global_segundos", 0) or 0))
         minutos_top = tempo_top // 60
@@ -264,7 +264,7 @@ class Perfil(commands.Cog):
             inline=True,
         )
         embed.add_field(name="◈ POSIÇÃO GLOBAL", value=f"#{posicao_global}" if posicao_global else "Sem posição", inline=True)
-        embed.add_field(name="◈ PONTOS DA TEMPORADA", value=f"{pontos_temporada:,}".replace(",", "."), inline=True)
+        embed.add_field(name="◈ XP NA TEMPORADA", value=f"{xp_temporada:,}".replace(",", "."), inline=True)
         embed.add_field(name="◈ TEMPORADA", value=f"#{int(estado_temporada.get('numero', 1) or 1)}", inline=True)
         embed.add_field(name="◈ TEMPO NO TOP 10", value=tempo_top_texto, inline=True)
         embed.add_field(name="◈ VITÓRIAS", value=str(p["vitorias"]), inline=True)
