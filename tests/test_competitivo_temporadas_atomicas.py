@@ -26,7 +26,8 @@ class TestCompetitivoTemporadasAtomicas(unittest.IsolatedAsyncioTestCase):
                 "10": {
                     "discordId": "10", "nome": "Campeão",
                     "pontos": 900, "pontos_temporada": 120,
-                    "vitorias": 8, "xp": 500, "tempo_top_global_segundos": 240,
+                    "vitorias": 8, "xp": 500, "xp_base_temporada": 300,
+                    "xp_temporada": 200, "tempo_top_global_segundos": 240,
                 }
             },
             "temporada_global": {
