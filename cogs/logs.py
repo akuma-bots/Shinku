@@ -247,6 +247,9 @@ class Logs(commands.Cog):
             timestamp=datetime.now(timezone.utc),
         )
         await self._enviar_log(canal, embed, categoria="mensagens")
+        if message.attachments:
+            await registrar_global(message.guild, "anexos", "Anexos removidos com mensagem", descricao, cor=0xED4245)
+        await registrar_global(message.guild, "historico_membros", "Mensagem removida", descricao, cor=0xED4245)
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
@@ -275,6 +278,9 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(antes.guild)
         if canal and canal.id != antes.channel.id:
             await self._enviar_log(canal, embed, categoria="mensagens")
+            if anexos_antes != anexos_depois:
+                await registrar_global(antes.guild, "anexos", "Anexos de mensagem alterados", embed.description or "Anexos alterados.", cor=0xFEE75C)
+            await registrar_global(antes.guild, "historico_membros", "Mensagem editada", embed.description or "Mensagem editada.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
@@ -310,6 +316,7 @@ class Logs(commands.Cog):
                 color=0xFEE75C,
             )
             await self._enviar_log(canal, embed, categoria="historico_membros")
+            await registrar_global(depois.guild, "historico_membros", "Apelido alterado", embed.description or "Apelido alterado.", cor=0xFEE75C)
 
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
@@ -334,6 +341,7 @@ class Logs(commands.Cog):
                     inline=False,
                 )
             await self._enviar_log(canal, embed, categoria="cargos")
+            await registrar_global(depois.guild, "historico_membros", "Cargos do membro alterados", embed.description or "Cargos alterados.", cor=0xB3132B)
 
         # Compatível com versões de discord.py em que o atributo não está
         # disponível no objeto Member. A comparação não pode derrubar o listener.
@@ -358,6 +366,7 @@ class Logs(commands.Cog):
                 inline=True,
             )
             await self._enviar_log(canal, embed, categoria="moderacao")
+            await registrar_global(depois.guild, "historico_membros", "Timeout alterado", embed.description or "Timeout alterado.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
@@ -379,11 +388,17 @@ class Logs(commands.Cog):
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="voz")
+            detalhe = f"{member.mention} entrou no canal de voz **{depois.channel.name}** (`{depois.channel.id}`)."
+            await self._enviar_log(canal, criar_embed(description=f"🔊 {detalhe}", color=0x57F287), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Entrada em chamada", detalhe, cor=0x57F287)
         elif antes.channel is not None and depois.channel is None:
-            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="voz")
+            detalhe = f"{member.mention} saiu do canal de voz **{antes.channel.name}** (`{antes.channel.id}`)."
+            await self._enviar_log(canal, criar_embed(description=f"🔇 {detalhe}", color=0xED4245), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Saída de chamada", detalhe, cor=0xED4245)
         elif antes.channel != depois.channel:
-            await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C), categoria="voz")
+            detalhe = f"{member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**."
+            await self._enviar_log(canal, criar_embed(description=f"🔀 {detalhe}", color=0xFEE75C), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Movimentação em chamada", detalhe, cor=0xFEE75C)
 
 
     @commands.Cog.listener()
