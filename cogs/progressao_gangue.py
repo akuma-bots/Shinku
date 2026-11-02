@@ -416,7 +416,7 @@ class ProgressaoGangue(commands.Cog):
         )
         embed.add_field(
             name="02  /  ATIVIDADES OFICIAIS",
-            value="Missões, contribuições e guerras geram registros mediante validação do OCTÓGONO e dos fluxos oficiais.",
+            value="Missões são validadas pelo OCTÓGONO; contribuições e guerras seguem os fluxos oficiais.",
             inline=True,
         )
         hierarquia = "\n".join(
