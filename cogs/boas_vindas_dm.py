@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, COR_PRIMARIA
 from utils.preferencias_notificacoes import obter_preferencias, definir_preferencia
 from utils.guia_servidores import (
     adicionar_seletor_guia,
@@ -44,7 +44,7 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
             "entre jogadores. Respeite as regras, acompanhe os anúncios e procure a equipe "
             "pelos canais oficiais quando precisar de suporte."
         ),
-        color=0x9F1239,
+        color=COR_PRIMARIA,
     )
     embed.add_field(name="TAG DA ORG", value=f"`{TAG_GANGUE}`", inline=True)
     embed.add_field(name="CARGO DE ENTRADA", value=f"<@&{CARGO_VISITANTES_ID}> (`{NOME_CARGO_VISITANTES}`) é atribuído automaticamente quando você entra.", inline=True)
@@ -70,7 +70,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     catalogo = carregar_catalogo_codigos()
     jogo = catalogo.get("jogos", {}).get(chave)
     if not jogo:
-        return criar_embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=0x9F1239)
+        return criar_embed(title="NÊMESIS ━ CÓDIGOS", description="O catálogo deste jogo está temporariamente indisponível.", color=COR_PRIMARIA)
     linhas = []
     for item in jogo.get("codigos", []):
         codigo = str(item.get("codigo", "")).strip()
@@ -85,7 +85,7 @@ def _embed_codigos(chave: str) -> discord.Embed:
     embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CÓDIGOS / {jogo['nome'].upper()}",
         description=(f"{jogo.get('descricao', '')}\n\n**Verificado em:** {catalogo.get('atualizado_em', 'indisponível')}{periodo}\n\n{descricao_codigos}")[:4096],
-        color=0x9F1239,
+        color=COR_PRIMARIA,
         url=jogo.get("fonte"),
     )
     embed.add_field(name="REQUISITOS E COMO RESGATAR", value=str(jogo.get("requisitos", "Confira os requisitos dentro do jogo."))[:1024], inline=False)
