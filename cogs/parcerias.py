@@ -559,10 +559,10 @@ class Parcerias(commands.Cog):
 
         from utils.registro_global import registrar as registrar_global
         detalhe_parceria = (
-            f"**Parceria:** {nome}\\n"
-            f"**Responsável:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
-            f"**Convite:** {convite}\\n"
-            f"**Canal:** {canal.mention}\\n"
+            f"**Parceria:** {nome}\n"
+            f"**Responsável:** {interaction.user.mention} (ID: {interaction.user.id})\n"
+            f"**Convite:** {convite}\n"
+            f"**Canal:** {canal.mention}\n"
             f"**Anúncio:** {'Publicado' if parceria.get('mensagem_id') else 'Pendente de publicação'}"
         )
         await registrar_global(
@@ -691,9 +691,9 @@ class Parcerias(commands.Cog):
 
         from utils.registro_global import registrar as registrar_global
         detalhe_remocao = (
-            f"**Parceria:** {alvo.get('nome', nome)}\\n"
-            f"**Responsável pela remoção:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
-            f"**Criada por:** <@{alvo.get('criado_por_id')}>\\n"
+            f"**Parceria:** {alvo.get('nome', nome)}\n"
+            f"**Responsável pela remoção:** {interaction.user.mention} (ID: {interaction.user.id})\n"
+            f"**Criada por:** <@{alvo.get('criado_por_id')}>\n"
             f"**Status:** Inativa"
         )
         await registrar_global(
