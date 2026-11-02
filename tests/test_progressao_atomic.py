@@ -123,6 +123,7 @@ class TestProgressaoAtomica(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(perfil["xp"], 0)
         self.assertEqual(perfil["historico_ranks"], [])
+        self.assertEqual(perfil["rank_no"], 12)
         self.assertIsInstance(self.dados["123"]["membros"]["456"], dict)
 
 
