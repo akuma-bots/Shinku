@@ -704,6 +704,8 @@ class ProgressaoGangue(commands.Cog):
             if not isinstance(cargos, dict):
                 cargos = {}
                 guild_data["cargos"] = cargos
+            for numero, cargo_padrao in CARGOS_PROGRESSAO_PADRAO.items():
+                cargos.setdefault(numero, cargo_padrao)
             duplicado = next(
                 (numero for numero, cargo_id in cargos.items()
                  if str(cargo_id) == str(cargo.id) and str(numero) != str(rank_no)),
