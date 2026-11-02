@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.guild_config import lideranca_only, hierarquia_only, membro_pode_gerenciar_membro
+from utils.guild_config import lideranca_only, hierarquia_only, membro_pode_gerenciar_membro, membro_pode_atribuir_cargo_hierarquico
 
 from utils.apresentacao import criar_embed
 from utils.storage import carregar
@@ -394,6 +394,13 @@ class Perfil(commands.Cog):
                     ephemeral=True,
                 )
                 return
+
+        if cargo_alvo and not membro_pode_atribuir_cargo_hierarquico(interaction.user, cargo_alvo):
+            await interaction.response.send_message(
+                "A patente escolhida está acima da sua autoridade hierárquica.",
+                ephemeral=True,
+            )
+            return
 
         ids_cargos_patentes = {
             int(item["cargo_id"])
