@@ -1,4 +1,4 @@
-from utils.apresentacao import criar_embed
+from utils.apresentacao import criar_embed, COR_PRIMARIA
 import asyncio
 import json
 import logging
@@ -176,7 +176,7 @@ class Novidades(commands.Cog):
                         "**◈ INFORMAÇÕES DA ATUALIZAÇÃO**\n"
                         "Consulte os botões abaixo para acessar os sistemas e acompanhar as missões."
                     ),
-                    color=0xB3132B,
+                    color=COR_PRIMARIA,
                     timestamp=datetime.now(timezone.utc),
                 )
                 _aplicar_identidade_bot(embed, guild, self.bot)
