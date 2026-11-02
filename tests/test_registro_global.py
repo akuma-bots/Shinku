@@ -72,6 +72,14 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         thread = Mock()
         thread.id = 789
         thread.parent_id = forum.id
+        thread.name = registro_global.CATEGORIAS["mensagens"][0]
+        thread.archived = False
+        thread.locked = False
+        forum.threads = []
+        async def sem_arquivados(limit=None):
+            if False:
+                yield None
+        forum.archived_threads.side_effect = sem_arquivados
         forum.guild.get_thread.return_value = thread
         with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
@@ -79,6 +87,32 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertIs(resultado, thread)
         forum.create_thread.assert_not_called()
         salvar.assert_not_awaited()
+
+    async def test_renomeia_topico_legado_salvo_sem_perder_historico(self):
+        forum = Mock()
+        forum.id = 456
+        forum.guild.id = registro_global.GUILD_NEMESIS_ID
+        thread = Mock()
+        thread.id = 789
+        thread.parent_id = forum.id
+        thread.name = "📌・Registros Antigos"
+        thread.archived = True
+        thread.locked = True
+        forum.threads = []
+        async def sem_arquivados(limit=None):
+            if False:
+                yield None
+        forum.archived_threads.side_effect = sem_arquivados
+        forum.guild.get_thread.return_value = thread
+        with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
+             patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
+            resultado = await registro_global._obter_topico(forum, "mensagens")
+        self.assertIs(resultado, thread)
+        thread.edit.assert_awaited_once()
+        self.assertEqual(thread.edit.await_args.kwargs["name"], registro_global.CATEGORIAS["mensagens"][0])
+        self.assertFalse(thread.edit.await_args.kwargs["archived"])
+        self.assertFalse(thread.edit.await_args.kwargs["locked"])
+        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 789)
 
 
 if __name__ == "__main__":
