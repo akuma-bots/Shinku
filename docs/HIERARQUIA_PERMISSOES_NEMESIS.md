@@ -18,6 +18,25 @@ A gestão de missões é exclusiva do OCTÓGONO. A regra vale para a central adm
 
 Não há permissões atribuídas a responsáveis de divisões enquanto esses responsáveis não forem designados.
 
+## Cargos de progressão e IDs oficiais
+
+| Rank | Cargo | ID |
+|---:|---|---:|
+| 12 | Lutador | `1563995879990624373` |
+| 11 | Subtenente | `1563995879990624374` |
+| 10 | Tenente | `1563995879990624375` |
+| 9 | Executor | `1563995879990624376` |
+| 8 | Especialista | `1563995879990624377` |
+| 7 | Elite | `1563995879995874937` |
+| 6 | Veterano | `1563995879998754938` |
+| 5 | Treinador | `1563995879998754939` |
+| 4 | Comandante | `1563995879998754940` |
+| 3 | Vice Capitão | `1563995879998754941` |
+| 2 | Capitão | `1563995879998754942` |
+| 1 | Capitão Geral | `1563995879998754943` |
+
+O Shinku preenche automaticamente os vínculos padrão sem sobrescrever configurações personalizadas. O OCTÓGONO pode alterar um vínculo pelo comando `/gangue-configurar-cargo`; cargos administrativos e o cargo-base NÊMESIS não podem ser usados como cargos de progressão.
+
 ## Ações hierárquicas
 
 Os cargos acima de Elite podem promover, rebaixar e banir:
