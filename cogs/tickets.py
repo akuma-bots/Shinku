@@ -176,7 +176,7 @@ async def fechar_canal_ticket(
                 "(guild=%s, canal=%s, ticket=%s).",
                 canal.guild.id,
                 canal.id,
-                (ticket or {}).get("id") if isinstance(ticket, dict) else "desconhecido",
+                "indisponível",
             )
 
     except Exception:
