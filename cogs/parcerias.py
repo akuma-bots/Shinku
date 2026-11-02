@@ -557,6 +557,29 @@ class Parcerias(commands.Cog):
             lista.append(parceria)
             await _salvar_da_guild(interaction.guild.id, lista)
 
+        from utils.registro_global import registrar as registrar_global
+        detalhe_parceria = (
+            f"**Parceria:** {nome}\\n"
+            f"**Responsável:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
+            f"**Convite:** {convite}\\n"
+            f"**Canal:** {canal.mention}\\n"
+            f"**Anúncio:** {'Publicado' if parceria.get('mensagem_id') else 'Pendente de publicação'}"
+        )
+        await registrar_global(
+            interaction.guild,
+            "parcerias",
+            "Nova parceria registrada",
+            detalhe_parceria,
+            cor=0xB3132B,
+        )
+        await registrar_global(
+            interaction.guild,
+            "historico_membros",
+            "Membro registrou parceria",
+            detalhe_parceria,
+            cor=0xB3132B,
+        )
+
         if cargo and not aviso_cargo:
 
             resultado_cargo = (
@@ -665,8 +688,29 @@ class Parcerias(commands.Cog):
                 interaction.guild.id,
                 lista,
             )
-    
-    
+
+        from utils.registro_global import registrar as registrar_global
+        detalhe_remocao = (
+            f"**Parceria:** {alvo.get('nome', nome)}\\n"
+            f"**Responsável pela remoção:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
+            f"**Criada por:** <@{alvo.get('criado_por_id')}>\\n"
+            f"**Status:** Inativa"
+        )
+        await registrar_global(
+            interaction.guild,
+            "parcerias",
+            "Parceria removida",
+            detalhe_remocao,
+            cor=0xED4245,
+        )
+        await registrar_global(
+            interaction.guild,
+            "historico_membros",
+            "Membro removeu parceria",
+            detalhe_remocao,
+            cor=0xED4245,
+        )
+
         await interaction.response.send_message(
             f"✓ Parceria com **{nome}** removida "
             "e marcada como inativa.",
