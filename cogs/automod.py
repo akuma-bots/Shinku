@@ -1574,11 +1574,11 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 "historico_membros",
                 "Infração identificada pelo AutoMod",
                 (
-                    f"**Membro:** <@{message.author.id}> (ID: {message.author.id})\\n"
-                    f"**Infração:** {infracao['tipo']}\\n"
-                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\\n"
-                    f"**Regra:** {infracao['regra_titulo']}\\n"
-                    f"**Canal:** <#{message.channel.id}>\\n"
+                    f"**Membro:** <@{message.author.id}> (ID: {message.author.id})\n"
+                    f"**Infração:** {infracao['tipo']}\n"
+                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\n"
+                    f"**Regra:** {infracao['regra_titulo']}\n"
+                    f"**Canal:** <#{message.channel.id}>\n"
                     "**Situação:** Aguardando revisão da equipe."
                 ),
                 cor=COR_AVISO,
@@ -1765,11 +1765,11 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 "historico_membros",
                 "Punição automática aplicada",
                 (
-                    f"**Membro:** <@{membro.id}> (ID: {membro.id})\\n"
-                    f"**Infração:** {infracao['tipo']}\\n"
-                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\\n"
-                    f"**Medida:** {nomes[medida]}\\n"
-                    f"**Canal:** <#{message.channel.id}>\\n"
+                    f"**Membro:** <@{membro.id}> (ID: {membro.id})\n"
+                    f"**Infração:** {infracao['tipo']}\n"
+                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\n"
+                    f"**Medida:** {nomes[medida]}\n"
+                    f"**Canal:** <#{message.channel.id}>\n"
                     f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
                 ),
                 cor=COR_ERRO if nivel >= 3 else COR_AVISO,
