@@ -242,6 +242,24 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
     return f"Já estava correto (**{rank_atual}**)."
 
 
+async def _registrar_evento_roblox(
+    guild: discord.Guild,
+    titulo: str,
+    descricao: str,
+    user_id: int | None = None,
+) -> None:
+    from utils.registro_global import registrar as registrar_global
+    await registrar_global(guild, "roblox", titulo, descricao, cor=0xB3132B)
+    if user_id is not None:
+        await registrar_global(
+            guild,
+            "historico_membros",
+            titulo,
+            f"**Membro:** <@{user_id}> (ID: {user_id})\n{descricao}",
+            cor=0xB3132B,
+        )
+
+
 class Roblox(commands.Cog):
     """Verificação e vínculo de conta Roblox, com sincronização automática de
     cargo por rank do grupo Roblox da gangue — quem sobe/desce de patente no
@@ -433,16 +451,33 @@ class Roblox(commands.Cog):
         if "Nenhum grupo" not in resultado_sync:
             mensagem += f"\n🎖️ {resultado_sync}"
 
+        await _registrar_evento_roblox(
+            interaction.guild,
+            "Conta Roblox vinculada",
+            (
+                f"**Conta Roblox:** {pendente['roblox_username']} (ID: {pendente['roblox_id']})\n"
+                f"**Membro Discord:** <@{interaction.user.id}>\n"
+                f"**Sincronização de cargo:** {resultado_sync}"
+            ),
+            interaction.user.id,
+        )
         await interaction.followup.send(mensagem, ephemeral=True)
 
     @app_commands.command(name="roblox-desvincular", description="Remove o vínculo da sua conta Roblox.")
     async def roblox_desvincular(self, interaction: discord.Interaction):
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
         guild_dados = vinculos.get(str(interaction.guild.id), {})
-        if guild_dados.pop(str(interaction.user.id), None) is None:
+        vinculo_removido = guild_dados.pop(str(interaction.user.id), None)
+        if vinculo_removido is None:
             await interaction.response.send_message("Você não tem nenhuma conta Roblox vinculada.", ephemeral=True)
             return
         await salvar(ARQUIVO_VINCULOS, vinculos)
+        await _registrar_evento_roblox(
+            interaction.guild,
+            "Conta Roblox desvinculada",
+            f"**Conta Roblox:** {vinculo_removido.get('roblox_username', 'Não informado')} (ID: {vinculo_removido.get('roblox_id', '—')})",
+            interaction.user.id,
+        )
         await interaction.response.send_message("🔓 Vínculo removido.", ephemeral=True)
 
     @app_commands.command(name="roblox-perfil", description="Mostra a conta Roblox vinculada de um membro.")
@@ -698,6 +733,24 @@ class Roblox(commands.Cog):
                             })
                             historico[str(guild.id)] = eventos[-200:]
                             await salvar(ARQUIVO_HISTORICO_ROBLOX, historico)
+                            rotulos = {
+                                "verificacao_inicial": "Vínculo Roblox verificado",
+                                "entrada": "Membro entrou no grupo Roblox",
+                                "saida": "Membro saiu do grupo Roblox",
+                                "alteracao_rank": "Rank Roblox alterado",
+                            }
+                            detalhe = (
+                                f"**Membro Discord:** <@{discord_id}> (ID: {discord_id})\n"
+                                f"**Conta Roblox:** {vinculo.get('roblox_username', 'Não informado')} (ID: {roblox_id})\n"
+                                f"**Rank anterior:** {rank_anterior or 'Sem rank'}\n"
+                                f"**Rank atual:** {rank_atual or 'Sem rank'}"
+                            )
+                            await _registrar_evento_roblox(
+                                guild,
+                                rotulos.get(tipo_evento, "Atualização Roblox"),
+                                detalhe,
+                                int(discord_id),
+                            )
                         resultado = await sincronizar_cargo_membro(guild, membro, roblox_id)
                         if resultado.startswith("Erro ao consultar"):
                             logger.warning("Consulta de rank falhou (guild=%s, user=%s): %s", guild.id, discord_id, resultado)
