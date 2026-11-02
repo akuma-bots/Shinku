@@ -767,14 +767,14 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                     f"Canal de regras inacessível: "
                     f"{erro}"
                 )
-
+                self.regras_cache_timestamp = time.time()
                 return self.regras_cache
 
         if not isinstance(
             canal,
             discord.TextChannel,
         ):
-
+            self.regras_cache_timestamp = time.time()
             return self.regras_cache
 
         partes = []
@@ -821,7 +821,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 "[AUTOMOD][ERRO] "
                 f"Falha ao ler regras: {erro}"
             )
-
+            self.regras_cache_timestamp = time.time()
             return self.regras_cache
 
         texto = "\n".join(
