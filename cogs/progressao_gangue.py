@@ -263,9 +263,21 @@ class ProgressaoGangue(commands.Cog):
                 cargos = {}
                 guild["cargos"] = cargos
             alterado = False
+            cargos_usados = {
+                str(cargo_id) for cargo_id in cargos.values()
+                if str(cargo_id).isdigit()
+            }
             for rank_no, cargo_id in CARGOS_PROGRESSAO_PADRAO.items():
                 if not str(cargos.get(rank_no, "")).isdigit():
+                    if str(cargo_id) in cargos_usados:
+                        log.warning(
+                            "Cargo padrão %s já está vinculado a outro rank; No. %s ficará sem vínculo até ajuste pelo OCTÓGONO.",
+                            cargo_id,
+                            rank_no,
+                        )
+                        continue
                     cargos[rank_no] = cargo_id
+                    cargos_usados.add(str(cargo_id))
                     alterado = True
             if alterado:
                 await self._salvar_dados(dados)
