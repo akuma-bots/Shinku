@@ -90,26 +90,45 @@ async def _obter_topico(forum: discord.ForumChannel, categoria: str) -> discord.
     nome, descricao = CATEGORIAS[categoria]
     async with _lock(forum.guild.id, categoria):
         ids = await _ler_ids(forum.guild.id)
+        # O ID salvo pode apontar para um tópico legado com nome antigo.
+        # Primeiro procuramos um tópico que já tenha o nome canônico; só depois
+        # reaproveitamos/renomeamos o ID salvo. Isso evita perpetuar a estrutura velha.
+        thread_salva = None
         thread_id = ids.get(categoria)
         if thread_id:
-            thread = forum.guild.get_thread(int(thread_id))
-            if thread is None:
+            thread_salva = forum.guild.get_thread(int(thread_id))
+            if thread_salva is None:
                 try:
-                    thread = await forum.guild.fetch_channel(int(thread_id))
+                    thread_salva = await forum.guild.fetch_channel(int(thread_id))
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    thread = None
-            if thread is not None and thread.parent_id == forum.id:
+                    thread_salva = None
+            if thread_salva is not None and thread_salva.parent_id != forum.id:
+                thread_salva = None
+
+        existentes = list(forum.threads)
+        async for thread in forum.archived_threads(limit=None):
+            if all(item.id != thread.id for item in existentes):
+                existentes.append(thread)
+
+        # Se o tópico canônico já existe, ele prevalece sobre qualquer ID legado.
+        for thread in existentes:
+            if thread.name == nome:
+                if ids.get(categoria) != thread.id:
+                    await _salvar_id(forum.guild.id, categoria, thread.id)
                 return thread
 
-        # Recupera tópicos já existentes antes de criar, inclusive arquivados.
-        for thread in forum.threads:
-            if thread.name == nome:
-                await _salvar_id(forum.guild.id, categoria, thread.id)
-                return thread
-        async for thread in forum.archived_threads(limit=100):
-            if thread.name == nome:
-                await _salvar_id(forum.guild.id, categoria, thread.id)
-                return thread
+        # Sem tópico canônico, preserva o histórico renomeando o tópico salvo.
+        if thread_salva is not None:
+            if thread_salva.name != nome or thread_salva.archived or thread_salva.locked:
+                await thread_salva.edit(
+                    name=nome,
+                    archived=False,
+                    locked=False,
+                    reason="Migração não destrutiva para o tópico canônico do Registro Global NÊMESIS",
+                )
+            if ids.get(categoria) != thread_salva.id:
+                await _salvar_id(forum.guild.id, categoria, thread_salva.id)
+            return thread_salva
 
         inicial = discord.Embed(
             title=nome,
