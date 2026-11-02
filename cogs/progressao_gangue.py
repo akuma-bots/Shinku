@@ -9,7 +9,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.storage import carregar, salvar
-from utils.guild_config import lideranca_only
+from utils.guild_config import octogono_only
 
 log = logging.getLogger(__name__)
 
@@ -569,7 +569,7 @@ class ProgressaoGangue(commands.Cog):
         app_commands.Choice(name="Contribuição", value="contribuicao"),
         app_commands.Choice(name="Guerra", value="guerra"),
     ])
-    @lideranca_only()
+    @octogono_only()
     async def gangue_registrar_atividade(self, interaction: discord.Interaction, membro: discord.Member, atividade: app_commands.Choice[str], quantidade: app_commands.Range[int, 1, 5000], motivo: str):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
