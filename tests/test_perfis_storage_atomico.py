@@ -60,7 +60,7 @@ class TestPerfisStorageAtomico(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(segunda["perfil"]["mvps"], 1)
         competitivo = await storage.carregar("competitivo.json", {})
         registro = competitivo["perfis"]["201"]
-        self.assertEqual(registro["pontos"], 60)
+        self.assertEqual(registro["pontos"], 0)\n        self.assertEqual(registro["xp_temporada"], 50)
         self.assertEqual(registro["xp"], 50)
 
     async def test_bonus_de_empate_e_pvp_nao_sobrescrevem_outros_campos(self):
