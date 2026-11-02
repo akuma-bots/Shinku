@@ -3,14 +3,14 @@ from unittest.mock import AsyncMock, patch
 from utils import competitivo_sync
 
 class TestCompetitivoSync(unittest.IsolatedAsyncioTestCase):
-    async def test_delta_preserva_campos_do_site(self):
+    async def test_pontos_legados_nao_sao_mais_acumulados_e_preserva_campos_do_site(self):
         dados = {'catalogo': [], 'perfis': {'123': {'discordId': '123', 'nome': 'Site', 'pontos': 80, 'elo': 1250, 'vitorias': 4, 'derrotas': 2, 'extra': 'manter'}}}
         async def atualizar(_arquivo, _padrao, transformador):
             return transformador(dados)
 
         with patch.object(competitivo_sync, 'atualizar_json', new=AsyncMock(side_effect=atualizar)) as atualizar_mock:
             perfil = await competitivo_sync.somar_pontos_competitivo(123, 'Atualizado', 15)
-        self.assertEqual(perfil['pontos'], 95)
+        self.assertEqual(perfil['pontos'], 80)
         self.assertEqual(perfil['elo'], 1250)
         self.assertEqual(perfil['extra'], 'manter')
         atualizar_mock.assert_awaited_once()
@@ -29,8 +29,8 @@ class TestCompetitivoSync(unittest.IsolatedAsyncioTestCase):
                 321, "Membro", 40, evento_id="guerra:77"
             )
 
-        self.assertEqual(primeira["pontos"], 40)
-        self.assertEqual(segunda["pontos"], 40)
+        self.assertEqual(primeira["pontos"], 0)
+        self.assertEqual(segunda["pontos"], 0)
         self.assertEqual(segunda["eventos_pontos_aplicados"], ["guerra:77"])
 
     async def test_migracao_nao_sobrescreve_perfil_existente(self):
@@ -52,7 +52,7 @@ class TestCompetitivoSync(unittest.IsolatedAsyncioTestCase):
         with patch.object(competitivo_sync, 'atualizar_json', new=AsyncMock(side_effect=atualizar)):
             perfil = await competitivo_sync.migrar_perfil_se_necessario(789, 'Novo membro', {'xp': 50, 'vitorias': 3, 'mvps': 2, 'derrotas': 1})
         self.assertEqual(perfil['discordId'], '789')
-        self.assertEqual(perfil['pontos'], 120)
+        self.assertEqual(perfil['pontos'], 0)\n        self.assertEqual(perfil['xp'], 50)\n        self.assertEqual(perfil['xp_temporada'], 50)
 
 if __name__ == '__main__':
     unittest.main()
