@@ -1566,7 +1566,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         try:
 
             await registrar_global(
-                message.guild, "seguranca", "AutoMod — Infração detectada",
+                message.guild, "automod", "AutoMod — Infração detectada",
                 embed=embed, view=PainelPunicao(self.bot),
             )
             await registrar_global(
@@ -1758,7 +1758,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         )
         try:
             await registrar_global(
-                guild, "seguranca", "AutoMod — Punição automática aplicada", embed=embed,
+                guild, "automod", "AutoMod — Punição automática aplicada", embed=embed,
             )
             await registrar_global(
                 guild,
@@ -1821,14 +1821,14 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         )
         try:
             await registrar_global(
-                message.guild, "seguranca", "AutoMod — Punição não aplicada", embed=embed,
+                message.guild, "automod", "AutoMod — Punição não aplicada", embed=embed,
             )
         except discord.HTTPException:
             pass
 
     async def enviar_auditoria(self, guild: discord.Guild, embed: discord.Embed):
         await registrar_global(
-            guild, "seguranca", embed.title or "Auditoria AutoMod", embed=embed,
+            guild, "automod", embed.title or "Auditoria AutoMod", embed=embed,
         )
 
     async def registrar_decisao(self, guild_id: int, alvo_id: int, tipo: str, nivel: int, motivo: str, moderador_id: int, infracao: str):
