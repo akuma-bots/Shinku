@@ -1941,6 +1941,13 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         await self.enviar_auditoria(guild, log)
+        await registrar_global(
+            guild,
+            "historico_membros",
+            "Punição aplicada após revisão do AutoMod",
+            log.description or "Punição registrada pela equipe.",
+            cor=COR_ERRO if nivel >= 3 else COR_AVISO,
+        )
 
     async def registrar_nao_punir(self, interaction: discord.Interaction, alvo_id: int, motivo: str, embed: discord.Embed, mensagem: discord.Message):
         guild = interaction.guild
@@ -1972,6 +1979,13 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             timestamp=datetime.datetime.now(datetime.timezone.utc),
         )
         await self.enviar_auditoria(guild, log)
+        await registrar_global(
+            guild,
+            "historico_membros",
+            "Infração revisada sem punição",
+            log.description or "A equipe decidiu não aplicar punição.",
+            cor=COR_SUCESSO,
+        )
 
     # ========================================================
     # BANIMENTOS TEMPORÁRIOS
