@@ -19,6 +19,12 @@ GUILD_NEMESIS_ID = 1563995879981981817
 CANAL_ENTRADAS_ID = 1563995880623841331
 
 
+def _formatar_linhas_registro(linhas, limite: int = 3800) -> str:
+    """Monta texto multilinha previsível e respeita o limite seguro do embed."""
+    limite_seguro = max(1, int(limite))
+    return "\\n".join(str(linha) for linha in linhas if linha is not None)[:limite_seguro]
+
+
 class Logs(commands.Cog):
     """Registra eventos do servidor (entradas, saídas, edições e exclusões de mensagem)
     no Fórum central de Registro Global da NÊMESIS."""
