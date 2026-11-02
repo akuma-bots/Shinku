@@ -296,6 +296,18 @@ def validar_privacidade(forum: discord.ForumChannel) -> None:
         elif isinstance(alvo, discord.Member) and alvo != guild.me:
             if overwrite.view_channel is True:
                 raise PermissionError(f"Membro não autorizado ainda possui acesso individual: {alvo.id}")
+    # Também verifica permissões herdadas da categoria, mesmo quando o cargo
+    # não possui overwrite próprio no Fórum.
+    cargos_servidor = getattr(guild, "roles", [])
+    if isinstance(cargos_servidor, (list, tuple, set)):
+        for role in cargos_servidor:
+            if (
+                isinstance(role, discord.Role)
+                and role != guild.default_role
+                and role.id not in CARGOS_ACESSO_IDS
+                and forum.permissions_for(role).view_channel
+            ):
+                raise PermissionError(f"Cargo não autorizado herda acesso ao Fórum: {role.name}")
     ausentes = []
     for role_id in CARGOS_ACESSO_IDS:
         role = guild.get_role(role_id)
@@ -339,6 +351,14 @@ async def configurar_permissoes(forum: discord.ForumChannel) -> None:
         overwrites[alvo] = overwrite
 
     overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+    for role in getattr(guild, "roles", []):
+        if (
+            isinstance(role, discord.Role)
+            and role != guild.default_role
+            and role.id not in CARGOS_ACESSO_IDS
+        ):
+            overwrites[role] = discord.PermissionOverwrite(view_channel=False)
+
     for role_id in CARGOS_ACESSO_IDS:
         role = guild.get_role(role_id)
         if role is None:
