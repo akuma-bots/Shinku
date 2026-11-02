@@ -166,6 +166,29 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
         dados["guerras"].append(registro)
         await self._salvar_dados_guild(interaction.guild.id, dados)
 
+        from utils.registro_global import registrar
+        detalhe_registro = (
+            f"**Protocolo:** {registro_id}\n"
+            f"**Placar:** NÊMESIS {placar_nemesis} × {placar_inimiga} {gangue_inimiga}\n"
+            f"**Resultado:** {status}\n"
+            f"**Temporada:** {registro['temporada']}\n"
+            f"**Responsável:** {interaction.user.mention} (ID: {interaction.user.id})"
+        )
+        await registrar(
+            interaction.guild,
+            "competicoes",
+            f"Guerra registrada • {gangue_inimiga}",
+            detalhe_registro,
+            cor=COR_NEMESIS,
+        )
+        await registrar(
+            interaction.guild,
+            "historico_membros",
+            "Membro registrou resultado de guerra",
+            detalhe_registro,
+            cor=COR_NEMESIS,
+        )
+
         embed = criar_embed(
             title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ RELATÓRIO OFICIAL DE GUERRA",
             description=(
@@ -201,17 +224,6 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             registro["mensagem_id"] = mensagem.id
             registro["canal_id"] = canal.id
             await self._salvar_dados_guild(interaction.guild.id, dados)
-            from utils.registro_global import registrar
-            await registrar(
-                interaction.guild,
-                "competicoes",
-                f"Guerra registrada • {gangue_inimiga}",
-                f"Protocolo: `{registro_id}`\nPlacar: **NÊMESIS {placar_nemesis} × {placar_inimiga} {gangue_inimiga}**\n"
-                f"Resultado: **{status}**\nTemporada: `{registro['temporada']}`\n"
-                f"Responsável: {interaction.user.mention} (`{interaction.user.id}`)\n"
-                f"Relatório público: {mensagem.jump_url}",
-                cor=COR_NEMESIS,
-            )
         except (discord.Forbidden, discord.HTTPException):
             await interaction.followup.send(
                 "O resultado foi salvo no histórico, mas não consegui publicar no canal de guerras. Verifique as permissões do bot.",
