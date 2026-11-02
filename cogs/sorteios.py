@@ -977,6 +977,28 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         await self.salvar_sorteio(
             sorteio
         )
+        from utils.registro_global import registrar as registrar_global
+        detalhe_criacao = (
+            f"**Sorteio:** {sorteio_id}\\n"
+            f"**Prêmio:** {premio[:700]}\\n"
+            f"**Criado por:** {interaction.user.mention} (ID: {interaction.user.id})\\n"
+            f"**Participação:** {vencedores} vencedor(es) · {duracao_minutos} minuto(s)\\n"
+            f"**Canal:** {canal_destino.mention}"
+        )
+        await registrar_global(
+            interaction.guild,
+            "sorteios",
+            "Sorteio criado",
+            detalhe_criacao,
+            cor=COR_PRIMARIA,
+        )
+        await registrar_global(
+            interaction.guild,
+            "historico_membros",
+            "Sorteio criado pelo membro",
+            detalhe_criacao,
+            cor=COR_PRIMARIA,
+        )
 
         await interaction.edit_original_response(
             content=(
@@ -1500,6 +1522,14 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             try:
                 await canal.send(embed=embed)
                 await self._marcar_anuncio_enviado(sorteio)
+                from utils.registro_global import registrar as registrar_global
+                await registrar_global(
+                    canal.guild,
+                    "sorteios",
+                    "Sorteio encerrado sem participantes",
+                    f"**Sorteio:** {sorteio_id}\\n**Prêmio:** {sorteio.get('premio', 'Não informado')}\\n**Participantes:** 0",
+                    cor=COR_ERRO,
+                )
             except (discord.Forbidden, discord.HTTPException) as erro:
                 await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
                 return
@@ -1546,6 +1576,28 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 embed=embed,
             )
             await self._marcar_anuncio_enviado(sorteio)
+            from utils.registro_global import registrar as registrar_global
+            detalhe_resultado = (
+                f"**Sorteio:** {sorteio_id}\\n"
+                f"**Prêmio:** {sorteio.get('premio', 'Não informado')}\\n"
+                f"**Participantes:** {len(participantes)}\\n"
+                f"**Vencedores:** {', '.join(str(uid) for uid in vencedores_ids) if vencedores_ids else 'Nenhum selecionado'}"
+            )
+            await registrar_global(
+                canal.guild,
+                "sorteios",
+                "Resultado de sorteio publicado",
+                detalhe_resultado,
+                cor=COR_SUCESSO,
+            )
+            for usuario_id in vencedores_ids:
+                await registrar_global(
+                    canal.guild,
+                    "historico_membros",
+                    "Membro venceu um sorteio",
+                    f"**Membro:** <@{usuario_id}> (ID: {usuario_id})\\n{detalhe_resultado}",
+                    cor=COR_SUCESSO,
+                )
         except (discord.Forbidden, discord.HTTPException) as erro:
             await self._reabrir_apos_falha_de_anuncio(sorteio, erro)
 
