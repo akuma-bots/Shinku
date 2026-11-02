@@ -54,6 +54,27 @@ class Recordes(commands.Cog):
             return
 
         emoji, nome, unidade = _categoria(categoria)
+        detalhe = (
+            f"**Competidor:** <@{user_id}> (ID: {user_id})\\n"
+            f"**Recorde:** {discord.utils.escape_markdown(nome)}\\n"
+            f"**Marca registrada:** {_valor(valor, unidade)}"
+        )
+        from utils.registro_global import registrar as registrar_global
+        await registrar_global(
+            guild,
+            "conquistas",
+            "Novo recorde da NÊMESIS",
+            detalhe,
+            cor=COR_PRIMARIA,
+        )
+        await registrar_global(
+            guild,
+            "historico_membros",
+            "Recorde pessoal atualizado",
+            detalhe,
+            cor=COR_PRIMARIA,
+        )
+
         config = await get_config(guild.id)
         canal_id = config.get("canal_recordes_id")
         canal = guild.get_channel(canal_id) if canal_id else None
