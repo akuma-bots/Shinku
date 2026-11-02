@@ -96,6 +96,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         legado.id = 789
         legado.parent_id = forum.id
         legado.name = "📌・Registros Antigos"
+        legado.edit = AsyncMock()
         canonico = Mock()
         canonico.id = 790
         canonico.parent_id = forum.id
