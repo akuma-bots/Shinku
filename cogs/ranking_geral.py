@@ -428,12 +428,12 @@ class RankingGeral(
                 user_id = int(uid)
             except (TypeError, ValueError):
                 continue
-            pontos = int(perfil.get("pontos_temporada", perfil.get("pontos", 0)) or 0)
+            xp_temporada = int(perfil.get("xp_temporada", perfil.get("xp", 0)) or 0)
             xp = int(perfil.get("xp", 0) or 0)
             vitorias = int(perfil.get("vitorias", 0) or 0)
             derrotas = int(perfil.get("derrotas", 0) or 0)
             tempo_top = int(perfil.get("tempo_top_global_segundos", 0) or 0)
-            pontuados.append((user_id, pontos, vitorias, xp, derrotas, tempo_top))
+            pontuados.append((user_id, xp_temporada, vitorias, xp, derrotas, tempo_top))
 
         top = sorted(pontuados, key=lambda item: (item[1], item[2]), reverse=True)[:10]
         estado = dados.get("temporada_global", {})
@@ -448,7 +448,7 @@ class RankingGeral(
             title="🏆 RANKING GLOBAL · TEMPORADA COMPETITIVA",
             description=(
                 "**CLASSIFICAÇÃO OFICIAL NÊMESIS**\n"
-                "A posição é definida pela pontuação sazonal. XP, vitórias, derrotas e permanência no Top 10 "
+                "A posição é definida pela XP acumulado na temporada. Vitórias, derrotas e permanência no Top 10 "
                 "são métricas complementares; o histórico das temporadas concluídas é preservado."
             ),
             color=0x9F1239,
@@ -462,12 +462,12 @@ class RankingGeral(
         if not top:
             embed.add_field(
                 name="QUADRO AINDA VAZIO",
-                value="Nenhum jogador possui pontos nesta temporada. Participe das atividades competitivas oficiais para entrar na classificação.",
+                value="Nenhum jogador possui XP competitivo nesta temporada. Participe das atividades competitivas oficiais para entrar na classificação.",
                 inline=False,
             )
         else:
             medalhas = {1: "🥇", 2: "🥈", 3: "🥉"}
-            for posicao, (uid, pontos, vitorias, xp, derrotas, tempo_top) in enumerate(top, start=1):
+            for posicao, (uid, xp_temporada, vitorias, xp, derrotas, tempo_top) in enumerate(top, start=1):
                 minutos = max(0, tempo_top) // 60
                 horas_top, minutos_restantes = divmod(minutos, 60)
                 tempo_texto = f"{horas_top}h {minutos_restantes}min"
@@ -475,7 +475,7 @@ class RankingGeral(
                 membro = guild.get_member(uid)
                 nome = membro.display_name if membro else f"Jogador {uid}"
                 embed.add_field(
-                    name=f"{selo}  {nome[:70]}  ·  {pontos:,} P.C.".replace(",", ".")[:256],
+                    name=f"{selo}  {nome[:70]}  ·  {xp_temporada:,} XP".replace(",", ".")[:256],
                     value=(
                         f"<@{uid}>\n"
                         f"**VITÓRIAS** {vitorias}  ·  **DERROTAS** {derrotas}\n"
