@@ -634,9 +634,14 @@ class ProgressaoGangue(commands.Cog):
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
             return
         bot_member = interaction.guild.me
-        if bot_member is None or cargo >= bot_member.top_role or cargo.managed:
+        if (
+            bot_member is None
+            or cargo >= bot_member.top_role
+            or cargo.managed
+            or not membro_pode_atribuir_cargo_hierarquico(interaction.user, cargo)
+        ):
             await interaction.response.send_message(
-                "O cargo escolhido precisa estar abaixo do cargo mais alto do bot e não pode ser gerenciado por integração.",
+                "O cargo escolhido precisa estar abaixo da autoridade do OCTÓGONO e do cargo mais alto do bot, e não pode ser gerenciado por integração.",
                 ephemeral=True,
             )
             return
