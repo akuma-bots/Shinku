@@ -404,26 +404,35 @@ class Perfil(commands.Cog):
             cargo for cargo in membro.roles
             if cargo.id in ids_cargos_patentes and (cargo_alvo is None or cargo.id != cargo_alvo.id)
         ]
+        cargo_adicionado = False
         try:
-            if remover:
-                await membro.remove_roles(
-                    *remover,
-                    reason=f"{acao} de patente por {interaction.user} ({interaction.user.id})",
-                )
+            # Adiciona primeiro o destino; só remove o cargo anterior depois
+            # que o Discord confirmar a atribuição do novo.
             if cargo_alvo and cargo_alvo not in membro.roles:
                 await membro.add_roles(
                     cargo_alvo,
                     reason=f"{acao} de patente por {interaction.user} ({interaction.user.id})",
                 )
-        except discord.Forbidden:
+                cargo_adicionado = True
+            if remover:
+                await membro.remove_roles(
+                    *remover,
+                    reason=f"{acao} de patente por {interaction.user} ({interaction.user.id})",
+                )
+        except (discord.Forbidden, discord.HTTPException):
+            if cargo_adicionado and cargo_alvo:
+                try:
+                    await membro.remove_roles(
+                        cargo_alvo,
+                        reason="Reversão da troca de patente após falha na atualização",
+                    )
+                except (discord.Forbidden, discord.HTTPException):
+                    import logging
+                    logging.getLogger(__name__).exception(
+                        "Falha ao reverter o novo cargo após erro na troca de patente."
+                    )
             await interaction.response.send_message(
-                "Não consegui atualizar os cargos da patente. Confira a hierarquia e as permissões do bot; o perfil não foi alterado.",
-                ephemeral=True,
-            )
-            return
-        except discord.HTTPException:
-            await interaction.response.send_message(
-                "O Discord não concluiu a troca de cargo. O perfil não foi alterado.",
+                "O Discord não concluiu a troca de cargo. O perfil não foi alterado; confira a hierarquia e as permissões do bot.",
                 ephemeral=True,
             )
             return
