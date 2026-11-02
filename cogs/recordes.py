@@ -55,8 +55,8 @@ class Recordes(commands.Cog):
 
         emoji, nome, unidade = _categoria(categoria)
         detalhe = (
-            f"**Competidor:** <@{user_id}> (ID: {user_id})\\n"
-            f"**Recorde:** {discord.utils.escape_markdown(nome)}\\n"
+            f"**Competidor:** <@{user_id}> (ID: {user_id})\n"
+            f"**Recorde:** {discord.utils.escape_markdown(nome)}\n"
             f"**Marca registrada:** {_valor(valor, unidade)}"
         )
         from utils.registro_global import registrar as registrar_global
