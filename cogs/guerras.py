@@ -204,7 +204,7 @@ class Guerras(commands.GroupCog, group_name="guerra", group_description="Guerras
             from utils.registro_global import registrar
             await registrar(
                 interaction.guild,
-                "sistemas",
+                "competicoes",
                 f"Guerra registrada • {gangue_inimiga}",
                 f"Protocolo: `{registro_id}`\nPlacar: **NÊMESIS {placar_nemesis} × {placar_inimiga} {gangue_inimiga}**\n"
                 f"Resultado: **{status}**\nTemporada: `{registro['temporada']}`\n"

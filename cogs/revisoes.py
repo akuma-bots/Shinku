@@ -502,7 +502,7 @@ class Revisoes(commands.Cog):
             from utils.registro_global import registrar
             await registrar(
                 guild,
-                "sistemas",
+                "missoes",
                 f"Evidência enviada para revisão • {revisao.get('titulo', 'Atividade')}",
                 f"Protocolo: `{revisao.get('id', '—')}`\n"
                 f"Tipo: **{revisao.get('tipo', '—')}**\n"

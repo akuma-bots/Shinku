@@ -11,7 +11,7 @@ from utils.guia_servidores import (
     TAG_ORG_NEMESIS,
 )
 from utils.storage import carregar
-from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, garantir_topicos, registrar as registrar_global
+from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, CATEGORIAS, garantir_topicos, registrar as registrar_global
 
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,8 @@ class Logs(commands.Cog):
             return
         try:
             topicos = await garantir_topicos(guild)
-            self._topicos_prontos = len(topicos) == 8
-            logger.info("Registro Global pronto: %s tópicos permanentes verificados.", len(topicos))
+            self._topicos_prontos = len(topicos) == len(CATEGORIAS)
+            logger.info("Registro Global pronto: %s/%s tópicos permanentes verificados.", len(topicos), len(CATEGORIAS))
         except Exception:
             logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
 
@@ -95,13 +95,16 @@ class Logs(commands.Cog):
             try:
                 canal = await self.bot.fetch_channel(CANAL_ENTRADAS_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logger.exception("Entrada não publicada: canal de entradas indisponível (guild=%s, channel=%s, member=%s).",
-                                 member.guild.id, CANAL_ENTRADAS_ID, member.id)
-                return
-        if not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID:
-            logger.error("Entrada não publicada: destino não é um canal de texto válido da NÊMESIS (channel=%s).",
-                         CANAL_ENTRADAS_ID)
-            return
+                logger.exception(
+                    "Canal de boas-vindas indisponível (guild=%s, channel=%s, member=%s).",
+                    member.guild.id, CANAL_ENTRADAS_ID, member.id,
+                )
+                canal = None
+        if canal is not None and (
+            not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID
+        ):
+            logger.error("Destino de boas-vindas inválido (channel=%s).", CANAL_ENTRADAS_ID)
+            canal = None
 
         # Dá tempo ao rastreador para persistir a atribuição deste evento.
         import asyncio
@@ -164,17 +167,17 @@ class Logs(commands.Cog):
             inline=False,
         )
         embed.set_footer(text="NÊMESIS • TAG DA ORG: NΞM • Sistema oficial de integração")
-        enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
-        if enviado:
-            logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
-                        member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
-        else:
-            logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
-                         member.guild.id, member.id, canal.id)
-            return
+        if canal is not None:
+            enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
+            if enviado:
+                logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
+                            member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
+            else:
+                logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
+                             member.guild.id, member.id, canal.id)
         await registrar_global(
             member.guild,
-            "membros",
+            "entradas",
             "Novo membro na NÊMESIS",
             (
                 f"Membro: {member.mention} (`{member.id}`)\n"
@@ -188,15 +191,30 @@ class Logs(commands.Cog):
             ),
             cor=0x57F287,
         )
+        await registrar_global(
+            member.guild, "historico_membros", "Entrada no histórico do membro",
+            f"Membro: {member} (ID: {member.id})\nEntrada: {discord.utils.format_dt(agora, style='F')}\nConta criada: {discord.utils.format_dt(member.created_at, style='F')}",
+            cor=0x57F287,
+        )
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
+        agora = datetime.now(timezone.utc)
         canal = await self._canal_logs(member.guild)
-        if not canal:
-            return
-        embed = criar_embed(description=f"📤 {member.mention} saiu do servidor.", color=0xED4245)
-        embed.set_thumbnail(url=member.display_avatar.url)
-        await self._enviar_log(canal, embed, categoria="membros")
+        if canal:
+            embed = criar_embed(
+                title="Saída de membro",
+                description=f"📤 {member} (ID: {member.id}) saiu da NÊMESIS.",
+                color=0xED4245,
+                timestamp=agora,
+            )
+            embed.set_thumbnail(url=member.display_avatar.url)
+            await self._enviar_log(canal, embed, categoria="entradas")
+        await registrar_global(
+            member.guild, "historico_membros", "Saída do membro",
+            f"Membro: {member} (ID: {member.id})\\nSaída registrada: {discord.utils.format_dt(agora, style='F')}",
+            cor=0xED4245,
+        )
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -229,6 +247,9 @@ class Logs(commands.Cog):
             timestamp=datetime.now(timezone.utc),
         )
         await self._enviar_log(canal, embed, categoria="mensagens")
+        if message.attachments:
+            await registrar_global(message.guild, "anexos", "Anexos removidos com mensagem", descricao, cor=0xED4245)
+        await registrar_global(message.guild, "historico_membros", "Mensagem removida", descricao, cor=0xED4245)
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
@@ -257,6 +278,9 @@ class Logs(commands.Cog):
         canal = await self._canal_logs(antes.guild)
         if canal and canal.id != antes.channel.id:
             await self._enviar_log(canal, embed, categoria="mensagens")
+            if anexos_antes != anexos_depois:
+                await registrar_global(antes.guild, "anexos", "Anexos de mensagem alterados", embed.description or "Anexos alterados.", cor=0xFEE75C)
+            await registrar_global(antes.guild, "historico_membros", "Mensagem editada", embed.description or "Mensagem editada.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
@@ -291,7 +315,8 @@ class Logs(commands.Cog):
                 ),
                 color=0xFEE75C,
             )
-            await self._enviar_log(canal, embed, categoria="membros")
+            await self._enviar_log(canal, embed, categoria="historico_membros")
+            await registrar_global(depois.guild, "historico_membros", "Apelido alterado", embed.description or "Apelido alterado.", cor=0xFEE75C)
 
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
@@ -315,7 +340,8 @@ class Logs(commands.Cog):
                     value=" ".join(cargo.mention for cargo in perdidos)[:1024],
                     inline=False,
                 )
-            await self._enviar_log(canal, embed, categoria="membros")
+            await self._enviar_log(canal, embed, categoria="cargos")
+            await registrar_global(depois.guild, "historico_membros", "Cargos do membro alterados", embed.description or "Cargos alterados.", cor=0xB3132B)
 
         # Compatível com versões de discord.py em que o atributo não está
         # disponível no objeto Member. A comparação não pode derrubar o listener.
@@ -340,6 +366,7 @@ class Logs(commands.Cog):
                 inline=True,
             )
             await self._enviar_log(canal, embed, categoria="moderacao")
+            await registrar_global(depois.guild, "historico_membros", "Timeout alterado", embed.description or "Timeout alterado.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
@@ -361,11 +388,17 @@ class Logs(commands.Cog):
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            await self._enviar_log(canal, criar_embed(description=f"🔊 {member.mention} entrou no canal de voz **{depois.channel.name}**.", color=0x57F287), categoria="membros")
+            detalhe = f"{member.mention} entrou no canal de voz **{depois.channel.name}** (`{depois.channel.id}`)."
+            await self._enviar_log(canal, criar_embed(description=f"🔊 {detalhe}", color=0x57F287), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Entrada em chamada", detalhe, cor=0x57F287)
         elif antes.channel is not None and depois.channel is None:
-            await self._enviar_log(canal, criar_embed(description=f"🔇 {member.mention} saiu do canal de voz **{antes.channel.name}**.", color=0xED4245), categoria="membros")
+            detalhe = f"{member.mention} saiu do canal de voz **{antes.channel.name}** (`{antes.channel.id}`)."
+            await self._enviar_log(canal, criar_embed(description=f"🔇 {detalhe}", color=0xED4245), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Saída de chamada", detalhe, cor=0xED4245)
         elif antes.channel != depois.channel:
-            await self._enviar_log(canal, criar_embed(description=f"🔀 {member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**.", color=0xFEE75C), categoria="membros")
+            detalhe = f"{member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**."
+            await self._enviar_log(canal, criar_embed(description=f"🔀 {detalhe}", color=0xFEE75C), categoria="voz")
+            await registrar_global(member.guild, "historico_membros", "Movimentação em chamada", detalhe, cor=0xFEE75C)
 
 
     @commands.Cog.listener()
@@ -514,7 +547,7 @@ class Logs(commands.Cog):
         if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            invite.guild, "seguranca", "Convite criado",
+            invite.guild, "convites", "Convite criado",
             f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}\n"
             f"Criado por: {invite.inviter.mention if invite.inviter else 'Não identificado'}\n"
             f"Usos máximos: {invite.max_uses or 'Ilimitado'}",
@@ -526,7 +559,7 @@ class Logs(commands.Cog):
         if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            invite.guild, "seguranca", "Convite removido",
+            invite.guild, "convites", "Convite removido",
             f"Código: `{invite.code}`\nCanal: {invite.channel.mention if invite.channel else 'Não identificado'}",
             cor=0xED4245,
         )
@@ -556,7 +589,7 @@ class Logs(commands.Cog):
             f"Término: {discord.utils.format_dt(event.end_time, style='F') if event.end_time else 'Não definido'}"
         )
         await registrar_global(
-            event.guild, "sistemas", "Evento agendado criado", descricao,
+            event.guild, "eventos", "Evento agendado criado", descricao,
             cor=0x57F287,
         )
 
@@ -565,7 +598,7 @@ class Logs(commands.Cog):
         if event.guild.id != GUILD_NEMESIS_ID:
             return
         await registrar_global(
-            event.guild, "sistemas", "Evento agendado removido",
+            event.guild, "eventos", "Evento agendado removido",
             f"Evento: **{event.name}** (`{event.id}`)\nStatus final: {event.status}",
             cor=0xED4245,
         )
@@ -582,7 +615,7 @@ class Logs(commands.Cog):
                 mudancas.append(f"{rotulo}: {valor_antes} → {valor_depois}")
         if mudancas:
             await registrar_global(
-                depois.guild, "sistemas", "Evento agendado atualizado",
+                depois.guild, "eventos", "Evento agendado atualizado",
                 f"Evento: **{depois.name}** (`{depois.id}`)\n" + "\n".join(mudancas),
                 cor=0xFEE75C,
             )

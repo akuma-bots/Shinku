@@ -33,6 +33,27 @@ CATEGORIAS = {
     "administracao": ("🏛️・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
     "seguranca": ("🚨・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
     "formularios": ("📋・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
+    "progressao": ("📈・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
+    "missoes": ("🎯・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
+    "competicoes": ("⚔️・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
+    "eventos": ("🏆・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
+    "parcerias": ("🤝・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
+    "integracoes": ("🔗・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
+    "infraestrutura": ("🖥️・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
+    "configuracoes": ("⚙️・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
+    "entradas": ("📥・Histórico de Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
+    "historico_membros": ("🧾・Histórico dos Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
+    "cargos": ("🎖️・Histórico de Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
+    "convites": ("🔗・Histórico de Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
+    "voz": ("🎙️・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
+    "anexos": ("📎・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
+    "atividade": ("📊・Atividade dos Membros", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
+    "conquistas": ("🏅・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
+    "sorteios": ("🎁・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
+    "sugestoes": ("💡・Sugestões e Votações", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
+    "relatorios": ("📑・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
+    "roblox": ("🧩・Integração Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
+    "automod": ("🤖・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
 }
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 
@@ -213,7 +234,7 @@ async def configurar_permissoes(forum: discord.ForumChannel) -> None:
 
 
 async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
-    """Cria ou recupera os oito tópicos fixos; não cria duplicatas por evento."""
+    """Cria ou recupera os tópicos fixos configurados; não cria duplicatas por evento."""
     if guild.id != GUILD_NEMESIS_ID:
         return {}
     canal = guild.get_channel(CANAL_REGISTRO_GLOBAL_ID)
