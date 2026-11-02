@@ -124,17 +124,39 @@ async def _obter_topico(
                 return thread
 
         # Sem tópico canônico, preserva o histórico renomeando o tópico salvo.
+        # Se o Discord negar a migração, cria o destino canônico e deixa o legado
+        # na lista para que a rotina de limpeza tente arquivá-lo sem apagar mensagens.
         if thread_salva is not None:
-            if thread_salva.name != nome or thread_salva.archived or thread_salva.locked:
-                await thread_salva.edit(
-                    name=nome,
-                    archived=False,
-                    locked=False,
-                    reason="Migração não destrutiva para o tópico canônico do Registro Global NÊMESIS",
+            if topicos_existentes is not None and all(
+                item.id != thread_salva.id for item in topicos_existentes
+            ):
+                topicos_existentes.append(thread_salva)
+            try:
+                if thread_salva.name != nome or thread_salva.archived or thread_salva.locked:
+                    nome_antigo = thread_salva.name
+                    await thread_salva.edit(
+                        name=nome,
+                        archived=False,
+                        locked=False,
+                        reason="Migração não destrutiva para o tópico canônico do Registro Global NÊMESIS",
+                    )
+                    _LOG.info(
+                        "Tópico legado migrado sem apagar histórico: %s (%s) -> %s",
+                        nome_antigo,
+                        thread_salva.id,
+                        nome,
+                    )
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception(
+                    "Não foi possível renomear o tópico legado %s (%s); será criado o tópico canônico.",
+                    thread_salva.name,
+                    thread_salva.id,
                 )
-            if ids.get(categoria) != thread_salva.id:
-                await _salvar_id(forum.guild.id, categoria, thread_salva.id)
-            return thread_salva
+                thread_salva = None
+            if thread_salva is not None:
+                if ids.get(categoria) != thread_salva.id:
+                    await _salvar_id(forum.guild.id, categoria, thread_salva.id)
+                return thread_salva
 
         inicial = discord.Embed(
             title=nome,
