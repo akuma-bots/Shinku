@@ -252,6 +252,33 @@ class Logs(commands.Cog):
         await registrar_global(message.guild, "historico_membros", "Mensagem removida", descricao, cor=0xED4245)
 
     @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Registra metadados de anexos enviados, sem armazenar conteúdo de mensagens comuns."""
+        if not message.guild or message.author.bot or not message.attachments:
+            return
+        if message.guild.id != GUILD_NEMESIS_ID:
+            return
+        linhas = [
+            f"**Autor:** {message.author.mention} (ID: {message.author.id})",
+            f"**Canal:** {message.channel.mention} (ID: {message.channel.id})",
+            f"**Mensagem:** {message.id}",
+            f"**Enviado em:** {discord.utils.format_dt(message.created_at, style='F')}",
+        ]
+        for anexo in message.attachments[:10]:
+            linhas.append(
+                f"• **{anexo.filename[:180]}** — {anexo.size:,} bytes"
+                + (f" — [abrir arquivo]({anexo.url})" if anexo.url else "")
+            )
+        descricao = "\\n".join(linhas)[:3800]
+        await registrar_global(
+            message.guild, "anexos", "Anexos enviados", descricao, cor=0x57F287,
+        )
+        await registrar_global(
+            message.guild, "historico_membros", "Envio de anexos",
+            descricao, cor=0x57F287,
+        )
+
+    @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
         if antes.author.bot or not antes.guild:
             return
@@ -290,6 +317,11 @@ class Logs(commands.Cog):
         embed = criar_embed(description=f"🔨 {user.mention} (`{user}`) foi banido do servidor.", color=0xED4245)
         embed.set_thumbnail(url=user.display_avatar.url)
         await self._enviar_log(canal, embed, categoria="moderacao")
+        await registrar_global(
+            guild, "historico_membros", "Banimento de membro",
+            f"Membro: {user} (ID: {user.id})\\nAção: banimento\\nOrigem: evento do Discord; executor não identificado pelo gateway.",
+            cor=0xED4245,
+        )
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User):
@@ -298,6 +330,11 @@ class Logs(commands.Cog):
             return
         embed = criar_embed(description=f"⚖️ {user.mention} (`{user}`) foi desbanido do servidor.", color=0x57F287)
         await self._enviar_log(canal, embed, categoria="moderacao")
+        await registrar_global(
+            guild, "historico_membros", "Desbanimento de membro",
+            f"Membro: {user} (ID: {user.id})\\nAção: desbanimento\\nOrigem: evento do Discord; executor não identificado pelo gateway.",
+            cor=0x57F287,
+        )
 
     @commands.Cog.listener()
     async def on_member_update(self, antes: discord.Member, depois: discord.Member):
