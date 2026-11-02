@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 import uuid
 
@@ -13,6 +14,7 @@ from utils.guild_config import get_config, set_config, lideranca_only
 
 
 ARQUIVO = "parcerias.json"
+logger = logging.getLogger(__name__)
 _PARCERIAS_LOCK = asyncio.Lock()
 
 
@@ -652,6 +654,7 @@ class Parcerias(commands.Cog):
             cargo_id = alvo.get(
                 "cargo_id"
             )
+            erro_cargo = None
     
             if cargo_id:
     
@@ -671,8 +674,14 @@ class Parcerias(commands.Cog):
                     except (
                         discord.Forbidden,
                         discord.HTTPException,
-                    ):
-                        pass
+                    ) as erro:
+                        erro_cargo = str(erro)
+                        logger.exception(
+                            "Não foi possível remover o cargo da parceria %s (guild=%s, cargo=%s).",
+                            nome,
+                            interaction.guild.id,
+                            cargo.id,
+                        )
     
             alvo["status"] = "removida"
             alvo["atualizado_em"] = time.time()
@@ -694,7 +703,8 @@ class Parcerias(commands.Cog):
             f"**Parceria:** {alvo.get('nome', nome)}\n"
             f"**Responsável pela remoção:** {interaction.user.mention} (ID: {interaction.user.id})\n"
             f"**Criada por:** <@{alvo.get('criado_por_id')}>\n"
-            f"**Status:** Inativa"
+            f"**Status:** Inativa\\n"
+            f"**Cargo:** {'Removido' if cargo_id and not erro_cargo else 'Falha ao remover' if erro_cargo else 'Não havia cargo vinculado'}"
         )
         await registrar_global(
             interaction.guild,
@@ -711,9 +721,13 @@ class Parcerias(commands.Cog):
             cor=0xED4245,
         )
 
+        aviso = (
+            f" Atenção: não consegui excluir o cargo vinculado ({erro_cargo}). "
+            "A parceria foi marcada como inativa; remova o cargo manualmente."
+            if erro_cargo else ""
+        )
         await interaction.response.send_message(
-            f"✓ Parceria com **{nome}** removida "
-            "e marcada como inativa.",
+            f"✓ Parceria com **{nome}** removida e marcada como inativa.{aviso}",
             ephemeral=True,
         )
 
