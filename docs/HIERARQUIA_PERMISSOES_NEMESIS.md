@@ -34,7 +34,11 @@ Elite (`1563995879998754937`) e cargos inferiores não recebem essas ações por
 ## Auditoria e preservação
 
 - Promoções e rebaixamentos de patentes são registrados no Registro Global.
+- `/gangue-promover` e `/gangue-rebaixar` ajustam o XP até o limiar do rank escolhido e aplicam o cargo configurado; exigem justificativa e ficam no histórico.
+- `/gangue-configurar-cargo` vincula cada rank a um cargo do Discord e é exclusivo do OCTÓGONO.
+- `/patente-promover` e `/patente-rebaixar` alteram as patentes do perfil competitivo, sem substituir a hierarquia principal.
 - O comando `/banir` registra responsável, alvo e motivo; não apaga mensagens anteriores.
+- Promoção, rebaixamento e banimento não podem atingir membro com cargo igual ou superior ao responsável.
 - A hierarquia não é alterada automaticamente por esta configuração.
 - Alterações de cargos no Discord continuam sujeitas à hierarquia e às permissões do próprio bot.
 - XP é a métrica competitiva vigente; os campos antigos de pontos são mantidos apenas para compatibilidade com dados históricos e não alimentam mais o ranking.
