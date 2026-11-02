@@ -1569,6 +1569,20 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
                 message.guild, "seguranca", "AutoMod — Infração detectada",
                 embed=embed, view=PainelPunicao(self.bot),
             )
+            await registrar_global(
+                message.guild,
+                "historico_membros",
+                "Infração identificada pelo AutoMod",
+                (
+                    f"**Membro:** <@{message.author.id}> (ID: {message.author.id})\\n"
+                    f"**Infração:** {infracao['tipo']}\\n"
+                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\\n"
+                    f"**Regra:** {infracao['regra_titulo']}\\n"
+                    f"**Canal:** <#{message.channel.id}>\\n"
+                    "**Situação:** Aguardando revisão da equipe."
+                ),
+                cor=COR_AVISO,
+            )
 
         except Exception as erro:
 
@@ -1745,6 +1759,20 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
         try:
             await registrar_global(
                 guild, "seguranca", "AutoMod — Punição automática aplicada", embed=embed,
+            )
+            await registrar_global(
+                guild,
+                "historico_membros",
+                "Punição automática aplicada",
+                (
+                    f"**Membro:** <@{membro.id}> (ID: {membro.id})\\n"
+                    f"**Infração:** {infracao['tipo']}\\n"
+                    f"**Nível:** {nivel} — {NIVEIS[nivel]['nome']}\\n"
+                    f"**Medida:** {nomes[medida]}\\n"
+                    f"**Canal:** <#{message.channel.id}>\\n"
+                    f"**Motivo:** {discord.utils.escape_markdown(infracao['motivo'][:500])}"
+                ),
+                cor=COR_ERRO if nivel >= 3 else COR_AVISO,
             )
         except discord.HTTPException as erro:
             print(f"[AUTOMOD][ERRO] Falha ao publicar registro automático: {erro}")
