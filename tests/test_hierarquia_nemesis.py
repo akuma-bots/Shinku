@@ -6,9 +6,18 @@ from utils import guild_config
 
 
 class FakeMember:
-    def __init__(self, role_ids):
-        self.guild = SimpleNamespace(id=guild_config.GUILD_NEMESIS_ID)
-        self.roles = [SimpleNamespace(id=role_id) for role_id in role_ids]
+    def __init__(self, role_ids, positions=None, user_id=123):
+        self.id = user_id
+        self.guild = SimpleNamespace(
+            id=guild_config.GUILD_NEMESIS_ID,
+            owner_id=999,
+            default_role=SimpleNamespace(id=0),
+        )
+        positions = positions or {}
+        self.roles = [
+            SimpleNamespace(id=role_id, position=positions.get(role_id, 1))
+            for role_id in role_ids
+        ]
 
 
 class TestHierarquiaNemesis(unittest.TestCase):
@@ -31,6 +40,19 @@ class TestHierarquiaNemesis(unittest.TestCase):
         self.assertFalse(guild_config.membro_tem_octogono(membro))
         self.assertFalse(guild_config.membro_pode_revisar_categoria(membro, "missao"))
         self.assertTrue(guild_config.membro_pode_revisar_categoria(membro, "pvp"))
+
+    def test_hierarquia_impede_acao_contra_cargo_igual_ou_superior(self):
+        veterano_id = 1563995879998754938
+        elite_id = 1563995879998754937
+        comandante_id = 1563995879998754940
+        autor = self._member([veterano_id])
+        alvo_inferior = self._member([elite_id])
+        alvo_superior = self._member([comandante_id])
+        autor.roles[0].position = 20
+        alvo_inferior.roles[0].position = 10
+        alvo_superior.roles[0].position = 30
+        self.assertTrue(guild_config.membro_pode_gerenciar_membro(autor, alvo_inferior))
+        self.assertFalse(guild_config.membro_pode_gerenciar_membro(autor, alvo_superior))
 
     def test_octogono_e_o_unico_cargo_autorizado_a_gerir_missoes(self):
         membro = self._member([guild_config.CARGO_OCTOGONO_ID])
