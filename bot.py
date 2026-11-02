@@ -476,7 +476,15 @@ async def main():
             "O bot não iniciará com armazenamento inconsistente."
         )
     if USANDO_UPSTASH:
-        await verificar_conexao_storage()
+        logging.info("Verificando conexão com o armazenamento privado do Upstash.")
+        try:
+            await asyncio.wait_for(verificar_conexao_storage(), timeout=20)
+        except Exception:
+            logging.exception(
+                "Não foi possível confirmar o Upstash durante a inicialização; "
+                "o bot não iniciará com armazenamento inconsistente."
+            )
+            raise
         logging.info("Conexão com o armazenamento privado confirmada.")
     else:
         logging.warning(
