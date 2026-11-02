@@ -4,7 +4,7 @@ import os
 import discord
 from discord.ext import commands
 
-from utils.apresentacao import criar_embed, aplicar_identidade_servidor
+from utils.apresentacao import criar_embed, aplicar_identidade_servidor, COR_PRIMARIA
 from utils.storage import carregar, salvar
 
 logger = logging.getLogger(__name__)
@@ -289,7 +289,7 @@ def _embed_indice(guild: discord.Guild | None = None, bot: commands.Bot | None =
             "**Selecione um assunto no menu abaixo** para abrir o passo a passo completo. "
             "A consulta é privada: sua navegação não altera o painel público."
         ),
-        color=0xB3132B,
+        color=COR_PRIMARIA,
     )
     embed.add_field(
         name="◈ COMO UTILIZAR",
@@ -332,7 +332,7 @@ def _embed_tutorial(chave: str, guild: discord.Guild | None = None, bot: command
     embed = criar_embed(
         title=f"𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ GUIA / {tutorial['titulo'].upper()}",
         description=f"⟡・{tutorial['descricao']}\n\nSiga as orientações abaixo e utilize somente os fluxos oficiais.",
-        color=0xB3132B,
+        color=COR_PRIMARIA,
     )
     blocos = []
     atual = []
