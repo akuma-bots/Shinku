@@ -298,7 +298,7 @@ async def _atualizar_ranking_competitivo(
     user_id: int,
     perfil: dict,
     nome: str = "",
-    delta_pontos: int = 0,
+    delta_pontos: int = 0,  # mantido por compatibilidade; P.C. não é mais pontuado
     evento_id: str = "",
 ) -> dict:
     """Sincroniza o perfil competitivo no mesmo commit atômico da pontuação."""
@@ -318,7 +318,7 @@ async def _atualizar_ranking_competitivo(
     return await somar_pontos_competitivo(
         user_id=user_id,
         nome=nome,
-        delta=delta_pontos,
+        delta=0,
         vitorias=perfil.get("vitorias", 0),
         derrotas=perfil.get("derrotas", 0),
         evento_id=evento_id,
