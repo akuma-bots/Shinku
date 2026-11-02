@@ -365,8 +365,8 @@ class Logs(commands.Cog):
             identidade = criar_embed(
                 title="Identidade do Discord alterada",
                 description=(
-                    f"**Membro:** {depois.mention} ({depois.id})\\n"
-                    f"**Nome de usuário:** {antes.name} → {depois.name}\\n"
+                    f"**Membro:** {depois.mention} ({depois.id})\n"
+                    f"**Nome de usuário:** {antes.name} → {depois.name}\n"
                     f"**Nome global:** {antes.global_name or 'Não definido'} → {depois.global_name or 'Não definido'}"
                 ),
                 color=0xFEE75C,
@@ -383,8 +383,8 @@ class Logs(commands.Cog):
         if antes.premium_since != depois.premium_since:
             iniciou_boost = depois.premium_since is not None
             detalhe_boost = (
-                f"**Membro:** {depois.mention} ({depois.id})\\n"
-                f"**Ação:** {'Começou a impulsionar' if iniciou_boost else 'Deixou de impulsionar'} o servidor.\\n"
+                f"**Membro:** {depois.mention} ({depois.id})\n"
+                f"**Ação:** {'Começou a impulsionar' if iniciou_boost else 'Deixou de impulsionar'} o servidor.\n"
                 f"**Data:** {discord.utils.format_dt(depois.premium_since, style='F') if depois.premium_since else 'Boost encerrado'}"
             )
             await self._enviar_log(
