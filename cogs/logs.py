@@ -361,6 +361,49 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, embed, categoria="historico_membros")
             await registrar_global(depois.guild, "historico_membros", "Apelido alterado", embed.description or "Apelido alterado.", cor=0xFEE75C)
 
+        if antes.name != depois.name or antes.global_name != depois.global_name:
+            identidade = criar_embed(
+                title="Identidade do Discord alterada",
+                description=(
+                    f"**Membro:** {depois.mention} ({depois.id})\\n"
+                    f"**Nome de usuário:** {antes.name} → {depois.name}\\n"
+                    f"**Nome global:** {antes.global_name or 'Não definido'} → {depois.global_name or 'Não definido'}"
+                ),
+                color=0xFEE75C,
+            )
+            await self._enviar_log(canal, identidade, categoria="membros")
+            await registrar_global(
+                depois.guild,
+                "historico_membros",
+                "Identidade do Discord alterada",
+                identidade.description or "Identidade alterada.",
+                cor=0xFEE75C,
+            )
+
+        if antes.premium_since != depois.premium_since:
+            iniciou_boost = depois.premium_since is not None
+            detalhe_boost = (
+                f"**Membro:** {depois.mention} ({depois.id})\\n"
+                f"**Ação:** {'Começou a impulsionar' if iniciou_boost else 'Deixou de impulsionar'} o servidor.\\n"
+                f"**Data:** {discord.utils.format_dt(depois.premium_since, style='F') if depois.premium_since else 'Boost encerrado'}"
+            )
+            await self._enviar_log(
+                canal,
+                criar_embed(
+                    title="Status de impulsionamento alterado",
+                    description=detalhe_boost,
+                    color=0x57F287 if iniciou_boost else 0xED4245,
+                ),
+                categoria="membros",
+            )
+            await registrar_global(
+                depois.guild,
+                "historico_membros",
+                "Status de impulsionamento alterado",
+                detalhe_boost,
+                cor=0x57F287 if iniciou_boost else 0xED4245,
+            )
+
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
         ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
