@@ -36,6 +36,21 @@ RANKS = [
     {"no": 1, "nome": "Capitão Geral", "xp": 70000},
 ]
 
+CARGOS_PROGRESSAO_PADRAO = {
+    "12": 1563995879990624373,  # Lutador
+    "11": 1563995879990624374,  # Subtenente
+    "10": 1563995879990624375,  # Tenente
+    "9": 1563995879990624376,   # Executor
+    "8": 1563995879990624377,   # Especialista
+    "7": 1563995879995874937,   # Elite
+    "6": 1563995879998754938,   # Veterano
+    "5": 1563995879998754939,   # Treinador
+    "4": 1563995879998754940,   # Comandante
+    "3": 1563995879998754941,   # Vice Capitão
+    "2": 1563995879998754942,   # Capitão
+    "1": 1563995879998754943,   # Capitão Geral
+}
+
 RANK_CHOICES = [
     app_commands.Choice(name=f"No. {rank['no']:02d} — {rank['nome']}", value=str(rank["no"]))
     for rank in RANKS
@@ -233,11 +248,28 @@ class ProgressaoGangue(commands.Cog):
             return dict(origem), dict(destino)
 
     async def _config(self, guild_id: int) -> dict:
-        dados = await self._dados()
-        guild = dados.setdefault(str(guild_id), {})
-        guild.setdefault("membros", {})
-        guild.setdefault("cargos", {})
-        return guild
+        async with self._lock:
+            dados = await self._dados()
+            chave_guild = str(guild_id)
+            guild = dados.get(chave_guild)
+            if not isinstance(guild, dict):
+                guild = {}
+                dados[chave_guild] = guild
+            membros = guild.get("membros")
+            if not isinstance(membros, dict):
+                guild["membros"] = {}
+            cargos = guild.get("cargos")
+            if not isinstance(cargos, dict):
+                cargos = {}
+                guild["cargos"] = cargos
+            alterado = False
+            for rank_no, cargo_id in CARGOS_PROGRESSAO_PADRAO.items():
+                if rank_no not in cargos:
+                    cargos[rank_no] = cargo_id
+                    alterado = True
+            if alterado:
+                await self._salvar_dados(dados)
+            return guild
 
     async def _aplicar_cargo_rank(self, guild: discord.Guild, membro: discord.Member, rank: dict) -> bool:
         config = await self._config(guild.id)
