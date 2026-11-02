@@ -57,6 +57,7 @@ CATEGORIAS = {
     "automod": ("🆕 NÊMESIS V3・29・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
 }
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
+_CABECALHOS_VERIFICADOS: set[tuple[int, int]] = set()
 
 
 def _lock(guild_id: int, categoria: str) -> asyncio.Lock:
@@ -173,7 +174,8 @@ async def _atualizar_cabecalho_topico(
     nome: str,
     descricao: str,
 ) -> None:
-    if thread.archived or thread.locked:
+    chave = (thread.guild.id, thread.id)
+    if chave in _CABECALHOS_VERIFICADOS or thread.archived or thread.locked:
         return
     embed = _embed_cabecalho_topico(nome, descricao)
     try:
@@ -183,6 +185,7 @@ async def _atualizar_cabecalho_topico(
             await mensagem.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
             _LOG.info("Cabeçalho do tópico atualizado: %s (%s)", nome, thread.id)
             await asyncio.sleep(0.2)
+        _CABECALHOS_VERIFICADOS.add(chave)
     except discord.NotFound:
         _LOG.warning("Tópico sem mensagem inicial recuperável: %s (%s).", nome, thread.id)
     except (discord.Forbidden, discord.HTTPException):
@@ -257,6 +260,7 @@ async def _obter_topico(
             allowed_mentions=discord.AllowedMentions.none(),
         )
         thread = criado.thread
+        _CABECALHOS_VERIFICADOS.add((forum.guild.id, thread.id))
         if topicos_existentes is not None:
             topicos_existentes.append(thread)
         await _salvar_id(forum.guild.id, categoria, thread.id)
@@ -465,6 +469,8 @@ async def registrar(
         thread = await _obter_topico(canal, categoria)
         if thread.archived or thread.locked:
             await thread.edit(archived=False, locked=False, reason="Reabrir tópico permanente para novos registros")
+            nome, descricao_topico = CATEGORIAS[categoria]
+            await _atualizar_cabecalho_topico(thread, nome, descricao_topico)
         if categoria not in CATEGORIAS:
             raise ValueError(f"Categoria de registro desconhecida: {categoria}")
 
