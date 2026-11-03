@@ -17,7 +17,13 @@ def _resumo_tarefas_automaticas(bot):
     total = ativas = falhas = 0
     vistos = set()
     for cog in getattr(bot, "cogs", {}).values():
-        for valor in vars(cog).values():
+        # Loops decorados com @tasks.loop vivem como descritores da classe;
+        # tarefas asyncio explícitas normalmente vivem no estado da instância.
+        for nome in dir(cog):
+            try:
+                valor = getattr(cog, nome)
+            except Exception:
+                continue
             identidade = id(valor)
             if identidade in vistos:
                 continue
