@@ -340,6 +340,106 @@ class ParceriaView(discord.ui.View):
             )
 
 
+
+
+def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | None = None) -> discord.Embed:
+    """Cartão público padronizado das alianças oficiais."""
+    nome = str(parceria.get("nome") or "Comunidade parceira")[:180]
+    descricao = str(parceria.get("descricao") or "Aliança oficial da NÊMESIS.")[:3500]
+    embed = discord.Embed(
+        title=f"◈ NÊMESIS  |  ALIANÇA OFICIAL",
+        description=f"**{nome}**\n{descricao}",
+        color=0x8F1D2C,
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.add_field(name="STATUS DA ALIANÇA", value="🟢 **ATIVA**", inline=True)
+    embed.add_field(name="CATEGORIA", value=str(parceria.get("categoria") or "Reconhecida"), inline=True)
+    convite = str(parceria.get("convite") or "")
+    embed.add_field(name="ACESSO À COMUNIDADE", value=f"[Entrar no servidor]({convite})" if convite else "Convite indisponível", inline=False)
+    cargo = guild.get_role(int(parceria["cargo_id"])) if parceria.get("cargo_id") else None
+    embed.add_field(name="CARGO DE PARCEIRO", value=cargo.mention if cargo else "Não vinculado", inline=True)
+    embed.add_field(name="REGISTRO", value=f"`{str(parceria.get('id', '—'))[:18]}`", inline=True)
+    banner = parceria.get("banner")
+    if banner:
+        try:
+            embed.set_image(url=str(banner))
+        except (TypeError, discord.HTTPException):
+            pass
+    embed.set_author(name="NÊMESIS • RELAÇÕES INSTITUCIONAIS")
+    embed.set_footer(text=f"Aliança verificada pela administração NÊMESIS{f' • Registro {indice}' if indice else ''}")
+    return embed
+
+
+async def registrar_parceria_aprovada(
+    guild: discord.Guild,
+    candidatura: dict,
+    aprovador: discord.Member,
+) -> tuple[dict | None, str | None]:
+    """Converte uma candidatura aprovada em parceria ativa no cadastro oficial."""
+    candidatura_id = str(candidatura.get("id") or "")
+    async with _PARCERIAS_LOCK:
+        lista = await _normalizar_todas_guild(guild.id)
+        existente = next((p for p in lista if p.get("candidatura_id") == candidatura_id), None)
+        if existente:
+            return existente, None
+
+        nome = str(candidatura.get("nome") or "Comunidade parceira").strip()[:80]
+        cargo, aviso_cargo = await _criar_cargo_da_parceria(guild, nome)
+        agora = time.time()
+        parceria = {
+            "id": str(uuid.uuid4()),
+            "guild_id": guild.id,
+            "nome": nome,
+            "convite": str(candidatura.get("convite") or ""),
+            "descricao": str(candidatura.get("proposta") or candidatura.get("segmento") or "Aliança oficial da NÊMESIS.")[:3500],
+            "banner": candidatura.get("banner"),
+            "cargo_id": cargo.id if cargo else None,
+            "criado_por_id": aprovador.id,
+            "criado_em": agora,
+            "atualizado_em": agora,
+            "status": "ativa",
+            "categoria": str(candidatura.get("categoria") or "Reconhecida"),
+            "candidatura_id": candidatura_id,
+            "proxima_revisao": agora + (15 * 24 * 60 * 60),
+        }
+        config = await get_config(guild.id)
+        canal_id = config.get("canal_parcerias_id")
+        canal = guild.get_channel(canal_id) if canal_id else None
+        if isinstance(canal, discord.TextChannel):
+            try:
+                mensagem = await canal.send(
+                    embed=_embed_parceria_publica(parceria, guild),
+                    view=ParceriaView(cargo.id) if cargo else None,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                parceria["mensagem_id"] = mensagem.id
+                parceria["canal_id"] = canal.id
+            except (discord.Forbidden, discord.HTTPException):
+                logger.exception("Falha ao publicar parceria aprovada: %s", nome)
+                parceria["mensagem_id"] = None
+                parceria["canal_id"] = canal.id
+        else:
+            parceria["mensagem_id"] = None
+            parceria["canal_id"] = canal_id
+
+        lista.append(parceria)
+        await _salvar_da_guild(guild.id, lista)
+
+    try:
+        from utils.registro_global import registrar as registrar_global
+        await registrar_global(
+            guild, "parcerias", "Aliança oficial aprovada e ativada",
+            f"**Comunidade:** {nome}\n**Candidatura:** {candidatura_id}\n"
+            f"**Aprovador:** {aprovador.mention}\n**Categoria:** {parceria['categoria']}\n"
+            f"**Próxima revisão:** <t:{int(parceria['proxima_revisao'])}:F>\n"
+            f"**Cargo:** {cargo.mention if cargo else 'Não criado'}",
+            cor=0xB58A45,
+        )
+    except Exception:
+        logger.exception("Falha ao auditar ativação de parceria %s", nome)
+    return parceria, aviso_cargo
+
+
 class Parcerias(commands.Cog):
     """
     Sistema de parcerias da NÊMESIS.
@@ -490,39 +590,7 @@ class Parcerias(commands.Cog):
             "status": "ativa",
         }
 
-        embed = criar_embed(
-            f"N̷ÊMESIS ━ NOVA PARCERIA: {nome}",
-            descricao,
-            rodape=None,
-        )
-
-        embed.add_field(
-            name="Convite",
-            value=convite,
-            inline=False,
-        )
-
-        if cargo:
-            embed.add_field(
-                name="Cargo da parceria",
-                value=cargo.mention,
-                inline=False,
-            )
-
-        if banner:
-            try:
-                embed.set_image(
-                    url=banner
-                )
-            except Exception:
-                pass
-
-        embed.set_footer(
-            text=(
-                f"Parceria registrada por "
-                f"{interaction.user}"
-            )
-        )
+        embed = _embed_parceria_publica(parceria, interaction.guild)
 
         try:
 
@@ -774,19 +842,7 @@ class Parcerias(commands.Cog):
             start=1,
         ):
 
-            embed = criar_embed(
-                f"🤝 {parceria['nome']}",
-                parceria["descricao"],
-                rodape=None,
-            )
-
-            embed.add_field(
-                name="Convite",
-                value=parceria[
-                    "convite"
-                ],
-                inline=False,
-            )
+            embed = _embed_parceria_publica(parceria, interaction.guild, indice)
 
             cargo_id = parceria.get(
                 "cargo_id"
