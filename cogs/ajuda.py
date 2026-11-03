@@ -8,6 +8,7 @@ from utils.apresentacao import criar_embed
 
 SISTEMAS = {
     "Missoes": ("🎯", "Missões"),
+    "HistoricoMembros": ("📚", "Histórico Individual"),
     "Desafios": ("⚔️", "PvP / Desafios"),
     "Guerras": ("🏰", "Guerras"),
     "Perfil": ("🎖️", "Perfil & Patentes"),
