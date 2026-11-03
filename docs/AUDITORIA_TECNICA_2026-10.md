@@ -24,7 +24,7 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 
 ### P1 — Persistência e notificações
 
-- O armazenamento já oferece `atualizar_json` com compare-and-set via Lua no Upstash e atualização protegida por lock no modo local.
+- O armazenamento já oferece `atualizar_json` com compare-and-set via Lua no Upstash e atualização protegida por lock no modo local. O histórico e a remoção de punições também foram migrados para essa operação atômica, evitando que processos diferentes sobrescrevam registros concorrentes.
 - O fluxo de notas automáticas passou a usar `atualizar_json` para reservar destinatários e registrar resultados, evitando sobrescrever o documento inteiro com snapshots antigos.
 - A reserva ocorre antes da chamada ao Discord; duas instâncias não devem enviar a mesma release ao mesmo destinatário.
 - Resultados de transporte incertos permanecem marcados e não são reenviados automaticamente, evitando duplicações quando o Discord pode ter aceitado a DM.
@@ -64,7 +64,7 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 ## Validação executada
 
 - `python -m compileall -q bot.py cogs utils tests` — aprovado.
-- `PYTHONPATH=. python -m pytest -q` — **317 testes aprovados e 67 subtestes aprovados**.
+- `PYTHONPATH=. python -m pytest -q` — **318 testes aprovados e 67 subtestes aprovados**.
 - Os testes foram executados em ambiente isolado com o código clonado do GitHub; não equivalem a teste funcional no Discord ou a deploy no Render.
 
 ## Critérios para encerrar a implantação
