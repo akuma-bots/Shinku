@@ -196,8 +196,8 @@ class DecisaoCandidaturaView(discord.ui.View):
     def __init__(self, protocolo):
         super().__init__(timeout=None)
         self.protocolo = protocolo
-        b1 = discord.ui.Button(label="Aprovar e formalizar", style=discord.ButtonStyle.success, emoji="✓", custom_id=f"nemesis:parcerias:aprovar:{protocolo}")
-        b2 = discord.ui.Button(label="Recusar candidatura", style=discord.ButtonStyle.danger, emoji="✕", custom_id=f"nemesis:parcerias:recusar:{protocolo}")
+        b1 = discord.ui.Button(label="Aprovar e formalizar", style=discord.ButtonStyle.success, emoji="✅", custom_id=f"nemesis:parcerias:aprovar:{protocolo}")
+        b2 = discord.ui.Button(label="Recusar candidatura", style=discord.ButtonStyle.danger, emoji="❌", custom_id=f"nemesis:parcerias:recusar:{protocolo}")
         b1.callback = self._aprovar
         b2.callback = self._recusar
         self.add_item(b1)
@@ -279,7 +279,7 @@ class RevisaoParceriaView(discord.ui.View):
     def __init__(self, parceria_id):
         super().__init__(timeout=None)
         self.parceria_id = parceria_id
-        b1 = discord.ui.Button(label="Manter por mais 15 dias", style=discord.ButtonStyle.success, emoji="✓", custom_id=f"nemesis:parcerias:manter:{parceria_id}")
+        b1 = discord.ui.Button(label="Manter por mais 15 dias", style=discord.ButtonStyle.success, emoji="✅", custom_id=f"nemesis:parcerias:manter:{parceria_id}")
         b2 = discord.ui.Button(label="Suspender aliança", style=discord.ButtonStyle.danger, emoji="⛔", custom_id=f"nemesis:parcerias:suspender:{parceria_id}")
         b1.callback = self._manter
         b2.callback = self._suspender
