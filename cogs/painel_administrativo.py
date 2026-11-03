@@ -27,14 +27,14 @@ SECOES_ADMINISTRATIVAS = {
     },
     "membros": {
         "titulo": "GESTÃO DE MEMBROS E HIERARQUIA",
-        "descricao": "Consulte histórico individual, alterações de cargos, progressão, recrutamento e atividade registrada. Ações hierárquicas continuam sujeitas às regras de autoridade existentes.",
-        "topicos": ("historico_membros", "membros", "cargos", "progressao", "entradas", "convites", "atividade"),
+        "descricao": "Consulte o dossiê individual e a linha do tempo de cada integrante. Alterações de cargos fazem parte do histórico do próprio membro.",
+        "topicos": ("historico_membros",),
         "canais": (("Progressão e XP", 1563995881315897548),),
     },
     "operacoes": {
         "titulo": "OPERAÇÕES E DESENVOLVIMENTO",
         "descricao": "Acesse missões, validações, competições, eventos, inscrições, parcerias e relatórios operacionais.",
-        "topicos": ("missoes", "competicoes", "eventos", "formularios", "parcerias", "relatorios"),
+        "topicos": ("missoes", "competitivo", "eventos", "operacoes", "parcerias"),
         "canais": (
             ("Central de missões", 1556543214885019668),
             ("Envio de provas", 1556543417843056641),
@@ -44,35 +44,38 @@ SECOES_ADMINISTRATIVAS = {
     "seguranca": {
         "titulo": "SEGURANÇA E CONTROLE ADMINISTRATIVO",
         "descricao": "Acompanhe ocorrências de segurança, AutoMod, moderação e decisões administrativas. A central não amplia permissões nem substitui as confirmações dos sistemas existentes.",
-        "topicos": ("seguranca", "automod", "moderacao", "administracao"),
+        "topicos": ("seguranca", "moderacao", "administracao"),
         "canais": (),
     },
     "sistemas": {
         "titulo": "SISTEMAS E INFRAESTRUTURA",
         "descricao": "Acesse registros de integrações, infraestrutura, configurações, sistemas e Roblox. O diagnóstico abaixo mostra o estado da sessão atual.",
-        "topicos": ("infraestrutura", "integracoes", "configuracoes", "sistemas", "roblox"),
+        "topicos": ("infraestrutura", "integracoes", "operacoes"),
         "canais": (),
     },
     "registros": {
         "titulo": "AUDITORIA E REGISTROS",
-        "descricao": "Navegue pelos históricos permanentes de mensagens, atendimento, entradas, voz, anexos, conquistas, sorteios e sugestões.",
-        "topicos": ("mensagens", "atendimento", "entradas", "voz", "anexos", "conquistas", "sorteios", "sugestoes"),
+        "descricao": "Consulte auditoria de mensagens, atendimento e registros operacionais consolidados, sem áreas duplicadas.",
+        "topicos": ("mensagens", "atendimento", "historico_membros", "sorteios", "sugestoes"),
         "canais": (),
     },
 }
 
 _ROTULOS_TOPICOS = {
-    "historico_membros": "Histórico individual", "membros": "Histórico de membros",
-    "cargos": "Histórico de cargos", "progressao": "Progressão e XP",
-    "entradas": "Entradas e saídas", "convites": "Convites e recrutamento",
-    "atividade": "Atividade", "missoes": "Missões", "competicoes": "Competições",
-    "eventos": "Eventos", "formularios": "Formulários e inscrições",
-    "parcerias": "Parcerias", "relatorios": "Relatórios", "seguranca": "Segurança",
-    "automod": "AutoMod", "moderacao": "Moderação", "administracao": "Administração e decisões",
-    "infraestrutura": "Infraestrutura", "integracoes": "Integrações",
-    "configuracoes": "Configurações", "sistemas": "Sistemas", "roblox": "Roblox",
-    "mensagens": "Mensagens", "atendimento": "Atendimento", "voz": "Chamadas e voz",
-    "anexos": "Anexos", "conquistas": "Conquistas", "sorteios": "Sorteios",
+    "historico_membros": "Histórico de membros",
+    "mensagens": "Mensagens e arquivos",
+    "atendimento": "Atendimento",
+    "moderacao": "Moderação",
+    "seguranca": "Segurança",
+    "missoes": "Missões",
+    "competitivo": "Competitivo",
+    "eventos": "Eventos",
+    "operacoes": "Operações",
+    "administracao": "Administração",
+    "parcerias": "Parcerias",
+    "integracoes": "Integrações",
+    "infraestrutura": "Infraestrutura",
+    "sorteios": "Sorteios",
     "sugestoes": "Sugestões e votações",
 }
 
@@ -121,7 +124,7 @@ async def _embed_visao_geral(bot: commands.Bot, guild: discord.Guild) -> discord
         total_topicos = 0
 
     registro_pronto = bool(getattr(bot.get_cog("Logs"), "_topicos_prontos", False))
-    registro_estado = f"{total_topicos}/29 tópicos" if total_topicos else (
+    registro_estado = f"{total_topicos}/{len(CATEGORIAS)} áreas" if total_topicos else (
         "Sincronizado" if registro_pronto else "Aguardando sincronização"
     )
     lideranca = sum(
