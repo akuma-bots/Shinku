@@ -111,6 +111,6 @@ O workflow é uma primeira barreira de qualidade; não substitui testes funciona
 
 - A central pública de tutoriais é mantida automaticamente no canal `#Sistemas`; o seletor abre cada guia em uma consulta privada. Não existe comando de tutorial.
 - O guia **Começando na NÊMESIS** explica a TAG `NΞM`, o cargo automático `Visitantes`, os canais essenciais, a progressão e o fluxo de atendimento.
-- As notas automáticas são publicadas no canal `#Anúncios`, por DM aos membros inscritos, sem publicação em #Anúncios. Comunicados privados enviados por `/avisos-enviar` respeitam a preferência individual; a DM inclui o botão **Não quero receber avisos** e um botão na própria mensagem permite ativar ou desativar o recebimento.
+- As notas automáticas são entregues por DM aos membros inscritos que mantêm a preferência ativa. O envio é sequencial, registra a reserva de cada destinatário no Upstash antes da tentativa e não repete automaticamente resultados incertos para evitar mensagens duplicadas. O comando `/notas-atualizacao` é somente leitura e não dispara comunicados.
 - Ao publicar uma nova versão com novidades para anunciar, atualize `config/novidades.json`: altere `release_id` para um identificador novo e revise `titulo`, `tipo` e `mensagem`. O bot registra o ID da mensagem publicada no canal para evitar duplicações após reiniciar.
 - Para vincular o Roblox, o membro usa `/roblox-vincular`, adiciona temporariamente o código à descrição do perfil Roblox e confirma com `/roblox-confirmar`. A mesma conta Roblox não pode ser vinculada a dois membros diferentes.
