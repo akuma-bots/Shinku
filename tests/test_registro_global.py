@@ -71,7 +71,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             yield arquivado
 
         forum.archived_threads.side_effect = arquivados
-        with patch("utils.storage.carregar", new=AsyncMock(return_value={})), \\
+        with patch("utils.storage.carregar", new=AsyncMock(return_value={})), \
              patch("utils.storage.salvar", new=AsyncMock()) as salvar:
             quantidade = await registro_global._executar_migracao_destrutiva(forum)
 
