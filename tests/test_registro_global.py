@@ -10,8 +10,8 @@ from utils import registro_global
 class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
     def test_define_topicos_permanentes_configurados(self):
         essenciais = {
-            "mensagens", "atendimento", "moderacao", "membros",
-            "sistemas", "administracao", "seguranca", "formularios",
+            "mensagens", "atendimento", "moderacao", "historico_membros",
+            "operacoes", "administracao", "seguranca", "missoes",
         }
         self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
         self.assertEqual(len(registro_global.CATEGORIAS), 15)
@@ -97,6 +97,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
         legado = Mock()
         legado.id = 789
+        legado.edit = AsyncMock()
         legado.parent_id = forum.id
         legado.name = "📝・Mensagens"
         legado.archived = True
