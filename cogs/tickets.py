@@ -1205,7 +1205,7 @@ class CentralTicketsView(discord.ui.View):
                 ephemeral=True,
             )
 
-    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="✕", row=3)
+    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="❌", row=3)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
