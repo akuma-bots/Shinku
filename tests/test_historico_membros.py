@@ -1,6 +1,6 @@
 import unittest
 
-from cogs.historico_membros import filtrar_revisoes_membro, _resumo_revisoes
+from utils.historico_membros import filtrar_revisoes_membro, _resumo_revisoes
 
 
 class TestHistoricoMembros(unittest.TestCase):
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
 class TestHistoricoEmbeds(unittest.TestCase):
     def test_linha_do_tempo_respeita_limite_de_campos_discord(self):
-        from cogs.historico_membros import _embed_registros
+        from utils.historico_membros import _embed_registros
 
         eventos = [
             {
@@ -53,3 +53,16 @@ class TestHistoricoEmbeds(unittest.TestCase):
         self.assertTrue(embed.fields)
         self.assertTrue(all(len(campo.value) <= 1024 for campo in embed.fields))
         self.assertLessEqual(len(embed.fields), 25)
+
+
+class TestPainelHistoricoRegistro(unittest.TestCase):
+    def test_painel_persistente_sem_comando_slash(self):
+        from cogs.logs import PainelHistoricoMembrosView, SeletorMembroRegistroView
+        from utils import historico_membros
+
+        painel = PainelHistoricoMembrosView()
+        seletor = SeletorMembroRegistroView(123)
+        self.assertIsNone(painel.timeout)
+        self.assertEqual(painel.children[0].custom_id, "nemesis:registro:membro:abrir")
+        self.assertEqual(seletor.children[0].custom_id, "nemesis:registro:membro:selecionar")
+        self.assertFalse(hasattr(historico_membros, "HistoricoMembros"))
