@@ -14,7 +14,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             "sistemas", "administracao", "seguranca", "formularios",
         }
         self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
-        self.assertGreaterEqual(len(registro_global.CATEGORIAS), 28)
+        self.assertEqual(len(registro_global.CATEGORIAS), 15)
         nomes = [nome for nome, _ in registro_global.CATEGORIAS.values()]
         self.assertEqual(len(nomes), len(set(nomes)))
 
@@ -30,6 +30,13 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(registro_global.CARGOS_ACESSO_IDS, esperados)
         self.assertNotIn(1563995879998754943, registro_global.CARGOS_ACESSO_IDS)
         self.assertNotIn(1563995879990624373, registro_global.CARGOS_ACESSO_IDS)
+
+    def test_categorias_legadas_apontam_para_areas_oficiais(self):
+        self.assertNotIn("cargos", registro_global.CATEGORIAS)
+        self.assertEqual(registro_global.normalizar_categoria("cargos"), "historico_membros")
+        self.assertEqual(registro_global.normalizar_categoria("automod"), "seguranca")
+        self.assertEqual(registro_global.normalizar_categoria("anexos"), "mensagens")
+        self.assertEqual(registro_global.normalizar_categoria("competicoes"), "competitivo")
 
     async def test_nao_provisiona_outros_servidores(self):
         guild = Mock()
@@ -84,7 +91,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(PermissionError, "herda acesso"):
             registro_global.validar_privacidade(forum)
 
-    async def test_reconstrucao_v3_cria_topico_novo_sem_reutilizar_id_legado(self):
+    async def test_reorganizacao_reaproveita_topico_legado_sem_apagar_historico(self):
         forum = Mock()
         forum.id = 456
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
@@ -108,10 +115,15 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
-        self.assertIs(resultado, novo)
-        forum.create_thread.assert_awaited_once()
-        legado.edit.assert_not_called()
-        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 900)
+        self.assertIs(resultado, legado)
+        forum.create_thread.assert_not_called()
+        legado.edit.assert_awaited_once_with(
+            name=registro_global.CATEGORIAS["mensagens"][0],
+            archived=False,
+            locked=False,
+            reason="Reorganização dos registros da NÊMESIS; preservação do histórico existente",
+        )
+        salvar.assert_awaited_once_with(registro_global.GUILD_NEMESIS_ID, "mensagens", 789)
 
     async def test_topico_v3_existente_prevalece_sobre_id_legado(self):
         forum = Mock()
