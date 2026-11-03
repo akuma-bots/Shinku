@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from cogs.sugestoes import (
     CATEGORIAS,
@@ -24,6 +24,7 @@ from cogs.sugestoes import (
     _esta_no_canal_sugestoes,
     CANAL_SUGESTOES_ID,
     GUILD_NEMESIS_ID,
+    Sugestoes,
 )
 
 
@@ -138,6 +139,61 @@ class TestSistemaSugestoes(unittest.TestCase):
 
 
 class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
+
+    async def test_migracao_atualiza_publicacao_antiga_sem_criar_outra(self):
+        ids_antigos = ["nemesis:sugestoes:votar:apoia", "nemesis:sugestoes:votar:nao_apoia"]
+        mensagem = SimpleNamespace(
+            components=[SimpleNamespace(children=[SimpleNamespace(custom_id=item) for item in ids_antigos])],
+            edit=AsyncMock(),
+        )
+        canal = SimpleNamespace(fetch_message=AsyncMock(return_value=mensagem))
+        guild = SimpleNamespace(
+            get_channel=lambda _id: canal,
+            get_thread=lambda _id: None,
+            fetch_channel=AsyncMock(),
+        )
+        bot = SimpleNamespace(add_view=lambda _view: None)
+        cog = Sugestoes(bot)
+        registro = {
+            "id": 321,
+            "canal_publicacao_id": 654,
+            "titulo": "Sugestão antiga",
+            "status": "pendente",
+            "criado_em": "2026-11-01T00:00:00+00:00",
+        }
+        with patch("cogs.sugestoes.carregar", AsyncMock(return_value={"321": registro})):
+            total = await cog._sincronizar_publicacoes_existentes(guild)
+        self.assertEqual(total, 1)
+        mensagem.edit.assert_awaited_once()
+        self.assertEqual(mensagem.edit.await_args.kwargs["embed"].title, "💡 Sugestão antiga")
+        self.assertEqual(len(mensagem.edit.await_args.kwargs["view"].children), 6)
+
+    async def test_migracao_nao_edita_publicacao_que_ja_tem_todos_os_botoes(self):
+        ids_atuais = [
+            "nemesis:sugestoes:votar:apoia",
+            "nemesis:sugestoes:votar:nao_apoia",
+            "nemesis:sugestoes:comentar",
+            "nemesis:sugestoes:acompanhar",
+            "nemesis:sugestoes:editar",
+            "nemesis:sugestoes:gerenciar",
+        ]
+        mensagem = SimpleNamespace(
+            components=[SimpleNamespace(children=[SimpleNamespace(custom_id=item) for item in ids_atuais])],
+            edit=AsyncMock(),
+        )
+        canal = SimpleNamespace(fetch_message=AsyncMock(return_value=mensagem))
+        guild = SimpleNamespace(
+            get_channel=lambda _id: canal,
+            get_thread=lambda _id: None,
+            fetch_channel=AsyncMock(),
+        )
+        cog = Sugestoes(SimpleNamespace(add_view=lambda _view: None))
+        registro = {"id": 322, "canal_publicacao_id": 654, "status": "pendente"}
+        with patch("cogs.sugestoes.carregar", AsyncMock(return_value={"322": registro})):
+            total = await cog._sincronizar_publicacoes_existentes(guild)
+        self.assertEqual(total, 0)
+        mensagem.edit.assert_not_awaited()
+
     async def test_seguidor_pode_ativar_e_desativar_acompanhamento(self):
         dados = {}
         async def fake_atualizar(nome, padrao, transformador):

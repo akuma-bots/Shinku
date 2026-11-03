@@ -14,6 +14,7 @@
 - Cada pessoa mantém somente um voto; pode trocar a opção ou clicar novamente para retirar o voto.
 - O autor não pode votar na própria sugestão, e as ações são validadas contra a publicação original do Fórum.
 - O autor pode editar título, descrição e resultado esperado enquanto a sugestão estiver pendente ou em análise.
+- Ao iniciar, o bot atualiza os botões das publicações antigas (até 250 mais recentes) sem criar mensagens duplicadas.
 - O botão **Acompanhar** permite receber atualizações por DM quando a liderança mudar o status.
 - No Fórum, a própria publicação da sugestão é o espaço de comentários; em canal de texto, o botão cria uma thread vinculada.
 - Sugestões rejeitadas ou implementadas encerram a votação.

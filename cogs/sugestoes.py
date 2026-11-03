@@ -1070,6 +1070,64 @@ class Sugestoes(commands.Cog):
         self.bot.add_view(PainelSugestoesView())
         self.bot.add_view(PublicacaoSugestaoView())
 
+    async def _sincronizar_publicacoes_existentes(self, guild: discord.Guild) -> int:
+        """Atualiza controles de publicações antigas sem reenviar mensagens."""
+        dados = await carregar(ARQUIVO_SUGESTOES, {})
+        if not isinstance(dados, dict):
+            return 0
+        itens = [item for item in dados.values() if isinstance(item, dict)]
+        itens.sort(key=lambda item: str(item.get("criado_em", "")), reverse=True)
+        atualizadas = 0
+        for registro in itens[:250]:
+            try:
+                canal_id = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+                canal = guild.get_channel(canal_id) or guild.get_thread(canal_id)
+                if canal is None:
+                    canal = await guild.fetch_channel(canal_id)
+                mensagem_id = int(registro.get("id") or 0)
+                if not mensagem_id:
+                    continue
+                mensagem = await canal.fetch_message(mensagem_id)
+                ids_componentes = {
+                    getattr(componente, "custom_id", None)
+                    for linha in mensagem.components
+                    for componente in getattr(linha, "children", [])
+                }
+                obrigatorios = {
+                    "nemesis:sugestoes:votar:apoia",
+                    "nemesis:sugestoes:votar:nao_apoia",
+                    "nemesis:sugestoes:comentar",
+                    "nemesis:sugestoes:acompanhar",
+                    "nemesis:sugestoes:editar",
+                    "nemesis:sugestoes:gerenciar",
+                }
+                if obrigatorios.issubset(ids_componentes):
+                    continue
+                await mensagem.edit(
+                    embed=_embed_sugestao(registro),
+                    view=PublicacaoSugestaoView(
+                        votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
+                        edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
+                    ),
+                )
+                atualizadas += 1
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+                _LOG.warning(
+                    "Não foi possível atualizar os botões da sugestão antiga %s.",
+                    registro.get("id"),
+                    exc_info=True,
+                )
+            except Exception:
+                _LOG.exception(
+                    "Falha inesperada ao migrar controles da sugestão antiga %s.",
+                    registro.get("id"),
+                )
+        _LOG.info(
+            "Controles das sugestões existentes sincronizados: %s publicações atualizadas (lote máximo 250).",
+            atualizadas,
+        )
+        return atualizadas
+
     async def _sincronizar_painel(self, guild: discord.Guild):
         canal = guild.get_channel(CANAL_SUGESTOES_ID)
         if canal is None:
@@ -1161,6 +1219,7 @@ class Sugestoes(commands.Cog):
             return
         try:
             await self._sincronizar_painel(guild)
+            await self._sincronizar_publicacoes_existentes(guild)
             self._painel_pronto = True
         except Exception:
             _LOG.exception("Não foi possível sincronizar o painel oficial de sugestões.")
