@@ -2,9 +2,9 @@
 
 ## Acesso pelo Registro Global
 
-Não existe comando para abrir o histórico individual. A consulta fica integrada ao tópico permanente **NÊMESIS V3・18・Histórico Membros**, dentro do Fórum privado do Registro Global.
+Não existe comando para abrir o histórico individual. A consulta fica integrada ao tópico permanente **Histórico de membros**, dentro do Fórum privado do Registro Global.
 
-1. Abra o tópico **Histórico Membros**.
+1. Abra o tópico **Histórico de membros**.
 2. Clique em **Consultar histórico de membro** no cabeçalho do tópico.
 3. Pesquise pelo nome e selecione a pessoa no seletor nativo do Discord.
 4. Navegue pelas seções do dossiê no menu privado.
