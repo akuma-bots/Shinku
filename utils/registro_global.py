@@ -45,23 +45,24 @@ CATEGORIAS = {
     "sugestoes": ("Sugestões e votações", "Sugestões recebidas, votos, decisões e resultados."),
 }
 
-# Cores vivas por área para diferenciar visualmente os registros no Discord.
+# Paleta NÊMESIS: carmesim escuro, vermelho profundo e preto.
+# Tons próximos diferenciam as áreas sem descaracterizar a identidade visual.
 CORES_CATEGORIAS = {
-    "mensagens": 0x3498DB,          # Azul
-    "atendimento": 0x1ABC9C,        # Turquesa
-    "moderacao": 0xE74C3C,          # Vermelho
-    "historico_membros": 0x9B59B6,   # Roxo
-    "operacoes": 0xF39C12,           # Laranja
-    "administracao": 0xC0392B,       # Carmesim
-    "seguranca": 0xE67E22,           # Âmbar
-    "missoes": 0x2ECC71,             # Verde
-    "competitivo": 0xE84393,         # Rosa
-    "eventos": 0xF1C40F,             # Dourado
-    "parcerias": 0x16A085,           # Verde-água
-    "integracoes": 0x5865F2,         # Azul Discord
-    "infraestrutura": 0x607D8B,      # Azul aço
-    "sorteios": 0xD35400,             # Laranja forte
-    "sugestoes": 0x8E44AD,            # Violeta
+    "mensagens": 0x8B1E2D,
+    "atendimento": 0xA62139,
+    "moderacao": 0x741629,
+    "historico_membros": 0x991B33,
+    "operacoes": 0x5C101F,
+    "administracao": 0xB3263E,
+    "seguranca": 0x681323,
+    "missoes": 0x8F172C,
+    "competitivo": 0xA01D35,
+    "eventos": 0x4A0D19,
+    "parcerias": 0x7A1425,
+    "integracoes": 0x381018,
+    "infraestrutura": 0x252126,
+    "sorteios": 0xAD233A,
+    "sugestoes": 0x3A0B14,
 }
 
 EMOJIS_CATEGORIAS = {
