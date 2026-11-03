@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import discord
 
-COR_PRIMARIA = 0x9F1239  # Carmesim NÊMESIS
+COR_PRIMARIA = 0x8E44AD  # Violeta NÊMESIS
 COR_SUCESSO = 0x2D9D78
 COR_AVISO = 0xD69E2E
 COR_ERRO = 0x7F1D2D
 COR_NEUTRA = 0x202127
-MARCA = "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒"
-AUTOR_PADRAO = "✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE SISTEMAS"
-RODAPE_PADRAO = "◈ NÊMESIS  •  SISTEMAS INTEGRADOS"
+MARCA = "NÊMESIS"
+AUTOR_PADRAO = "NÊMESIS • CENTRAL DE SISTEMAS"
+RODAPE_PADRAO = "NÊMESIS • SISTEMAS INTEGRADOS"
 
 
 def criar_embed(
@@ -39,13 +39,10 @@ def criar_embed(
     if "timestamp" not in kwargs:
         kwargs["timestamp"] = discord.utils.utcnow()
 
-    # Um tratamento de título uniforme torna a mudança perceptível, sem duplicar
-    # a moldura em títulos que já usam a identidade NÊMESIS.
+    # Títulos objetivos e legíveis: a identidade fica no autor, no rodapé
+    # e nas cores, sem fontes artificiais ou molduras repetitivas.
     if title:
-        titulo = title.strip()
-        if not titulo.startswith(("✦・", "✦ ", "◈ ", "𝐍̷Ê𝐌𝐄𝐒𝐈𝐒")):
-            titulo = f"✦・ {titulo} ・✦"
-        title = titulo[:256]
+        title = " ".join(title.strip().split())[:256]
 
     embed = discord.Embed(title=title, description=description, **kwargs)
 
