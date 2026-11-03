@@ -374,7 +374,11 @@ def membro_tem_octogono(membro) -> bool:
     )
 
 
-CARGOS_AUTORIZADOS_HIERARQUIA_IDS = CARGOS_ACIMA_ELITE_IDS | CARGOS_LIDERANCA_IDS
+CARGOS_AUTORIZADOS_HIERARQUIA_IDS = CARGOS_ACIMA_ELITE_IDS | frozenset({
+    CARGO_OCTOGONO_ID,
+    1563995880007139424,  # Diretor Staff
+    1563995880007139423,  # Vice-Diretor Staff
+})
 
 
 def membro_pode_promover_rebaixar_banir(membro) -> bool:
