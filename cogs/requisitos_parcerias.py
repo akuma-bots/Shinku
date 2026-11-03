@@ -64,7 +64,7 @@ def embed_painel():
         ),
         color=VERMELHO,
     )
-    e.add_field(name="AUTORIDADE COMPETENTE", value="OCTÓGONO, Diretor Staff e Vice-Diretor Staff, conforme a hierarquia oficial.", inline=False)
+    e.add_field(name="AUTORIDADE COMPETENTE", value="OCTÓGONO, Diretor Staff, Vice-Diretor Staff e Supervisor Staff, conforme a hierarquia oficial.", inline=False)
     e.add_field(name="CONFORMIDADE", value="Informações falsas, convites inválidos, publicidade enganosa ou violações dos critérios podem resultar em recusa ou encerramento da aliança.", inline=False)
     e.set_author(name="NÊMESIS • ALIANÇAS ESTRATÉGICAS")
     e.set_footer(text="DOCUMENTO INSTITUCIONAL • AVALIAÇÃO ADMINISTRATIVA")
