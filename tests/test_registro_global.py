@@ -95,7 +95,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         forum = Mock()
         forum.id = 456
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
-        legado = Mock()
+        legado = Mock(spec=discord.Thread)
         legado.id = 789
         legado.edit = AsyncMock()
         legado.parent_id = forum.id
