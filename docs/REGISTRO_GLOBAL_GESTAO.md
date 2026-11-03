@@ -4,23 +4,20 @@ O Registro Global é o arquivo de auditoria privado da NÊMESIS. A estrutura foi
 
 ## Áreas oficiais
 
-| Área | Conteúdo |
+| Tópico | Conteúdo |
 |---|---|
-| Mensagens e arquivos | Edições, exclusões e anexos de mensagens |
-| Atendimento | Tickets, responsáveis, encerramentos e avaliações |
-| Moderação | Advertências, timeouts, expulsões e banimentos |
-| Histórico de membros | Dossiê individual: entradas, saídas, cargos, convites, XP, voz, conquistas e ocorrências |
-| Operações | Atividades gerais, formulários e relatórios |
-| Administração | Decisões, permissões e configurações estruturais |
-| Segurança | AutoMod, Anti-Raid, filtros e incidentes |
-| Missões | Criação, atribuição, validação, conclusão e recompensas |
-| Competitivo | Desafios, PvP, guerras e resultados |
-| Eventos | Agenda, inscrições e resultados |
-| Parcerias | Solicitações, aprovações e alterações |
-| Integrações | Roblox, APIs, vínculos e sincronizações |
-| Infraestrutura | Upstash, conexões, tarefas e disponibilidade |
-| Sorteios | Participações, vencedores e entrega de prêmios |
-| Sugestões e votações | Sugestões, votos e decisões |
+| 👑・Central de Administração | Decisões, permissões, configurações e diretrizes oficiais |
+| 👥・Arquivo de Membros | Entradas, saídas, cargos, XP, conquistas e linha do tempo individual |
+| ⚖️・Tribunal de Moderação | Advertências, timeouts, expulsões e banimentos |
+| 🛡️・Muralha de Segurança | AutoMod, Anti-Raid, filtros e incidentes |
+| 🎯・Operações e Missões | Missões, operações, formulários, provas, validações e recompensas |
+| 🏆・Arena Competitiva | Desafios, PvP, guerras, placares e resultados |
+| 🎉・Eventos e Celebrações | Eventos, inscrições, sorteios e vencedores |
+| 🎫・Central de Atendimento | Tickets, responsáveis, encerramentos, avaliações e transcrições |
+| 💬・Comunicação Geral | Edições, exclusões e anexos de mensagens |
+| 🤝・Alianças e Parcerias | Solicitações, aprovações e representantes |
+| ⚙️・Sistemas e Integrações | Roblox, APIs, Upstash, conexões e disponibilidade |
+| 📋・Sugestões e Ideias | Sugestões, votos, decisões e resultados |
 
 ## Histórico de cargos
 
