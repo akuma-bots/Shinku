@@ -20,19 +20,19 @@ _COR_NEMESIS = 0x9F2035
 
 SECOES_ADMINISTRATIVAS = {
     "visao_geral": {
-        "titulo": "VISÃO GERAL DA ORGANIZAÇÃO",
+        "titulo": "📊 VISÃO GERAL DA ORGANIZAÇÃO",
         "descricao": "Resumo operacional atualizado no momento da consulta, com acesso às áreas administrativas da NÊMESIS.",
         "topicos": (),
         "canais": (),
     },
     "membros": {
-        "titulo": "GESTÃO DE MEMBROS E HIERARQUIA",
+        "titulo": "👥 GESTÃO DE MEMBROS E HIERARQUIA",
         "descricao": "Consulte o dossiê individual e a linha do tempo de cada integrante. Alterações de cargos fazem parte do histórico do próprio membro.",
         "topicos": ("historico_membros",),
         "canais": (("Progressão e XP", 1563995881315897548),),
     },
     "operacoes": {
-        "titulo": "OPERAÇÕES E DESENVOLVIMENTO",
+        "titulo": "🎯 OPERAÇÕES E DESENVOLVIMENTO",
         "descricao": "Acesse missões, validações, competições, eventos, inscrições, parcerias e relatórios operacionais.",
         "topicos": ("missoes", "competitivo", "eventos", "operacoes", "parcerias"),
         "canais": (
@@ -42,23 +42,32 @@ SECOES_ADMINISTRATIVAS = {
         ),
     },
     "seguranca": {
-        "titulo": "SEGURANÇA E CONTROLE ADMINISTRATIVO",
+        "titulo": "🛡️ SEGURANÇA E CONTROLE ADMINISTRATIVO",
         "descricao": "Acompanhe ocorrências de segurança, AutoMod, moderação e decisões administrativas. A central não amplia permissões nem substitui as confirmações dos sistemas existentes.",
         "topicos": ("seguranca", "moderacao", "administracao"),
         "canais": (),
     },
     "sistemas": {
-        "titulo": "SISTEMAS E INFRAESTRUTURA",
+        "titulo": "⚙️ SISTEMAS E INFRAESTRUTURA",
         "descricao": "Acesse registros de integrações, infraestrutura, configurações, sistemas e Roblox. O diagnóstico abaixo mostra o estado da sessão atual.",
         "topicos": ("infraestrutura", "integracoes", "operacoes"),
         "canais": (),
     },
     "registros": {
-        "titulo": "AUDITORIA E REGISTROS",
+        "titulo": "📚 AUDITORIA E REGISTROS",
         "descricao": "Consulte auditoria de mensagens, atendimento e registros operacionais consolidados, sem áreas duplicadas.",
         "topicos": ("mensagens", "atendimento", "historico_membros", "sorteios", "sugestoes"),
         "canais": (),
     },
+}
+
+CORES_SECOES = {
+    "visao_geral": 0x5865F2,
+    "membros": 0x9B59B6,
+    "operacoes": 0xF39C12,
+    "seguranca": 0xE74C3C,
+    "sistemas": 0x3498DB,
+    "registros": 0x16A085,
 }
 
 _ROTULOS_TOPICOS = {
@@ -172,7 +181,7 @@ async def _embed_visao_geral(bot: commands.Bot, guild: discord.Guild) -> discord
 async def _embed_secao(bot: commands.Bot, guild: discord.Guild, chave: str):
     secao = SECOES_ADMINISTRATIVAS[chave]
     embed = criar_embed(
-        f"NÊMESIS • {secao['titulo']}", secao["descricao"], cor=_COR_NEMESIS,
+        f"NÊMESIS • {secao['titulo']}", secao["descricao"], cor=CORES_SECOES.get(chave, _COR_NEMESIS),
         rodape="NÊMESIS • CENTRAL ADMINISTRATIVA • ACESSO RESTRITO", timestamp=True,
     )
     try:
