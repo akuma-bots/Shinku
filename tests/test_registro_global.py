@@ -14,7 +14,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             "operacoes", "administracao", "seguranca", "missoes",
         }
         self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
-        self.assertEqual(len(registro_global.CATEGORIAS), 15)
+        self.assertEqual(len(registro_global.CATEGORIAS), 12)
         nomes = [nome for nome, _ in registro_global.CATEGORIAS.values()]
         self.assertEqual(len(nomes), len(set(nomes)))
 
@@ -45,7 +45,51 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(registro_global.normalizar_categoria("cargos"), "historico_membros")
         self.assertEqual(registro_global.normalizar_categoria("automod"), "seguranca")
         self.assertEqual(registro_global.normalizar_categoria("anexos"), "mensagens")
+        self.assertEqual(registro_global.normalizar_categoria("operacoes"), "missoes")
+        self.assertEqual(registro_global.normalizar_categoria("infraestrutura"), "integracoes")
+        self.assertEqual(registro_global.normalizar_categoria("sorteios"), "eventos")
+        self.assertEqual(registro_global.normalizar_categoria("formularios"), "missoes")
+        self.assertEqual(registro_global.normalizar_categoria("sistemas"), "integracoes")
         self.assertEqual(registro_global.normalizar_categoria("competicoes"), "competitivo")
+
+    async def test_migracao_exclui_topicos_ativos_e_arquivados_uma_vez(self):
+        forum = Mock()
+        forum.id = 456
+        ativo = Mock(spec=discord.Thread)
+        ativo.id = 10
+        ativo.parent_id = forum.id
+        ativo.name = "Tópico antigo"
+        ativo.delete = AsyncMock()
+        arquivado = Mock(spec=discord.Thread)
+        arquivado.id = 11
+        arquivado.parent_id = forum.id
+        arquivado.name = "Outro tópico antigo"
+        arquivado.delete = AsyncMock()
+        forum.threads = [ativo]
+
+        async def arquivados(limit=None):
+            yield arquivado
+
+        forum.archived_threads.side_effect = arquivados
+        with patch("utils.storage.carregar", new=AsyncMock(return_value={})), \\
+             patch("utils.storage.salvar", new=AsyncMock()) as salvar:
+            quantidade = await registro_global._executar_migracao_destrutiva(forum)
+
+        self.assertEqual(quantidade, 2)
+        ativo.delete.assert_awaited_once()
+        arquivado.delete.assert_awaited_once()
+        salvar.assert_awaited_once()
+        self.assertEqual(salvar.await_args.args[0], registro_global.ARQUIVO_MIGRACAO_DESTRUTIVA)
+        self.assertTrue(salvar.await_args.args[1]["concluida"])
+
+    async def test_migracao_concluida_nao_apaga_novamente(self):
+        forum = Mock()
+        forum.id = 456
+        estado = {"versao": 1, "concluida": True, "forum_id": forum.id}
+        with patch("utils.storage.carregar", new=AsyncMock(return_value=estado)):
+            quantidade = await registro_global._executar_migracao_destrutiva(forum)
+        self.assertIsNone(quantidade)
+        forum.archived_threads.assert_not_called()
 
     async def test_nao_provisiona_outros_servidores(self):
         guild = Mock()
