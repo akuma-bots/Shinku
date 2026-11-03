@@ -63,7 +63,7 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 ## Validação executada
 
 - `python -m compileall -q bot.py cogs utils tests` — aprovado.
-- `PYTHONPATH=. python -m pytest -q` — **315 testes aprovados e 67 subtestes aprovados**.
+- `PYTHONPATH=. python -m pytest -q` — **317 testes aprovados e 67 subtestes aprovados**.
 - Os testes foram executados em ambiente isolado com o código clonado do GitHub; não equivalem a teste funcional no Discord ou a deploy no Render.
 
 ## Critérios para encerrar a implantação
