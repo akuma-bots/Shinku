@@ -100,6 +100,7 @@ async def remover_punicao(guild_id: int, punicao_id: str) -> bool:
     resultado = {"removida": False}
 
     def remover(todos):
+        resultado["removida"] = False
         if not isinstance(todos, dict):
             todos = {}
         lista = _lista_valida(todos.get(str(guild_id), []))
