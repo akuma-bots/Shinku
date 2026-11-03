@@ -16,6 +16,7 @@ from utils.guild_config import membro_tem_lideranca
 from utils.historico_membros import (
     ABAS, construir_dossie, _embed_geral, _embed_missoes,
     _embed_competitivo, _embed_conquistas, _embed_moderacao, _embed_registros,
+    _timeout_membro,
 )
 
 
@@ -552,10 +553,9 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, embed, categoria="cargos")
             await registrar_global(depois.guild, "historico_membros", "Cargos do membro alterados", embed.description or "Cargos alterados.", cor=0xB3132B)
 
-        # Compatível com versões de discord.py em que o atributo não está
-        # disponível no objeto Member. A comparação não pode derrubar o listener.
-        timeout_antes = getattr(antes, "communication_disabled_until", None)
-        timeout_depois = getattr(depois, "communication_disabled_until", None)
+        # Usa o atributo oficial de discord.py e mantém fallback para forks antigos.
+        timeout_antes = _timeout_membro(antes)
+        timeout_depois = _timeout_membro(depois)
         if timeout_antes != timeout_depois:
             embed = criar_embed(
                 title="Timeout alterado",
