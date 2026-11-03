@@ -80,6 +80,20 @@ def _embed_revisao(revisao: dict, guild: discord.Guild = None, bot: commands.Bot
     embed.set_footer(text="NÊMESIS  •  CENTRAL DE VALIDAÇÃO  •  DECISÃO REGISTRADA EM AUDITORIA")
     return aplicar_identidade_servidor(embed, guild, bot, banner=False)
 
+def _view_link_revisao(url: str) -> discord.ui.View:
+    """Dá ao registro um atalho direto para a evidência com os controles ativos."""
+    view = discord.ui.View(timeout=None)
+    view.add_item(
+        discord.ui.Button(
+            label="Abrir evidência e revisar",
+            style=discord.ButtonStyle.link,
+            emoji="🔎",
+            url=url,
+        )
+    )
+    return view
+
+
 def _view_revisao(revisao_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
     view.add_item(discord.ui.Button(label="Aprovar", style=discord.ButtonStyle.success,
@@ -517,6 +531,7 @@ class Revisoes(commands.Cog):
                 f"Status: **Pendente de revisão**\n"
                 f"Prova original: {msg.jump_url}",
                 cor=0xFEE75C,
+                view=_view_link_revisao(msg.jump_url),
             )
             await registrar(
                 guild,

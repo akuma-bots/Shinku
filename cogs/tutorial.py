@@ -293,52 +293,29 @@ TUTORIAIS = {
 
 
 def _embed_indice(guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
+    """Capa enxuta: o conteúdo didático só aparece após escolher um guia."""
+    quebra = chr(10)
     embed = criar_embed(
-        title="✦・ 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — CENTRAL DE TUTORIAIS ・✦",
+        title="✦・ NÊMESIS — TUTORIAIS ・✦",
         description=(
-            "⟡・**Conhecimento, organização e evolução.**\n"
-            "Esta é a biblioteca oficial de orientação da NÊMESIS. Comece pelo guia **Começando na NÊMESIS** para conhecer a TAG da Org, o cargo Visitantes e o roteiro de integração. Os demais guias explicam o funcionamento "
-            "de um sistema, os procedimentos corretos e os canais que você deve consultar.\n\n"
-            "**Selecione um assunto no menu abaixo** para abrir o passo a passo completo. "
-            "A consulta é privada: sua navegação não altera o painel público."
+            "**Central de orientação da NÊMESIS.**" + quebra
+            + "Escolha um assunto no seletor abaixo para abrir o guia correspondente."
+            + quebra * 2
+            + "A consulta é privada e não altera esta mensagem."
         ),
         color=COR_PRIMARIA,
     )
     embed.add_field(
-        name="◈ COMO UTILIZAR",
-        value=(
-            "➜ Escolha o sistema no seletor.\n"
-            "➜ Leia os requisitos e siga a sequência indicada.\n"
-            "➜ Use os canais oficiais para executar cada procedimento.\n"
-            "➜ Em caso de divergência, procure a Central de Atendimento."
-        ),
-        inline=False,
-    )
-    itens = list(TUTORIAIS.items())
-    metade = (len(itens) + 1) // 2
-    for titulo, grupo in (
-        ("◈ GUIAS — OPERAÇÃO E COMUNIDADE", itens[:metade]),
-        ("◈ GUIAS — COMPETITIVO E ORGANIZAÇÃO", itens[metade:]),
-    ):
-        linhas = [
-            f"**{dados['titulo']}** — {dados['descricao']}"
-            for _, dados in grupo
-        ]
-        embed.add_field(name=titulo, value="\n".join(linhas)[:1024] or "Em preparação.", inline=True)
-    embed.add_field(
-        name="◈ ACESSO AO CONHECIMENTO",
-        value=(
-            "O painel permanece disponível em #Sistemas. "
-            "A central de comandos /help continua sendo a referência para localizar comandos "
-            "liberados ao seu cargo."
-        ),
+        name="COMO USAR",
+        value="1. Selecione o sistema." + quebra
+        + "2. Leia o passo a passo exibido." + quebra
+        + "3. Use os canais oficiais indicados no guia.",
         inline=False,
     )
     embed.set_footer(text=MARCADOR_CENTRAL_TUTORIAIS)
     if guild is not None:
         aplicar_identidade_servidor(embed, guild, bot)
     return embed
-
 
 def _embed_tutorial(chave: str, guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
     tutorial = TUTORIAIS[chave]

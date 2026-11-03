@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from cogs.tutorial import TUTORIAIS, Tutorial, CANAL_TUTORIAIS_ID
+from cogs.tutorial import TUTORIAIS, Tutorial, CANAL_TUTORIAIS_ID, _embed_indice
 from utils.guia_servidores import CANAIS_GUIA_SERVIDORES, CARGO_VISITANTES_ID, TAG_ORG_NEMESIS
 
 
@@ -43,3 +43,11 @@ def test_visitor_role_is_part_of_automatic_entry_roles():
     from cogs.autocargo import CargoAutomatico
 
     assert CARGO_VISITANTES_ID in CargoAutomatico.CARGOS_ENTRADA
+
+
+def test_tutorial_index_is_short_and_keeps_teaching_content_behind_selector():
+    embed = _embed_indice()
+    assert len(embed.fields) == 1
+    assert "seletor" in embed.description.lower()
+    assert "Começando na NÊMESIS" not in embed.description
+    assert all(item["descricao"] not in embed.description for item in TUTORIAIS.values())

@@ -741,11 +741,12 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 await topico.edit(archived=False, locked=False, reason="Registrar nova candidatura")
             # Preserva no Fórum o dossiê completo, incluindo todas as respostas,
             # não apenas um aviso resumido da existência da candidatura.
-            for embed_dossie in embeds:
+            for indice, embed_dossie in enumerate(embeds):
                 copia = embed_dossie.copy()
                 copia.set_footer(text=f"NÊMESIS • Cópia restrita do Registro Global • {guild.name}")
                 await topico.send(
                     embed=copia,
+                    view=view if indice == 0 else None,
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
         except Exception:

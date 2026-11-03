@@ -1,3 +1,4 @@
+import discord
 import unittest
 from unittest.mock import Mock
 
@@ -74,3 +75,13 @@ class TestPainelProvas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_link_do_registro_global_abre_a_evidencia_com_controles():
+    from cogs.revisoes import _view_link_revisao
+    view = _view_link_revisao("https://discord.com/channels/1/2/3")
+    assert len(view.children) == 1
+    botao = view.children[0]
+    assert botao.style is discord.ButtonStyle.link
+    assert botao.url == "https://discord.com/channels/1/2/3"
+    assert botao.label == "Abrir evidência e revisar"

@@ -1,5 +1,6 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import discord
 
@@ -7,7 +8,7 @@ from cogs import formularios as cog_formularios
 from cogs.formularios import _embeds_painel, _embeds_resposta, _paginas_modal, _limpar_sessoes_formularios
 
 
-class TestFormularios(unittest.TestCase):
+class TestFormularios(unittest.IsolatedAsyncioTestCase):
     def test_descricao_longa_e_dividida_sem_ultrapassar_limite_do_discord(self):
         descricao = ("Texto da descrição da NÊMESIS.\n" * 500)
         embeds = _embeds_painel({
@@ -66,6 +67,37 @@ class TestFormularios(unittest.TestCase):
 
         paginas = _paginas_modal(formulario)
         self.assertEqual([len(p["perguntas"]) for p in paginas], [5, 5, 2])
+
+    async def test_dossie_no_registro_global_recebe_botoes_de_decisao(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        cog.bot = SimpleNamespace()
+        canal = SimpleNamespace(send=AsyncMock())
+        topico = SimpleNamespace(
+            archived=False,
+            locked=False,
+            send=AsyncMock(),
+        )
+        guild = SimpleNamespace(
+            name="NÊMESIS",
+            get_channel=lambda _channel_id: canal,
+            get_role=lambda _role_id: None,
+        )
+        embed = discord.Embed(title="Dossiê de candidatura")
+        view = object()
+        with patch("cogs.formularios._embeds_resposta", return_value=[embed]), patch(
+            "cogs.formularios._view_resposta", return_value=view
+        ), patch("utils.registro_global.obter_topico", AsyncMock(return_value=topico)):
+            publicado = await cog.notificar_cargos(
+                guild,
+                {"id": "form-staff", "cargos_notificar": []},
+                {"id": "resp-123", "autor_id": 456, "respostas": []},
+            )
+
+        self.assertTrue(publicado)
+        canal.send.assert_awaited_once()
+        self.assertIs(canal.send.await_args.kwargs["view"], view)
+        topico.send.assert_awaited_once()
+        self.assertIs(topico.send.await_args.kwargs["view"], view)
 
     def test_candidatura_longa_respeita_limite_de_campos_por_embed(self):
         perguntas = [
