@@ -770,6 +770,20 @@ class Parcerias(commands.Cog):
                 lista,
             )
 
+        canal_anuncio_id = alvo.get("canal_id")
+        mensagem_anuncio_id = alvo.get("mensagem_id")
+        canal_anuncio = interaction.guild.get_channel(canal_anuncio_id) if canal_anuncio_id else None
+        if isinstance(canal_anuncio, discord.TextChannel) and mensagem_anuncio_id:
+            try:
+                mensagem_anuncio = await canal_anuncio.fetch_message(int(mensagem_anuncio_id))
+                await mensagem_anuncio.edit(
+                    embed=_embed_parceria_publica(alvo, interaction.guild),
+                    view=None,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+                logger.exception("Não foi possível atualizar o anúncio da parceria encerrada: %s", nome)
+
         from utils.registro_global import registrar as registrar_global
         detalhe_remocao = (
             f"**Parceria:** {alvo.get('nome', nome)}\n"
