@@ -339,6 +339,7 @@ class RequisitosParcerias(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.tarefa = None
+        self._painel_lock = asyncio.Lock()
 
     async def cog_load(self):
         self.bot.add_view(PainelCandidaturaView())
@@ -360,6 +361,10 @@ class RequisitosParcerias(commands.Cog):
             self.tarefa.cancel()
 
     async def garantir_painel(self):
+        async with self._painel_lock:
+            await self._garantir_painel_unico()
+
+    async def _garantir_painel_unico(self):
         guild = self.bot.get_guild(GUILD_ID)
         if guild is None:
             return
@@ -380,8 +385,21 @@ class RequisitosParcerias(commands.Cog):
                 mensagem = await canal.fetch_message(int(dados["painel_mensagem_id"]))
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 mensagem = None
+        if mensagem is None and self.bot.user:
+            try:
+                async for candidata in canal.history(limit=60):
+                    if (
+                        candidata.author.id == self.bot.user.id
+                        and candidata.embeds
+                        and candidata.embeds[0].title == "NÊMESIS  |  DIRETORIA DE RELAÇÕES INSTITUCIONAIS"
+                    ):
+                        mensagem = candidata
+                        break
+            except (discord.Forbidden, discord.HTTPException):
+                LOG.exception("Não foi possível procurar um painel de parcerias anterior.")
         if mensagem:
             await mensagem.edit(embed=embed_painel(), view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
+            await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
         else:
             mensagem = await canal.send(embed=embed_painel(), view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
             await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
