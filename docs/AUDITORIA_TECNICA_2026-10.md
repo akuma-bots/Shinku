@@ -57,14 +57,13 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 
 1. **IDs de canais e cargos:** há IDs padrão/legados distribuídos em módulos. Não foram substituídos porque a configuração efetiva do Discord e do Upstash precisa ser consultada no ambiente real antes de qualquer migração.
 2. **Concorrência fora dos fluxos modernizados:** alguns módulos ainda podem usar leitura seguida de `salvar`; é necessário migrar cada documento de forma específica, com testes e compatibilidade dos dados.
-3. **Sessão HTTP do Upstash:** `utils/storage.py` ainda cria uma `aiohttp.ClientSession` por comando. A reutilização exige ciclo de vida de inicialização e encerramento bem definido e deve ser tratada separadamente.
 4. **Verificação operacional:** permissões reais, envio de DMs, tarefas no Discord, health check do Render e dados do Upstash não podem ser confirmados apenas pelo código.
 5. **Segurança estática:** o workflow de segurança audita dependências; análise estática de código e varredura adicional de segredos ainda podem ser incorporadas em uma rodada própria.
 
 ## Validação executada
 
 - `python -m compileall -q bot.py cogs utils tests` — aprovado.
-- `PYTHONPATH=. python -m pytest -q` — **318 testes aprovados e 67 subtestes aprovados**.
+- `PYTHONPATH=. python -m pytest -q` — **319 testes aprovados e 67 subtestes aprovados**.
 - Os testes foram executados em ambiente isolado com o código clonado do GitHub; não equivalem a teste funcional no Discord ou a deploy no Render.
 
 ## Critérios para encerrar a implantação
