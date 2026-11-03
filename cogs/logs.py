@@ -106,7 +106,7 @@ class SeletorMembroRegistroView(discord.ui.View):
 
 
 class PainelHistoricoMembrosView(discord.ui.View):
-    """Botão persistente anexado ao cabeçalho do tópico Histórico Membros."""
+    """Botão persistente anexado ao cabeçalho do tópico Histórico de membros."""
     def __init__(self):
         super().__init__(timeout=None)
 
@@ -138,7 +138,7 @@ class Logs(commands.Cog):
     async def _atualizar_painel_historico_membros(self, guild: discord.Guild, topicos: dict) -> None:
         thread_id = topicos.get("historico_membros")
         if not thread_id:
-            logger.error("Tópico Histórico Membros não foi retornado pelo Registro Global.")
+            logger.error("Tópico Histórico de membros não foi retornado pelo Registro Global.")
             return
         try:
             thread = guild.get_thread(int(thread_id))
@@ -151,7 +151,7 @@ class Logs(commands.Cog):
                 await thread.edit(archived=False, locked=False, reason="Atualizar painel de consulta do histórico individual")
             mensagem = await thread.fetch_message(thread.id)
             await mensagem.edit(view=PainelHistoricoMembrosView(), allowed_mentions=discord.AllowedMentions.none())
-            logger.info("Painel de consulta individual atualizado no tópico Histórico Membros (%s).", thread.id)
+            logger.info("Painel de consulta individual atualizado no tópico Histórico de membros (%s).", thread.id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível atualizar o painel de histórico individual.")
 
