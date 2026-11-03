@@ -12,9 +12,14 @@ class FakeLoop:
         return self.running
 
 
+class CogComLoops:
+    loop_ativo = FakeLoop(True)
+    loop_parado = FakeLoop(False)
+
+
 class TestResumoTarefasSistema(unittest.TestCase):
     def test_conta_loops_ativos_e_parados(self):
-        cog = SimpleNamespace(loop_ativo=FakeLoop(True), loop_parado=FakeLoop(False))
+        cog = CogComLoops()
         total, ativas, falhas = _resumo_tarefas_automaticas(SimpleNamespace(cogs={"Teste": cog}))
         self.assertEqual((total, ativas, falhas), (2, 1, 1))
 
