@@ -66,3 +66,27 @@ class TestPainelHistoricoRegistro(unittest.TestCase):
         self.assertEqual(painel.children[0].custom_id, "nemesis:registro:membro:abrir")
         self.assertEqual(seletor.children[0].custom_id, "nemesis:registro:membro:selecionar")
         self.assertFalse(hasattr(historico_membros, "HistoricoMembros"))
+
+
+class TestTimeoutCompatibilidade(unittest.TestCase):
+    def test_usa_atributo_timed_out_until_do_discord_py(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+        from utils.historico_membros import _timeout_membro
+
+        data = datetime(2026, 11, 3, tzinfo=timezone.utc)
+        self.assertEqual(_timeout_membro(SimpleNamespace(timed_out_until=data)), data)
+
+    def test_fallback_para_forks_com_communication_disabled_until(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+        from utils.historico_membros import _timeout_membro
+
+        data = datetime(2026, 11, 3, tzinfo=timezone.utc)
+        self.assertEqual(_timeout_membro(SimpleNamespace(communication_disabled_until=data)), data)
+
+    def test_membro_sem_timeout(self):
+        from types import SimpleNamespace
+        from utils.historico_membros import _timeout_membro
+
+        self.assertIsNone(_timeout_membro(SimpleNamespace()))
