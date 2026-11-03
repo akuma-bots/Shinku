@@ -590,6 +590,8 @@ class Parcerias(commands.Cog):
             "criado_em": agora,
             "atualizado_em": agora,
             "status": "ativa",
+            "categoria": "Reconhecida",
+            "proxima_revisao": agora + (15 * 24 * 60 * 60),
         }
 
         embed = _embed_parceria_publica(parceria, interaction.guild)
