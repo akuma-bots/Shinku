@@ -46,7 +46,7 @@ class TestPainelAdministrativoCentral(unittest.TestCase):
         self.assertIn("missoes", SECOES_ADMINISTRATIVAS["operacoes"]["topicos"])
         self.assertIn("seguranca", SECOES_ADMINISTRATIVAS["seguranca"]["topicos"])
         self.assertNotIn("automod", SECOES_ADMINISTRATIVAS["seguranca"]["topicos"])
-        self.assertIn("infraestrutura", SECOES_ADMINISTRATIVAS["sistemas"]["topicos"])
+        self.assertIn("integracoes", SECOES_ADMINISTRATIVAS["sistemas"]["topicos"])
 
     def test_autorizacao_exige_servidor_e_lideranca(self):
         membro = SimpleNamespace(id=123)
