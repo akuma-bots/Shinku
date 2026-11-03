@@ -44,6 +44,31 @@ UPSTASH_CONFIG_INCOMPLETA = bool(UPSTASH_URL) != bool(UPSTASH_TOKEN)
 
 # Namespace exclusivo do bot; os dados não compartilham chaves operacionais com outros sistemas.
 PREFIXO_CHAVES = "nemesis_bot:"
+_redis_session = None
+_redis_session_loop = None
+
+
+def _obter_sessao_redis():
+    """Reutiliza uma sessão HTTP por processo/event loop para conexões Redis."""
+    global _redis_session, _redis_session_loop
+    loop = asyncio.get_running_loop()
+    if _redis_session is not None and not _redis_session.closed:
+        if _redis_session_loop is not loop:
+            raise ErroStorage("A sessão do Upstash foi solicitada fora do event loop proprietário.")
+        return _redis_session
+    _redis_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15))
+    _redis_session_loop = loop
+    return _redis_session
+
+
+async def fechar_sessao_storage():
+    """Fecha a sessão HTTP compartilhada durante o encerramento do bot."""
+    global _redis_session, _redis_session_loop
+    sessao = _redis_session
+    _redis_session = None
+    _redis_session_loop = None
+    if sessao is not None and not sessao.closed:
+        await sessao.close()
 
 
 def _chave_bot(nome_arquivo: str) -> str:
@@ -81,47 +106,33 @@ async def _comando_redis(*args):
     }
 
     try:
-        timeout = aiohttp.ClientTimeout(
-            total=15
-        )
+        session = _obter_sessao_redis()
+        async with session.post(
+            UPSTASH_URL,
+            headers=headers,
+            json=list(args),
+        ) as resposta:
+            try:
+                dados = await resposta.json()
+            except Exception as erro:
+                texto = await resposta.text()
+                raise ErroStorage(
+                    "O Upstash retornou uma resposta inválida: "
+                    f"{texto}"
+                ) from erro
 
-        async with aiohttp.ClientSession(
-            timeout=timeout
-        ) as session:
+            if resposta.status != 200:
+                raise ErroStorage(
+                    f"Erro do Upstash ({resposta.status}): {dados}"
+                )
 
-            async with session.post(
-                UPSTASH_URL,
-                headers=headers,
-                json=list(args),
-            ) as resposta:
+            if not isinstance(dados, dict):
+                raise ErroStorage("O Upstash retornou uma estrutura inválida.")
 
-                try:
-                    dados = await resposta.json()
-                except Exception as erro:
-                    texto = await resposta.text()
+            if dados.get("error"):
+                raise ErroStorage(f"Erro retornado pelo Redis: {dados['error']}")
 
-                    raise ErroStorage(
-                        "O Upstash retornou uma resposta inválida: "
-                        f"{texto}"
-                    ) from erro
-
-                if resposta.status != 200:
-                    raise ErroStorage(
-                        f"Erro do Upstash "
-                        f"({resposta.status}): {dados}"
-                    )
-
-                if not isinstance(dados, dict):
-                    raise ErroStorage(
-                        "O Upstash retornou uma estrutura inválida."
-                    )
-
-                if dados.get("error"):
-                    raise ErroStorage(
-                        f"Erro retornado pelo Redis: {dados['error']}"
-                    )
-
-                return dados.get("result")
+            return dados.get("result")
 
     except asyncio.TimeoutError as erro:
         raise ErroStorage(
