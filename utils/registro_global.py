@@ -104,15 +104,15 @@ def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
     embed = discord.Embed(
         title=nome,
         description=(
-            "**CENTRAL OFICIAL DE AUDITORIA**\n"
-            "Área permanente de registros operacionais da NÊMESIS. "
+            "**REGISTRO OFICIAL DA NÊMESIS**\n"
+            "Área de consulta dos registros operacionais da NÊMESIS. "
             "As ocorrências são organizadas por assunto neste mesmo tópico."
         ),
         color=0xB3132B,
     )
-    embed.add_field(name="ESCOPO DESTE TÓPICO", value=descricao[:1024], inline=False)
+    embed.add_field(name="O que é registrado", value=descricao[:1024], inline=False)
     embed.add_field(
-        name="PADRÃO DE AUDITORIA",
+        name="Padrão de registro",
         value=(
             "Quando disponível, cada registro identifica responsável, membro relacionado, "
             "ação, canal/protocolo, data e resultado. Dados não observáveis pelo Discord "
@@ -121,7 +121,7 @@ def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
         inline=False,
     )
     embed.add_field(
-        name="ORGANIZAÇÃO",
+        name="Como funciona",
         value=(
             "Os eventos desta categoria são adicionados em sequência aqui. "
             "Não é criado um tópico por ocorrência e os registros não devem ser misturados "
@@ -130,14 +130,14 @@ def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
         inline=False,
     )
     embed.add_field(
-        name="ACESSO E INTEGRIDADE",
+        name="Acesso e integridade",
         value=(
             "Fórum restrito aos cargos autorizados da NÊMESIS. "
             "O cabeçalho é mantido pelo Shinku; as ocorrências são acrescentadas abaixo."
         ),
         inline=False,
     )
-    embed.set_footer(text="NÊMESIS • REGISTRO GLOBAL V3 • TÓPICO PERMANENTE")
+    embed.set_footer(text="NÊMESIS • Registro Global")
     return embed
 
 
@@ -462,7 +462,7 @@ async def registrar(
         if registro.timestamp is None:
             registro.timestamp = datetime.now(timezone.utc)
         if not registro.author.name:
-            registro.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  |  CENTRAL DE REGISTROS")
+            registro.set_author(name="NÊMESIS | Registro Global")
         if not registro.footer.text:
             registro.set_footer(text=f"◈ NÊMESIS • REGISTRO GLOBAL • {CATEGORIAS[categoria][0]}")
         await thread.send(
