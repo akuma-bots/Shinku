@@ -305,12 +305,26 @@ class RevisaoParceriaView(discord.ui.View):
             await interaction.message.edit(
                 embed=discord.Embed(
                     title="NÊMESIS  |  RESULTADO DA REVISÃO QUINZENAL",
-                    description=f"**Comunidade:** {resultado.get('nome')}\n**Resultado:** {'Mantida por mais 15 dias' if manter else 'Suspensa'}\n**Responsável:** {interaction.user.mention}",
+                    description="**Comunidade:** " + str(resultado.get("nome")) + "\n**Resultado:** " + ("Mantida por mais 15 dias" if manter else "Suspensa") + "\n**Responsável:** " + interaction.user.mention,
                     color=0x2D9D68 if manter else 0xB93636,
                 ), view=None,
             )
         except (discord.Forbidden, discord.HTTPException, AttributeError):
             LOG.exception("Falha ao atualizar cartão de revisão %s", self.parceria_id)
+        try:
+            canal_id = resultado.get("canal_id")
+            mensagem_id = resultado.get("mensagem_id")
+            canal_publico = interaction.guild.get_channel(int(canal_id)) if canal_id else None
+            if isinstance(canal_publico, discord.TextChannel) and mensagem_id:
+                mensagem_publica = await canal_publico.fetch_message(int(mensagem_id))
+                from cogs.parcerias import _embed_parceria_publica, ParceriaView
+                await mensagem_publica.edit(
+                    embed=_embed_parceria_publica(resultado, interaction.guild),
+                    view=ParceriaView(int(resultado["cargo_id"])) if manter and resultado.get("cargo_id") else None,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
+            LOG.exception("Falha ao sincronizar anúncio público da parceria revisada %s", self.parceria_id)
         await registrar_log(interaction.guild, "Revisão quinzenal concluída", f"**Parceria:** {resultado.get('nome')}\n**Resultado:** {'Mantida por 15 dias' if manter else 'Suspensa'}\n**Responsável:** {interaction.user.mention}", cor=0x2D9D68 if manter else 0xB93636)
         await interaction.followup.send("Revisão registrada e auditada.", ephemeral=True)
 
