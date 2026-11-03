@@ -474,7 +474,7 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
     await configurar_permissoes(canal)
     validar_privacidade(canal)
 
-    migracao_executada = await _executar_migracao_descritiva(canal)
+    migracao_executada = await _executar_migracao_destrutiva(canal)
     topicos_existentes: list[discord.Thread] = [] if migracao_executada is not None else list(canal.threads)
     try:
         async for thread in canal.archived_threads(limit=None):
