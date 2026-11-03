@@ -477,6 +477,10 @@ async def registrar(
     """Publica um registro no tópico permanente apropriado sem interromper o fluxo principal."""
     if guild.id != GUILD_NEMESIS_ID:
         return False
+    categoria = normalizar_categoria(categoria)
+    if categoria not in CATEGORIAS:
+        _LOG.error("Categoria de registro desconhecida: %s", categoria)
+        return False
     try:
         canal = guild.get_channel(CANAL_REGISTRO_GLOBAL_ID)
         if canal is None:
@@ -489,8 +493,6 @@ async def registrar(
             await thread.edit(archived=False, locked=False, reason="Reabrir tópico permanente para novos registros")
             nome, descricao_topico = CATEGORIAS[categoria]
             await _atualizar_cabecalho_topico(thread, nome, descricao_topico)
-        if categoria not in CATEGORIAS:
-            raise ValueError(f"Categoria de registro desconhecida: {categoria}")
 
         registro = embed.copy() if embed is not None else criar_embed(
             title=str(titulo or "Registro")[:256],
