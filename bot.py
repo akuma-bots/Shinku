@@ -28,7 +28,7 @@ logging.basicConfig(
 CAMINHO_ENV = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=CAMINHO_ENV)
 
-from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
+from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA, fechar_sessao_storage
 from utils.guild_config import membro_tem_acesso_nemesis
 
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -75,6 +75,12 @@ class NemesisBot(commands.Bot):
     Comandos globais têm um limite de 100 por aplicação. Como este bot é
     exclusivo de um servidor, o escopo de servidor evita esse limite global.
     """
+
+    async def close(self):
+        try:
+            await super().close()
+        finally:
+            await fechar_sessao_storage()
 
     async def add_cog(
         self,
