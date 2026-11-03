@@ -352,7 +352,9 @@ def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | 
         color=0x8F1D2C,
         timestamp=discord.utils.utcnow(),
     )
-    embed.add_field(name="STATUS DA ALIANÇA", value="🟢 **ATIVA**", inline=True)
+    status = str(parceria.get("status") or "ativa").lower()
+    status_label = {"ativa": "🟢 ATIVA", "suspensa": "🔴 SUSPENSA", "revisao_pendente": "🟡 REVISÃO PENDENTE", "removida": "⚫ ENCERRADA"}.get(status, status.upper())
+    embed.add_field(name="STATUS DA ALIANÇA", value="**" + status_label + "**", inline=True)
     embed.add_field(name="CATEGORIA", value=str(parceria.get("categoria") or "Reconhecida"), inline=True)
     convite = str(parceria.get("convite") or "")
     embed.add_field(name="ACESSO À COMUNIDADE", value=f"[Entrar no servidor]({convite})" if convite else "Convite indisponível", inline=False)
