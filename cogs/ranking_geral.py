@@ -311,7 +311,7 @@ class CentralRankingGeralView(discord.ui.View):
             return
         await interaction.response.send_modal(ResetarRankingGlobalModal(self))
 
-    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="✕", row=1)
+    @discord.ui.button(label="Fechar central", style=discord.ButtonStyle.secondary, emoji="❌", row=1)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.autorizar(interaction):
             return
