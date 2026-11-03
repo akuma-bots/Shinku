@@ -45,6 +45,33 @@ CATEGORIAS = {
     "sugestoes": ("Sugestões e votações", "Sugestões recebidas, votos, decisões e resultados."),
 }
 
+# Cores vivas por área para diferenciar visualmente os registros no Discord.
+CORES_CATEGORIAS = {
+    "mensagens": 0x3498DB,          # Azul
+    "atendimento": 0x1ABC9C,        # Turquesa
+    "moderacao": 0xE74C3C,          # Vermelho
+    "historico_membros": 0x9B59B6,   # Roxo
+    "operacoes": 0xF39C12,           # Laranja
+    "administracao": 0xC0392B,       # Carmesim
+    "seguranca": 0xE67E22,           # Âmbar
+    "missoes": 0x2ECC71,             # Verde
+    "competitivo": 0xE84393,         # Rosa
+    "eventos": 0xF1C40F,             # Dourado
+    "parcerias": 0x16A085,           # Verde-água
+    "integracoes": 0x5865F2,         # Azul Discord
+    "infraestrutura": 0x607D8B,      # Azul aço
+    "sorteios": 0xD35400,             # Laranja forte
+    "sugestoes": 0x8E44AD,            # Violeta
+}
+
+EMOJIS_CATEGORIAS = {
+    "mensagens": "💬", "atendimento": "🎫", "moderacao": "⚖️",
+    "historico_membros": "👥", "operacoes": "🧭", "administracao": "🏛️",
+    "seguranca": "🛡️", "missoes": "🎯", "competitivo": "🏆",
+    "eventos": "🎉", "parcerias": "🤝", "integracoes": "🔗",
+    "infraestrutura": "⚙️", "sorteios": "🎁", "sugestoes": "💡",
+}
+
 ALIASES_CATEGORIAS = {
     "anexos": "mensagens",
     "automod": "seguranca",
@@ -101,14 +128,16 @@ async def _ler_ids(guild_id: int) -> dict:
 
 
 def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
+    categoria = next((chave for chave, (rotulo, _desc) in CATEGORIAS.items() if rotulo == nome), None)
+    emoji = EMOJIS_CATEGORIAS.get(categoria, "📌")
     embed = discord.Embed(
-        title=nome,
+        title=f"{emoji}  {nome}",
         description=(
             "**REGISTRO OFICIAL DA NÊMESIS**\n"
             "Área de consulta dos registros operacionais da NÊMESIS. "
             "As ocorrências são organizadas por assunto neste mesmo tópico."
         ),
-        color=0xB3132B,
+        color=next((cor for chave, cor in CORES_CATEGORIAS.items() if CATEGORIAS[chave][0] == nome), 0xE84393),
     )
     embed.add_field(name="O que é registrado", value=descricao[:1024], inline=False)
     embed.add_field(
@@ -397,24 +426,33 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
 
     canonicos = set(resultado.values())
     aposentados = 0
+    excluidos_vazios = 0
     for thread in topicos_existentes:
         if thread.id in canonicos or (thread.archived and thread.locked):
             continue
         try:
+            # Apaga somente tópico redundante comprovadamente vazio (apenas a
+            # mensagem inicial). Registros antigos nunca são apagados em lote.
+            quantidade = getattr(thread, "message_count", None)
+            if quantidade is not None and quantidade <= 1:
+                await thread.delete(reason="Remoção de tópico duplicado vazio após consolidação do Registro Global")
+                excluidos_vazios += 1
+                continue
             await thread.edit(
                 archived=True,
                 locked=True,
-                reason="Tópico redundante aposentado após reorganização; conteúdo preservado",
+                reason="Tópico antigo com histórico preservado após consolidação do Registro Global",
             )
             aposentados += 1
         except discord.NotFound:
             continue
         except (discord.Forbidden, discord.HTTPException):
-            _LOG.exception("Falha ao arquivar tópico redundante (%s).", thread.id)
+            _LOG.exception("Falha ao limpar tópico redundante (%s).", thread.id)
 
     _LOG.info(
-        "Registro Global organizado: %s áreas principais; %s tópicos antigos arquivados e preservados.",
-        len(resultado), aposentados,
+        "Registro Global organizado: %s áreas oficiais; %s tópicos duplicados vazios excluídos; "
+        "%s tópicos antigos com histórico arquivados e preservados.",
+        len(resultado), excluidos_vazios, aposentados,
     )
     return resultado
 
@@ -426,7 +464,7 @@ async def registrar(
     descricao: str | None = None,
     *,
     embed: discord.Embed | None = None,
-    cor: int = 0x99AAB5,
+    cor: int | None = None,
     arquivo: discord.File | None = None,
     view: discord.ui.View | None = None,
     content: str | None = None,
@@ -452,11 +490,17 @@ async def registrar(
             nome, descricao_topico = CATEGORIAS[categoria]
             await _atualizar_cabecalho_topico(thread, nome, descricao_topico)
 
+        cor_final = cor if cor is not None else CORES_CATEGORIAS[categoria]
+        emoji = EMOJIS_CATEGORIAS[categoria]
         registro = embed.copy() if embed is not None else criar_embed(
-            title=str(titulo or "Registro")[:256],
+            title=f"{emoji}  {str(titulo or 'Registro')[:240]}",
             description=str(descricao or "Sem detalhes.")[:4096],
-            cor=cor,
+            cor=cor_final,
         )
+        if embed is not None and cor is None:
+            registro.color = discord.Colour(cor_final)
+            if registro.title and not registro.title.startswith(emoji):
+                registro.title = f"{emoji}  {registro.title}"[:256]
         if not registro.title:
             registro.title = str(titulo or "Registro")[:256]
         if registro.timestamp is None:
