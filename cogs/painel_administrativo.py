@@ -57,7 +57,7 @@ SECOES_ADMINISTRATIVAS = {
         "titulo": "📚 AUDITORIA E REGISTROS",
         "descricao": "Consulte auditoria de mensagens, atendimento e registros operacionais consolidados, sem áreas duplicadas.",
         "topicos": ("mensagens", "atendimento", "historico_membros", "eventos", "sugestoes"),
-        "canais": (),
+        "canais": (("Canal oficial de sugestões", 1563995881508831336),),
     },
 }
 
