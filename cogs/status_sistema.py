@@ -12,6 +12,35 @@ from utils.guild_config import lideranca_only
 from utils.registro_global import CATEGORIAS
 
 
+def _resumo_tarefas_automaticas(bot):
+    """Conta loops do discord.py e tarefas asyncio pertencentes aos cogs."""
+    total = ativas = falhas = 0
+    vistos = set()
+    for cog in getattr(bot, "cogs", {}).values():
+        for valor in vars(cog).values():
+            identidade = id(valor)
+            if identidade in vistos:
+                continue
+            vistos.add(identidade)
+            estado = getattr(valor, "is_running", None)
+            if callable(estado):
+                total += 1
+                try:
+                    if estado():
+                        ativas += 1
+                    else:
+                        falhas += 1
+                except Exception:
+                    falhas += 1
+            elif isinstance(valor, asyncio.Task):
+                total += 1
+                if not valor.done():
+                    ativas += 1
+                elif valor.cancelled() or valor.exception() is not None:
+                    falhas += 1
+    return total, ativas, falhas
+
+
 class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
     """Painel administrativo de estado e diagnóstico da NÊMESIS."""
 
@@ -30,6 +59,7 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         falhas = getattr(self.bot, "cogs_falhos", [])
         latencia_ms = round(self.bot.latency * 1000) if self.bot.latency is not None else None
         comandos = self.bot.tree.get_commands(guild=guild)
+        total_tarefas, tarefas_ativas, tarefas_com_falha = _resumo_tarefas_automaticas(self.bot)
         uptime = max(0, int(time.monotonic() - self._inicio))
         horas, resto = divmod(uptime, 3600)
         minutos, segundos = divmod(resto, 60)
@@ -73,6 +103,14 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
         )
         embed.add_field(name="◈ MÓDULOS ATIVOS", value=str(len(self.bot.cogs)), inline=True)
         embed.add_field(name="◈ COMANDOS DO SERVIDOR", value=str(len(comandos)), inline=True)
+        embed.add_field(
+            name="◈ TAREFAS AUTOMÁTICAS",
+            value=(
+                f"{tarefas_ativas}/{total_tarefas} em execução"
+                + (f"\n⚠️ {tarefas_com_falha} parada(s) ou com falha" if tarefas_com_falha else "\n✓ Sem falhas detectadas")
+            ),
+            inline=False,
+        )
         if falhas:
             nomes = [str(item.get("cog", "desconhecido")) for item in falhas[:12] if isinstance(item, dict)]
             embed.add_field(
