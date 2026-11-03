@@ -400,7 +400,11 @@ class RequisitosParcerias(commands.Cog):
                         if not isinstance(item, dict) or item.get("status") != "ativa":
                             continue
                         prazo = int(item.get("proxima_revisao") or 0)
-                        if prazo and prazo <= agora:
+                        if not prazo:
+                            referencia = int(item.get("atualizado_em") or item.get("criado_em") or agora)
+                            prazo = referencia + REVISAO_SEGUNDOS
+                            item["proxima_revisao"] = prazo
+                        if prazo <= agora:
                             item["status"] = "revisao_pendente"
                             item["revisao_solicitada_em"] = agora
                             vencidas.append(dict(item))
