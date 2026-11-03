@@ -178,13 +178,18 @@ class PainelCandidaturaView(discord.ui.View):
 class ModalRecusa(discord.ui.Modal, title="Fundamentação da recusa"):
     motivo = discord.ui.TextInput(label="Motivo da decisão", style=discord.TextStyle.paragraph, min_length=8, max_length=700)
 
-    def __init__(self, protocolo, origem):
+    def __init__(self, protocolo, origem, mensagem_id, canal_id):
         super().__init__()
         self.protocolo = protocolo
         self.origem = origem
+        self.mensagem_id = mensagem_id
+        self.canal_id = canal_id
 
     async def on_submit(self, interaction):
-        await self.origem._decidir(interaction, False, str(self.motivo.value).strip())
+        await self.origem._decidir(
+            interaction, False, str(self.motivo.value).strip(),
+            mensagem_id=self.mensagem_id, canal_id=self.canal_id,
+        )
 
 
 class DecisaoCandidaturaView(discord.ui.View):
@@ -208,9 +213,11 @@ class DecisaoCandidaturaView(discord.ui.View):
         if not self.autorizado(interaction):
             await interaction.response.send_message("Somente o OCTÓGONO e a administração autorizada podem deliberar.", ephemeral=True)
             return
-        await interaction.response.send_modal(ModalRecusa(self.protocolo, self))
+        mensagem_id = interaction.message.id if interaction.message else None
+        canal_id = interaction.channel_id
+        await interaction.response.send_modal(ModalRecusa(self.protocolo, self, mensagem_id, canal_id))
 
-    async def _decidir(self, interaction, aprovar, motivo=None):
+    async def _decidir(self, interaction, aprovar, motivo=None, mensagem_id=None, canal_id=None):
         if not self.autorizado(interaction):
             if not interaction.response.is_done():
                 await interaction.response.send_message("Somente o OCTÓGONO e a administração autorizada podem deliberar.", ephemeral=True)
@@ -248,8 +255,13 @@ class DecisaoCandidaturaView(discord.ui.View):
         if parceria:
             item["parceria_id"] = parceria.get("id")
         try:
-            await interaction.message.edit(embed=embed_candidatura(item), view=None, allowed_mentions=discord.AllowedMentions.none())
-        except (discord.Forbidden, discord.HTTPException, AttributeError):
+            mensagem_origem = interaction.message
+            if mensagem_origem is None and mensagem_id and canal_id:
+                canal_origem = await interaction.guild.fetch_channel(int(canal_id))
+                mensagem_origem = await canal_origem.fetch_message(int(mensagem_id))
+            if mensagem_origem is not None:
+                await mensagem_origem.edit(embed=embed_candidatura(item), view=None, allowed_mentions=discord.AllowedMentions.none())
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException, AttributeError, TypeError, ValueError):
             LOG.exception("Falha ao atualizar dossiê %s", self.protocolo)
         await registrar_log(
             interaction.guild, "Candidatura aprovada e aliança formalizada" if aprovar else "Candidatura recusada",
