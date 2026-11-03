@@ -1,4 +1,6 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from cogs.sugestoes import (
     CATEGORIAS,
@@ -11,6 +13,9 @@ from cogs.sugestoes import (
     _embed_painel_administrativo,
     PainelSugestoesView,
     PublicacaoSugestaoView,
+    _esta_no_canal_sugestoes,
+    CANAL_SUGESTOES_ID,
+    GUILD_NEMESIS_ID,
 )
 
 
@@ -19,6 +24,19 @@ class TestSistemaSugestoes(unittest.TestCase):
         self.assertIn("Sistemas", CATEGORIAS)
         self.assertIn("Comunidade", CATEGORIAS)
         self.assertIn("Outros", CATEGORIAS)
+
+    def test_painel_em_thread_de_forum_e_reconhecido_como_canal_oficial(self):
+        class FakeThread:
+            def __init__(self, parent_id):
+                self.parent_id = parent_id
+                self.id = 900
+
+        interacao = SimpleNamespace(
+            guild_id=GUILD_NEMESIS_ID,
+            channel=FakeThread(CANAL_SUGESTOES_ID),
+        )
+        with patch("cogs.sugestoes.discord.Thread", FakeThread):
+            self.assertTrue(_esta_no_canal_sugestoes(interacao))
 
     def test_categoria_aceita_acentos_e_apelidos(self):
         self.assertEqual(_normalizar_categoria("Missões"), "Missões e operações")
