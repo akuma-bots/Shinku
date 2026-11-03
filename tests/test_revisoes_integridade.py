@@ -37,3 +37,34 @@ class TestIntegridadeRevisoes(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRevisaoDuplicadaDeMissao(unittest.IsolatedAsyncioTestCase):
+    async def test_reutiliza_prova_pendente_sem_publicar_mensagem_duplicada(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from cogs.revisoes import Revisoes
+
+        existente = {
+            "id": "rev-existente",
+            "tipo": "missao",
+            "autor_id": 77,
+            "referencia_id": "missao-1",
+            "status": "pendente",
+            "mensagem_id": 1234,
+            "canal_id": 5678,
+        }
+        cog = object.__new__(Revisoes)
+        canal = SimpleNamespace(send=AsyncMock())
+        guild = SimpleNamespace(id=999)
+        with patch("cogs.revisoes.revisoes.listar", new=AsyncMock(return_value=[existente])):
+            resultado = await cog._abrir_revisao_sem_lock(
+                guild, canal,
+                tipo="missao", autor_id=77, referencia_id="missao-1",
+                print_url="https://cdn.discordapp.com/attachments/nova.png",
+                titulo="Missão repetida",
+            )
+
+        self.assertTrue(resultado["_ja_existente"])
+        self.assertEqual(resultado["id"], "rev-existente")
+        canal.send.assert_not_awaited()

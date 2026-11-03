@@ -311,12 +311,16 @@ async def criar_pendencia(
         resultado = {"revisao": None}
 
         def aplicar(lista):
-            if tipo == "pvp":
+            if tipo in {"pvp", "pve", "missao", "contribuicao", "especial"}:
                 existente = next((
                     item for item in lista
-                    if str(item.get("tipo", "")).lower() == "pvp"
+                    if str(item.get("tipo", "")).lower() == tipo
                     and str(item.get("referencia_id")) == str(referencia_id)
                     and item.get("status") == "pendente"
+                    and (
+                        tipo == "pvp"
+                        or str(item.get("autor_id")) == str(autor_id)
+                    )
                 ), None)
                 if existente:
                     resultado["revisao"] = existente

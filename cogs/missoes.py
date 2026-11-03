@@ -2804,7 +2804,7 @@ class Missoes(commands.Cog):
             return
 
         try:
-            await revisoes_cog.abrir_revisao(
+            protocolo = await revisoes_cog.abrir_revisao(
                 guild,
                 canal,
                 tipo=tipo,
@@ -2825,6 +2825,13 @@ class Missoes(commands.Cog):
                 auxiliar_id=auxiliar_id,
                 recompensa_xp=recompensa,
             )
+            if protocolo.get("_ja_existente"):
+                await interaction.followup.send(
+                    "⏳ Você já tem uma prova pendente para esta atividade. "
+                    "A equipe precisa concluir a análise antes de um novo envio.",
+                    ephemeral=True,
+                )
+                return
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Falha ao criar revisão da missão %s.", atividade.get("id"))
             await interaction.followup.send(

@@ -476,23 +476,27 @@ class Revisoes(commands.Cog):
                              titulo: str, descricao: str = None,
                              auxiliar_id: int = None,
                              recompensa_xp: int = None) -> dict:
-        # Um desafio PvP só pode gerar uma revisão ativa. Se a publicação
-        # falhar depois de persistir a pendência, a nova tentativa reutiliza
-        # o mesmo registro em vez de criar uma segunda prova para a mesma luta.
+        # Só pode existir uma revisão pendente por referência e participante.
+        # PvP é único por desafio; missões e demais categorias são únicas por
+        # participante + atividade. A verificação fica dentro do lock que cobre
+        # o ciclo completo, evitando duas mensagens para envios simultâneos.
         revisao = None
-        if tipo == "pvp":
-            existentes = await revisoes.listar(guild.id, status="pendente")
-            revisao = next(
-                (
-                    item for item in existentes
-                    if isinstance(item, dict)
-                    and item.get("tipo") == "pvp"
-                    and str(item.get("referencia_id")) == str(referencia_id)
-                ),
-                None,
-            )
-            if revisao and revisao.get("mensagem_id"):
-                return revisao
+        existentes = await revisoes.listar(guild.id, status="pendente")
+        revisao = next(
+            (
+                item for item in existentes
+                if isinstance(item, dict)
+                and str(item.get("tipo", "")).lower() == str(tipo).lower()
+                and str(item.get("referencia_id")) == str(referencia_id)
+                and (
+                    tipo == "pvp"
+                    or str(item.get("autor_id")) == str(autor_id)
+                )
+            ),
+            None,
+        )
+        if revisao and revisao.get("mensagem_id"):
+            return {**revisao, "_ja_existente": True}
 
         if revisao is None:
             revisao = await revisoes.criar_pendencia(
