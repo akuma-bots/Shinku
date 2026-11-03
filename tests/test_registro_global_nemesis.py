@@ -8,26 +8,24 @@ class TestRegistroGlobalNemesis(unittest.TestCase):
         self.assertEqual(GUILD_NEMESIS_ID, 1563995879981981817)
         self.assertEqual(CANAL_REGISTRO_GLOBAL_ID, 1566579335966498926)
 
-    def test_categorias_essenciais_estao_separadas(self):
+    def test_categorias_essenciais_estao_consolidadas(self):
         esperadas = {
-            "mensagens", "atendimento", "moderacao", "membros",
-            "sistemas", "administracao", "seguranca", "formularios",
-            "progressao", "missoes", "competicoes", "eventos",
-            "parcerias", "integracoes", "infraestrutura", "configuracoes",
+            "mensagens", "atendimento", "moderacao", "historico_membros",
+            "operacoes", "administracao", "seguranca", "missoes",
+            "competitivo", "eventos", "parcerias", "integracoes",
+            "infraestrutura", "sorteios", "sugestoes",
         }
-        self.assertTrue(esperadas.issubset(CATEGORIAS))
+        self.assertEqual(set(CATEGORIAS), esperadas)
+        self.assertNotIn("cargos", CATEGORIAS)
 
     def test_nomes_dos_topicos_sao_unicos(self):
         nomes = [nome for nome, _descricao in CATEGORIAS.values()]
         self.assertEqual(len(nomes), len(set(nomes)))
 
-    def test_topicos_novos_sao_identificados_com_versao_e_numero(self):
+    def test_nomes_sao_claros_e_sem_prefixos_de_versao(self):
         nomes = [nome for nome, _descricao in CATEGORIAS.values()]
-        self.assertEqual(len(nomes), 29)
-        for numero, nome in enumerate(nomes, start=1):
-            with self.subTest(topico=nome):
-                self.assertTrue(nome.startswith("🆕 NÊMESIS V3・"))
-                self.assertIn(f"・{numero:02d}・", nome)
+        self.assertEqual(len(nomes), 15)
+        self.assertTrue(all(not nome.startswith("🆕") for nome in nomes))
 
     def test_todas_as_categorias_possuem_descricao(self):
         for chave, valor in CATEGORIAS.items():
