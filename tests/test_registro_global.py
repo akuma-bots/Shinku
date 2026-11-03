@@ -31,6 +31,15 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(1563995879998754943, registro_global.CARGOS_ACESSO_IDS)
         self.assertNotIn(1563995879990624373, registro_global.CARGOS_ACESSO_IDS)
 
+    def test_cada_area_tem_cor_viva_e_emoji(self):
+        self.assertEqual(set(registro_global.CORES_CATEGORIAS), set(registro_global.CATEGORIAS))
+        self.assertEqual(set(registro_global.EMOJIS_CATEGORIAS), set(registro_global.CATEGORIAS))
+        self.assertGreater(len(set(registro_global.CORES_CATEGORIAS.values())), 10)
+        for categoria, (nome, descricao) in registro_global.CATEGORIAS.items():
+            embed = registro_global._embed_cabecalho_topico(nome, descricao)
+            self.assertEqual(embed.color.value, registro_global.CORES_CATEGORIAS[categoria])
+            self.assertTrue(embed.title.startswith(registro_global.EMOJIS_CATEGORIAS[categoria]))
+
     def test_categorias_legadas_apontam_para_areas_oficiais(self):
         self.assertNotIn("cargos", registro_global.CATEGORIAS)
         self.assertEqual(registro_global.normalizar_categoria("cargos"), "historico_membros")
