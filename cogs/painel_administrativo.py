@@ -34,7 +34,7 @@ SECOES_ADMINISTRATIVAS = {
     "operacoes": {
         "titulo": "🎯 OPERAÇÕES E DESENVOLVIMENTO",
         "descricao": "Acesse missões, validações, competições, eventos, inscrições, parcerias e relatórios operacionais.",
-        "topicos": ("missoes", "competitivo", "eventos", "operacoes", "parcerias"),
+        "topicos": ("missoes", "competitivo", "eventos", "parcerias"),
         "canais": (
             ("Central de missões", 1556543214885019668),
             ("Envio de provas", 1556543417843056641),
@@ -50,13 +50,13 @@ SECOES_ADMINISTRATIVAS = {
     "sistemas": {
         "titulo": "⚙️ SISTEMAS E INFRAESTRUTURA",
         "descricao": "Acesse registros de integrações, infraestrutura, configurações, sistemas e Roblox. O diagnóstico abaixo mostra o estado da sessão atual.",
-        "topicos": ("infraestrutura", "integracoes", "operacoes"),
+        "topicos": ("integracoes",),
         "canais": (),
     },
     "registros": {
         "titulo": "📚 AUDITORIA E REGISTROS",
         "descricao": "Consulte auditoria de mensagens, atendimento e registros operacionais consolidados, sem áreas duplicadas.",
-        "topicos": ("mensagens", "atendimento", "historico_membros", "sorteios", "sugestoes"),
+        "topicos": ("mensagens", "atendimento", "historico_membros", "eventos", "sugestoes"),
         "canais": (),
     },
 }
@@ -72,21 +72,18 @@ CORES_SECOES = {
 }
 
 _ROTULOS_TOPICOS = {
-    "historico_membros": "Histórico de membros",
-    "mensagens": "Mensagens e arquivos",
-    "atendimento": "Atendimento",
-    "moderacao": "Moderação",
-    "seguranca": "Segurança",
-    "missoes": "Missões",
-    "competitivo": "Competitivo",
-    "eventos": "Eventos",
-    "operacoes": "Operações",
-    "administracao": "Administração",
-    "parcerias": "Parcerias",
-    "integracoes": "Integrações",
-    "infraestrutura": "Infraestrutura",
-    "sorteios": "Sorteios",
-    "sugestoes": "Sugestões e votações",
+    "historico_membros": "👥 Arquivo de Membros",
+    "mensagens": "💬 Comunicação Geral",
+    "atendimento": "🎫 Central de Atendimento",
+    "moderacao": "⚖️ Tribunal de Moderação",
+    "seguranca": "🛡️ Muralha de Segurança",
+    "missoes": "🎯 Operações e Missões",
+    "competitivo": "🏆 Arena Competitiva",
+    "eventos": "🎉 Eventos e Celebrações",
+    "administracao": "👑 Central de Administração",
+    "parcerias": "🤝 Alianças e Parcerias",
+    "integracoes": "⚙️ Sistemas e Integrações",
+    "sugestoes": "📋 Sugestões e Ideias",
 }
 
 
