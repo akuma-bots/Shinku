@@ -14,6 +14,8 @@ _LOG = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = 1563995879981981817
 CANAL_REGISTRO_GLOBAL_ID = 1566579335966498926
 ARQUIVO = "registro_global_topicos.json"
+ARQUIVO_MIGRACAO_DESTRUTIVA = "registro_global_migracao_20261103.json"
+VERSAO_MIGRACAO_DESTRUTIVA = 1
 
 # OCTÓGONO (oito posições + cargo coletivo) e todos os cargos funcionais de staff.
 CARGOS_ACESSO_IDS = {
@@ -28,53 +30,49 @@ CARGOS_ACESSO_IDS = {
 # Estrutura enxuta: cada assunto tem um único destino canônico.
 # Os nomes antigos continuam aceitos pelos cogs durante a migração.
 CATEGORIAS = {
-    "mensagens": ("Mensagens e arquivos", "Edições, exclusões e anexos de mensagens, com autor, canal e contexto disponíveis."),
-    "atendimento": ("Atendimento", "Tickets, responsáveis, encerramentos, avaliações e transcrições."),
-    "moderacao": ("Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
-    "historico_membros": ("Histórico de membros", "Linha do tempo individual: entradas, saídas, cargos, convites, XP, voz, conquistas e ocorrências relacionadas."),
-    "operacoes": ("Operações", "Atividades gerais, formulários, relatórios e execução dos sistemas da organização."),
-    "administracao": ("Administração", "Decisões administrativas, permissões, configurações e alterações estruturais."),
-    "seguranca": ("Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
-    "missoes": ("Missões", "Criação, atribuição, conclusão, validação de provas e recompensas."),
-    "competitivo": ("Competitivo", "Desafios, PvP, guerras, placares, participantes e resultados."),
-    "eventos": ("Eventos", "Agenda, inscrições, atividades coletivas e resultados."),
-    "parcerias": ("Parcerias", "Solicitações, aprovações, representantes e alterações de parcerias."),
-    "integracoes": ("Integrações", "Roblox, APIs externas, vínculos e sincronizações."),
-    "infraestrutura": ("Infraestrutura", "Conexões, Upstash, health checks, tarefas e disponibilidade do Shinku."),
-    "sorteios": ("Sorteios", "Criação, participação, encerramento, vencedores e entrega de prêmios."),
-    "sugestoes": ("Sugestões e votações", "Sugestões recebidas, votos, decisões e resultados."),
+    "administracao": ("👑・Central de Administração", "Decisões administrativas, permissões, configurações e diretrizes oficiais da NÊMESIS."),
+    "historico_membros": ("👥・Arquivo de Membros", "Linha do tempo individual: entradas, saídas, cargos, convites, XP, voz, conquistas e ocorrências relacionadas."),
+    "moderacao": ("⚖️・Tribunal de Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
+    "seguranca": ("🛡️・Muralha de Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
+    "missoes": ("🎯・Operações e Missões", "Missões, operações, formulários, relatórios, atribuições, provas, validações, conclusões e recompensas."),
+    "competitivo": ("🏆・Arena Competitiva", "Desafios, PvP, guerras, placares, participantes e resultados."),
+    "eventos": ("🎉・Eventos e Celebrações", "Agenda, inscrições, atividades coletivas, sorteios, vencedores e entrega de prêmios."),
+    "atendimento": ("🎫・Central de Atendimento", "Tickets, responsáveis, encerramentos, avaliações e transcrições."),
+    "mensagens": ("💬・Comunicação Geral", "Edições, exclusões e anexos de mensagens, com autor, canal e contexto disponíveis."),
+    "parcerias": ("🤝・Alianças e Parcerias", "Solicitações, aprovações, representantes e alterações de parcerias."),
+    "integracoes": ("⚙️・Sistemas e Integrações", "Roblox, APIs externas, Upstash, conexões, health checks, tarefas e disponibilidade do Shinku."),
+    "sugestoes": ("📋・Sugestões e Ideias", "Sugestões recebidas, votos, decisões e resultados."),
 }
 
 # Paleta NÊMESIS: carmesim escuro, vermelho profundo e preto.
 # Tons próximos diferenciam as áreas sem descaracterizar a identidade visual.
 CORES_CATEGORIAS = {
-    "mensagens": 0x8B1E2D,
-    "atendimento": 0xA62139,
-    "moderacao": 0x741629,
-    "historico_membros": 0x991B33,
-    "operacoes": 0x5C101F,
     "administracao": 0xB3263E,
+    "historico_membros": 0x991B33,
+    "moderacao": 0x741629,
     "seguranca": 0x681323,
     "missoes": 0x8F172C,
     "competitivo": 0xA01D35,
-    "eventos": 0x4A0D19,
+    "eventos": 0xAD233A,
+    "atendimento": 0xA62139,
+    "mensagens": 0x8B1E2D,
     "parcerias": 0x7A1425,
     "integracoes": 0x381018,
-    "infraestrutura": 0x252126,
-    "sorteios": 0xAD233A,
-    "sugestoes": 0x3A0B14,
+    "sugestoes": 0x5C101F,
 }
 
 EMOJIS_CATEGORIAS = {
-    "mensagens": "💬", "atendimento": "🎫", "moderacao": "⚖️",
-    "historico_membros": "👥", "operacoes": "🧭", "administracao": "🏛️",
+    "administracao": "👑", "historico_membros": "👥", "moderacao": "⚖️",
     "seguranca": "🛡️", "missoes": "🎯", "competitivo": "🏆",
-    "eventos": "🎉", "parcerias": "🤝", "integracoes": "🔗",
-    "infraestrutura": "⚙️", "sorteios": "🎁", "sugestoes": "💡",
+    "eventos": "🎉", "atendimento": "🎫", "mensagens": "💬",
+    "parcerias": "🤝", "integracoes": "⚙️", "sugestoes": "📋",
 }
 
 ALIASES_CATEGORIAS = {
     "anexos": "mensagens",
+    "operacoes": "missoes",
+    "infraestrutura": "integracoes",
+    "sorteios": "eventos",
     "automod": "seguranca",
     "cargos": "historico_membros",
     "competicoes": "competitivo",
@@ -100,6 +98,7 @@ def normalizar_categoria(categoria: str) -> str:
 
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 _CABECALHOS_VERIFICADOS: set[tuple[int, int]] = set()
+_MIGRACAO_DESTRUTIVA_LOCK = asyncio.Lock()
 
 
 def _lock(guild_id: int, categoria: str) -> asyncio.Lock:
@@ -138,7 +137,7 @@ def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
             "Área de consulta dos registros operacionais da NÊMESIS. "
             "As ocorrências são organizadas por assunto neste mesmo tópico."
         ),
-        color=next((cor for chave, cor in CORES_CATEGORIAS.items() if CATEGORIAS[chave][0] == nome), 0xE84393),
+        color=next((cor for chave, cor in CORES_CATEGORIAS.items() if CATEGORIAS[chave][0] == nome), 0x8B1E2D),
     )
     embed.add_field(name="O que é registrado", value=descricao[:1024], inline=False)
     embed.add_field(
@@ -400,8 +399,71 @@ async def configurar_permissoes(forum: discord.ForumChannel) -> None:
 
 
 
+async def _executar_migracao_descritiva(forum: discord.ForumChannel) -> int | None:
+    """Apaga uma única vez todos os tópicos antigos deste Fórum, inclusive mensagens.
+
+    O marcador persistente só é concluído depois que a exclusão terminou. Se a
+    criação dos novos tópicos falhar depois disso, a próxima inicialização
+    apenas completa os que faltarem, sem apagar novamente os tópicos novos.
+    Retorna a quantidade apagada, ou None quando a migração já foi concluída.
+    """
+    async with _MIGRACAO_DESTRUTIVA_LOCK:
+        from utils.storage import carregar, salvar
+
+        estado = await carregar(ARQUIVO_MIGRACAO_DESTRUTIVA, {})
+        if (
+            isinstance(estado, dict)
+            and estado.get("versao") == VERSAO_MIGRACAO_DESTRUTIVA
+            and estado.get("concluida") is True
+            and int(estado.get("forum_id", 0)) == forum.id
+        ):
+            return None
+
+        topicos: dict[int, discord.Thread] = {
+            thread.id: thread
+            for thread in forum.threads
+            if getattr(thread, "parent_id", None) == forum.id
+        }
+        async for thread in forum.archived_threads(limit=None):
+            if getattr(thread, "parent_id", None) == forum.id:
+                topicos[thread.id] = thread
+
+        apagados = 0
+        for thread in topicos.values():
+            try:
+                await thread.delete(
+                    reason="Migração única e autorizada do Registro Global NÊMESIS para a nova estrutura oficial",
+                )
+                apagados += 1
+                await asyncio.sleep(0.25)
+            except discord.NotFound:
+                continue
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception(
+                    "Migração do Registro Global interrompida; não foi possível excluir o tópico %s (%s).",
+                    thread.name, thread.id,
+                )
+                raise
+
+        await salvar(
+            ARQUIVO_MIGRACAO_DESTRUTIVA,
+            {
+                "versao": VERSAO_MIGRACAO_DESTRUTIVA,
+                "concluida": True,
+                "forum_id": forum.id,
+                "topicos_excluidos": apagados,
+                "estrutura": "registro-global-nemesis-12-areas",
+            },
+        )
+        _LOG.warning(
+            "Migração destrutiva do Registro Global concluída: %s tópicos e suas mensagens excluídos permanentemente.",
+            apagados,
+        )
+        return apagados
+
+
 async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
-    """Sincroniza apenas destinos canônicos, preservando tópicos e mensagens antigas."""
+    """Executa a migração destrutiva única e provisiona as 12 áreas oficiais."""
     if guild.id != GUILD_NEMESIS_ID:
         return {}
     canal = guild.get_channel(CANAL_REGISTRO_GLOBAL_ID)
@@ -412,7 +474,8 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
     await configurar_permissoes(canal)
     validar_privacidade(canal)
 
-    topicos_existentes: list[discord.Thread] = list(canal.threads)
+    migracao_executada = await _executar_migracao_descritiva(canal)
+    topicos_existentes: list[discord.Thread] = [] if migracao_executada is not None else list(canal.threads)
     try:
         async for thread in canal.archived_threads(limit=None):
             if all(item.id != thread.id for item in topicos_existentes):
@@ -452,8 +515,8 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
 
     _LOG.info(
         "Registro Global organizado: %s áreas oficiais; %s tópicos duplicados vazios excluídos; "
-        "%s tópicos antigos com histórico arquivados e preservados.",
-        len(resultado), excluidos_vazios, aposentados,
+        "%s tópicos antigos com histórico arquivados e preservados; migração destrutiva executada=%s.",
+        len(resultado), excluidos_vazios, aposentados, migracao_executada is not None,
     )
     return resultado
 
