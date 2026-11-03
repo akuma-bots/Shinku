@@ -80,12 +80,12 @@ ALIASES_CATEGORIAS = {
     "conquistas": "historico_membros",
     "convites": "historico_membros",
     "entradas": "historico_membros",
-    "formularios": "operacoes",
+    "formularios": "missoes",
     "membros": "historico_membros",
     "progressao": "historico_membros",
-    "relatorios": "operacoes",
+    "relatorios": "missoes",
     "roblox": "integracoes",
-    "sistemas": "operacoes",
+    "sistemas": "integracoes",
     "atividade": "historico_membros",
     "voz": "historico_membros",
 }
@@ -131,7 +131,7 @@ def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
     categoria = next((chave for chave, (rotulo, _desc) in CATEGORIAS.items() if rotulo == nome), None)
     emoji = EMOJIS_CATEGORIAS.get(categoria, "📌")
     embed = discord.Embed(
-        title=f"{emoji}  {nome}",
+        title=nome,
         description=(
             "**REGISTRO OFICIAL DA NÊMESIS**\n"
             "Área de consulta dos registros operacionais da NÊMESIS. "
@@ -399,7 +399,7 @@ async def configurar_permissoes(forum: discord.ForumChannel) -> None:
 
 
 
-async def _executar_migracao_descritiva(forum: discord.ForumChannel) -> int | None:
+async def _executar_migracao_destrutiva(forum: discord.ForumChannel) -> int | None:
     """Apaga uma única vez todos os tópicos antigos deste Fórum, inclusive mensagens.
 
     O marcador persistente só é concluído depois que a exclusão terminou. Se a
