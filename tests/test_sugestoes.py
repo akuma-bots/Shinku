@@ -8,11 +8,19 @@ from cogs.sugestoes import (
     STATUS_TERMINAIS,
     _contagem_votos,
     _normalizar_categoria,
+    _normalizar_titulo,
+    _encontrar_duplicada,
+    _registro_no_canal,
     _registrar_voto,
     _embed_sugestao,
     _embed_painel_administrativo,
     PainelSugestoesView,
     PublicacaoSugestaoView,
+    ModalNovaSugestao,
+    ModalEditarSugestao,
+    _alternar_seguidor,
+    _atualizar_decisao,
+    _editar_registro,
     _esta_no_canal_sugestoes,
     CANAL_SUGESTOES_ID,
     GUILD_NEMESIS_ID,
@@ -43,6 +51,31 @@ class TestSistemaSugestoes(unittest.TestCase):
         self.assertEqual(_normalizar_categoria("operacoes"), "Missões e operações")
         self.assertEqual(_normalizar_categoria("categoria desconhecida"), "Outros")
 
+    def test_titulos_sao_normalizados_para_detectar_duplicatas(self):
+        self.assertEqual(_normalizar_titulo("  NOVO Sistema!!! "), "novo sistema")
+        registros = {
+            "1": {"id": 1, "titulo": "Criar sistema de patentes", "status": "pendente"},
+            "2": {"id": 2, "titulo": "Evento antigo", "status": "implementada"},
+        }
+        self.assertEqual(_encontrar_duplicada(registros, "Criar sistema de patentes")["id"], 1)
+        self.assertIsNone(_encontrar_duplicada(registros, "Criar evento de verão"))
+        self.assertIsNone(_encontrar_duplicada(registros, "Criar sistema de patentes", ignorar_id="1"))
+
+    def test_publicacao_so_e_valida_no_topico_oficial(self):
+        class FakeThread:
+            def __init__(self, id, parent_id):
+                self.id = id
+                self.parent_id = parent_id
+
+        interacao = SimpleNamespace(
+            guild_id=GUILD_NEMESIS_ID,
+            channel=FakeThread(901, CANAL_SUGESTOES_ID),
+        )
+        registro = {"canal_publicacao_id": 901}
+        with patch("cogs.sugestoes.discord.Thread", FakeThread):
+            self.assertTrue(_registro_no_canal(interacao, registro))
+            self.assertFalse(_registro_no_canal(interacao, {"canal_publicacao_id": 902}))
+
     def test_voto_unico_pode_ser_alterado_ou_removido(self):
         votos = _registrar_voto({}, 10, "apoia")
         self.assertEqual(votos, {"10": "apoia"})
@@ -58,14 +91,27 @@ class TestSistemaSugestoes(unittest.TestCase):
             "id": 123, "titulo": "Ideia", "descricao": "Descrição",
             "autor_id": 1, "categoria": "Sistemas", "status": "pendente",
             "votos": votos,
+            "impacto": "Melhorar a organização da equipe.",
         }
         embed = _embed_sugestao(registro)
-        self.assertIn("67%", embed.fields[5].value)
+        self.assertIn("67%", embed.fields[6].value)
+        self.assertIn("Melhorar a organização", embed.fields[3].value)
 
     def test_status_terminais_encerram_votacao(self):
         self.assertEqual(STATUS_TERMINAIS, {"rejeitada", "implementada"})
         self.assertIn("aprovada", STATUS)
         self.assertIn("analise", STATUS)
+
+    def test_formularios_capturam_contexto_e_resultado_esperado(self):
+        novo = ModalNovaSugestao()
+        editar = ModalEditarSugestao("123", {
+            "titulo": "Título original",
+            "descricao": "Descrição original da proposta",
+            "impacto": "Resultado esperado da proposta",
+        })
+        self.assertEqual(len(novo.children), 4)
+        self.assertEqual(len(editar.children), 3)
+        self.assertEqual(editar.titulo.default, "Título original")
 
     def test_paineis_publicos_sao_persistentes_e_nao_criam_comandos(self):
         painel = PainelSugestoesView()
@@ -73,8 +119,13 @@ class TestSistemaSugestoes(unittest.TestCase):
         self.assertIsNone(painel.timeout)
         self.assertIsNone(publicacao.timeout)
         self.assertEqual(len(painel.children), 2)
-        self.assertEqual(len(publicacao.children), 4)
+        self.assertEqual(len(publicacao.children), 6)
         self.assertTrue(all(item.custom_id for item in painel.children + publicacao.children))
+        encerrada = PublicacaoSugestaoView(votacao_encerrada=True, edicao_encerrada=True)
+        botoes = {item.custom_id: item for item in encerrada.children}
+        self.assertTrue(botoes["nemesis:sugestoes:votar:apoia"].disabled)
+        self.assertTrue(botoes["nemesis:sugestoes:editar"].disabled)
+        self.assertFalse(botoes["nemesis:sugestoes:acompanhar"].disabled)
 
     def test_painel_administrativo_exibe_contagens_e_populares(self):
         registros = {
@@ -84,6 +135,50 @@ class TestSistemaSugestoes(unittest.TestCase):
         embed = _embed_painel_administrativo(registros, "populares")
         self.assertIn("2", embed.fields[0].value)
         self.assertIn("Evento", embed.fields[-1].value)
+
+
+class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
+    async def test_seguidor_pode_ativar_e_desativar_acompanhamento(self):
+        dados = {}
+        async def fake_atualizar(nome, padrao, transformador):
+            nonlocal dados
+            dados = transformador(dados)
+        with patch("cogs.sugestoes.atualizar_json", fake_atualizar):
+            self.assertTrue(await _alternar_seguidor("100", 55))
+            self.assertEqual(dados["100"], ["55"])
+            self.assertFalse(await _alternar_seguidor("100", 55))
+            self.assertEqual(dados["100"], [])
+
+    async def test_decisao_registra_trilha_de_auditoria(self):
+        dados = {
+            "100": {
+                "id": 100,
+                "status": "pendente",
+                "titulo": "Sugestão",
+                "historico_status": [],
+            }
+        }
+        async def fake_atualizar(nome, padrao, transformador):
+            nonlocal dados
+            dados = transformador(dados)
+        with patch("cogs.sugestoes.atualizar_json", fake_atualizar):
+            resultado = await _atualizar_decisao("100", "desenvolvimento", "Equipe iniciou o trabalho", 77)
+        self.assertEqual(resultado["status"], "desenvolvimento")
+        self.assertEqual(resultado["historico_status"][-1]["de"], "pendente")
+        self.assertEqual(resultado["historico_status"][-1]["responsavel_id"], 77)
+
+    async def test_edicao_so_permite_autor_e_status_aberto(self):
+        dados = {
+            "100": {"id": 100, "autor_id": 55, "status": "pendente", "titulo": "Antes"}
+        }
+        async def fake_atualizar(nome, padrao, transformador):
+            nonlocal dados
+            dados = transformador(dados)
+        with patch("cogs.sugestoes.atualizar_json", fake_atualizar):
+            self.assertIsNone(await _editar_registro("100", 99, "Depois", "Descrição suficiente", "Impacto esperado"))
+            self.assertIsNotNone(await _editar_registro("100", 55, "Depois", "Descrição suficiente", "Impacto esperado"))
+            dados["100"]["status"] = "implementada"
+            self.assertIsNone(await _editar_registro("100", 55, "Terceira", "Outra descrição suficiente", "Outro impacto esperado"))
 
 
 if __name__ == "__main__":
