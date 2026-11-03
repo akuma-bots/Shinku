@@ -33,3 +33,12 @@
 - Não são criados slash commands nem canais adicionais.
 - A Central Administrativa contém um atalho para o canal oficial.
 
+
+
+## Resiliência de interações e publicações antigas
+
+- A validação aceita registros antigos que guardam o ID do Fórum e os atuais que guardam o ID do tópico, sempre limitando as ações ao Fórum oficial.
+- Na inicialização, a sincronização tenta recuperar tópicos ativos, arquivados e registros legados cujo canal salvo não existe mais. Ela edita a publicação existente; não cria uma nova sugestão.
+- Falhas de DM são contabilizadas e não desfazem uma decisão da liderança nem impedem a notificação dos demais seguidores.
+- O autor e cada seguidor opt-in recebem no máximo uma DM por atualização, mesmo se houver IDs repetidos no armazenamento.
+- A suíte cobre o fluxo de voto, a notificação privada, falhas individuais de DM e recuperação de tópico de Fórum.

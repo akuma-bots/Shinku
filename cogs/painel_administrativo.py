@@ -246,17 +246,26 @@ class CentralAdministrativaView(discord.ui.View):
 
     async def _selecionar_secao(self, interaction: discord.Interaction):
         chave = self.seletor.values[0]
-        if chave == "visao_geral":
-            embed = await _embed_visao_geral(self.bot, self.guild)
-            atalhos = []
-        else:
-            embed, atalhos = await _embed_secao(self.bot, self.guild, chave)
-        for item in list(self.children):
-            if isinstance(item, discord.ui.Button):
-                self.remove_item(item)
-        for indice, (rotulo, url) in enumerate(atalhos[:10]):
-            self.add_item(discord.ui.Button(label=rotulo[:80], url=url, row=1 + indice // 5))
-        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.response.defer()
+        try:
+            if chave == "visao_geral":
+                embed = await _embed_visao_geral(self.bot, self.guild)
+                atalhos = []
+            else:
+                embed, atalhos = await _embed_secao(self.bot, self.guild, chave)
+            for item in list(self.children):
+                if isinstance(item, discord.ui.Button):
+                    self.remove_item(item)
+            for indice, (rotulo, url) in enumerate(atalhos[:10]):
+                self.add_item(discord.ui.Button(label=rotulo[:80], url=url, row=1 + indice // 5))
+            await interaction.edit_original_response(embed=embed, view=self)
+        except Exception:
+            _LOG.exception("Falha ao abrir seção %s da Central Administrativa.", chave)
+            await interaction.edit_original_response(
+                content="Não consegui carregar esta área agora. Tente selecionar novamente.",
+                embed=None,
+                view=self,
+            )
 
 
 class PainelAdministrativoView(discord.ui.View):

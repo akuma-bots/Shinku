@@ -1,4 +1,5 @@
 import time
+import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -397,7 +398,18 @@ class Desafios(commands.Cog):
         # Carregar/atualizar o desafio pode demorar quando o storage está lento.
         # Deferimos antes do I/O para evitar a expiração da interação.
         await interaction.response.defer(ephemeral=True, thinking=True)
-        desafio = await desafios.get(interaction.guild.id, desafio_id)
+        try:
+            desafio = await desafios.get(interaction.guild.id, desafio_id)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Falha ao consultar desafio %s durante interação.",
+                desafio_id,
+            )
+            await interaction.followup.send(
+                "Não consegui consultar este desafio agora. Nenhuma ação foi aplicada; tente novamente.",
+                ephemeral=True,
+            )
+            return
         if not desafio or desafio["status"] != "pendente":
             await interaction.followup.send("Esse desafio não está mais disponível.", ephemeral=True)
             return

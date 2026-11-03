@@ -101,7 +101,68 @@ def _registro_no_canal(interaction: discord.Interaction, registro: dict) -> bool
         return False
     canal = interaction.channel
     canal_registro = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
-    return getattr(canal, "id", None) == canal_registro
+    # Registros antigos podem guardar o ID do Fórum; os atuais guardam o ID
+    # do tópico. Aceitamos ambos, mas nunca um canal fora do Fórum oficial.
+    if isinstance(canal, discord.Thread):
+        return canal_registro in {canal.id, canal.parent_id, CANAL_SUGESTOES_ID}
+    return getattr(canal, "id", None) == canal_registro == CANAL_SUGESTOES_ID
+
+
+async def _resolver_canal_publicacao(guild: discord.Guild, registro: dict):
+    """Resolve publicações de Fórum e texto, inclusive registros legados/arquivados."""
+    canal_id = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+    mensagem_id = int(registro.get("id") or 0)
+    thread_id = int(registro.get("thread_id") or 0)
+    canal = guild.get_channel(canal_id) or guild.get_thread(canal_id)
+
+    if isinstance(canal, discord.Thread):
+        return canal
+
+    if canal is None:
+        try:
+            canal = await guild.fetch_channel(canal_id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            canal = None
+
+    if isinstance(canal, discord.Thread):
+        return canal
+
+    if isinstance(canal, discord.ForumChannel):
+        for thread in getattr(canal, "threads", []):
+            if thread.id in {thread_id, mensagem_id}:
+                return thread
+        for candidato_id in (thread_id, mensagem_id):
+            if not candidato_id:
+                continue
+            thread = guild.get_thread(candidato_id)
+            if thread is None:
+                try:
+                    thread = await guild.fetch_channel(candidato_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    thread = None
+            if isinstance(thread, discord.Thread) and thread.parent_id == canal.id:
+                return thread
+        try:
+            async for thread in canal.archived_threads(limit=100):
+                if thread.id in {thread_id, mensagem_id}:
+                    return thread
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.debug("Não foi possível consultar tópicos arquivados do Fórum %s.", canal.id)
+        return None
+
+    if canal is None and canal_id != CANAL_SUGESTOES_ID:
+        forum = guild.get_channel(CANAL_SUGESTOES_ID)
+        if forum is None:
+            try:
+                forum = await guild.fetch_channel(CANAL_SUGESTOES_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                forum = None
+        if isinstance(forum, discord.ForumChannel):
+            return await _resolver_canal_publicacao(
+                guild,
+                {**registro, "canal_publicacao_id": forum.id},
+            )
+    return canal
 
 
 async def _alternar_seguidor(message_id: str, usuario_id: int) -> bool:
@@ -134,6 +195,42 @@ async def _listar_seguidores(message_id: str) -> list[int]:
         except (TypeError, ValueError):
             continue
     return resultado
+
+
+async def _notificar_atualizacao_sugestao(
+    guild: discord.Guild,
+    registro: dict,
+    message_id: str,
+    status: str,
+    motivo: str,
+) -> tuple[int, int]:
+    """Notifica autor e seguidores opt-in; falha de DM nunca desfaz a decisão."""
+    autor_id = int(registro.get("autor_id") or 0)
+    destinatarios = set(await _listar_seguidores(message_id))
+    if autor_id:
+        destinatarios.add(autor_id)
+    enviados = falhas = 0
+    rotulo, cor = STATUS.get(status, STATUS["pendente"])
+    embed = criar_embed(
+        "📬 ATUALIZAÇÃO DA SUA SUGESTÃO",
+        f"**{registro.get('titulo', 'Sugestão')}**\nSituação: **{rotulo}**\n\n{str(motivo)[:900]}",
+        cor=cor,
+        rodape="NÊMESIS • CENTRAL DE SUGESTÕES",
+    )
+    for membro_id in sorted(destinatarios):
+        try:
+            membro = guild.get_member(membro_id)
+            if membro is None:
+                membro = await guild.fetch_member(membro_id)
+            await membro.send(embed=embed)
+            enviados += 1
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            falhas += 1
+            _LOG.info("DM de atualização indisponível para membro %s na sugestão %s.", membro_id, message_id)
+        except Exception:
+            falhas += 1
+            _LOG.exception("Falha inesperada ao notificar membro %s da sugestão %s.", membro_id, message_id)
+    return enviados, falhas
 
 
 async def _editar_registro(message_id: str, autor_id: int, titulo: str, descricao: str, impacto: str) -> dict | None:
@@ -1011,37 +1108,13 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
                 ),
             )
 
-            try:
-                autor = interaction.guild.get_member(int(registro["autor_id"]))
-                if autor is None:
-                    autor = await interaction.guild.fetch_member(int(registro["autor_id"]))
-                await autor.send(
-                    embed=criar_embed(
-                        "📬 ATUALIZAÇÃO DA SUA SUGESTÃO",
-                        f"**{registro['titulo']}**\nSituação: **{STATUS[self.status][0]}**\n\n{self.motivo.value}",
-                        cor=STATUS[self.status][1],
-                        rodape="NÊMESIS • CENTRAL DE SUGESTÕES",
-                    )
-                )
-            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                _LOG.info("Não foi possível enviar DM ao autor da sugestão %s.", self.message_id)
-
-            seguidores = await _listar_seguidores(self.message_id)
-            for seguidor_id in seguidores:
-                if seguidor_id == int(registro["autor_id"]):
-                    continue
-                try:
-                    membro = interaction.guild.get_member(seguidor_id) or await interaction.guild.fetch_member(seguidor_id)
-                    await membro.send(
-                        embed=criar_embed(
-                            "🔔 ATUALIZAÇÃO DE SUGESTÃO ACOMPANHADA",
-                            f"**{registro['titulo']}**\nSituação: **{STATUS[self.status][0]}**\n\n{self.motivo.value}",
-                            cor=STATUS[self.status][1],
-                            rodape="NÊMESIS • CENTRAL DE SUGESTÕES",
-                        )
-                    )
-                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                    _LOG.debug("Não foi possível notificar seguidor %s da sugestão %s.", seguidor_id, self.message_id)
+            enviados, falhas_dm = await _notificar_atualizacao_sugestao(
+                interaction.guild, registro, self.message_id, self.status, str(self.motivo.value)
+            )
+            _LOG.info(
+                "Notificações da sugestão %s: %s enviadas, %s indisponíveis.",
+                self.message_id, enviados, falhas_dm,
+            )
 
             await registrar_global(
                 interaction.guild,
@@ -1078,16 +1151,30 @@ class Sugestoes(commands.Cog):
         itens = [item for item in dados.values() if isinstance(item, dict)]
         itens.sort(key=lambda item: str(item.get("criado_em", "")), reverse=True)
         atualizadas = 0
+        ignoradas = 0
         for registro in itens[:250]:
             try:
-                canal_id = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
-                canal = guild.get_channel(canal_id) or guild.get_thread(canal_id)
-                if canal is None:
-                    canal = await guild.fetch_channel(canal_id)
                 mensagem_id = int(registro.get("id") or 0)
                 if not mensagem_id:
+                    ignoradas += 1
                     continue
-                mensagem = await canal.fetch_message(mensagem_id)
+                canal = await _resolver_canal_publicacao(guild, registro)
+                if canal is None or not hasattr(canal, "fetch_message"):
+                    ignoradas += 1
+                    _LOG.debug("Publicação antiga %s sem canal recuperável; registro preservado.", mensagem_id)
+                    continue
+                try:
+                    mensagem = await canal.fetch_message(mensagem_id)
+                except discord.NotFound:
+                    if isinstance(canal, discord.ForumChannel):
+                        thread = await _resolver_canal_publicacao(guild, {**registro, "thread_id": mensagem_id})
+                        if thread is None:
+                            ignoradas += 1
+                            continue
+                        canal = thread
+                        mensagem = await canal.fetch_message(mensagem_id)
+                    else:
+                        raise
                 ids_componentes = {
                     getattr(componente, "custom_id", None)
                     for linha in mensagem.components
@@ -1111,7 +1198,11 @@ class Sugestoes(commands.Cog):
                     ),
                 )
                 atualizadas += 1
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+            except discord.NotFound:
+                ignoradas += 1
+                _LOG.debug("Publicação antiga %s não existe mais no Discord; registro preservado.", registro.get("id"))
+            except (discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+                ignoradas += 1
                 _LOG.warning(
                     "Não foi possível atualizar os botões da sugestão antiga %s.",
                     registro.get("id"),
@@ -1123,8 +1214,9 @@ class Sugestoes(commands.Cog):
                     registro.get("id"),
                 )
         _LOG.info(
-            "Controles das sugestões existentes sincronizados: %s publicações atualizadas (lote máximo 250).",
+            "Controles das sugestões existentes sincronizados: %s atualizadas, %s ignoradas sem exclusão (lote máximo 250).",
             atualizadas,
+            ignoradas,
         )
         return atualizadas
 

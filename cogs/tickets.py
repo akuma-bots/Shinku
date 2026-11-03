@@ -1431,9 +1431,9 @@ class Tickets(commands.Cog):
 
         if interaction.data.get("custom_id") != CUSTOM_ID_SELECT:
             return
-        if interaction.guild is None:
+        if interaction.guild is None or interaction.user.bot:
             await interaction.response.send_message(
-                "O painel de atendimento só funciona dentro do servidor.",
+                "O painel de atendimento só funciona para membros dentro do servidor.",
                 ephemeral=True,
             )
             return
@@ -1445,8 +1445,18 @@ class Tickets(commands.Cog):
             )
             return
 
-        valor_escolhido = valores[0]
-        tipos = await tickets.get_tipos(interaction.guild.id)
+        valor_escolhido = str(valores[0])
+        # Reconhece a interação antes de consultar o Redis.
+        await _preparar_resposta_interacao(interaction)
+        try:
+            tipos = await tickets.get_tipos(interaction.guild.id)
+        except Exception:
+            log.exception("Falha ao carregar categorias do painel de tickets.")
+            await interaction.followup.send(
+                "Não consegui carregar as categorias agora. Tente novamente em instantes.",
+                ephemeral=True,
+            )
+            return
 
         tipo = next(
             (
@@ -1458,15 +1468,11 @@ class Tickets(commands.Cog):
         )
 
         if not tipo:
-            await interaction.response.send_message(
-                "Essa categoria não existe mais. Avise um admin.",
+            await interaction.followup.send(
+                "Essa categoria não existe mais. Atualize o painel e tente novamente.",
                 ephemeral=True,
             )
             return
-
-        # Responde antes de acessar o armazenamento/criar canal, para não
-        # deixar a interação do Discord expirar enquanto aguarda a operação.
-        await interaction.response.defer(ephemeral=True, thinking=True)
 
         async with ABERTURA_TICKET_LOCK:
             # A consulta fica dentro do lock: dois cliques simultâneos do

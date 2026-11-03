@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from cogs.painel_administrativo import (
     CentralAdministrativaView,
@@ -11,7 +11,7 @@ from cogs.painel_administrativo import (
 )
 
 
-class TestPainelAdministrativoCentral(unittest.TestCase):
+class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
     def test_painel_publico_e_persistente_sem_comando_slash(self):
         painel = PainelAdministrativoView(SimpleNamespace())
         self.assertIsNone(painel.timeout)
@@ -34,6 +34,24 @@ class TestPainelAdministrativoCentral(unittest.TestCase):
             {opcao.value for opcao in view.seletor.options},
             set(SECOES_ADMINISTRATIVAS),
         )
+
+    async def test_seletor_administrativo_reconhece_clique_antes_de_carregar_secao(self):
+        view = CentralAdministrativaView(
+            SimpleNamespace(), owner_id=123,
+            guild=SimpleNamespace(id=1563995879981981817),
+        )
+        view.seletor._values = ["membros"]
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        async def carregar_secao(_bot, _guild, _chave):
+            interaction.response.defer.assert_awaited_once_with()
+            return (SimpleNamespace(title="Membros"), [])
+        with patch("cogs.painel_administrativo._embed_secao", AsyncMock(side_effect=carregar_secao)):
+            await view._selecionar_secao(interaction)
+        interaction.edit_original_response.assert_awaited_once()
+        self.assertEqual(interaction.edit_original_response.await_args.kwargs["embed"].title, "Membros")
 
     def test_areas_tem_destinos_de_auditoria_e_descricao(self):
         for chave, secao in SECOES_ADMINISTRATIVAS.items():

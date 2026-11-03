@@ -1,11 +1,31 @@
 import asyncio
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import discord
+from cogs.desafios import Desafios
 from utils import desafios
 
 
 class TestIntegridadeDesafios(unittest.IsolatedAsyncioTestCase):
+    async def test_botao_de_desafio_retorna_erro_privado_se_storage_falhar(self):
+        interaction = SimpleNamespace(
+            type=discord.InteractionType.component,
+            data={"custom_id": "desafio:aceitar:duelo-1"},
+            guild=SimpleNamespace(id=123),
+            user=SimpleNamespace(id=20),
+            response=SimpleNamespace(defer=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+        )
+        cog = object.__new__(Desafios)
+        with patch("cogs.desafios.desafios.get", AsyncMock(side_effect=RuntimeError("Redis offline"))):
+            await Desafios.on_interaction(cog, interaction)
+        interaction.response.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+        interaction.followup.send.assert_awaited_once()
+        self.assertTrue(interaction.followup.send.await_args.kwargs["ephemeral"])
+        self.assertIn("Nenhuma ação foi aplicada", interaction.followup.send.await_args.args[0])
+
     async def test_rejeita_aposta_negativa_sem_gravar(self):
         with patch.object(desafios, "carregar", new=AsyncMock(return_value={})), patch.object(
             desafios, "salvar", new=AsyncMock()

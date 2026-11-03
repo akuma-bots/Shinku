@@ -25,6 +25,7 @@ from cogs.sugestoes import (
     CANAL_SUGESTOES_ID,
     GUILD_NEMESIS_ID,
     Sugestoes,
+    _notificar_atualizacao_sugestao,
 )
 
 
@@ -75,6 +76,17 @@ class TestSistemaSugestoes(unittest.TestCase):
         registro = {"canal_publicacao_id": 901}
         with patch("cogs.sugestoes.discord.Thread", FakeThread):
             self.assertTrue(_registro_no_canal(interacao, registro))
+            self.assertFalse(_registro_no_canal(interacao, {"canal_publicacao_id": 902}))
+
+    def test_publicacao_em_forum_aceita_id_do_topico_ou_do_forum(self):
+        class FakeThread:
+            def __init__(self, id, parent_id):
+                self.id = id
+                self.parent_id = parent_id
+        interacao = SimpleNamespace(guild_id=GUILD_NEMESIS_ID, channel=FakeThread(901, CANAL_SUGESTOES_ID))
+        with patch("cogs.sugestoes.discord.Thread", FakeThread):
+            self.assertTrue(_registro_no_canal(interacao, {"canal_publicacao_id": 901}))
+            self.assertTrue(_registro_no_canal(interacao, {"canal_publicacao_id": CANAL_SUGESTOES_ID}))
             self.assertFalse(_registro_no_canal(interacao, {"canal_publicacao_id": 902}))
 
     def test_voto_unico_pode_ser_alterado_ou_removido(self):
@@ -140,6 +152,50 @@ class TestSistemaSugestoes(unittest.TestCase):
 
 class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
 
+    async def test_voto_responde_privadamente_e_edita_publicacao(self):
+        mensagem = SimpleNamespace(id=321, edit=AsyncMock())
+        interaction = SimpleNamespace(
+            message=mensagem, user=SimpleNamespace(id=22, bot=False),
+            response=SimpleNamespace(defer=AsyncMock()),
+            followup=SimpleNamespace(send=AsyncMock()),
+        )
+        registro = {
+            "id": 321, "autor_id": 11, "status": "pendente",
+            "titulo": "Melhoria de painel", "descricao": "Descrição válida",
+            "categoria": "Sistemas", "votos": {"22": "apoia"},
+        }
+        with patch("cogs.sugestoes._obter_registro", AsyncMock(return_value=registro)), patch(
+            "cogs.sugestoes._registro_no_canal", return_value=True
+        ), patch("cogs.sugestoes._atualizar_voto", AsyncMock(return_value=registro)):
+            await PublicacaoSugestaoView()._votar(interaction, "apoia")
+        interaction.response.defer.assert_awaited_once()
+        mensagem.edit.assert_awaited_once()
+        interaction.followup.send.assert_awaited_once()
+        self.assertTrue(interaction.followup.send.await_args.kwargs["ephemeral"])
+
+    async def test_notificacao_dm_alcanca_autor_e_seguidores_sem_duplicar(self):
+        autor = SimpleNamespace(send=AsyncMock())
+        seguidor = SimpleNamespace(send=AsyncMock())
+        guild = SimpleNamespace(get_member=lambda member_id: {10: autor, 20: seguidor}.get(member_id))
+        with patch("cogs.sugestoes._listar_seguidores", AsyncMock(return_value=[20, 10, 20])):
+            enviados, falhas = await _notificar_atualizacao_sugestao(
+                guild, {"autor_id": 10, "titulo": "Nova função"}, "321", "analise", "A equipe iniciou a avaliação."
+            )
+        self.assertEqual((enviados, falhas), (2, 0))
+        autor.send.assert_awaited_once()
+        seguidor.send.assert_awaited_once()
+
+    async def test_falha_de_dm_nao_interrompe_notificacao_dos_demais(self):
+        bloqueou = SimpleNamespace(send=AsyncMock(side_effect=RuntimeError("DM indisponível")))
+        membro_ok = SimpleNamespace(send=AsyncMock())
+        guild = SimpleNamespace(get_member=lambda member_id: {10: bloqueou, 20: membro_ok}.get(member_id))
+        with patch("cogs.sugestoes._listar_seguidores", AsyncMock(return_value=[20])):
+            enviados, falhas = await _notificar_atualizacao_sugestao(
+                guild, {"autor_id": 10, "titulo": "Nova função"}, "321", "aprovada", "Aprovada para execução."
+            )
+        self.assertEqual((enviados, falhas), (1, 1))
+        membro_ok.send.assert_awaited_once()
+
     async def test_migracao_atualiza_publicacao_antiga_sem_criar_outra(self):
         ids_antigos = ["nemesis:sugestoes:votar:apoia", "nemesis:sugestoes:votar:nao_apoia"]
         mensagem = SimpleNamespace(
@@ -167,6 +223,39 @@ class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
         mensagem.edit.assert_awaited_once()
         self.assertEqual(mensagem.edit.await_args.kwargs["embed"].title, "💡 Sugestão antiga")
         self.assertEqual(len(mensagem.edit.await_args.kwargs["view"].children), 6)
+
+    async def test_migracao_recupera_topico_do_forum_quando_id_salvo_esta_obsoleto(self):
+        class FakeThread:
+            def __init__(self):
+                self.id = 321
+                self.parent_id = 654
+                self.fetch_message = AsyncMock(return_value=SimpleNamespace(
+                    components=[SimpleNamespace(children=[])], edit=AsyncMock()
+                ))
+        class FakeForum:
+            def __init__(self):
+                self.id = 654
+                self.archived_threads = AsyncMock()
+        forum, thread = FakeForum(), FakeThread()
+        guild = SimpleNamespace(
+            get_channel=lambda channel_id: forum if channel_id == 654 else None,
+            get_thread=lambda thread_id: thread if thread_id == 321 else None,
+            fetch_channel=AsyncMock(return_value=None),
+        )
+        cog = Sugestoes(SimpleNamespace(add_view=lambda _view: None))
+        registro = {
+            "id": 321, "canal_publicacao_id": 999, "status": "pendente",
+            "titulo": "Sugestão antiga", "descricao": "Descrição preservada",
+            "autor_id": 11, "categoria": "Sistemas", "votos": {},
+        }
+        with patch("cogs.sugestoes.CANAL_SUGESTOES_ID", 654), patch(
+            "cogs.sugestoes.discord.ForumChannel", FakeForum
+        ), patch("cogs.sugestoes.discord.Thread", FakeThread), patch(
+            "cogs.sugestoes.carregar", AsyncMock(return_value={"321": registro})
+        ):
+            total = await cog._sincronizar_publicacoes_existentes(guild)
+        self.assertEqual(total, 1)
+        thread.fetch_message.assert_awaited_once_with(321)
 
     async def test_migracao_nao_edita_publicacao_que_ja_tem_todos_os_botoes(self):
         ids_atuais = [
