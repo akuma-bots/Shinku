@@ -12,6 +12,11 @@ from utils.guia_servidores import (
 )
 from utils.storage import carregar
 from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, CATEGORIAS, garantir_topicos, registrar as registrar_global
+from utils.guild_config import membro_tem_lideranca
+from utils.historico_membros import (
+    ABAS, construir_dossie, _embed_geral, _embed_missoes,
+    _embed_competitivo, _embed_conquistas, _embed_moderacao, _embed_registros,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +30,101 @@ def _formatar_linhas_registro(linhas, limite: int = 3800) -> str:
     return "\n".join(str(linha) for linha in linhas if linha is not None)[:limite_seguro]
 
 
+def _usuario_pode_consultar_historico(interaction: discord.Interaction) -> bool:
+    return bool(interaction.guild_id == GUILD_NEMESIS_ID and membro_tem_lideranca(interaction.user))
+
+
+class DossieMembroRegistroView(discord.ui.View):
+    """Navegação privada pelas seções do histórico de um membro."""
+    def __init__(self, dossie: dict, owner_id: int):
+        super().__init__(timeout=300)
+        self.dossie = dossie
+        self.owner_id = owner_id
+        opcoes = [discord.SelectOption(label=label, value=chave, description=descricao[:100], default=(chave == "geral")) for chave, label, descricao in ABAS]
+        self.seletor = discord.ui.Select(placeholder="Escolha o que deseja consultar", min_values=1, max_values=1, options=opcoes, custom_id="nemesis:registro:membro:aba")
+        self.seletor.callback = self._selecionar_aba
+        self.add_item(self.seletor)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id or not _usuario_pode_consultar_historico(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança autorizada.", ephemeral=True)
+            return False
+        return True
+
+    async def _selecionar_aba(self, interaction: discord.Interaction):
+        renderizadores = {
+            "geral": _embed_geral, "missoes": _embed_missoes,
+            "competitivo": _embed_competitivo, "conquistas": _embed_conquistas,
+            "moderacao": _embed_moderacao, "registros": _embed_registros,
+        }
+        chave = self.seletor.values[0]
+        embed = renderizadores.get(chave, _embed_geral)(self.dossie)
+        for opcao in self.seletor.options:
+            opcao.default = opcao.value == chave
+        await interaction.response.edit_message(embed=embed, view=self)
+
+
+class SeletorMembroRegistroView(discord.ui.View):
+    """Seletor nativo do Discord: pesquisa membro pelo nome ou escolhe na lista."""
+    def __init__(self, owner_id: int):
+        super().__init__(timeout=180)
+        self.owner_id = owner_id
+        self.seletor = discord.ui.UserSelect(
+            placeholder="Pesquise pelo nome ou selecione um membro",
+            min_values=1, max_values=1,
+            custom_id="nemesis:registro:membro:selecionar",
+        )
+        self.seletor.callback = self._selecionar_membro
+        self.add_item(self.seletor)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id or not _usuario_pode_consultar_historico(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança autorizada.", ephemeral=True)
+            return False
+        return True
+
+    async def _selecionar_membro(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != GUILD_NEMESIS_ID:
+            await interaction.response.send_message("Esta consulta só está disponível na NÊMESIS.", ephemeral=True)
+            return
+        selecionado = self.seletor.values[0]
+        membro = selecionado
+        if not isinstance(membro, discord.Member):
+            try:
+                membro = await interaction.guild.fetch_member(selecionado.id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                await interaction.response.send_message("Não consegui localizar esse integrante na NÊMESIS.", ephemeral=True)
+                return
+        await interaction.response.defer()
+        try:
+            dossie = await construir_dossie(interaction.guild, membro)
+            await interaction.edit_original_response(content=None, embed=_embed_geral(dossie), view=DossieMembroRegistroView(dossie, self.owner_id))
+        except Exception:
+            logger.exception("Falha ao montar histórico individual (guild=%s, membro=%s).", interaction.guild.id, membro.id)
+            await interaction.edit_original_response(content="Não foi possível carregar o histórico agora. Tente novamente.", embed=None, view=None)
+
+
+class PainelHistoricoMembrosView(discord.ui.View):
+    """Botão persistente anexado ao cabeçalho do tópico Histórico Membros."""
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Consultar histórico de membro", emoji="🔎", style=discord.ButtonStyle.primary, custom_id="nemesis:registro:membro:abrir")
+    async def abrir_historico(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not _usuario_pode_consultar_historico(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            embed=criar_embed(
+                "📚 CENTRAL DE HISTÓRICO INDIVIDUAL",
+                "Pesquise e selecione um integrante pelo nome na lista abaixo. O dossiê será aberto somente para você, com missões, progressão, conquistas, competitivo, moderação e linha do tempo.",
+                cor=0x9F2035, rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+            ),
+            view=SeletorMembroRegistroView(interaction.user.id),
+            ephemeral=True,
+        )
+
+
 class Logs(commands.Cog):
     """Registra eventos do servidor (entradas, saídas, edições e exclusões de mensagem)
     no Fórum central de Registro Global da NÊMESIS."""
@@ -32,6 +132,27 @@ class Logs(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._topicos_prontos = False
+        self.bot.add_view(PainelHistoricoMembrosView())
+
+    async def _atualizar_painel_historico_membros(self, guild: discord.Guild, topicos: dict) -> None:
+        thread_id = topicos.get("historico_membros")
+        if not thread_id:
+            logger.error("Tópico Histórico Membros não foi retornado pelo Registro Global.")
+            return
+        try:
+            thread = guild.get_thread(int(thread_id))
+            if thread is None:
+                thread = await self.bot.fetch_channel(int(thread_id))
+            if not isinstance(thread, discord.Thread) or thread.guild.id != GUILD_NEMESIS_ID:
+                logger.error("Destino inválido para o painel de histórico individual: %s.", thread_id)
+                return
+            if thread.archived or thread.locked:
+                await thread.edit(archived=False, locked=False, reason="Atualizar painel de consulta do histórico individual")
+            mensagem = await thread.fetch_message(thread.id)
+            await mensagem.edit(view=PainelHistoricoMembrosView(), allowed_mentions=discord.AllowedMentions.none())
+            logger.info("Painel de consulta individual atualizado no tópico Histórico Membros (%s).", thread.id)
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.exception("Não foi possível atualizar o painel de histórico individual.")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -44,6 +165,7 @@ class Logs(commands.Cog):
         try:
             topicos = await garantir_topicos(guild)
             self._topicos_prontos = len(topicos) == len(CATEGORIAS)
+            await self._atualizar_painel_historico_membros(guild, topicos)
             logger.info("Registro Global pronto: %s/%s tópicos permanentes verificados.", len(topicos), len(CATEGORIAS))
         except Exception:
             logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
