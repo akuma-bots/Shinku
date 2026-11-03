@@ -159,6 +159,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class TestTemporadaPublicaView(unittest.TestCase):
+    def test_botoes_usam_emojis_unicode_validos(self):
+        from cogs.temporadas_missoes import TemporadaPublicaView
+
+        view = TemporadaPublicaView(None, 123)
+        fechar = next(item for item in view.children if getattr(item, "label", None) == "Fechar")
+        self.assertEqual(str(fechar.emoji), "❌")
+
+
 class TestCentralTemporadasSemComandos(unittest.TestCase):
     def test_cog_de_temporadas_nao_registra_comandos_slash(self):
         from cogs.temporadas_missoes import TemporadasMissoes
