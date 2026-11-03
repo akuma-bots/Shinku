@@ -108,7 +108,6 @@ class FormularioParceria(discord.ui.Modal, title="Solicitação de parceria NÊM
     membros = discord.ui.TextInput(label="Quantidade aproximada de membros", max_length=12, placeholder="Ex.: 850")
     segmento = discord.ui.TextInput(label="Segmento / objetivo", max_length=120, placeholder="Ex.: comunidade gamer, RP, tecnologia...")
     proposta = discord.ui.TextInput(label="Proposta de parceria", style=discord.TextStyle.paragraph, min_length=20, max_length=900, placeholder="Explique o que sua comunidade oferece e como será a reciprocidade.")
-    evidencias = discord.ui.TextInput(label="Atividade e evidências (opcional)", style=discord.TextStyle.paragraph, required=False, max_length=700, placeholder="Links de apresentação, redes sociais, prints ou informações relevantes.")
 
     async def on_submit(self, interaction: discord.Interaction):
         if interaction.guild_id != GUILD_ID:
@@ -136,7 +135,7 @@ class FormularioParceria(discord.ui.Modal, title="Solicitação de parceria NÊM
             "membros": membros,
             "segmento": str(self.segmento.value).strip(),
             "proposta": str(self.proposta.value).strip(),
-            "evidencias": str(self.evidencias.value).strip(),
+            "evidencias": "",
             "responsavel_id": interaction.user.id,
             "criada_em": int(time.time()),
             "status": "pendente",
@@ -216,8 +215,16 @@ class DecisaoParceriaView(discord.ui.View):
         item["decisao_por"] = interaction.user.id
         item["decidida_em"] = agora
         item["proxima_revisao"] = agora + INTERVALO_REVISAO if aprovado else None
-        data["solicitacoes"] = itens
-        await _atualizar(lambda _: data)
+        def salvar_decisao(atual):
+            atual = atual if isinstance(atual, dict) else {}
+            lista_atual = atual.get("solicitacoes", [])
+            for registro in lista_atual:
+                if isinstance(registro, dict) and registro.get("id") == self.protocolo and registro.get("status") == "pendente":
+                    registro.update(item)
+                    break
+            atual["solicitacoes"] = lista_atual
+            return atual
+        await _atualizar(salvar_decisao)
         try:
             await interaction.message.edit(embed=_embed_solicitacao(item), view=None)
         except (discord.Forbidden, discord.HTTPException):
@@ -315,8 +322,17 @@ class ParceriasRequisitos(commands.Cog):
                                 aviso.set_footer(text="A revisão deve ser concluída pela administração autorizada.")
                                 await canal.send(embed=aviso)
                     if alterou:
-                        data["solicitacoes"] = itens
-                        await _atualizar(lambda _: data)
+                        ids_vencidos = {str(x.get("id")) for x in itens if isinstance(x, dict) and x.get("status") == "revisao_pendente"}
+                        def salvar_revisoes(atual):
+                            atual = atual if isinstance(atual, dict) else {}
+                            lista_atual = atual.get("solicitacoes", [])
+                            for registro in lista_atual:
+                                if isinstance(registro, dict) and str(registro.get("id")) in ids_vencidos and registro.get("status") == "aprovada":
+                                    registro["status"] = "revisao_pendente"
+                                    registro["revisao_solicitada_em"] = agora
+                            atual["solicitacoes"] = lista_atual
+                            return atual
+                        await _atualizar(salvar_revisoes)
                 await asyncio.sleep(3600)
             except asyncio.CancelledError:
                 raise
