@@ -356,6 +356,10 @@ def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | 
     status_label = {"ativa": "🟢 ATIVA", "suspensa": "🔴 SUSPENSA", "revisao_pendente": "🟡 REVISÃO PENDENTE", "removida": "⚫ ENCERRADA"}.get(status, status.upper())
     embed.add_field(name="STATUS DA ALIANÇA", value="**" + status_label + "**", inline=True)
     embed.add_field(name="CATEGORIA", value=str(parceria.get("categoria") or "Reconhecida"), inline=True)
+    if parceria.get("segmento"):
+        embed.add_field(name="SEGMENTO", value=str(parceria.get("segmento"))[:180], inline=True)
+    if parceria.get("membros"):
+        embed.add_field(name="COMUNIDADE", value=(format(int(parceria["membros"]), ",").replace(",", ".") + " membros"), inline=True)
     convite = str(parceria.get("convite") or "")
     embed.add_field(name="ACESSO À COMUNIDADE", value=f"[Entrar no servidor]({convite})" if convite else "Convite indisponível", inline=False)
     cargo = guild.get_role(int(parceria["cargo_id"])) if parceria.get("cargo_id") else None
@@ -397,6 +401,8 @@ async def registrar_parceria_aprovada(
             "nome": nome,
             "convite": str(candidatura.get("convite") or ""),
             "descricao": str(candidatura.get("proposta") or candidatura.get("segmento") or "Aliança oficial da NÊMESIS.")[:3500],
+            "segmento": str(candidatura.get("segmento") or "")[:180],
+            "membros": candidatura.get("membros"),
             "banner": candidatura.get("banner"),
             "cargo_id": cargo.id if cargo else None,
             "criado_por_id": aprovador.id,
