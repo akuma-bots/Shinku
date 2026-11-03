@@ -228,6 +228,11 @@ async def construir_dossie(guild: discord.Guild, membro: discord.abc.User) -> di
     }
 
 
+def _timeout_membro(membro):
+    """Retorna o fim do timeout em diferentes versões de discord.py."""
+    return getattr(membro, "timed_out_until", None) or getattr(membro, "communication_disabled_until", None)
+
+
 def _embed_geral(d: dict) -> discord.Embed:
     membro = d["membro"]
     perfil = d["perfil"]
@@ -254,7 +259,7 @@ def _embed_geral(d: dict) -> discord.Embed:
         cargos_texto = " · ".join(cargos) if cargos else "Nenhum cargo além de @everyone."
         embed.add_field(name=f"◈ CARGOS ATUAIS ({len(cargos)})", value=cargos_texto[:1024], inline=False)
         estado = str(getattr(membro, "status", "indisponível")).replace("dnd", "Não perturbe").replace("online", "Online").replace("idle", "Ausente").replace("offline", "Offline")
-        embed.add_field(name="◈ ESTADO", value=f"**Presença:** {estado}\n**Bot:** {'Sim' if membro.bot else 'Não'}\n**Timeout:** {discord.utils.format_dt(membro.communication_disabled_until, style='R') if membro.communication_disabled_until else 'Não'}", inline=True)
+        embed.add_field(name="◈ ESTADO", value=f"**Presença:** {estado}\n**Bot:** {'Sim' if membro.bot else 'Não'}\n**Timeout:** {discord.utils.format_dt(_timeout_membro(membro), style='R') if _timeout_membro(membro) else 'Não'}", inline=True)
 
     xp_org = _inteiro(progressao.get("xp"))
     rank_no = progressao.get("rank_no")
