@@ -550,8 +550,15 @@ class Logs(commands.Cog):
                     value=" ".join(cargo.mention for cargo in perdidos)[:1024],
                     inline=False,
                 )
-            await self._enviar_log(canal, embed, categoria="cargos")
-            await registrar_global(depois.guild, "historico_membros", "Cargos do membro alterados", embed.description or "Cargos alterados.", cor=0xB3132B)
+            # O histórico de cargos separado foi removido: os detalhes completos
+            # ficam na linha do tempo individual do membro.
+            await registrar_global(
+                depois.guild,
+                "historico_membros",
+                "Alterações de cargos",
+                embed=embed,
+                cor=0xB3132B,
+            )
 
         # Usa o atributo oficial de discord.py e mantém fallback para forks antigos.
         timeout_antes = _timeout_membro(antes)
