@@ -1,12 +1,10 @@
-import asyncio
 import time
 import uuid
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 
 ARQUIVO = "punicoes.json"
-_PUNICOES_LOCK = asyncio.Lock()
 
 
 async def _tudo():
@@ -35,22 +33,26 @@ async def registrar_punicao(
     if not motivo:
         motivo = "Sem motivo informado."
 
-    async with _PUNICOES_LOCK:
-        todos = await _tudo()
+    punicao = {
+        "id": uuid.uuid4().hex[:8],
+        "guild_id": int(guild_id),
+        "membro_id": int(membro_id),
+        "tipo": tipo,
+        "motivo": motivo[:2000],
+        "aplicado_por_id": int(aplicado_por_id) if aplicado_por_id is not None else None,
+        "timestamp": time.time(),
+    }
+
+    def inserir(todos):
+        if not isinstance(todos, dict):
+            todos = {}
         lista = _lista_valida(todos.get(str(guild_id), []))
-        punicao = {
-            "id": uuid.uuid4().hex[:8],
-            "guild_id": int(guild_id),
-            "membro_id": int(membro_id),
-            "tipo": tipo,
-            "motivo": motivo[:2000],
-            "aplicado_por_id": int(aplicado_por_id) if aplicado_por_id is not None else None,
-            "timestamp": time.time(),
-        }
         lista.append(punicao)
         todos[str(guild_id)] = lista
-        await salvar(ARQUIVO, todos)
-        return punicao
+        return todos
+
+    await atualizar_json(ARQUIVO, {}, inserir)
+    return punicao
 
 
 async def historico_punicoes(
@@ -95,12 +97,17 @@ async def obter_todas_punicoes(guild_id: int) -> list:
 
 
 async def remover_punicao(guild_id: int, punicao_id: str) -> bool:
-    async with _PUNICOES_LOCK:
-        todos = await _tudo()
+    resultado = {"removida": False}
+
+    def remover(todos):
+        if not isinstance(todos, dict):
+            todos = {}
         lista = _lista_valida(todos.get(str(guild_id), []))
         nova_lista = [punicao for punicao in lista if str(punicao.get("id")) != str(punicao_id)]
-        if len(nova_lista) == len(lista):
-            return False
-        todos[str(guild_id)] = nova_lista
-        await salvar(ARQUIVO, todos)
-        return True
+        if len(nova_lista) != len(lista):
+            todos[str(guild_id)] = nova_lista
+            resultado["removida"] = True
+        return todos
+
+    await atualizar_json(ARQUIVO, {}, remover)
+    return resultado["removida"]
