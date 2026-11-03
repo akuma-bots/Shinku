@@ -4,7 +4,7 @@ O Painel Administrativo Central é uma navegação privada por botões e menus, 
 
 ## Acesso
 
-- O botão persistente **Abrir Central Administrativa** é exibido no tópico Administração.
+- O botão persistente **Abrir Central Administrativa** é exibido no tópico Central de Administração.
 - Somente membros da NÊMESIS reconhecidos por `membro_tem_lideranca()` podem abrir a central.
 - A consulta é efêmera e vinculada à pessoa que abriu a interface; outra pessoa não pode controlar a sessão.
 - A interface não cria comandos slash e não concede permissões novas.
@@ -29,4 +29,4 @@ Os botões de destino apontam para tópicos permanentes já existentes ou canais
 
 ## Publicação e manutenção
 
-Na inicialização, depois que o Registro Global valida a privacidade e sincroniza os 29 tópicos, o bot atualiza a mensagem inicial do tópico Administração com a view persistente. A mensagem existente é editada; não é criada uma nova publicação a cada reinício.
+Na inicialização, depois que o Registro Global valida a privacidade e sincroniza os 29 tópicos, o bot atualiza a mensagem inicial do tópico Central de Administração com a view persistente. A mensagem existente é editada; não é criada uma nova publicação a cada reinício.
