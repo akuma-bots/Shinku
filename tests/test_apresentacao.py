@@ -16,12 +16,12 @@ from utils.apresentacao import (
 def test_criar_embed_aplica_padrao_visual():
     embed = criar_embed("Teste", "Descrição")
 
-    assert embed.title == "✦・ Teste ・✦"
+    assert embed.title == "Teste"
     assert embed.description == "Descrição"
     assert embed.color.value == COR_PRIMARIA
-    assert embed.author.name == "✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE SISTEMAS"
+    assert embed.author.name == "NÊMESIS • CENTRAL DE SISTEMAS"
     assert embed.timestamp is not None
-    assert embed.footer.text == "◈ NÊMESIS  •  SISTEMAS INTEGRADOS"
+    assert embed.footer.text == "NÊMESIS • SISTEMAS INTEGRADOS"
 
 
 def test_criar_embed_respeita_cor_rodape_e_timestamp():
@@ -52,6 +52,6 @@ def test_respostas_semanticas_preservam_assinatura_visual():
         embed_aviso("Atenção", "Verifique"),
         embed_info("Informação", "Detalhes"),
     ):
-        assert embed.footer.text == "◈ NÊMESIS  •  SISTEMAS INTEGRADOS"
-        assert embed.author.name == "✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CENTRAL DE SISTEMAS"
-        assert embed.title.endswith("・✦")
+        assert embed.footer.text == "NÊMESIS • SISTEMAS INTEGRADOS"
+        assert embed.author.name == "NÊMESIS • CENTRAL DE SISTEMAS"
+        assert embed.title in {"OK", "Falha", "Atenção", "Informação"}
