@@ -161,3 +161,50 @@ class TestAtualizacaoAtomica(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStorageSessaoHTTP(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        storage._redis_session = None
+        storage._redis_session_loop = None
+
+    async def asyncTearDown(self):
+        await storage.fechar_sessao_storage()
+
+    async def test_reutiliza_sessao_http_e_fecha_no_shutdown(self):
+        class Resposta:
+            status = 200
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            async def json(self):
+                return {"result": "PONG"}
+
+        class Sessao:
+            def __init__(self, **_):
+                self.closed = False
+                self.post_count = 0
+
+            def post(self, *_args, **_kwargs):
+                self.post_count += 1
+                return Resposta()
+
+            async def close(self):
+                self.closed = True
+
+        criada = Sessao()
+        with patch.multiple(storage, UPSTASH_URL="https://redis.example", UPSTASH_TOKEN="token"), patch.object(
+            storage.aiohttp, "ClientSession", return_value=criada
+        ) as factory:
+            self.assertEqual(await storage._comando_redis("PING"), "PONG")
+            self.assertEqual(await storage._comando_redis("PING"), "PONG")
+            factory.assert_called_once()
+            self.assertEqual(criada.post_count, 2)
+            await storage.fechar_sessao_storage()
+
+        self.assertTrue(criada.closed)
+        self.assertIsNone(storage._redis_session)
