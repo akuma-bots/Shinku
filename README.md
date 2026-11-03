@@ -14,7 +14,7 @@ O bot é exclusivo do servidor configurado por `NEMESIS_GUILD_ID`. Não é um mo
 - **Guerras:** registro de resultados, guerras em andamento, atualização de placar, regras, cancelamento e histórico.
 - **Progressão da gangue:** XP de participação, ranks, cargos configuráveis e recompensas.
 - **Perfil e competitivo:** XP, patentes, vitórias, derrotas, KDR, temporadas e rankings; o perfil também exibe a conta Roblox verificada.
-- **Histórico individual:** comando `/historico` para pesquisar por nome, usuário ou ID Discord e abrir um dossiê interativo com identidade, cargos, progressão, missões, provas, combate, conquistas, convites, punições e linha do tempo do Registro Global. A consulta é restrita à liderança autorizada.
+- **Histórico individual:** painel integrado ao tópico **Histórico Membros** do Registro Global. A liderança abre a consulta pelo botão, pesquisa/seleciona um integrante pelo nome no seletor do Discord e navega por identidade, cargos, progressão, missões, provas, combate, conquistas, convites, punições e linha do tempo. O dossiê é privado.
 - **Conquistas e medalhas:** catálogo automático com critérios verificáveis de progressão, participação, missões e combate; desbloqueios permanentes, recompensas de XP idempotentes, anúncio no canal de conquistas e consulta pelos comandos /conquistas e /perfil.
 - **Roblox:** vínculo por código de verificação, consulta de perfil, identificação de membros pelo nome Roblox e sincronização opcional de cargos por rank.
 - **Integração de novos membros:** mensagem pública e DM de boas-vindas preservam a TAG oficial `NΞM`, apresentam o cargo automático `Visitantes`, mostram os primeiros passos e oferecem botões para os canais essenciais. A DM também mantém o menu de códigos dos jogos.
