@@ -16,6 +16,7 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 
 - Supervisor Staff foi incluído na autorização administrativa geral, junto de OCTÓGONO, Diretor Staff e Vice-Diretor Staff.
 - A permissão geral foi separada dos poderes hierárquicos de promoção, rebaixamento e banimento. Supervisor Staff não herda essas ações apenas por possuir acesso administrativo.
+- Os comandos gerais de limpeza de mensagens e consulta de avisos/histórico de punições passaram a usar a autorização administrativa central; o banimento permanece sujeito à autorização hierárquica específica e à posição do alvo.
 - A gestão de missões permanece exclusiva do OCTÓGONO.
 - A autorização central continua restrita ao servidor oficial e não usa permissões genéricas do Discord como substituto da hierarquia organizacional.
 - O teste de hierarquia foi atualizado para validar o acesso geral do Supervisor Staff e negar poderes de promoção/banimento e gestão de missões.
