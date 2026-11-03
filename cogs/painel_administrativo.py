@@ -61,13 +61,14 @@ SECOES_ADMINISTRATIVAS = {
     },
 }
 
+# Carmesim e preto em variações profundas; sem cores fora da identidade.
 CORES_SECOES = {
-    "visao_geral": 0x5865F2,
-    "membros": 0x9B59B6,
-    "operacoes": 0xF39C12,
-    "seguranca": 0xE74C3C,
-    "sistemas": 0x3498DB,
-    "registros": 0x16A085,
+    "visao_geral": 0x8B1E2D,
+    "membros": 0x991B33,
+    "operacoes": 0x741629,
+    "seguranca": 0xB3263E,
+    "sistemas": 0x252126,
+    "registros": 0x5C101F,
 }
 
 _ROTULOS_TOPICOS = {
