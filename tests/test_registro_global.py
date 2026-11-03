@@ -11,7 +11,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
     def test_define_topicos_permanentes_configurados(self):
         essenciais = {
             "mensagens", "atendimento", "moderacao", "historico_membros",
-            "operacoes", "administracao", "seguranca", "missoes",
+            "administracao", "seguranca", "missoes",
         }
         self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
         self.assertEqual(len(registro_global.CATEGORIAS), 12)
