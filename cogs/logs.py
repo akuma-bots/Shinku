@@ -307,23 +307,20 @@ class Logs(commands.Cog):
                              member.guild.id, member.id, canal.id)
         await registrar_global(
             member.guild,
-            "entradas",
-            "Novo membro na NÊMESIS",
+            "historico_membros",
+            "Entrada de membro",
             (
                 f"Membro: {member.mention} (`{member.id}`)\n"
+                f"Entrada: {discord.utils.format_dt(agora, style='F')}\n"
                 f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
                 f"Efetivo após entrada: {total_membros}\n"
                 f"Convidador: <@{convidador_id}>"
                 if convidador_id else
                 f"Membro: {member.mention} (`{member.id}`)\n"
+                f"Entrada: {discord.utils.format_dt(agora, style='F')}\n"
                 f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
                 f"Efetivo após entrada: {total_membros}\nConvidador: Não identificado"
             ),
-            cor=0x57F287,
-        )
-        await registrar_global(
-            member.guild, "historico_membros", "Entrada no histórico do membro",
-            f"Membro: {member} (ID: {member.id})\nEntrada: {discord.utils.format_dt(agora, style='F')}\nConta criada: {discord.utils.format_dt(member.created_at, style='F')}",
             cor=0x57F287,
         )
 
