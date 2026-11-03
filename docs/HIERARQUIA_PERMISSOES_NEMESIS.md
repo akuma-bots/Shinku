@@ -4,13 +4,14 @@ Este documento registra a matriz aplicada pelo Shinku. Os IDs são os cargos do 
 
 ## Administração
 
-Somente cargos acima de Supervisor Staff recebem acesso administrativo geral:
+O acesso administrativo geral é concedido aos seguintes cargos:
 
 - OCTÓGONO — `1563995880007139425`
 - Diretor Staff — `1563995880007139424`
 - Vice-Diretor Staff — `1563995880007139423`
+- Supervisor Staff — `1563995880007139422`
 
-Supervisor Staff (`1563995880007139422`) não recebe, por esse cargo isolado, acesso administrativo geral.
+Supervisor Staff pode executar operações administrativas gerais, incluindo gestão de parcerias e revisões administrativas. Esse acesso não concede automaticamente poderes de promoção, rebaixamento, banimento ou gestão exclusiva de missões.
 
 ## Gestão de missões
 
@@ -39,7 +40,7 @@ O Shinku preenche automaticamente os vínculos padrão sem sobrescrever configur
 
 ## Ações hierárquicas
 
-Os cargos acima de Elite podem promover, rebaixar e banir:
+Os cargos explicitamente autorizados abaixo podem promover, rebaixar e banir. Supervisor Staff possui acesso administrativo geral, mas não recebe essas ações hierárquicas por herança:
 
 - Veterano — `1563995879998754938`
 - Treinador — `1563995879998754939`
