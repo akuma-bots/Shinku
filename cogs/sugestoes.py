@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import unicodedata
+from difflib import SequenceMatcher
 from datetime import datetime, timezone
 
 import discord
@@ -19,7 +21,9 @@ CANAL_SUGESTOES_ID = 1563995881508831336
 ARQUIVO_SUGESTOES = "sugestoes_nemesis.json"
 ARQUIVO_COOLDOWN = "sugestoes_cooldown.json"
 ARQUIVO_PAINEL = "sugestoes_painel.json"
+ARQUIVO_SEGUIDORES = "sugestoes_seguidores.json"
 COOLDOWN_SEGUNDOS = 600
+LIMITE_DUPLICIDADE = 0.91
 COR_SUGESTOES = 0x8B1E2D
 
 CATEGORIAS = (
@@ -35,6 +39,7 @@ STATUS = {
     "pendente": ("⏳ Pendente", 0x8B1E2D),
     "analise": ("🔎 Em análise", 0x741629),
     "aprovada": ("✅ Aprovada", 0x991B33),
+    "desenvolvimento": ("🛠️ Em desenvolvimento", 0x6B1729),
     "rejeitada": ("❌ Rejeitada", 0x5C101F),
     "implementada": ("🏆 Implementada", 0x381018),
 }
@@ -59,6 +64,102 @@ def _normalizar_categoria(valor: str) -> str:
         "outros": "Outros",
     }
     return aliases.get(texto, "Outros")
+
+
+def _normalizar_titulo(valor: str) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or "").casefold())
+    texto = "".join(caractere for caractere in texto if not unicodedata.combining(caractere))
+    texto = re.sub(r"[^a-z0-9]+", " ", texto)
+    return " ".join(texto.split())
+
+
+def _encontrar_duplicada(registros: dict, titulo: str, ignorar_id: str | None = None) -> dict | None:
+    alvo = _normalizar_titulo(titulo)
+    if len(alvo) < 8:
+        return None
+    melhor = None
+    melhor_indice = 0.0
+    for item in registros.values() if isinstance(registros, dict) else ():
+        if not isinstance(item, dict) or item.get("status") in STATUS_TERMINAIS:
+            continue
+        if ignorar_id is not None and str(item.get("id")) == str(ignorar_id):
+            continue
+        existente = _normalizar_titulo(item.get("titulo", ""))
+        if not existente:
+            continue
+        indice = SequenceMatcher(None, alvo, existente).ratio()
+        if alvo == existente:
+            indice = 1.0
+        if indice >= LIMITE_DUPLICIDADE and indice > melhor_indice:
+            melhor = item
+            melhor_indice = indice
+    return melhor
+
+
+def _registro_no_canal(interaction: discord.Interaction, registro: dict) -> bool:
+    if not _esta_no_canal_sugestoes(interaction):
+        return False
+    canal = interaction.channel
+    canal_registro = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+    return getattr(canal, "id", None) == canal_registro
+
+
+async def _alternar_seguidor(message_id: str, usuario_id: int) -> bool:
+    seguindo = False
+    def atualizar(dados):
+        nonlocal seguindo
+        if not isinstance(dados, dict):
+            dados = {}
+        seguidores = set(str(item) for item in dados.get(str(message_id), []))
+        chave = str(int(usuario_id))
+        if chave in seguidores:
+            seguidores.remove(chave)
+            seguindo = False
+        else:
+            seguidores.add(chave)
+            seguindo = True
+        dados[str(message_id)] = sorted(seguidores)
+        return dados
+    await atualizar_json(ARQUIVO_SEGUIDORES, {}, atualizar)
+    return seguindo
+
+
+async def _listar_seguidores(message_id: str) -> list[int]:
+    dados = await carregar(ARQUIVO_SEGUIDORES, {})
+    itens = dados.get(str(message_id), []) if isinstance(dados, dict) else []
+    resultado = []
+    for item in itens if isinstance(itens, list) else []:
+        try:
+            resultado.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return resultado
+
+
+async def _editar_registro(message_id: str, autor_id: int, titulo: str, descricao: str, impacto: str) -> dict | None:
+    resultado = None
+    def atualizar(dados):
+        nonlocal resultado
+        if not isinstance(dados, dict):
+            return dados
+        atual = dados.get(str(message_id))
+        if not isinstance(atual, dict) or int(atual.get("autor_id", 0)) != int(autor_id):
+            return dados
+        if atual.get("status") not in {"pendente", "analise"}:
+            return dados
+        atual = dict(atual)
+        atual.update({
+            "titulo": titulo.strip(),
+            "descricao": descricao.strip(),
+            "impacto": impacto.strip(),
+            "atualizado_em": datetime.now(timezone.utc).isoformat(),
+            "editado_em": datetime.now(timezone.utc).isoformat(),
+        })
+        dados[str(message_id)] = atual
+        resultado = dict(atual)
+        return dados
+    await atualizar_json(ARQUIVO_SUGESTOES, {}, atualizar)
+    return resultado
 
 
 def _esta_no_canal_sugestoes(interaction: discord.Interaction) -> bool:
@@ -113,7 +214,7 @@ def _embed_painel() -> discord.Embed:
     )
     embed.add_field(
         name="◈ CATEGORIAS",
-        value="Sistemas • Missões • Eventos • Competitivo • Comunidade • Outros",
+        value="Sistemas • Missões • Eventos • Competitivo • Comunidade • Qualidade de vida • Outros",
         inline=False,
     )
     embed.set_footer(text="NÊMESIS • CENTRAL DE SUGESTÕES • PAINEL OFICIAL")
@@ -137,6 +238,19 @@ def _embed_sugestao(registro: dict) -> discord.Embed:
     embed.add_field(name="◈ AUTOR", value=f"<@{registro.get('autor_id')}>", inline=True)
     embed.add_field(name="◈ CATEGORIA", value=str(registro.get("categoria", "Outros"))[:100], inline=True)
     embed.add_field(name="◈ SITUAÇÃO", value=status, inline=True)
+    try:
+        criado = datetime.fromisoformat(str(registro.get("criado_em", "")))
+        embed.timestamp = criado
+    except (TypeError, ValueError):
+        pass
+    try:
+        atualizado = datetime.fromisoformat(str(registro.get("atualizado_em", "")))
+        embed.add_field(name="🕒 ÚLTIMA ATUALIZAÇÃO", value=f"<t:{int(atualizado.timestamp())}:R>", inline=True)
+    except (TypeError, ValueError):
+        pass
+    impacto = str(registro.get("impacto", "")).strip()
+    if impacto:
+        embed.add_field(name="🎯 RESULTADO ESPERADO", value=impacto[:1024], inline=False)
     embed.add_field(name="👍 APOIO", value=str(apoios), inline=True)
     embed.add_field(name="👎 NÃO APOIO", value=str(oposicoes), inline=True)
     embed.add_field(name="📊 APROVAÇÃO", value=f"{aprovacao}% ({total} votos)", inline=True)
@@ -204,11 +318,21 @@ async def _atualizar_decisao(
         if not isinstance(atual, dict):
             return dados
         atual = dict(atual)
+        agora = datetime.now(timezone.utc).isoformat()
+        historico = list(atual.get("historico_status", []))
+        historico.append({
+            "de": atual.get("status", "pendente"),
+            "para": status,
+            "motivo": motivo.strip(),
+            "responsavel_id": int(responsavel_id),
+            "em": agora,
+        })
         atual.update({
             "status": status,
             "motivo_decisao": motivo.strip(),
             "responsavel_id": int(responsavel_id),
-            "atualizado_em": datetime.now(timezone.utc).isoformat(),
+            "historico_status": historico[-30:],
+            "atualizado_em": agora,
         })
         dados[str(message_id)] = atual
         resultado = dict(atual)
@@ -259,6 +383,13 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
         min_length=20,
         max_length=1800,
     )
+    impacto = discord.ui.TextInput(
+        label="Resultado esperado",
+        placeholder="Que melhoria concreta essa ideia traria?",
+        style=discord.TextStyle.paragraph,
+        min_length=10,
+        max_length=500,
+    )
     categoria = discord.ui.TextInput(
         label="Categoria",
         placeholder="Ex.: Sistemas, Eventos, Comunidade...",
@@ -267,10 +398,27 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not _esta_no_canal_sugestoes(interaction):
-            await interaction.response.send_message("Este formulário só funciona no canal oficial de sugestões.", ephemeral=True)
+        if not _esta_no_canal_sugestoes(interaction) or interaction.user.bot:
+            await interaction.response.send_message("Este formulário só funciona para membros no canal oficial de sugestões.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            registros_atuais = await carregar(ARQUIVO_SUGESTOES, {})
+            duplicada = _encontrar_duplicada(registros_atuais, self.titulo.value)
+            if duplicada:
+                canal_id = int(duplicada.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+                mensagem_id = duplicada.get("id")
+                link = f"https://discord.com/channels/{GUILD_NEMESIS_ID}/{canal_id}/{mensagem_id}"
+                await interaction.followup.send(
+                    f"Encontrei uma sugestão muito parecida com essa ideia: [ver publicação existente]({link}). "
+                    "Vote ou comente nela para fortalecer a proposta, em vez de criar uma duplicata.",
+                    ephemeral=True,
+                )
+                return
+        except Exception:
+            _LOG.exception("Falha ao verificar sugestões duplicadas.")
+            await interaction.followup.send("Não consegui verificar sugestões existentes. Tente novamente em instantes.", ephemeral=True)
+            return
         agora = int(time.time())
         try:
             restante = await _reservar_cooldown(interaction.user.id, agora)
@@ -302,6 +450,7 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
             "autor_id": interaction.user.id,
             "titulo": str(self.titulo.value).strip(),
             "descricao": str(self.descricao.value).strip(),
+            "impacto": str(self.impacto.value).strip(),
             "categoria": categoria,
             "status": "pendente",
             "votos": {},
@@ -423,7 +572,14 @@ def _embed_painel_administrativo(registros: dict, filtro: str = "resumo") -> dis
     embed.add_field(name="🔎 EM ANÁLISE", value=str(contagens["analise"]), inline=True)
     embed.add_field(name="✅ APROVADAS", value=str(contagens["aprovada"]), inline=True)
     embed.add_field(name="❌ REJEITADAS", value=str(contagens["rejeitada"]), inline=True)
+    embed.add_field(name="🛠️ EM DESENVOLVIMENTO", value=str(contagens["desenvolvimento"]), inline=True)
     embed.add_field(name="🏆 IMPLEMENTADAS", value=str(contagens["implementada"]), inline=True)
+    votos_totais = sum(sum(_contagem_votos(item.get("votos", {}))) for item in itens)
+    decididas = sum(contagens[chave] for chave in ("aprovada", "desenvolvimento", "implementada", "rejeitada"))
+    favoraveis = contagens["aprovada"] + contagens["desenvolvimento"] + contagens["implementada"]
+    taxa = round(favoraveis * 100 / decididas) if decididas else 0
+    embed.add_field(name="🗳️ VOTOS REGISTRADOS", value=str(votos_totais), inline=True)
+    embed.add_field(name="📈 TAXA DE APROVAÇÃO", value=f"{taxa}% ({decididas} decisões)", inline=True)
 
     if filtro == "populares":
         selecionados = sorted(
@@ -475,6 +631,7 @@ class PainelAdminSugestoesView(discord.ui.View):
                 discord.SelectOption(label="Pendentes", value="pendente", emoji="⏳"),
                 discord.SelectOption(label="Em análise", value="analise", emoji="🔎"),
                 discord.SelectOption(label="Aprovadas", value="aprovada", emoji="✅"),
+                discord.SelectOption(label="Em desenvolvimento", value="desenvolvimento", emoji="🛠️"),
                 discord.SelectOption(label="Rejeitadas", value="rejeitada", emoji="❌"),
                 discord.SelectOption(label="Implementadas", value="implementada", emoji="🏆"),
             ],
@@ -507,8 +664,15 @@ class PainelAdminSugestoesView(discord.ui.View):
 
 
 class PublicacaoSugestaoView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, *, votacao_encerrada: bool = False, edicao_encerrada: bool = False):
         super().__init__(timeout=None)
+        for item in self.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            if item.custom_id in {"nemesis:sugestoes:votar:apoia", "nemesis:sugestoes:votar:nao_apoia"}:
+                item.disabled = votacao_encerrada
+            elif item.custom_id == "nemesis:sugestoes:editar":
+                item.disabled = edicao_encerrada
 
     @discord.ui.button(
         label="Apoiar",
@@ -535,14 +699,19 @@ class PublicacaoSugestaoView(discord.ui.View):
         custom_id="nemesis:sugestoes:comentar",
     )
     async def comentar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.guild_id != GUILD_NEMESIS_ID or interaction.message is None:
-            await interaction.response.send_message("Esta ação só está disponível na NÊMESIS.", ephemeral=True)
+        if interaction.message is None or interaction.user.bot:
+            await interaction.response.send_message("Esta ação só está disponível para membros da NÊMESIS.", ephemeral=True)
             return
         message_id = _chave_mensagem(interaction)
         await interaction.response.defer(ephemeral=True, thinking=True)
-        registro = await _obter_registro(message_id)
-        if not registro:
-            await interaction.followup.send("Não encontrei os dados desta sugestão.", ephemeral=True)
+        try:
+            registro = await _obter_registro(message_id)
+            if not registro or not _registro_no_canal(interaction, registro):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
+        except Exception:
+            _LOG.exception("Falha ao carregar sugestão para abrir discussão %s.", message_id)
+            await interaction.followup.send("Não foi possível carregar esta sugestão agora.", ephemeral=True)
             return
         thread = None
         if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == CANAL_SUGESTOES_ID:
@@ -571,6 +740,54 @@ class PublicacaoSugestaoView(discord.ui.View):
         await interaction.followup.send(f"Participe da discussão: {thread.mention}", ephemeral=True)
 
     @discord.ui.button(
+        label="Acompanhar",
+        emoji="🔔",
+        style=discord.ButtonStyle.secondary,
+        custom_id="nemesis:sugestoes:acompanhar",
+        row=1,
+    )
+    async def acompanhar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.message is None or interaction.user.bot:
+            await interaction.response.send_message("Acompanhar está disponível apenas para membros.", ephemeral=True)
+            return
+        message_id = _chave_mensagem(interaction)
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            registro = await _obter_registro(message_id)
+            if not registro or not _registro_no_canal(interaction, registro):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
+            seguindo = await _alternar_seguidor(message_id, interaction.user.id)
+            texto = "Você receberá atualizações desta sugestão por mensagem privada." if seguindo else "Você deixou de acompanhar esta sugestão."
+            await interaction.followup.send(texto, ephemeral=True)
+        except Exception:
+            _LOG.exception("Falha ao alterar acompanhamento da sugestão %s.", message_id)
+            await interaction.followup.send("Não foi possível alterar seu acompanhamento agora.", ephemeral=True)
+
+    @discord.ui.button(
+        label="Editar minha sugestão",
+        emoji="✏️",
+        style=discord.ButtonStyle.secondary,
+        custom_id="nemesis:sugestoes:editar",
+        row=1,
+    )
+    async def editar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.message is None or interaction.user.bot:
+            await interaction.response.send_message("Edição disponível apenas para membros.", ephemeral=True)
+            return
+        registro = await _obter_registro(_chave_mensagem(interaction))
+        if not registro or not _registro_no_canal(interaction, registro):
+            await interaction.response.send_message("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+            return
+        if int(registro.get("autor_id", 0)) != interaction.user.id:
+            await interaction.response.send_message("Somente o autor pode editar esta sugestão.", ephemeral=True)
+            return
+        if registro.get("status") not in {"pendente", "analise"}:
+            await interaction.response.send_message("Esta sugestão não pode mais ser editada após a decisão da liderança.", ephemeral=True)
+            return
+        await interaction.response.send_modal(ModalEditarSugestao(_chave_mensagem(interaction), registro))
+
+    @discord.ui.button(
         label="Gerenciar",
         emoji="⚙️",
         style=discord.ButtonStyle.danger,
@@ -580,25 +797,33 @@ class PublicacaoSugestaoView(discord.ui.View):
         if interaction.guild_id != GUILD_NEMESIS_ID or not membro_tem_lideranca(interaction.user):
             await interaction.response.send_message("Acesso restrito à liderança autorizada.", ephemeral=True)
             return
-        await interaction.response.send_message(
-            "Selecione a decisão administrativa para esta sugestão.",
-            view=MenuDecisaoSugestaoView(_chave_mensagem(interaction)),
-            ephemeral=True,
-        )
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            registro = await _obter_registro(_chave_mensagem(interaction))
+            if not registro or not _registro_no_canal(interaction, registro):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
+            await interaction.edit_original_response(
+                content="Selecione a decisão administrativa para esta sugestão.",
+                view=MenuDecisaoSugestaoView(_chave_mensagem(interaction)),
+            )
+        except Exception:
+            _LOG.exception("Falha ao abrir gestão da sugestão %s.", _chave_mensagem(interaction))
+            await interaction.edit_original_response(content="Não foi possível carregar a gestão desta sugestão.", view=None)
 
     async def _votar(self, interaction: discord.Interaction, escolha: str):
-        if interaction.guild_id != GUILD_NEMESIS_ID or interaction.message is None:
-            await interaction.response.send_message("Esta votação só está disponível na NÊMESIS.", ephemeral=True)
+        if interaction.message is None or interaction.user.bot:
+            await interaction.response.send_message("Esta votação está disponível apenas para membros.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
-        registro_atual = await _obter_registro(_chave_mensagem(interaction))
-        if not registro_atual:
-            await interaction.followup.send("Não encontrei os dados desta sugestão.", ephemeral=True)
-            return
-        if int(registro_atual.get("autor_id", 0)) == interaction.user.id:
-            await interaction.followup.send("O autor não pode votar na própria sugestão.", ephemeral=True)
-            return
         try:
+            registro_atual = await _obter_registro(_chave_mensagem(interaction))
+            if not registro_atual or not _registro_no_canal(interaction, registro_atual):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
+            if int(registro_atual.get("autor_id", 0)) == interaction.user.id:
+                await interaction.followup.send("O autor não pode votar na própria sugestão.", ephemeral=True)
+                return
             registro = await _atualizar_voto(_chave_mensagem(interaction), interaction.user.id, escolha)
             if not registro:
                 await interaction.followup.send("Não encontrei os dados desta sugestão.", ephemeral=True)
@@ -606,7 +831,13 @@ class PublicacaoSugestaoView(discord.ui.View):
             if registro.get("encerrada"):
                 await interaction.followup.send("A votação desta sugestão foi encerrada.", ephemeral=True)
                 return
-            await interaction.message.edit(embed=_embed_sugestao(registro), view=PublicacaoSugestaoView())
+            await interaction.message.edit(
+                embed=_embed_sugestao(registro),
+                view=PublicacaoSugestaoView(
+                    votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
+                    edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
+                ),
+            )
             apoios, oposicoes = _contagem_votos(registro.get("votos", {}))
             await interaction.followup.send(
                 f"Voto atualizado. 👍 **{apoios}** • 👎 **{oposicoes}**",
@@ -615,6 +846,89 @@ class PublicacaoSugestaoView(discord.ui.View):
         except Exception:
             _LOG.exception("Falha ao registrar voto na sugestão %s.", _chave_mensagem(interaction))
             await interaction.followup.send("Não foi possível atualizar seu voto agora.", ephemeral=True)
+
+
+class ModalEditarSugestao(discord.ui.Modal, title="Editar minha sugestão"):
+    titulo = discord.ui.TextInput(
+        label="Título da ideia",
+        min_length=5,
+        max_length=100,
+    )
+    descricao = discord.ui.TextInput(
+        label="Descrição atualizada",
+        style=discord.TextStyle.paragraph,
+        min_length=20,
+        max_length=1800,
+    )
+    impacto = discord.ui.TextInput(
+        label="Resultado esperado",
+        style=discord.TextStyle.paragraph,
+        min_length=10,
+        max_length=500,
+    )
+
+    def __init__(self, message_id: str, registro: dict):
+        super().__init__()
+        self.message_id = str(message_id)
+        self.titulo.default = str(registro.get("titulo", ""))[:100]
+        self.descricao.default = str(registro.get("descricao", ""))[:1800]
+        self.impacto.default = str(registro.get("impacto", ""))[:500] or "Melhorar a experiência da comunidade."
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.user.bot or not _esta_no_canal_sugestoes(interaction):
+            await interaction.response.send_message("Edição disponível apenas na Central de Sugestões.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            registro_atual = await _obter_registro(self.message_id)
+            if not registro_atual or not _registro_no_canal(interaction, registro_atual):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
+            todos_registros = await carregar(ARQUIVO_SUGESTOES, {})
+            duplicada = _encontrar_duplicada(todos_registros, str(self.titulo.value), ignorar_id=self.message_id)
+            if duplicada:
+                canal_duplicado = int(duplicada.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+                link_duplicado = f"https://discord.com/channels/{GUILD_NEMESIS_ID}/{canal_duplicado}/{duplicada.get('id')}"
+                await interaction.followup.send(
+                    f"Esse título se parece com outra proposta ativa: [abrir sugestão existente]({link_duplicado}).",
+                    ephemeral=True,
+                )
+                return
+            registro = await _editar_registro(
+                self.message_id,
+                interaction.user.id,
+                str(self.titulo.value),
+                str(self.descricao.value),
+                str(self.impacto.value),
+            )
+            if not registro:
+                await interaction.followup.send("A sugestão não existe, não pertence a você ou já saiu da fila de edição.", ephemeral=True)
+                return
+            canal_id = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+            canal = interaction.guild.get_channel(canal_id) or interaction.guild.get_thread(canal_id)
+            if canal is None:
+                canal = await interaction.guild.fetch_channel(canal_id)
+            mensagem = await canal.fetch_message(int(self.message_id))
+            await mensagem.edit(
+                embed=_embed_sugestao(registro),
+                view=PublicacaoSugestaoView(
+                    votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
+                    edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
+                ),
+            )
+            if isinstance(canal, discord.Thread) and canal.parent_id == CANAL_SUGESTOES_ID:
+                await canal.edit(name=f"💡・{registro['titulo']}"[:100], reason="Autor atualizou a própria sugestão")
+            await registrar_global(
+                interaction.guild,
+                "sugestoes",
+                "Sugestão editada pelo autor",
+                f"**{registro['titulo']}**\nAutor: {interaction.user.mention}\n[Publicação]({mensagem.jump_url})",
+                cor=COR_SUGESTOES,
+            )
+            await interaction.followup.send("Sua sugestão foi atualizada com sucesso.", ephemeral=True)
+        except Exception:
+            _LOG.exception("Falha ao editar sugestão %s.", self.message_id)
+            await interaction.followup.send("Não foi possível atualizar sua sugestão agora.", ephemeral=True)
 
 
 class MenuDecisaoSugestaoView(discord.ui.View):
@@ -630,7 +944,8 @@ class MenuDecisaoSugestaoView(discord.ui.View):
                 for chave, descricao in (
                     ("pendente", "Retornar para a fila de sugestões"),
                     ("analise", "A equipe está avaliando a proposta"),
-                    ("aprovada", "A proposta foi aprovada"),
+                    ("aprovada", "A proposta foi aprovada e aguarda execução"),
+                    ("desenvolvimento", "A equipe está trabalhando na proposta"),
                     ("rejeitada", "A proposta não será adotada"),
                     ("implementada", "A proposta já foi implementada"),
                 )
@@ -670,6 +985,10 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         try:
+            registro_existente = await _obter_registro(self.message_id)
+            if not registro_existente or not _registro_no_canal(interaction, registro_existente):
+                await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
+                return
             registro = await _atualizar_decisao(
                 self.message_id,
                 self.status,
@@ -684,7 +1003,13 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
             if canal is None:
                 canal = await interaction.guild.fetch_channel(canal_id)
             mensagem = await canal.fetch_message(int(self.message_id))
-            await mensagem.edit(embed=_embed_sugestao(registro), view=PublicacaoSugestaoView())
+            await mensagem.edit(
+                embed=_embed_sugestao(registro),
+                view=PublicacaoSugestaoView(
+                    votacao_encerrada=self.status in STATUS_TERMINAIS,
+                    edicao_encerrada=self.status not in {"pendente", "analise"},
+                ),
+            )
 
             try:
                 autor = interaction.guild.get_member(int(registro["autor_id"]))
@@ -700,6 +1025,23 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
                 )
             except (discord.Forbidden, discord.NotFound, discord.HTTPException):
                 _LOG.info("Não foi possível enviar DM ao autor da sugestão %s.", self.message_id)
+
+            seguidores = await _listar_seguidores(self.message_id)
+            for seguidor_id in seguidores:
+                if seguidor_id == int(registro["autor_id"]):
+                    continue
+                try:
+                    membro = interaction.guild.get_member(seguidor_id) or await interaction.guild.fetch_member(seguidor_id)
+                    await membro.send(
+                        embed=criar_embed(
+                            "🔔 ATUALIZAÇÃO DE SUGESTÃO ACOMPANHADA",
+                            f"**{registro['titulo']}**\nSituação: **{STATUS[self.status][0]}**\n\n{self.motivo.value}",
+                            cor=STATUS[self.status][1],
+                            rodape="NÊMESIS • CENTRAL DE SUGESTÕES",
+                        )
+                    )
+                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                    _LOG.debug("Não foi possível notificar seguidor %s da sugestão %s.", seguidor_id, self.message_id)
 
             await registrar_global(
                 interaction.guild,
