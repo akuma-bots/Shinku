@@ -628,7 +628,7 @@ class InteligenciaMissoesView(discord.ui.View):
             view=InteligenciaMissoesView(self.cog, self.owner_id, self.pagina),
         )
 
-    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             content="Central administrativa encerrada.",
@@ -833,7 +833,7 @@ class RelatoriosMissoesView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger, row=2)
+    @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger, row=2)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(content="Central de relatórios encerrada.", embed=None, view=None)
 
@@ -901,7 +901,7 @@ class AuditoriaIntegridadeView(discord.ui.View):
     async def reanalisar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._atualizar(interaction, self.pagina)
 
-    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger, row=0)
+    @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger, row=0)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             content="Auditoria de integridade encerrada.", embed=None, view=None
@@ -948,7 +948,7 @@ class HistoricoDesempenhoView(discord.ui.View):
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._navegar(interaction, 1)
 
-    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             content="Histórico encerrado.",
