@@ -327,15 +327,16 @@ from discord import app_commands
 GUILD_NEMESIS_ID = 1563995879981981817
 CARGO_ACESSO_NEMESIS_ID = 1563995879990624372
 
-# Administração: somente cargos acima de Supervisor Staff.
+# Administração: Supervisor Staff também possui permissões administrativas.
 CARGO_ELITE_ID = 1563995879995874937
 CARGO_OCTOGONO_ID = 1563995880007139425
+CARGO_SUPERVISOR_STAFF_ID = 1563995880007139422
 CARGOS_LIDERANCA_IDS = frozenset({
     CARGO_OCTOGONO_ID,
     1563995880007139424,  # Diretor Staff
     1563995880007139423,  # Vice-Diretor Staff
+    CARGO_SUPERVISOR_STAFF_ID,
 })
-CARGO_SUPERVISOR_STAFF_ID = 1563995880007139422
 CARGOS_RESERVADOS_PROGRESSAO_IDS = CARGOS_LIDERANCA_IDS | frozenset({
     CARGO_SUPERVISOR_STAFF_ID,
     CARGO_ACESSO_NEMESIS_ID,
@@ -447,7 +448,7 @@ async def verificar_hierarquia(interaction: discord.Interaction) -> bool:
 
 
 def lideranca_only():
-    """Restringe administração aos cargos acima de Supervisor Staff."""
+    """Restringe administração à liderança, incluindo Supervisor Staff."""
     return app_commands.check(verificar_lideranca)
 
 
