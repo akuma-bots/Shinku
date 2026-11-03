@@ -29,10 +29,13 @@ class TestHierarquiaNemesis(unittest.TestCase):
         self.patch_member.start()
         self.addCleanup(self.patch_member.stop)
 
-    def test_supervisor_staff_nao_e_cargo_administrativo(self):
-        membro = self._member([1563995880007139422])
-        self.assertFalse(guild_config.membro_tem_lideranca(membro))
+    def test_supervisor_staff_tem_administracao_geral_sem_poderes_hierarquicos(self):
+        membro = self._member([guild_config.CARGO_SUPERVISOR_STAFF_ID])
+        self.assertTrue(guild_config.membro_tem_lideranca(membro))
         self.assertFalse(guild_config.membro_tem_octogono(membro))
+        self.assertFalse(guild_config.membro_pode_promover_rebaixar_banir(membro))
+        self.assertFalse(guild_config.membro_pode_revisar_categoria(membro, "missao"))
+        self.assertTrue(guild_config.membro_pode_revisar_categoria(membro, "pvp"))
 
     def test_direcao_staff_tem_acesso_administrativo_sem_gerir_missoes(self):
         membro = self._member([1563995880007139424])
