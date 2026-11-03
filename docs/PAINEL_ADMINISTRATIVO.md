@@ -12,11 +12,11 @@ O Painel Administrativo Central é uma navegação privada por botões e menus, 
 ## Áreas
 
 1. **Visão geral:** estado do bot, latência, tempo ativo, efetivo, módulos, tarefas automáticas, Upstash e sincronização do Registro Global.
-2. **Membros e hierarquia:** histórico individual, alterações de cargos, progressão, entradas, convites e atividade.
+2. **Membros e hierarquia:** histórico individual, evolução, entradas, convites e atividade. As alterações de cargos aparecem na linha do tempo de cada membro; não existe uma área separada para elas.
 3. **Operações:** missões, provas, desafios competitivos, eventos, formulários, parcerias e relatórios.
 4. **Segurança:** segurança, AutoMod, moderação e decisões administrativas.
 5. **Sistemas e infraestrutura:** infraestrutura, integrações, configurações, sistemas e Roblox.
-6. **Auditoria e registros:** mensagens, atendimento, entradas, voz, anexos, conquistas, sorteios e sugestões.
+6. **Auditoria e registros:** mensagens, atendimento, histórico individual, sorteios e sugestões.
 
 Os botões de destino apontam para tópicos permanentes já existentes ou canais de sistemas existentes. A central não cria cópias de painéis nem duplica registros.
 
