@@ -180,7 +180,7 @@ class TemporadaPublicaView(discord.ui.View):
         await interaction.response.edit_message(embed=_embed_historico(interaction.guild, self.cog.bot, dados),
                                                 view=TemporadaPublicaView(self.cog, self.owner_id))
 
-    @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction, button):
         await interaction.response.edit_message(content="Consulta de temporada encerrada.", embed=None, view=None)
 
