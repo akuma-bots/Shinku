@@ -23,13 +23,13 @@ O Registro Global é o arquivo de auditoria privado da NÊMESIS. A estrutura foi
 
 Não existe mais uma área independente de histórico de cargos. Toda alteração de cargo é registrada diretamente na linha do tempo do membro relacionado, com os cargos recebidos e removidos quando esses dados estão disponíveis.
 
-## Migração segura
+## Migração única da estrutura
 
-- Os nomes antigos de categorias continuam aceitos internamente pelos sistemas, mas são direcionados à área oficial correspondente.
-- O tópico antigo é reaproveitado e renomeado quando possível.
-- Tópicos redundantes são arquivados e bloqueados, nunca apagados pela rotina de reorganização.
-- As mensagens antigas permanecem preservadas nos tópicos arquivados.
-- A reorganização não executa limpeza destrutiva nem remove registros históricos.
+- Na próxima inicialização após a implantação, o Shinku excluirá permanentemente todos os tópicos antigos deste Fórum, incluindo as mensagens dentro deles, conforme autorização expressa do responsável.
+- A exclusão é limitada ao Fórum Registro Global da NÊMESIS; o canal, outros canais e seus conteúdos não são removidos.
+- A conclusão é registrada no Upstash para impedir que reinicializações futuras repitam a exclusão.
+- Os 12 tópicos oficiais serão criados e reutilizados nas próximas inicializações.
+- Se a criação de algum tópico falhar após a exclusão, a próxima inicialização apenas completa os tópicos ausentes; não apaga os que já foram criados.
 - O Fórum continua privado e a validação de permissões permanece obrigatória.
 
 ## Critérios de auditoria
