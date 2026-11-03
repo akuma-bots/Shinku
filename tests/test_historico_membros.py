@@ -90,3 +90,36 @@ class TestTimeoutCompatibilidade(unittest.TestCase):
         from utils.historico_membros import _timeout_membro
 
         self.assertIsNone(_timeout_membro(SimpleNamespace()))
+
+
+class TestEscopoHistoricoMembros(unittest.TestCase):
+    def test_nao_consulta_mensagens_cargos_ou_conquistas_no_arquivo(self):
+        from utils.historico_membros import CATEGORIAS_HISTORICO, ABAS
+        self.assertNotIn("mensagens", CATEGORIAS_HISTORICO)
+        self.assertNotIn("administracao", CATEGORIAS_HISTORICO)
+        self.assertNotIn("eventos", CATEGORIAS_HISTORICO)
+        self.assertNotIn("conquistas", {chave for chave, *_ in ABAS})
+
+    def test_visao_geral_nao_exibe_cargos_ou_conquistas(self):
+        from types import SimpleNamespace
+        from utils.historico_membros import _embed_geral
+        membro = SimpleNamespace(
+            display_name="Membro", name="membro", id=123,
+            created_at=__import__("datetime").datetime(2026, 1, 1),
+            display_avatar=SimpleNamespace(url="https://example.com/avatar.png"),
+            bot=False,
+        )
+        dados = {
+            "membro": membro, "perfil": {}, "progressao": {},
+            "perfil_competitivo": {}, "resumo_missoes": {
+                "total": 0, "aprovadas": 0, "pendentes": 0,
+                "rejeitadas": 0, "por_tipo": {},
+            },
+            "guild": SimpleNamespace(), "membro_presente": False,
+            "punicoes": [], "eventos": [], "convidador_id": None,
+            "convidados_ativos": [], "conquistas": {},
+        }
+        embed = _embed_geral(dados)
+        texto = " ".join([embed.description or ""] + [f.name + " " + f.value for f in embed.fields])
+        self.assertNotIn("CARGOS ATUAIS", texto)
+        self.assertNotIn("Conquistas", texto)

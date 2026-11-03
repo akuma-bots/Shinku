@@ -15,7 +15,7 @@ from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, CATEGORIAS, garantir
 from utils.guild_config import membro_tem_lideranca
 from utils.historico_membros import (
     ABAS, construir_dossie, _embed_geral, _embed_missoes,
-    _embed_competitivo, _embed_conquistas, _embed_moderacao, _embed_registros,
+    _embed_competitivo, _embed_moderacao, _embed_registros,
     _timeout_membro,
 )
 
@@ -55,7 +55,7 @@ class DossieMembroRegistroView(discord.ui.View):
     async def _selecionar_aba(self, interaction: discord.Interaction):
         renderizadores = {
             "geral": _embed_geral, "missoes": _embed_missoes,
-            "competitivo": _embed_competitivo, "conquistas": _embed_conquistas,
+            "competitivo": _embed_competitivo,
             "moderacao": _embed_moderacao, "registros": _embed_registros,
         }
         chave = self.seletor.values[0]
@@ -118,7 +118,7 @@ class PainelHistoricoMembrosView(discord.ui.View):
         await interaction.response.send_message(
             embed=criar_embed(
                 "📚 CENTRAL DE HISTÓRICO INDIVIDUAL",
-                "Pesquise e selecione um integrante pelo nome na lista abaixo. O dossiê será aberto somente para você, com missões, progressão, conquistas, competitivo, moderação e linha do tempo.",
+                "Pesquise e selecione um integrante pelo nome na lista abaixo. O histórico será aberto somente para você, com identificação, missões, progressão, competitivo e moderação.",
                 cor=0x9F2035, rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
             ),
             view=SeletorMembroRegistroView(interaction.user.id),

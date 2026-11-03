@@ -26,18 +26,16 @@ ARQUIVO_REGISTRO_GLOBAL = "registro_global_topicos.json"
 
 # Categorias do Registro Global que podem conter ações ligadas a uma pessoa.
 CATEGORIAS_HISTORICO = (
-    "historico_membros", "moderacao", "seguranca", "missoes",
-    "competitivo", "eventos", "atendimento", "mensagens",
-    "administracao", "parcerias", "integracoes", "sugestoes",
+    "moderacao", "seguranca", "missoes", "competitivo",
+    "atendimento", "parcerias", "sugestoes",
 )
 
 ABAS = (
-    ("geral", "◈ Visão geral", "Resumo, identidade, cargos e indicadores."),
+    ("geral", "◈ Visão geral", "Identificação e indicadores essenciais do membro."),
     ("missoes", "🎯 Missões e atividades", "Provas, contribuições, aprovações e recusas."),
     ("competitivo", "⚔️ Competitivo", "XP, progressão, guerras e estatísticas de combate."),
-    ("conquistas", "🏅 Conquistas", "Marcos desbloqueados e distinções de temporada."),
     ("moderacao", "🛡️ Moderação", "Punições registradas e ocorrências de segurança."),
-    ("registros", "📚 Linha do tempo", "Eventos registrados nos sistemas da NÊMESIS."),
+    ("registros", "📚 Linha do tempo", "Eventos relevantes registrados nos sistemas da NÊMESIS."),
 )
 
 
@@ -253,9 +251,6 @@ def _embed_geral(d: dict) -> discord.Embed:
     embed.add_field(name="◈ IDENTIDADE DISCORD", value=f"**Usuário:** `{membro.name}`\n**ID:** `{membro.id}`\n**Conta criada:** {criado}\n**Entrada no servidor:** {entrada}", inline=False)
 
     if isinstance(membro, discord.Member):
-        cargos = [cargo.mention for cargo in reversed(membro.roles) if cargo != guild.default_role]
-        cargos_texto = " · ".join(cargos) if cargos else "Nenhum cargo além de @everyone."
-        embed.add_field(name=f"◈ CARGOS ATUAIS ({len(cargos)})", value=cargos_texto[:1024], inline=False)
         estado = str(getattr(membro, "status", "indisponível")).replace("dnd", "Não perturbe").replace("online", "Online").replace("idle", "Ausente").replace("offline", "Offline")
         embed.add_field(name="◈ ESTADO", value=f"**Presença:** {estado}\n**Bot:** {'Sim' if membro.bot else 'Não'}\n**Timeout:** {discord.utils.format_dt(_timeout_membro(membro), style='R') if _timeout_membro(membro) else 'Não'}", inline=True)
 
@@ -269,7 +264,7 @@ def _embed_geral(d: dict) -> discord.Embed:
     rank_nome = ranks.get(_inteiro(rank_no, -1), "Não definido")
     embed.add_field(name="◈ PROGRESSÃO ORGANIZACIONAL", value=f"**Rank:** {rank_nome}\n**XP:** {xp_org:,}\n**Mensagens válidas:** {_inteiro(progressao.get('mensagens')):,}\n**Missões aprovadas:** {_inteiro(progressao.get('missoes'))}\n**Guerras registradas:** {_inteiro(progressao.get('guerras'))}".replace(",", "."), inline=True)
     embed.add_field(name="◈ ATIVIDADE COMPETITIVA", value=f"**Vitórias:** {_inteiro(perfil.get('vitorias'))}\n**Derrotas:** {_inteiro(perfil.get('derrotas'))}\n**Empates:** {_inteiro(perfil.get('empates'))}\n**Kills / Deaths:** {_inteiro(perfil.get('kills'))} / {_inteiro(perfil.get('deaths'))}\n**MVPs:** {_inteiro(perfil.get('mvps'))}", inline=True)
-    embed.add_field(name="◈ PARTICIPAÇÃO NA NÊMESIS", value=f"**Provas vinculadas:** {resumo['total']}\n**Aprovadas:** {resumo['aprovadas']} · **Pendentes:** {resumo['pendentes']} · **Recusadas:** {resumo['rejeitadas']}\n**Conquistas:** {len(d['conquistas'])}\n**Punições registradas:** {len(d['punicoes'])}\n**Eventos localizados:** {len(d['eventos'])}", inline=False)
+    embed.add_field(name="◈ PARTICIPAÇÃO NA NÊMESIS", value=f"**Provas vinculadas:** {resumo['total']}\n**Aprovadas:** {resumo['aprovadas']} · **Pendentes:** {resumo['pendentes']} · **Recusadas:** {resumo['rejeitadas']}\n**Punições registradas:** {len(d['punicoes'])}\n**Registros relevantes:** {len(d['eventos'])}", inline=False)
     embed.add_field(name="◈ RECRUTAMENTO", value=(f"**Convidado por:** <@{d['convidador_id']}>" if d["convidador_id"] else "**Convidador:** Não identificado") + f"\n**Convidados ativos atribuídos:** {len(d['convidados_ativos'])}", inline=True)
     embed.add_field(name="◈ REGISTRO DE DADOS", value="As informações são consolidadas dos sistemas e registros atualmente disponíveis. Um campo sem registro não significa que a ação nunca ocorreu.", inline=False)
     return embed

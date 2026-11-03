@@ -42,7 +42,9 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
 
     def test_categorias_legadas_apontam_para_areas_oficiais(self):
         self.assertNotIn("cargos", registro_global.CATEGORIAS)
-        self.assertEqual(registro_global.normalizar_categoria("cargos"), "historico_membros")
+        self.assertEqual(registro_global.normalizar_categoria("cargos"), "administracao")
+        self.assertEqual(registro_global.normalizar_categoria("conquistas"), "eventos")
+        self.assertEqual(registro_global.normalizar_categoria("progressao"), "competitivo")
         self.assertEqual(registro_global.normalizar_categoria("automod"), "seguranca")
         self.assertEqual(registro_global.normalizar_categoria("anexos"), "mensagens")
         self.assertEqual(registro_global.normalizar_categoria("operacoes"), "missoes")
@@ -95,6 +97,16 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         guild = Mock()
         guild.id = 123
         self.assertEqual(await registro_global.garantir_topicos(guild), {})
+
+    async def test_arquivo_de_membros_nao_recebe_registros_automaticos(self):
+        guild = Mock()
+        guild.id = registro_global.GUILD_NEMESIS_ID
+        with patch.object(registro_global, "_obter_topico", new=AsyncMock()) as obter:
+            resultado = await registro_global.registrar(
+                guild, "historico_membros", "Mensagem editada", "conteúdo",
+            )
+        self.assertFalse(resultado)
+        obter.assert_not_awaited()
 
     async def test_recusa_categoria_desconhecida(self):
         forum = Mock()

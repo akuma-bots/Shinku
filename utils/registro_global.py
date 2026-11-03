@@ -31,7 +31,7 @@ CARGOS_ACESSO_IDS = {
 # Os nomes antigos continuam aceitos pelos cogs durante a migração.
 CATEGORIAS = {
     "administracao": ("👑・Central de Administração", "Decisões administrativas, permissões, configurações e diretrizes oficiais da NÊMESIS."),
-    "historico_membros": ("👥・Arquivo de Membros", "Linha do tempo individual: entradas, saídas, cargos, convites, XP, voz, conquistas e ocorrências relacionadas."),
+    "historico_membros": ("👥・Arquivo de Membros", "Área exclusiva para consultar o histórico individual dos membros. Não recebe registros automáticos."),
     "moderacao": ("⚖️・Tribunal de Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
     "seguranca": ("🛡️・Muralha de Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
     "missoes": ("🎯・Operações e Missões", "Missões, operações, formulários, relatórios, atribuições, provas, validações, conclusões e recompensas."),
@@ -74,20 +74,20 @@ ALIASES_CATEGORIAS = {
     "infraestrutura": "integracoes",
     "sorteios": "eventos",
     "automod": "seguranca",
-    "cargos": "historico_membros",
+    "cargos": "administracao",
     "competicoes": "competitivo",
     "configuracoes": "administracao",
-    "conquistas": "historico_membros",
-    "convites": "historico_membros",
-    "entradas": "historico_membros",
+    "conquistas": "eventos",
+    "convites": "administracao",
+    "entradas": "administracao",
     "formularios": "missoes",
-    "membros": "historico_membros",
-    "progressao": "historico_membros",
+    "membros": "administracao",
+    "progressao": "competitivo",
     "relatorios": "missoes",
     "roblox": "integracoes",
     "sistemas": "integracoes",
-    "atividade": "historico_membros",
-    "voz": "historico_membros",
+    "atividade": "administracao",
+    "voz": "administracao",
 }
 
 
@@ -538,6 +538,11 @@ async def registrar(
     if guild.id != GUILD_NEMESIS_ID:
         return False
     categoria = normalizar_categoria(categoria)
+    # Este tópico é somente a central fixa do botão de consulta individual.
+    # Nenhum evento automático deve ser publicado nele.
+    if categoria == "historico_membros":
+        _LOG.info("Registro ignorado: Arquivo de Membros é exclusivo para consulta individual.")
+        return False
     if categoria not in CATEGORIAS:
         _LOG.error("Categoria de registro desconhecida: %s", categoria)
         return False
