@@ -26,11 +26,9 @@ ARQUIVO_REGISTRO_GLOBAL = "registro_global_topicos.json"
 
 # Categorias do Registro Global que podem conter ações ligadas a uma pessoa.
 CATEGORIAS_HISTORICO = (
-    "historico_membros", "membros", "moderacao", "automod", "entradas",
-    "cargos", "convites", "progressao", "missoes", "competicoes",
-    "eventos", "conquistas", "sorteios", "atendimento", "voz",
-    "atividade", "anexos", "formularios", "parcerias", "roblox",
-    "relatorios", "sugestoes",
+    "historico_membros", "moderacao", "seguranca", "missoes",
+    "competitivo", "eventos", "sorteios", "atendimento",
+    "mensagens", "operacoes", "parcerias", "integracoes", "sugestoes",
 )
 
 ABAS = (
