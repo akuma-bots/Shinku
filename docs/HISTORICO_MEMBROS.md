@@ -2,9 +2,9 @@
 
 ## Acesso pelo Registro Global
 
-Não existe comando para abrir o histórico individual. A consulta fica integrada ao tópico permanente **Histórico de membros**, dentro do Fórum privado do Registro Global.
+Não existe comando para abrir o histórico individual. A consulta fica integrada ao tópico permanente **👥・Arquivo de Membros**, dentro do Fórum privado do Registro Global.
 
-1. Abra o tópico **Histórico de membros**.
+1. Abra o tópico **👥・Arquivo de Membros**.
 2. Clique em **Consultar histórico de membro** no cabeçalho do tópico.
 3. Pesquise pelo nome e selecione a pessoa no seletor nativo do Discord.
 4. Navegue pelas seções do dossiê no menu privado.
@@ -31,7 +31,7 @@ O painel é atualizado automaticamente pelo Shinku quando o Registro Global é i
 - competitivo.json
 - Tópicos privados do Registro Global.
 
-A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (13 áreas consolidadas). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem desse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
+A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (12 áreas oficiais). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem desse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
 
 ## Privacidade e segurança
 
