@@ -1,17 +1,15 @@
 # Central de Histórico Individual — NÊMESIS
 
-## Comando
+## Acesso pelo Registro Global
 
-`/historico membro:<nome, usuário ou ID Discord>`
+Não existe comando para abrir o histórico individual. A consulta fica integrada ao tópico permanente **NÊMESIS V3・18・Histórico Membros**, dentro do Fórum privado do Registro Global.
 
-O comando abre um dossiê privado e interativo do membro. A consulta é restrita à liderança autorizada da NÊMESIS, incluindo Supervisor Staff, respeitando a matriz administrativa central.
+1. Abra o tópico **Histórico Membros**.
+2. Clique em **Consultar histórico de membro** no cabeçalho do tópico.
+3. Pesquise pelo nome e selecione a pessoa no seletor nativo do Discord.
+4. Navegue pelas seções do dossiê no menu privado.
 
-## Pesquisa e seleção
-
-- O campo aceita ID numérico, nome de exibição, nome de usuário ou parte do nome.
-- A lista de autocomplete sugere membros do servidor.
-- Se houver mais de uma correspondência, o bot apresenta um seletor com nome e ID para evitar abrir a ficha errada.
-- Um ID também pode localizar uma conta que já saiu do servidor, desde que o Discord ainda permita resolver a conta. Nesses casos, os dados atuais de cargos e entrada não estão disponíveis, mas os registros persistidos continuam sendo consultados.
+O painel é atualizado automaticamente pelo Shinku quando o Registro Global é inicializado. O botão é persistente e continua disponível após reinicializações.
 
 ## Seções do dossiê
 
@@ -24,23 +22,23 @@ O comando abre um dossiê privado e interativo do membro. A consulta é restrita
 
 ## Fontes consultadas
 
-- `perfis.json` e `progressao_gangue.json`
-- `revisoes.json`
-- `conquistas.json`
-- `temporadas_missoes.json`
-- `punicoes.json`
-- `convites_nemesis.json`
-- `competitivo.json`
+- perfis.json e progressao_gangue.json
+- revisoes.json
+- conquistas.json
+- temporadas_missoes.json
+- punicoes.json
+- convites_nemesis.json
+- competitivo.json
 - Tópicos privados do Registro Global.
 
-A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (22 categorias). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não ficam limitados a esse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
+A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (22 categorias). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem desse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
 
 ## Privacidade e segurança
 
-- A resposta é efêmera: somente quem executou o comando vê o dossiê.
-- Acesso verificado pela função central `membro_tem_lideranca()`; não depende de `Administrator` ou `Manage Guild` genéricos.
-- Os menus interativos verificam novamente o usuário e a liderança em cada interação.
-- O comando é exclusivo do servidor oficial da NÊMESIS.
+- A consulta e o dossiê são efêmeros/privados; somente quem iniciou a consulta vê os dados.
+- Acesso verificado pela função central membro_tem_lideranca(); não depende de Administrator ou Manage Guild genéricos.
+- O botão, o seletor e o menu de navegação verificam novamente o usuário e a liderança em cada interação.
+- O painel é exclusivo do servidor oficial da NÊMESIS.
 - A consulta não altera dados, cargos, punições ou histórico.
 
 ## Limites conhecidos
