@@ -9,10 +9,9 @@ from datetime import datetime, timezone
 import discord
 
 from utils.storage import carregar
+from utils import monitoramento_membros
 from utils.perfis import get_perfil
 from utils import revisoes as revisoes_storage
-from utils import conquistas as conquistas_storage
-from utils import temporadas_missoes as temporadas_storage
 from utils import punicoes as punicoes_storage
 from utils.competitivo_sync import ARQUIVO_COMPETITIVO
 from utils.apresentacao import criar_embed
@@ -35,6 +34,8 @@ ABAS = (
     ("missoes", "🎯 Missões e atividades", "Provas, contribuições, aprovações e recusas."),
     ("competitivo", "⚔️ Competitivo", "XP, progressão, guerras e estatísticas de combate."),
     ("moderacao", "🛡️ Moderação", "Punições registradas e ocorrências de segurança."),
+    ("mensagens", "💬 Mensagens", "Mensagens enviadas, editadas e excluídas nos últimos 30 dias."),
+    ("atividade", "◷ Monitoramento", "Entradas, saídas, voz e alterações relevantes do membro."),
     ("registros", "📚 Linha do tempo", "Eventos relevantes registrados nos sistemas da NÊMESIS."),
 )
 
@@ -165,12 +166,11 @@ async def construir_dossie(guild: discord.Guild, membro: discord.abc.User) -> di
         get_perfil(guild.id, uid),
         _ler_documento(ARQUIVO_PROGRESSAO, {}),
         revisoes_storage.listar(guild.id),
-        conquistas_storage.listar_desbloqueadas(guild.id, uid),
-        temporadas_storage.listar_recompensas_usuario(guild.id, uid, limite=50),
         punicoes_storage.historico_punicoes(guild.id, uid, limite=100),
         _ler_documento(ARQUIVO_CONVITES, {}),
         _ler_documento(ARQUIVO_COMPETITIVO, {"perfis": {}}),
         _buscar_eventos_forum(guild, uid),
+        monitoramento_membros.consultar(guild.id, uid),
         return_exceptions=True,
     )
 
@@ -184,12 +184,11 @@ async def construir_dossie(guild: discord.Guild, membro: discord.abc.User) -> di
     perfil = valor(0, {})
     progressao_doc = valor(1, {})
     revisoes = valor(2, [])
-    conquistas = valor(3, {})
-    temporadas = valor(4, [])
-    punicoes = valor(5, [])
-    convites = valor(6, {})
-    competitivo = valor(7, {"perfis": {}})
-    eventos = valor(8, [])
+    punicoes = valor(3, [])
+    convites = valor(4, {})
+    competitivo = valor(5, {"perfis": {}})
+    eventos = valor(6, [])
+    atividade = valor(7, {"mensagens": [], "eventos": []})
 
     progressao_guild = progressao_doc.get(str(guild.id), {}) if isinstance(progressao_doc, dict) else {}
     membros_progressao = progressao_guild.get("membros", {}) if isinstance(progressao_guild, dict) else {}
@@ -214,12 +213,11 @@ async def construir_dossie(guild: discord.Guild, membro: discord.abc.User) -> di
         "perfil_competitivo": perfil_competitivo if isinstance(perfil_competitivo, dict) else {},
         "revisoes": revisoes_membro,
         "resumo_missoes": resumo_missoes,
-        "conquistas": conquistas if isinstance(conquistas, dict) else {},
-        "temporadas": temporadas if isinstance(temporadas, list) else [],
         "punicoes": punicoes if isinstance(punicoes, list) else [],
         "convidador_id": convidador_id,
         "convidados_ativos": convidados_ativos if isinstance(convidados_ativos, list) else [],
         "eventos": eventos if isinstance(eventos, list) else [],
+        "atividade": atividade if isinstance(atividade, dict) else {"mensagens": [], "eventos": []},
         "membro_presente": isinstance(membro, discord.Member),
     }
 
@@ -337,6 +335,60 @@ def _embed_moderacao(d: dict) -> discord.Embed:
     return embed
 
 
+def _embed_mensagens(d: dict, pagina: int = 0) -> discord.Embed:
+    mensagens = sorted(d.get("atividade", {}).get("mensagens", []), key=lambda x: _timestamp(x.get("timestamp")), reverse=True)
+    por_pagina = 6
+    total = len(mensagens)
+    paginas = max(1, (total + por_pagina - 1) // por_pagina)
+    pagina = max(0, min(int(pagina), paginas - 1))
+    inicio = pagina * por_pagina
+    embed = criar_embed(
+        "💬 NÊMESIS — HISTÓRICO DE MENSAGENS",
+        f"Mensagens registradas nos últimos 30 dias (limite de 500) · {total} registro(s) · Página {pagina + 1}/{paginas}.",
+        cor=0x9F2035,
+    )
+    for item in mensagens[inicio:inicio + por_pagina]:
+        status = str(item.get("status", "enviada"))
+        selo = {"excluida": "🗑️ EXCLUÍDA", "editada": "✏️ EDITADA"}.get(status, "🟢 ENVIADA")
+        conteudo = discord.utils.escape_mentions(discord.utils.escape_markdown(str(item.get("conteudo") or "[mensagem sem texto]")[:650]))
+        canal_id = item.get("canal_id")
+        canal = f" <#{canal_id}>" if canal_id else " canal não identificado"
+        data = _data(_timestamp(item.get("timestamp")))
+        revisoes = item.get("revisoes", [])
+        detalhe = ""
+        if revisoes:
+            anterior = str(revisoes[-1].get("conteudo", ""))[:220]
+            anterior = discord.utils.escape_mentions(discord.utils.escape_markdown(anterior))
+            detalhe = f"\n**Versão anterior:** {anterior or '[vazia]'}"
+        if status == "excluida":
+            detalhe += f"\n**Excluída em:** {_data(_timestamp(item.get('excluida_em')))}"
+        anexos = item.get("anexos", [])
+        if anexos:
+            detalhe += "\n**Anexos:** " + ", ".join(str(a.get("nome", "arquivo"))[:60] for a in anexos[:4])
+        valor = f"{conteudo}{detalhe}"
+        if item.get("url"):
+            valor += f"\n[Abrir mensagem no Discord]({item['url']})"
+        embed.add_field(name=f"{selo} · {data}{canal}", value=valor[:1024], inline=False)
+    if not mensagens:
+        embed.description += "\n\nNenhuma mensagem foi capturada ainda. O monitoramento começa após a implantação; mensagens antigas não podem ser recuperadas pelo Discord."
+    embed.set_footer(text="NÊMESIS • Até 500 mensagens / 30 dias • Consulta restrita à liderança")
+    return embed
+
+
+def _embed_atividade(d: dict) -> discord.Embed:
+    eventos = sorted(d.get("atividade", {}).get("eventos", []), key=lambda x: _timestamp(x.get("timestamp")), reverse=True)
+    embed = criar_embed("◷ NÊMESIS — MONITORAMENTO DE ATIVIDADE", f"Eventos individuais capturados nos últimos 30 dias · {len(eventos)} registro(s).", cor=0x9F2035)
+    linhas = []
+    for item in eventos[:18]:
+        tipo = discord.utils.escape_markdown(str(item.get("tipo", "atividade")).replace("_", " ").title())
+        descricao = discord.utils.escape_mentions(discord.utils.escape_markdown(str(item.get("descricao", ""))[:180]))
+        linhas.append(f"• **{tipo}** · {_data(_timestamp(item.get('timestamp')))}\n↳ {descricao}")
+    embed.add_field(name="◈ ATIVIDADES RECENTES", value="\n\n".join(linhas)[:4000] if linhas else "Nenhum evento de atividade foi capturado ainda.", inline=False)
+    embed.add_field(name="◈ COBERTURA", value="Entradas e saídas do servidor, alterações de apelido, ações de moderação e movimentações em canais de voz. O Discord não fornece um registro completo de tudo o que um usuário faz fora do servidor.", inline=False)
+    embed.set_footer(text="NÊMESIS • Retenção de 30 dias • Consulta restrita à liderança")
+    return embed
+
+
 def _embed_registros(d: dict) -> discord.Embed:
     eventos = d["eventos"]
     embed = criar_embed("📚 NÊMESIS — LINHA DO TEMPO INDIVIDUAL", "Eventos localizados nos tópicos privados do Registro Global.", cor=0x9F2035)
@@ -363,7 +415,7 @@ def _embed_registros(d: dict) -> discord.Embed:
             blocos.append(atual)
         for indice, bloco in enumerate(blocos[:4], start=1):
             embed.add_field(name=f"◈ EVENTOS LOCALIZADOS · {indice}/{min(len(blocos), 4)}", value=bloco[:1024], inline=False)
-    embed.add_field(name="◈ COBERTURA DA CONSULTA", value=f"Foram consultadas até 40 mensagens recentes em cada uma das {len(CATEGORIAS_HISTORICO)} categorias individuais configuradas. Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem deste limite.", inline=False)
+    embed.add_field(name="◈ COBERTURA DA CONSULTA", value=f"Foram consultadas até 40 mensagens recentes em cada uma das {len(CATEGORIAS_HISTORICO)} categorias individuais configuradas. Os bancos de missões, punições e progressão são consultados separadamente e não dependem deste limite.", inline=False)
     embed.set_footer(text="NÊMESIS • Linha do tempo baseada nos registros efetivamente disponíveis")
     return embed
 

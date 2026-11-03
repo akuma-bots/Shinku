@@ -123,3 +123,74 @@ class TestEscopoHistoricoMembros(unittest.TestCase):
         texto = " ".join([embed.description or ""] + [f.name + " " + f.value for f in embed.fields])
         self.assertNotIn("CARGOS ATUAIS", texto)
         self.assertNotIn("Conquistas", texto)
+
+
+class TestMensagensEMonitoramento(unittest.TestCase):
+    def test_embed_mensagens_mostra_status_e_versao_anterior(self):
+        from utils.historico_membros import _embed_mensagens
+        dados = {"atividade": {"mensagens": [{
+            "message_id": "123", "canal_id": 456, "timestamp": 1_700_000_000,
+            "conteudo": "texto atual", "status": "excluida",
+            "excluida_em": 1_700_000_100,
+            "revisoes": [{"conteudo": "texto anterior", "timestamp": 1_700_000_050}],
+            "anexos": [],
+        }]}}
+        embed = _embed_mensagens(dados)
+        texto = " ".join([embed.description or ""] + [f"{f.name} {f.value}" for f in embed.fields])
+        self.assertIn("EXCLUÍDA", texto)
+        self.assertIn("texto atual", texto)
+        self.assertIn("texto anterior", texto)
+
+    def test_abas_incluem_mensagens_e_monitoramento_sem_cargos_ou_conquistas(self):
+        from utils.historico_membros import ABAS
+        chaves = {chave for chave, *_ in ABAS}
+        self.assertIn("mensagens", chaves)
+        self.assertIn("atividade", chaves)
+        self.assertNotIn("conquistas", chaves)
+        self.assertNotIn("cargos", chaves)
+
+
+class TestPersistenciaMonitoramento(unittest.IsolatedAsyncioTestCase):
+    async def test_mensagem_editada_e_excluida_preserva_conteudo_e_revisao(self):
+        from unittest.mock import patch, AsyncMock
+        from utils import monitoramento_membros as monitor
+        estado = {}
+
+        async def atualizar(nome, padrao, transformador):
+            atual = estado.get(nome, padrao)
+            estado[nome] = transformador(atual)
+            return estado[nome]
+
+        with patch.object(monitor, "atualizar_json", new=AsyncMock(side_effect=atualizar)), patch.object(monitor, "salvar_com_expiracao", new=AsyncMock()):
+            await monitor.registrar_mensagem(1, 2, {
+                "message_id": "99", "canal_id": 3, "timestamp": 1_800_000_000,
+                "conteudo": "original", "status": "enviada",
+            })
+            await monitor.registrar_mensagem(1, 2, {
+                "message_id": "99", "canal_id": 3, "timestamp": 1_800_000_000,
+                "conteudo": "editada", "status": "editada",
+            })
+            await monitor.registrar_mensagem(1, 2, {
+                "message_id": "99", "canal_id": 3, "timestamp": 1_800_000_000,
+                "conteudo": "editada", "status": "excluida", "excluida_em": 1_800_000_100,
+            })
+        item = estado[monitor._arquivo(1, 2)]["mensagens"][0]
+        self.assertEqual(item["conteudo"], "editada")
+        self.assertEqual(item["status"], "excluida")
+        self.assertEqual(item["revisoes"][0]["conteudo"], "original")
+        self.assertEqual(item["excluida_em"], 1_800_000_100)
+
+    async def test_eventos_sao_deduplicados(self):
+        from unittest.mock import patch, AsyncMock
+        from utils import monitoramento_membros as monitor
+        estado = {}
+
+        async def atualizar(nome, padrao, transformador):
+            atual = estado.get(nome, padrao)
+            estado[nome] = transformador(atual)
+            return estado[nome]
+
+        with patch.object(monitor, "atualizar_json", new=AsyncMock(side_effect=atualizar)), patch.object(monitor, "definir_expiracao", new=AsyncMock()):
+            await monitor.registrar_evento(1, 2, "voz_entrada", "Entrou", timestamp=1_800_000_000)
+            await monitor.registrar_evento(1, 2, "voz_entrada", "Entrou", timestamp=1_800_000_000)
+        self.assertEqual(len(estado[monitor._arquivo(1, 2)]["eventos"]), 1)

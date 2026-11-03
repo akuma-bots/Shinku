@@ -83,6 +83,58 @@ class TestSistemaDM(unittest.IsolatedAsyncioTestCase):
 
 
 class TestSistemaLogs(unittest.IsolatedAsyncioTestCase):
+    async def test_exclusao_bruta_usa_cache_quando_indice_ainda_nao_foi_criado(self):
+        from datetime import datetime, timezone
+        bot = Mock()
+        cog = Logs(bot)
+        autor = Mock(bot=False, id=321)
+        mensagem = Mock(
+            author=autor, id=987, created_at=datetime(2026, 11, 3, tzinfo=timezone.utc),
+            content="apagada rapidamente", attachments=[], guild=Mock(id=1563995879981981817),
+        )
+        payload = Mock(guild_id=1563995879981981817, message_id=987, channel_id=654, cached_message=mensagem)
+        with patch("cogs.logs.monitoramento_membros.buscar_mensagem", new_callable=AsyncMock, return_value=None), patch(
+            "cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock
+        ) as registrar:
+            await cog.on_raw_message_delete(payload)
+        registrar.assert_awaited_once()
+        self.assertEqual(registrar.await_args.args[1], 321)
+        self.assertEqual(registrar.await_args.args[2]["conteudo"], "apagada rapidamente")
+        self.assertEqual(registrar.await_args.args[2]["status"], "excluida")
+
+    async def test_exclusao_bruta_atualiza_historico_mesmo_sem_cache(self):
+        bot = Mock()
+        cog = Logs(bot)
+        payload = Mock(guild_id=1563995879981981817, message_id=987, channel_id=654)
+        with patch("cogs.logs.monitoramento_membros.buscar_mensagem", new_callable=AsyncMock, return_value={
+            "user_id": 321, "channel_id": 654, "timestamp": 1_800_000_000,
+        }), patch("cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock) as registrar:
+            await cog.on_raw_message_delete(payload)
+        registrar.assert_awaited_once()
+        self.assertEqual(registrar.await_args.args[1], 321)
+        self.assertEqual(registrar.await_args.args[2]["status"], "excluida")
+
+    async def test_mensagem_comum_e_persistida_no_historico_individual(self):
+        from datetime import datetime, timezone
+        bot = Mock()
+        cog = Logs(bot)
+        message = Mock()
+        message.guild = Mock(id=1563995879981981817)
+        message.author = Mock(bot=False, id=321)
+        message.channel = Mock(id=654)
+        message.created_at = datetime(2026, 11, 3, tzinfo=timezone.utc)
+        message.content = "mensagem de teste"
+        message.id = 987
+        message.jump_url = "https://discord.com/channels/1/654/987"
+        message.attachments = []
+        with patch("cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock) as registrar:
+            await cog.on_message(message)
+        registrar.assert_awaited_once()
+        registro = registrar.await_args.args[2]
+        self.assertEqual(registro["conteudo"], "mensagem de teste")
+        self.assertEqual(registro["status"], "enviada")
+        self.assertEqual(registro["message_id"], "987")
+
     async def test_edicao_apenas_de_anexos_fica_registrada(self):
         bot = Mock()
         cog = Logs(bot)
@@ -98,9 +150,13 @@ class TestSistemaLogs(unittest.IsolatedAsyncioTestCase):
         antes = Mock()
         antes.author = autor
         antes.guild = Mock()
+        antes.guild.id = 1563995879981981817
         antes.channel = canal_origem
         antes.content = "mesma mensagem"
         antes.id = 321
+        from datetime import datetime, timezone
+        antes.created_at = datetime(2026, 11, 3, tzinfo=timezone.utc)
+        antes.jump_url = "https://discord.com/channels/1/10/321"
         antes.attachments = [Mock(filename="antigo.png", url="https://example.com/antigo.png")]
         depois = Mock()
         depois.author = autor
@@ -108,6 +164,8 @@ class TestSistemaLogs(unittest.IsolatedAsyncioTestCase):
         depois.channel = canal_origem
         depois.content = "mesma mensagem"
         depois.id = 321
+        depois.created_at = antes.created_at
+        depois.jump_url = antes.jump_url
         depois.attachments = [Mock(filename="novo.png", url="https://example.com/novo.png")]
 
         with patch.object(cog, "_canal_logs", new_callable=AsyncMock, return_value=canal_logs):

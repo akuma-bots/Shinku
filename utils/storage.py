@@ -459,6 +459,29 @@ async def atualizar_json(
         return novo
 
 
+async def salvar_com_expiracao(nome_arquivo: str, dados, segundos: int) -> None:
+    """Salva um documento e aplica TTL na mesma operação Redis."""
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise ErroStorage("Configuração parcial do Upstash: configure URL e token juntos.")
+    ttl = max(1, int(segundos))
+    if USANDO_UPSTASH:
+        conteudo = json.dumps(dados, ensure_ascii=False, separators=(",", ":"))
+        await _comando_redis("SET", _chave_bot(nome_arquivo), conteudo, "EX", ttl)
+        return
+    _salvar_local(nome_arquivo, dados)
+
+
+async def definir_expiracao(nome_arquivo: str, segundos: int) -> bool:
+    """Define TTL de uma chave privada do bot no Redis/Upstash."""
+    if UPSTASH_CONFIG_INCOMPLETA:
+        raise ErroStorage("Configuração parcial do Upstash: configure URL e token juntos.")
+    if not USANDO_UPSTASH:
+        return False
+    ttl = max(1, int(segundos))
+    resultado = await _comando_redis("EXPIRE", _chave_bot(nome_arquivo), ttl)
+    return str(resultado) == "1"
+
+
 # =========================================================
 # VERIFICAÇÃO DO ARMAZENAMENTO PRIVADO
 # =========================================================

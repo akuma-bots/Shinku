@@ -11,6 +11,7 @@ from utils.guia_servidores import (
     TAG_ORG_NEMESIS,
 )
 from utils.storage import carregar
+from utils import monitoramento_membros
 from utils.registro_global import CANAL_REGISTRO_GLOBAL_ID, CATEGORIAS, garantir_topicos, registrar as registrar_global
 from utils.guild_config import membro_tem_lideranca
 from utils.historico_membros import (
@@ -41,10 +42,60 @@ class DossieMembroRegistroView(discord.ui.View):
         super().__init__(timeout=300)
         self.dossie = dossie
         self.owner_id = owner_id
+        self.pagina_mensagens = 0
+        self.aba_atual = "geral"
         opcoes = [discord.SelectOption(label=label, value=chave, description=descricao[:100], default=(chave == "geral")) for chave, label, descricao in ABAS]
         self.seletor = discord.ui.Select(placeholder="Escolha o que deseja consultar", min_values=1, max_values=1, options=opcoes, custom_id="nemesis:registro:membro:aba")
         self.seletor.callback = self._selecionar_aba
         self.add_item(self.seletor)
+
+    @discord.ui.button(label="Atualizar dados", emoji="🔄", style=discord.ButtonStyle.primary, row=1)
+    async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        try:
+            self.dossie = await construir_dossie(self.dossie["guild"], self.dossie["membro"])
+            chave = self.aba_atual
+            from utils.historico_membros import _embed_mensagens, _embed_atividade
+            if chave == "mensagens":
+                embed = _embed_mensagens(self.dossie, self.pagina_mensagens)
+            elif chave == "atividade":
+                embed = _embed_atividade(self.dossie)
+            else:
+                renderizadores = {
+                    "geral": _embed_geral, "missoes": _embed_missoes,
+                    "competitivo": _embed_competitivo, "moderacao": _embed_moderacao,
+                    "registros": _embed_registros,
+                }
+                embed = renderizadores.get(chave, _embed_geral)(self.dossie)
+            mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
+            paginas = max(1, (len(mensagens) + 5) // 6)
+            self.pagina_mensagens = min(self.pagina_mensagens, paginas - 1)
+            self.anterior.disabled = chave != "mensagens" or self.pagina_mensagens <= 0
+            self.proxima.disabled = chave != "mensagens" or self.pagina_mensagens >= paginas - 1
+            await interaction.edit_original_response(embed=embed, view=self)
+        except Exception:
+            logger.exception("Falha ao atualizar dossiê individual.")
+            await interaction.edit_original_response(content="Não foi possível atualizar os dados agora.", embed=None, view=self)
+
+    @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=1, disabled=True)
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.pagina_mensagens = max(0, self.pagina_mensagens - 1)
+        await self._atualizar_mensagens(interaction)
+
+    @discord.ui.button(label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary, row=1, disabled=True)
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
+        paginas = max(1, (len(mensagens) + 5) // 6)
+        self.pagina_mensagens = min(paginas - 1, self.pagina_mensagens + 1)
+        await self._atualizar_mensagens(interaction)
+
+    async def _atualizar_mensagens(self, interaction: discord.Interaction):
+        from utils.historico_membros import _embed_mensagens
+        mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
+        paginas = max(1, (len(mensagens) + 5) // 6)
+        self.anterior.disabled = self.pagina_mensagens <= 0
+        self.proxima.disabled = self.pagina_mensagens >= paginas - 1
+        await interaction.response.edit_message(embed=_embed_mensagens(self.dossie, self.pagina_mensagens), view=self)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id or not _usuario_pode_consultar_historico(interaction):
@@ -56,12 +107,23 @@ class DossieMembroRegistroView(discord.ui.View):
         renderizadores = {
             "geral": _embed_geral, "missoes": _embed_missoes,
             "competitivo": _embed_competitivo,
-            "moderacao": _embed_moderacao, "registros": _embed_registros,
+            "moderacao": _embed_moderacao, "mensagens": None,
+            "atividade": None, "registros": _embed_registros,
         }
+        from utils.historico_membros import _embed_mensagens, _embed_atividade
         chave = self.seletor.values[0]
-        embed = renderizadores.get(chave, _embed_geral)(self.dossie)
+        self.aba_atual = chave
+        self.pagina_mensagens = 0
+        if chave == "mensagens":
+            embed = _embed_mensagens(self.dossie, self.pagina_mensagens)
+        elif chave == "atividade":
+            embed = _embed_atividade(self.dossie)
+        else:
+            embed = renderizadores.get(chave, _embed_geral)(self.dossie)
         for opcao in self.seletor.options:
             opcao.default = opcao.value == chave
+        self.anterior.disabled = chave != "mensagens" or not self.dossie.get("atividade", {}).get("mensagens")
+        self.proxima.disabled = chave != "mensagens" or len(self.dossie.get("atividade", {}).get("mensagens", [])) <= 6
         await interaction.response.edit_message(embed=embed, view=self)
 
 
@@ -118,7 +180,7 @@ class PainelHistoricoMembrosView(discord.ui.View):
         await interaction.response.send_message(
             embed=criar_embed(
                 "📚 CENTRAL DE HISTÓRICO INDIVIDUAL",
-                "Pesquise e selecione um integrante pelo nome na lista abaixo. O histórico será aberto somente para você, com identificação, missões, progressão, competitivo e moderação.",
+                "Pesquise e selecione um integrante. O dossiê mostra mensagens enviadas/editadas/excluídas e eventos de atividade dos últimos 30 dias. O monitoramento é informado e começa após a implantação.",
                 cor=0x9F2035, rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
             ),
             view=SeletorMembroRegistroView(interaction.user.id),
@@ -220,6 +282,7 @@ class Logs(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         if member.guild.id != 1563995879981981817:
             return
+        await monitoramento_membros.registrar_evento(member.guild.id, member.id, "entrada", "Entrou no servidor.", timestamp=member.joined_at.timestamp() if member.joined_at else None)
         canal = member.guild.get_channel(CANAL_ENTRADAS_ID)
         if canal is None:
             try:
@@ -327,6 +390,7 @@ class Logs(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         agora = datetime.now(timezone.utc)
+        await monitoramento_membros.registrar_evento(member.guild.id, member.id, "saida", "Saiu do servidor.", timestamp=agora.timestamp())
         canal = await self._canal_logs(member.guild)
         if canal:
             embed = criar_embed(
@@ -345,7 +409,7 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
-        if message.author.bot or not message.guild:
+        if message.author.bot or not message.guild or message.guild.id != GUILD_NEMESIS_ID:
             return
         canal = await self._canal_logs(message.guild)
         if not canal or canal.id == message.channel.id:
@@ -376,14 +440,129 @@ class Logs(commands.Cog):
         await self._enviar_log(canal, embed, categoria="mensagens")
         if message.attachments:
             await registrar_global(message.guild, "anexos", "Anexos removidos com mensagem", descricao, cor=0xED4245)
-        await registrar_global(message.guild, "historico_membros", "Mensagem removida", descricao, cor=0xED4245)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
+        if payload.guild_id != GUILD_NEMESIS_ID:
+            return
+        registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, payload.message_id)
+        agora = datetime.now(timezone.utc).timestamp()
+        mensagem_cache = getattr(payload, "cached_message", None)
+        if registro:
+            user_id = int(registro["user_id"])
+            timestamp = registro.get("timestamp")
+            conteudo = None
+            anexos = None
+        elif mensagem_cache and not mensagem_cache.author.bot:
+            user_id = mensagem_cache.author.id
+            timestamp = mensagem_cache.created_at.timestamp()
+            conteudo = mensagem_cache.content or ""
+            anexos = [{"nome": a.filename, "tamanho": a.size} for a in mensagem_cache.attachments[:10]]
+        else:
+            return
+        dados = {
+            "message_id": str(payload.message_id),
+            "canal_id": payload.channel_id,
+            "timestamp": timestamp,
+            "status": "excluida",
+            "excluida_em": agora,
+        }
+        if conteudo is not None:
+            dados["conteudo"] = conteudo
+            dados["anexos"] = anexos or []
+        await monitoramento_membros.registrar_mensagem(payload.guild_id, user_id, dados)
+
+    @commands.Cog.listener()
+    async def on_raw_bulk_message_delete(self, payload: discord.RawBulkMessageDeleteEvent):
+        if payload.guild_id != GUILD_NEMESIS_ID:
+            return
+        agora = datetime.now(timezone.utc).timestamp()
+        cache = {
+            mensagem.id: mensagem
+            for mensagem in (getattr(payload, "cached_messages", None) or [])
+            if mensagem.guild and not mensagem.author.bot
+        }
+        for message_id in payload.message_ids:
+            registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, message_id)
+            mensagem_cache = cache.get(message_id)
+            if registro:
+                user_id = int(registro["user_id"])
+                timestamp = registro.get("timestamp")
+                dados = {
+                    "message_id": str(message_id), "canal_id": payload.channel_id,
+                    "timestamp": timestamp, "status": "excluida", "excluida_em": agora,
+                }
+            elif mensagem_cache:
+                user_id = mensagem_cache.author.id
+                dados = {
+                    "message_id": str(message_id), "canal_id": payload.channel_id,
+                    "timestamp": mensagem_cache.created_at.timestamp(),
+                    "conteudo": mensagem_cache.content or "", "status": "excluida",
+                    "excluida_em": agora,
+                    "anexos": [{"nome": a.filename, "tamanho": a.size} for a in mensagem_cache.attachments[:10]],
+                }
+            else:
+                continue
+            await monitoramento_membros.registrar_mensagem(payload.guild_id, user_id, dados)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
+        if payload.guild_id != GUILD_NEMESIS_ID:
+            return
+        dados = payload.data if isinstance(payload.data, dict) else {}
+        autor = dados.get("author") if isinstance(dados.get("author"), dict) else {}
+        if autor.get("bot") is True:
+            return
+        indice = await monitoramento_membros.buscar_mensagem(payload.guild_id, payload.message_id)
+        user_id = int(autor.get("id") or (indice or {}).get("user_id") or 0)
+        if not user_id:
+            return
+        try:
+            canal = self.bot.get_channel(payload.channel_id) or await self.bot.fetch_channel(payload.channel_id)
+            mensagem = await canal.fetch_message(payload.message_id)
+            if mensagem.author.bot:
+                return
+            registro = {
+                "message_id": str(mensagem.id),
+                "canal_id": mensagem.channel.id,
+                "timestamp": mensagem.created_at.timestamp(),
+                "conteudo": mensagem.content or "",
+                "url": mensagem.jump_url,
+                "status": "editada",
+                "anexos": [{"nome": a.filename, "tamanho": a.size} for a in mensagem.attachments[:10]],
+            }
+            user_id = mensagem.author.id
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            # O payload bruto ainda pode conter o conteúdo atualizado mesmo sem cache/histórico acessível.
+            if "content" not in dados:
+                return
+            timestamp = (indice or {}).get("timestamp") or datetime.now(timezone.utc).timestamp()
+            registro = {
+                "message_id": str(payload.message_id),
+                "canal_id": payload.channel_id,
+                "timestamp": timestamp,
+                "conteudo": str(dados.get("content") or ""),
+                "url": f"https://discord.com/channels/{payload.guild_id}/{payload.channel_id}/{payload.message_id}",
+                "status": "editada",
+                "anexos": [
+                    {"nome": str(a.get("filename", "arquivo")), "tamanho": int(a.get("size", 0) or 0)}
+                    for a in dados.get("attachments", []) if isinstance(a, dict)
+                ][:10],
+            }
+        await monitoramento_membros.registrar_mensagem(payload.guild_id, user_id, registro)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Registra metadados de anexos enviados, sem armazenar conteúdo de mensagens comuns."""
-        if not message.guild or message.author.bot or not message.attachments:
+        """Captura mensagens da NÊMESIS para consulta privada, com retenção limitada."""
+        if not message.guild or message.guild.id != GUILD_NEMESIS_ID or message.author.bot:
             return
-        if message.guild.id != GUILD_NEMESIS_ID:
+        await monitoramento_membros.registrar_mensagem(message.guild.id, message.author.id, {
+            "message_id": str(message.id), "canal_id": message.channel.id,
+            "timestamp": message.created_at.timestamp(), "conteudo": message.content or "",
+            "url": message.jump_url, "status": "enviada",
+            "anexos": [{"nome": a.filename, "tamanho": a.size} for a in message.attachments[:10]],
+        })
+        if not message.attachments:
             return
         linhas = [
             f"**Autor:** {message.author.mention} (ID: {message.author.id})",
@@ -392,22 +571,12 @@ class Logs(commands.Cog):
             f"**Enviado em:** {discord.utils.format_dt(message.created_at, style='F')}",
         ]
         for anexo in message.attachments[:10]:
-            linhas.append(
-                f"• **{anexo.filename[:180]}** — {anexo.size:,} bytes"
-                + (f" — [abrir arquivo]({anexo.url})" if anexo.url else "")
-            )
-        descricao = "\n".join(linhas)[:3800]
-        await registrar_global(
-            message.guild, "anexos", "Anexos enviados", descricao, cor=0x57F287,
-        )
-        await registrar_global(
-            message.guild, "historico_membros", "Envio de anexos",
-            descricao, cor=0x57F287,
-        )
+            linhas.append(f"• **{anexo.filename[:180]}** — {anexo.size:,} bytes")
+        await registrar_global(message.guild, "anexos", "Anexos enviados", "\n".join(linhas)[:3800], cor=0x57F287)
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
-        if antes.author.bot or not antes.guild:
+        if antes.author.bot or not antes.guild or antes.guild.id != GUILD_NEMESIS_ID:
             return
         anexos_antes = [anexo.url for anexo in antes.attachments]
         anexos_depois = [anexo.url for anexo in depois.attachments]
@@ -434,10 +603,11 @@ class Logs(commands.Cog):
             await self._enviar_log(canal, embed, categoria="mensagens")
             if anexos_antes != anexos_depois:
                 await registrar_global(antes.guild, "anexos", "Anexos de mensagem alterados", embed.description or "Anexos alterados.", cor=0xFEE75C)
-            await registrar_global(antes.guild, "historico_membros", "Mensagem editada", embed.description or "Mensagem editada.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
+        if guild.id == GUILD_NEMESIS_ID:
+            await monitoramento_membros.registrar_evento(guild.id, user.id, "banimento", "Membro banido do servidor.")
         canal = await self._canal_logs(guild)
         if not canal:
             return
@@ -452,6 +622,8 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild: discord.Guild, user: discord.User):
+        if guild.id == GUILD_NEMESIS_ID:
+            await monitoramento_membros.registrar_evento(guild.id, user.id, "desbanimento", "Banimento removido do membro.")
         canal = await self._canal_logs(guild)
         if not canal:
             return
@@ -465,6 +637,17 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_update(self, antes: discord.Member, depois: discord.Member):
+        if depois.guild.id == GUILD_NEMESIS_ID:
+            if antes.nick != depois.nick:
+                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "apelido", f"Apelido alterado: {antes.nick or antes.name} → {depois.nick or depois.name}.")
+            if antes.name != depois.name or antes.global_name != depois.global_name:
+                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "identidade", f"Nome de usuário alterado: {antes.name} → {depois.name}.")
+            if antes.premium_since != depois.premium_since:
+                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "impulsionamento", "Status de impulsionamento alterado.")
+            timeout_antes = _timeout_membro(antes)
+            timeout_depois = _timeout_membro(depois)
+            if timeout_antes != timeout_depois:
+                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "timeout", "Timeout aplicado, alterado ou removido.")
         canal = await self._canal_logs(depois.guild)
         if not canal:
             return
@@ -480,7 +663,6 @@ class Logs(commands.Cog):
                 color=0xFEE75C,
             )
             await self._enviar_log(canal, embed, categoria="historico_membros")
-            await registrar_global(depois.guild, "historico_membros", "Apelido alterado", embed.description or "Apelido alterado.", cor=0xFEE75C)
 
         if antes.name != depois.name or antes.global_name != depois.global_name:
             identidade = criar_embed(
@@ -493,13 +675,6 @@ class Logs(commands.Cog):
                 color=0xFEE75C,
             )
             await self._enviar_log(canal, identidade, categoria="membros")
-            await registrar_global(
-                depois.guild,
-                "historico_membros",
-                "Identidade do Discord alterada",
-                identidade.description or "Identidade alterada.",
-                cor=0xFEE75C,
-            )
 
         if antes.premium_since != depois.premium_since:
             iniciou_boost = depois.premium_since is not None
@@ -517,45 +692,31 @@ class Logs(commands.Cog):
                 ),
                 categoria="membros",
             )
-            await registrar_global(
-                depois.guild,
-                "historico_membros",
-                "Status de impulsionamento alterado",
-                detalhe_boost,
-                cor=0x57F287 if iniciou_boost else 0xED4245,
-            )
 
         ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
         ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
         ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
         perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
         if ganhos or perdidos:
-            embed = criar_embed(
+            embed_cargos = criar_embed(
                 title="Cargos do membro alterados",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
                 color=0xB3132B,
             )
             if ganhos:
-                embed.add_field(
+                embed_cargos.add_field(
                     name=f"Cargos recebidos ({len(ganhos)})",
                     value=" ".join(cargo.mention for cargo in ganhos)[:1024],
                     inline=False,
                 )
             if perdidos:
-                embed.add_field(
+                embed_cargos.add_field(
                     name=f"Cargos removidos ({len(perdidos)})",
                     value=" ".join(cargo.mention for cargo in perdidos)[:1024],
                     inline=False,
                 )
-            # O histórico de cargos separado foi removido: os detalhes completos
-            # ficam na linha do tempo individual do membro.
-            await registrar_global(
-                depois.guild,
-                "historico_membros",
-                "Alterações de cargos",
-                embed=embed,
-                cor=0xB3132B,
-            )
+            # Auditoria de cargos permanece no tópico administrativo, nunca no Arquivo de Membros.
+            await self._enviar_log(canal, embed_cargos, categoria="administracao")
 
         # Usa o atributo oficial de discord.py e mantém fallback para forks antigos.
         timeout_antes = _timeout_membro(antes)
@@ -579,7 +740,6 @@ class Logs(commands.Cog):
                 inline=True,
             )
             await self._enviar_log(canal, embed, categoria="moderacao")
-            await registrar_global(depois.guild, "historico_membros", "Timeout alterado", embed.description or "Timeout alterado.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
@@ -597,19 +757,26 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, antes: discord.VoiceState, depois: discord.VoiceState):
+        if member.guild.id == GUILD_NEMESIS_ID:
+            if antes.channel is None and depois.channel is not None:
+                await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_entrada", f"Entrou no canal de voz {depois.channel.name}.")
+            elif antes.channel is not None and depois.channel is None:
+                await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_saida", f"Saiu do canal de voz {antes.channel.name}.")
+            elif antes.channel != depois.channel and antes.channel and depois.channel:
+                await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_movimentacao", f"Mudou de {antes.channel.name} para {depois.channel.name}.")
         canal = await self._canal_logs(member.guild)
         if not canal:
             return
         if antes.channel is None and depois.channel is not None:
-            detalhe = f"{member.mention} entrou no canal de voz **{depois.channel.name}** (`{depois.channel.id}`)."
+            detalhe = f"Entrou no canal de voz {depois.channel.name}."
             await self._enviar_log(canal, criar_embed(description=f"🔊 {detalhe}", color=0x57F287), categoria="voz")
             await registrar_global(member.guild, "historico_membros", "Entrada em chamada", detalhe, cor=0x57F287)
         elif antes.channel is not None and depois.channel is None:
-            detalhe = f"{member.mention} saiu do canal de voz **{antes.channel.name}** (`{antes.channel.id}`)."
+            detalhe = f"Saiu do canal de voz {antes.channel.name}."
             await self._enviar_log(canal, criar_embed(description=f"🔇 {detalhe}", color=0xED4245), categoria="voz")
             await registrar_global(member.guild, "historico_membros", "Saída de chamada", detalhe, cor=0xED4245)
         elif antes.channel != depois.channel:
-            detalhe = f"{member.mention} mudou de **{antes.channel.name}** para **{depois.channel.name}**."
+            detalhe = f"Mudou de {antes.channel.name} para {depois.channel.name}."
             await self._enviar_log(canal, criar_embed(description=f"🔀 {detalhe}", color=0xFEE75C), categoria="voz")
             await registrar_global(member.guild, "historico_membros", "Movimentação em chamada", detalhe, cor=0xFEE75C)
 

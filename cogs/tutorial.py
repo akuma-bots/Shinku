@@ -15,6 +15,20 @@ MARCADOR_CENTRAL_TUTORIAIS = "NÊMESIS • CENTRAL DE TUTORIAIS • V4"
 
 
 TUTORIAIS = {
+    "dados_atividade": {
+        "titulo": "Dados e histórico de atividade",
+        "descricao": "Entenda quais dados de atividade são registrados para segurança e moderação.",
+        "passos": [
+            "O Shinku registra mensagens enviadas nos canais e tópicos da NÊMESIS que o bot consegue acessar, incluindo o conteúdo atual, edições e exclusões.",
+            "O histórico de mensagens mantém até 500 mensagens por membro, por no máximo 30 dias. São preservadas até duas versões anteriores de uma mensagem editada.",
+            "O monitoramento também registra eventos do servidor, como entrada e saída, mudanças de apelido, timeout, banimento e movimentações em canais de voz.",
+            "A consulta individual é privada e restrita à liderança autorizada. Os dados são usados para segurança, auditoria e moderação da comunidade.",
+            "O bot não registra mensagens privadas (DMs), atividade em outros aplicativos ou o que acontece fora dos canais que ele pode acessar.",
+            "O monitoramento começa após a implantação. Mensagens antigas, especialmente as já excluídas antes da ativação, não podem ser recuperadas pelo Discord.",
+            "O evento de exclusão do Discord não informa com segurança quem apagou a mensagem; o registro confirma a exclusão, não identifica automaticamente o autor da ação.",
+        ],
+        "comandos": "Arquivo de Membros • Consulta privada pela liderança autorizada",
+    },
     "musica": {
         "titulo": "Sistema de música",
         "descricao": "Como colocar o bot em call e controlar a reprodução.",

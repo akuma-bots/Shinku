@@ -65,6 +65,21 @@ class TestStorageConfiguracao(unittest.IsolatedAsyncioTestCase):
                 await storage.salvar("estado.json", {})
 
 
+    async def test_salvar_com_expiracao_usa_set_ex_no_upstash(self):
+        chamadas = []
+
+        async def redis_mock(*args):
+            chamadas.append(args)
+            return "OK"
+
+        with patch.multiple(storage, USANDO_UPSTASH=True, UPSTASH_CONFIG_INCOMPLETA=False), patch.object(
+            storage, "_comando_redis", side_effect=redis_mock
+        ):
+            await storage.salvar_com_expiracao("atividade_mensagem_1_2.json", {"user_id": 3}, 3600)
+
+        self.assertEqual(chamadas[0][0], "SET")
+        self.assertEqual(chamadas[0][-2:], ("EX", 3600))
+
 class TestAtualizacaoAtomica(unittest.IsolatedAsyncioTestCase):
     async def test_atualizacao_local_preserva_incrementos_concorrentes(self):
         with tempfile.TemporaryDirectory() as pasta, patch.object(storage, "DATA_DIR", Path(pasta)), patch.multiple(
