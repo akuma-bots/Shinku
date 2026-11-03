@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from utils.punicoes import historico_punicoes
-from utils.guild_config import hierarquia_only, membro_pode_gerenciar_membro
+from utils.guild_config import hierarquia_only, lideranca_only, membro_pode_gerenciar_membro
 
 
 CANAL_REGRAS_ID = 1563995880833421508
@@ -98,9 +98,7 @@ class Moderacao(commands.Cog):
     @app_commands.describe(
         quantidade="Quantidade de mensagens a apagar (1-1000)"
     )
-    @app_commands.checks.has_permissions(
-        manage_messages=True
-    )
+    @lideranca_only()
     @app_commands.checks.bot_has_permissions(
         manage_messages=True,
         read_message_history=True
@@ -305,9 +303,7 @@ class Moderacao(commands.Cog):
         name="avisos",
         description="Mostra os avisos automáticos registrados de um membro."
     )
-    @app_commands.checks.has_permissions(
-        moderate_members=True
-    )
+    @lideranca_only()
     async def avisos(
         self,
         interaction: discord.Interaction,
@@ -352,9 +348,7 @@ class Moderacao(commands.Cog):
     @app_commands.describe(
         membro="Opcional: filtra apenas esse membro"
     )
-    @app_commands.checks.has_permissions(
-        moderate_members=True
-    )
+    @lideranca_only()
     async def punicoes_historico(
         self,
         interaction: discord.Interaction,
