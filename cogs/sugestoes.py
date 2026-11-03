@@ -61,6 +61,16 @@ def _normalizar_categoria(valor: str) -> str:
     return aliases.get(texto, "Outros")
 
 
+def _esta_no_canal_sugestoes(interaction: discord.Interaction) -> bool:
+    if interaction.guild_id != GUILD_NEMESIS_ID:
+        return False
+    canal = interaction.channel
+    return bool(
+        getattr(canal, "id", None) == CANAL_SUGESTOES_ID
+        or (isinstance(canal, discord.Thread) and canal.parent_id == CANAL_SUGESTOES_ID)
+    )
+
+
 def _chave_mensagem(interaction: discord.Interaction) -> str:
     return str(getattr(interaction.message, "id", 0))
 
@@ -257,7 +267,7 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        if interaction.guild_id != GUILD_NEMESIS_ID or interaction.channel_id != CANAL_SUGESTOES_ID:
+        if not _esta_no_canal_sugestoes(interaction):
             await interaction.response.send_message("Este formulário só funciona no canal oficial de sugestões.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
@@ -277,9 +287,14 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
 
         categoria = _normalizar_categoria(self.categoria.value)
         canal = interaction.guild.get_channel(CANAL_SUGESTOES_ID)
-        if not isinstance(canal, discord.TextChannel):
+        if canal is None:
+            try:
+                canal = await interaction.guild.fetch_channel(CANAL_SUGESTOES_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                canal = None
+        if not isinstance(canal, (discord.TextChannel, discord.ForumChannel)):
             await _liberar_cooldown(interaction.user.id, agora)
-            await interaction.followup.send("O canal oficial de sugestões não está disponível.", ephemeral=True)
+            await interaction.followup.send("O canal oficial de sugestões não está disponível ou não é um canal compatível.", ephemeral=True)
             return
 
         registro = {
@@ -295,16 +310,31 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
             "criado_em": datetime.now(timezone.utc).isoformat(),
             "atualizado_em": datetime.now(timezone.utc).isoformat(),
             "thread_id": None,
+            "canal_publicacao_id": canal.id,
         }
         mensagem = None
         persistida = False
         try:
-            mensagem = await canal.send(
+            if isinstance(canal, discord.ForumChannel):
+                thread, mensagem = await canal.create_thread(
+                    name=f"💡・{registro['titulo']}"[:100],
+                    embed=_embed_sugestao(registro),
+                    view=PublicacaoSugestaoView(),
+                    reason="Nova sugestão enviada pela comunidade",
+                )
+                registro["canal_publicacao_id"] = thread.id
+            else:
+                mensagem = await canal.send(
+                    embed=_embed_sugestao(registro),
+                    view=PublicacaoSugestaoView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+            registro["id"] = mensagem.id
+            await mensagem.edit(
                 embed=_embed_sugestao(registro),
                 view=PublicacaoSugestaoView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
-            registro["id"] = mensagem.id
             await _salvar_registro(str(mensagem.id), registro)
             persistida = True
 
@@ -312,7 +342,7 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
                 interaction.guild,
                 "sugestoes",
                 "Nova sugestão recebida",
-                f"**{registro['titulo']}**\nAutor: {interaction.user.mention}\nCategoria: {categoria}\n[Publicação](https://discord.com/channels/{interaction.guild.id}/{canal.id}/{mensagem.id})",
+                f"**{registro['titulo']}**\nAutor: {interaction.user.mention}\nCategoria: {categoria}\n[Publicação](https://discord.com/channels/{interaction.guild.id}/{registro['canal_publicacao_id']}/{mensagem.id})",
                 cor=COR_SUGESTOES,
             )
             await interaction.followup.send(
@@ -345,7 +375,7 @@ class PainelSugestoesView(discord.ui.View):
         custom_id="nemesis:sugestoes:enviar",
     )
     async def enviar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.guild_id != GUILD_NEMESIS_ID or interaction.channel_id != CANAL_SUGESTOES_ID:
+        if not _esta_no_canal_sugestoes(interaction):
             await interaction.response.send_message("Use o painel no canal oficial da NÊMESIS.", ephemeral=True)
             return
         await interaction.response.send_modal(ModalNovaSugestao())
@@ -417,7 +447,7 @@ def _embed_painel_administrativo(registros: dict, filtro: str = "resumo") -> dis
             apoios, oposicoes = _contagem_votos(item.get("votos", {}))
             message_id = item.get("id")
             link = (
-                f"https://discord.com/channels/{GUILD_NEMESIS_ID}/{CANAL_SUGESTOES_ID}/{message_id}"
+                f"https://discord.com/channels/{GUILD_NEMESIS_ID}/{item.get('canal_publicacao_id', CANAL_SUGESTOES_ID)}/{message_id}"
                 if message_id else None
             )
             nome = discord.utils.escape_markdown(str(item.get("titulo", "Sugestão"))[:90])
@@ -515,26 +545,29 @@ class PublicacaoSugestaoView(discord.ui.View):
             await interaction.followup.send("Não encontrei os dados desta sugestão.", ephemeral=True)
             return
         thread = None
-        thread_id = registro.get("thread_id")
-        if thread_id:
-            thread = interaction.guild.get_thread(int(thread_id))
+        if isinstance(interaction.channel, discord.Thread) and interaction.channel.parent_id == CANAL_SUGESTOES_ID:
+            thread = interaction.channel
+        else:
+            thread_id = registro.get("thread_id")
+            if thread_id:
+                thread = interaction.guild.get_thread(int(thread_id))
+                if thread is None:
+                    try:
+                        thread = await interaction.guild.fetch_channel(int(thread_id))
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        thread = None
             if thread is None:
                 try:
-                    thread = await interaction.guild.fetch_channel(int(thread_id))
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    thread = None
-        if thread is None:
-            try:
-                thread = await interaction.message.create_thread(
-                    name=f"Discussão • {registro.get('titulo', 'Sugestão')}"[:100],
-                    auto_archive_duration=10080,
-                    reason="Criar discussão pública para sugestão da comunidade",
-                )
-                registro["thread_id"] = thread.id
-                await _salvar_registro(message_id, registro)
-            except discord.HTTPException:
-                await interaction.followup.send("Não consegui abrir a discussão desta sugestão.", ephemeral=True)
-                return
+                    thread = await interaction.message.create_thread(
+                        name=f"Discussão • {registro.get('titulo', 'Sugestão')}"[:100],
+                        auto_archive_duration=10080,
+                        reason="Criar discussão pública para sugestão da comunidade",
+                    )
+                    registro["thread_id"] = thread.id
+                    await _salvar_registro(message_id, registro)
+                except discord.HTTPException:
+                    await interaction.followup.send("Não consegui abrir a discussão desta sugestão.", ephemeral=True)
+                    return
         await interaction.followup.send(f"Participe da discussão: {thread.mention}", ephemeral=True)
 
     @discord.ui.button(
@@ -646,7 +679,10 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
             if not registro:
                 await interaction.followup.send("Não encontrei os dados desta sugestão.", ephemeral=True)
                 return
-            canal = interaction.guild.get_channel(CANAL_SUGESTOES_ID)
+            canal_id = int(registro.get("canal_publicacao_id", CANAL_SUGESTOES_ID))
+            canal = interaction.guild.get_channel(canal_id) or interaction.guild.get_thread(canal_id)
+            if canal is None:
+                canal = await interaction.guild.fetch_channel(canal_id)
             mensagem = await canal.fetch_message(int(self.message_id))
             await mensagem.edit(embed=_embed_sugestao(registro), view=PublicacaoSugestaoView())
 
@@ -696,18 +732,46 @@ class Sugestoes(commands.Cog):
         canal = guild.get_channel(CANAL_SUGESTOES_ID)
         if canal is None:
             canal = await guild.fetch_channel(CANAL_SUGESTOES_ID)
-        if not isinstance(canal, discord.TextChannel) or canal.guild.id != GUILD_NEMESIS_ID:
-            raise TypeError("O canal oficial de sugestões não é um canal de texto da NÊMESIS.")
+        if not isinstance(canal, (discord.TextChannel, discord.ForumChannel)) or canal.guild.id != GUILD_NEMESIS_ID:
+            raise TypeError("O canal oficial de sugestões não é um canal de texto ou Fórum da NÊMESIS.")
 
         dados = await carregar(ARQUIVO_PAINEL, {})
         mensagem = None
-        if isinstance(dados, dict) and dados.get(str(guild.id)):
+        destino = None
+        salvo = dados.get(str(guild.id)) if isinstance(dados, dict) else None
+        if salvo:
             try:
-                mensagem = await canal.fetch_message(int(dados[str(guild.id)]))
+                if isinstance(canal, discord.ForumChannel):
+                    destino = guild.get_thread(int(salvo))
+                    if destino is None:
+                        destino = await guild.fetch_channel(int(salvo))
+                    if isinstance(destino, discord.Thread):
+                        if destino.archived or destino.locked:
+                            await destino.edit(archived=False, locked=False, reason="Atualizar painel oficial de sugestões")
+                        mensagem = await destino.fetch_message(destino.id)
+                else:
+                    mensagem = await canal.fetch_message(int(salvo))
             except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
                 mensagem = None
+                destino = None
 
-        if mensagem is None:
+        if mensagem is None and isinstance(canal, discord.ForumChannel):
+            existentes = list(canal.threads)
+            try:
+                async for thread in canal.archived_threads(limit=100):
+                    if all(item.id != thread.id for item in existentes):
+                        existentes.append(thread)
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Não foi possível consultar publicações arquivadas do Fórum de sugestões.")
+            for thread in existentes:
+                if thread.name == "💡・Central de Sugestões":
+                    destino = thread
+                    if destino.archived or destino.locked:
+                        await destino.edit(archived=False, locked=False, reason="Atualizar painel oficial de sugestões")
+                    mensagem = await destino.fetch_message(destino.id)
+                    break
+
+        if mensagem is None and isinstance(canal, discord.TextChannel):
             async for candidata in canal.history(limit=100, oldest_first=True):
                 if candidata.author.id == self.bot.user.id and any(
                     embed.footer.text == "NÊMESIS • CENTRAL DE SUGESTÕES • PAINEL OFICIAL"
@@ -716,7 +780,14 @@ class Sugestoes(commands.Cog):
                     mensagem = candidata
                     break
 
-        if mensagem is None:
+        if mensagem is None and isinstance(canal, discord.ForumChannel):
+            destino, mensagem = await canal.create_thread(
+                name="💡・Central de Sugestões",
+                embed=_embed_painel(),
+                view=PainelSugestoesView(),
+                reason="Publicar painel oficial da Central de Sugestões",
+            )
+        elif mensagem is None:
             mensagem = await canal.send(
                 embed=_embed_painel(),
                 view=PainelSugestoesView(),
@@ -729,8 +800,14 @@ class Sugestoes(commands.Cog):
                 view=PainelSugestoesView(),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
-        await salvar(ARQUIVO_PAINEL, {str(guild.id): mensagem.id})
-        _LOG.info("Painel oficial de sugestões sincronizado no canal %s (mensagem=%s).", canal.id, mensagem.id)
+        if isinstance(canal, discord.ForumChannel) and not mensagem.pinned:
+            try:
+                await mensagem.pin(reason="Manter destacado o painel oficial de sugestões")
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.warning("O painel foi publicado, mas não pôde ser fixado no Fórum de sugestões.")
+        identificador = destino.id if isinstance(canal, discord.ForumChannel) and destino is not None else mensagem.id
+        await salvar(ARQUIVO_PAINEL, {str(guild.id): identificador})
+        _LOG.info("Painel oficial de sugestões sincronizado no canal %s (destino=%s).", canal.id, identificador)
 
     @commands.Cog.listener()
     async def on_ready(self):
