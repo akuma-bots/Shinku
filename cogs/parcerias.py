@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from utils.apresentacao import criar_embed
 
-from utils.storage import carregar, salvar
+from utils.storage import carregar, salvar, atualizar_json
 from utils.guild_config import get_config, set_config, lideranca_only
 
 
@@ -424,8 +424,19 @@ async def registrar_parceria_aprovada(
             parceria["mensagem_id"] = None
             parceria["canal_id"] = canal_id
 
-        lista.append(parceria)
-        await _salvar_da_guild(guild.id, lista)
+        def persistir(dados):
+            if not isinstance(dados, dict):
+                dados = {}
+            atual = dados.get(str(guild.id), [])
+            if not isinstance(atual, list):
+                atual = []
+            existente_atual = next((p for p in atual if isinstance(p, dict) and p.get("candidatura_id") == candidatura_id), None)
+            if existente_atual:
+                return dados
+            atual.append(parceria)
+            dados[str(guild.id)] = atual
+            return dados
+        await atualizar_json(ARQUIVO, {}, persistir)
 
     try:
         from utils.registro_global import registrar as registrar_global
