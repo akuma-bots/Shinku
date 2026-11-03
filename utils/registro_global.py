@@ -25,37 +25,51 @@ CARGOS_ACESSO_IDS = {
     1563995879998754946, 1563995879998754945,
 }
 
+# Estrutura enxuta: cada assunto tem um único destino canônico.
+# Os nomes antigos continuam aceitos pelos cogs durante a migração.
 CATEGORIAS = {
-    "mensagens": ("🆕 NÊMESIS V3・01・Mensagens", "Exclusões, edições e remoções em massa de mensagens."),
-    "atendimento": ("🆕 NÊMESIS V3・02・Atendimento", "Abertura, atribuição, encerramento, avaliações e transcrições de tickets."),
-    "moderacao": ("🆕 NÊMESIS V3・03・Moderação", "Advertências, timeouts, expulsões, banimentos e ações da equipe."),
-    "membros": ("🆕 NÊMESIS V3・04・Membros", "Entradas, saídas, alterações de cargos e dados de membros."),
-    "sistemas": ("🆕 NÊMESIS V3・05・Sistemas", "Missões, contribuições, temporadas, rankings, guerras e eventos operacionais."),
-    "administracao": ("🆕 NÊMESIS V3・06・Administração", "Configurações, permissões, alterações estruturais e decisões administrativas."),
-    "seguranca": ("🆕 NÊMESIS V3・07・Segurança", "AutoMod, Anti-Raid, falhas de proteção e incidentes de segurança."),
-    "formularios": ("🆕 NÊMESIS V3・08・Formulários", "Inscrições, candidaturas, aprovações, recusas e revisões."),
-    "progressao": ("🆕 NÊMESIS V3・09・Progressão", "XP, níveis, patentes, promoções, rebaixamentos e evolução individual."),
-    "missoes": ("🆕 NÊMESIS V3・10・Missões", "Criação, atribuição, conclusão, validação e recompensas de missões."),
-    "competicoes": ("🆕 NÊMESIS V3・11・Competições", "Desafios, lutas, guerras, placares, participantes e resultados competitivos."),
-    "eventos": ("🆕 NÊMESIS V3・12・Eventos", "Agenda, inscrições, campeonatos, atividades e resultados de eventos."),
-    "parcerias": ("🆕 NÊMESIS V3・13・Parcerias", "Solicitações, aprovações, representantes, cargos e alterações de parcerias."),
-    "integracoes": ("🆕 NÊMESIS V3・14・Integrações", "Roblox, dashboard, APIs externas e sincronizações entre sistemas."),
-    "infraestrutura": ("🆕 NÊMESIS V3・15・Infraestrutura", "Conexões, armazenamento, health checks, tarefas e disponibilidade do Shinku."),
-    "configuracoes": ("🆕 NÊMESIS V3・16・Configurações", "Mudanças de configuração, parâmetros e ajustes operacionais do servidor."),
-    "entradas": ("🆕 NÊMESIS V3・17・Entradas", "Entradas, saídas, reentradas, convites associados e integração inicial de membros."),
-    "historico_membros": ("🆕 NÊMESIS V3・18・Histórico Membros", "Linha do tempo individual: alterações de perfil, apelido, status, participação e ocorrências vinculadas ao membro."),
-    "cargos": ("🆕 NÊMESIS V3・19・Histórico Cargos", "Concessão, remoção, alteração e sincronização de cargos, com autor identificado quando disponível."),
-    "convites": ("🆕 NÊMESIS V3・20・Convites", "Criação, remoção e uso de convites, convites atribuídos e estatísticas de recrutamento."),
-    "voz": ("🆕 NÊMESIS V3・21・Chamadas", "Entradas, saídas, movimentações e alterações relevantes nos canais de voz."),
-    "anexos": ("🆕 NÊMESIS V3・22・Anexos", "Arquivos, imagens, vídeos e outros anexos enviados, editados ou removidos em mensagens."),
-    "atividade": ("🆕 NÊMESIS V3・23・Atividade", "Participação em atividades, presença em eventos e métricas de engajamento que os sistemas realmente coletarem."),
-    "conquistas": ("🆕 NÊMESIS V3・24・Conquistas", "Conquistas desbloqueadas, recordes, marcos pessoais e recompensas concedidas."),
-    "sorteios": ("🆕 NÊMESIS V3・25・Sorteios", "Criação, participação, encerramento, seleção de vencedores e entrega de prêmios."),
-    "sugestoes": ("🆕 NÊMESIS V3・26・Sugestões", "Sugestões recebidas, votos, decisões, mudanças de status e resultados de votações."),
-    "relatorios": ("🆕 NÊMESIS V3・27・Relatórios", "Relatórios enviados, revisados, aprovados, recusados e encaminhamentos da equipe."),
-    "roblox": ("🆕 NÊMESIS V3・28・Roblox", "Vínculos de contas, verificações externas, sincronizações de grupos e falhas da integração Roblox."),
-    "automod": ("🆕 NÊMESIS V3・29・AutoMod", "Detecções, bloqueios, filtros, ações automáticas, falsos positivos revisados e falhas do AutoMod."),
+    "mensagens": ("Mensagens e arquivos", "Edições, exclusões e anexos de mensagens, com autor, canal e contexto disponíveis."),
+    "atendimento": ("Atendimento", "Tickets, responsáveis, encerramentos, avaliações e transcrições."),
+    "moderacao": ("Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
+    "historico_membros": ("Histórico de membros", "Linha do tempo individual: entradas, saídas, cargos, convites, XP, voz, conquistas e ocorrências relacionadas."),
+    "operacoes": ("Operações", "Atividades gerais, formulários, relatórios e execução dos sistemas da organização."),
+    "administracao": ("Administração", "Decisões administrativas, permissões, configurações e alterações estruturais."),
+    "seguranca": ("Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
+    "missoes": ("Missões", "Criação, atribuição, conclusão, validação de provas e recompensas."),
+    "competitivo": ("Competitivo", "Desafios, PvP, guerras, placares, participantes e resultados."),
+    "eventos": ("Eventos", "Agenda, inscrições, atividades coletivas e resultados."),
+    "parcerias": ("Parcerias", "Solicitações, aprovações, representantes e alterações de parcerias."),
+    "integracoes": ("Integrações", "Roblox, APIs externas, vínculos e sincronizações."),
+    "infraestrutura": ("Infraestrutura", "Conexões, Upstash, health checks, tarefas e disponibilidade do Shinku."),
+    "sorteios": ("Sorteios", "Criação, participação, encerramento, vencedores e entrega de prêmios."),
+    "sugestoes": ("Sugestões e votações", "Sugestões recebidas, votos, decisões e resultados."),
 }
+
+ALIASES_CATEGORIAS = {
+    "anexos": "mensagens",
+    "automod": "seguranca",
+    "cargos": "historico_membros",
+    "competicoes": "competitivo",
+    "configuracoes": "administracao",
+    "conquistas": "historico_membros",
+    "convites": "historico_membros",
+    "entradas": "historico_membros",
+    "formularios": "operacoes",
+    "membros": "historico_membros",
+    "progressao": "historico_membros",
+    "relatorios": "operacoes",
+    "roblox": "integracoes",
+    "sistemas": "operacoes",
+    "atividade": "historico_membros",
+    "voz": "historico_membros",
+}
+
+
+def normalizar_categoria(categoria: str) -> str:
+    """Converte nomes legados para a categoria canônica sem perder registros."""
+    chave = str(categoria or "").strip().lower()
+    return ALIASES_CATEGORIAS.get(chave, chave)
+
 _LOCKS: dict[tuple[int, str], asyncio.Lock] = {}
 _CABECALHOS_VERIFICADOS: set[tuple[int, int]] = set()
 
@@ -197,32 +211,12 @@ async def _obter_topico(
     categoria: str,
     topicos_existentes: list[discord.Thread] | None = None,
 ) -> discord.Thread:
+    categoria = normalizar_categoria(categoria)
     if categoria not in CATEGORIAS:
         raise ValueError(f"Categoria de registro desconhecida: {categoria}")
     nome, descricao = CATEGORIAS[categoria]
     async with _lock(forum.guild.id, categoria):
         ids = await _ler_ids(forum.guild.id)
-        # O ID salvo pode apontar para um tópico legado com nome antigo.
-        # Primeiro procuramos um tópico que já tenha o nome canônico; só depois
-        # reaproveitamos/renomeamos o ID salvo. Isso evita perpetuar a estrutura velha.
-        thread_salva = None
-        thread_id = ids.get(categoria)
-        if thread_id:
-            thread_salva = forum.guild.get_thread(int(thread_id))
-            if thread_salva is None:
-                try:
-                    thread_salva = await forum.guild.fetch_channel(int(thread_id))
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    thread_salva = None
-            if thread_salva is not None and thread_salva.parent_id != forum.id:
-                thread_salva = None
-            if (
-                thread_salva is not None
-                and topicos_existentes is not None
-                and all(item.id != thread_salva.id for item in topicos_existentes)
-            ):
-                topicos_existentes.append(thread_salva)
-
         existentes = topicos_existentes
         if existentes is None:
             existentes = list(forum.threads)
@@ -230,33 +224,62 @@ async def _obter_topico(
                 if all(item.id != thread.id for item in existentes):
                     existentes.append(thread)
 
-        # Se o tópico canônico já existe, ele prevalece sobre qualquer ID legado.
+        # Um tópico canônico existente sempre prevalece.
         for thread in existentes:
             if thread.name == nome:
-                if thread_salva is not None and thread_salva.id != thread.id:
-                    _LOG.info(
-                        "Tópico legado %s (%s) substituído pelo canônico %s (%s); será aposentado na limpeza.",
-                        thread_salva.name,
-                        thread_salva.id,
-                        nome,
-                        thread.id,
-                    )
                 if ids.get(categoria) != thread.id:
                     await _salvar_id(forum.guild.id, categoria, thread.id)
                 await _atualizar_cabecalho_topico(thread, nome, descricao)
                 return thread
 
-        # A geração V3 é uma reconstrução intencional: nunca reaproveita nem
-        # renomeia os tópicos legados. Cria um destino novo e deixa o antigo
-        # fora do mapa canônico para ser arquivado/bloqueado na limpeza.
+        # Reaproveita e renomeia um tópico antigo da mesma área. Assim, a
+        # reorganização preserva as mensagens e links existentes em vez de
+        # criar uma cópia vazia ou apagar o histórico.
+        chaves_legadas = [
+            chave for chave, destino in ALIASES_CATEGORIAS.items()
+            if destino == categoria
+        ]
+        candidatos = [categoria, *chaves_legadas]
         thread_salva = None
+        for chave in candidatos:
+            thread_id = ids.get(chave)
+            if not thread_id:
+                continue
+            try:
+                candidata = forum.guild.get_thread(int(thread_id))
+                if candidata is None:
+                    candidata = await forum.guild.fetch_channel(int(thread_id))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+                continue
+            if isinstance(candidata, discord.Thread) and candidata.parent_id == forum.id:
+                thread_salva = candidata
+                break
+
+        if thread_salva is not None:
+            try:
+                await thread_salva.edit(
+                    name=nome,
+                    archived=False,
+                    locked=False,
+                    reason="Reorganização dos registros da NÊMESIS; preservação do histórico existente",
+                )
+                await _salvar_id(forum.guild.id, categoria, thread_salva.id)
+                await _atualizar_cabecalho_topico(thread_salva, nome, descricao)
+                _LOG.info(
+                    "Tópico reaproveitado e renomeado sem apagar mensagens: %s (%s).",
+                    nome, thread_salva.id,
+                )
+                return thread_salva
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Não foi possível reaproveitar o tópico legado %s (%s).", thread_salva.name, thread_salva.id)
+                raise
 
         inicial = _embed_cabecalho_topico(nome, descricao)
         criado = await forum.create_thread(
             name=nome,
             embed=inicial,
             auto_archive_duration=10080,
-            reason="Provisionamento dos tópicos permanentes do Registro Global NÊMESIS",
+            reason="Provisionamento de categoria canônica do Registro Global NÊMESIS",
             allowed_mentions=discord.AllowedMentions.none(),
         )
         thread = criado.thread
@@ -265,8 +288,6 @@ async def _obter_topico(
             topicos_existentes.append(thread)
         await _salvar_id(forum.guild.id, categoria, thread.id)
         _LOG.info("Tópico permanente criado: %s (%s)", nome, thread.id)
-        # A criação de threads usa a mesma rota do Fórum; espaçar as operações
-        # evita rajadas de 429 durante a primeira sincronização de 29 destinos.
         await asyncio.sleep(1.1)
         return thread
 
@@ -392,7 +413,7 @@ async def configurar_permissoes(forum: discord.ForumChannel) -> None:
 
 
 async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
-    """Cria ou recupera os tópicos fixos configurados; não cria duplicatas por evento."""
+    """Sincroniza apenas destinos canônicos, preservando tópicos e mensagens antigas."""
     if guild.id != GUILD_NEMESIS_ID:
         return {}
     canal = guild.get_channel(CANAL_REGISTRO_GLOBAL_ID)
@@ -402,18 +423,7 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
         raise TypeError("O destino configurado não é o Fórum de Registro Global da NÊMESIS.")
     await configurar_permissoes(canal)
     validar_privacidade(canal)
-    # Reconstrução V3: executa a exclusão total uma única vez. O marcador só
-    # é gravado depois que os 29 destinos novos foram criados; se houver falha
-    # no meio, a próxima inicialização repete a limpeza dos tópicos parciais.
-    reconstruindo = not await _limpeza_v3_concluida(guild.id)
-    if reconstruindo:
-        await _excluir_todos_topicos(canal)
-        await atualizar_json(ARQUIVO, {}, lambda dados: {
-            **(dados if isinstance(dados, dict) else {}),
-            str(guild.id): {"_limpeza_total_v3_concluida": False},
-        })
 
-    # Faz uma única leitura dos tópicos ativos e arquivados.
     topicos_existentes: list[discord.Thread] = list(canal.threads)
     try:
         async for thread in canal.archived_threads(limit=None):
@@ -427,37 +437,25 @@ async def garantir_topicos(guild: discord.Guild) -> dict[str, int]:
         thread = await _obter_topico(canal, categoria, topicos_existentes)
         resultado[categoria] = thread.id
 
-    # Após a reconstrução V3, o Fórum deve conter apenas os destinos canônicos.
-    # Em sincronizações normais, tópicos extras são arquivados/bloqueados sem
-    # interferir nos 29 destinos oficiais.
     canonicos = set(resultado.values())
     aposentados = 0
-    legados: dict[int, discord.Thread] = {
-        thread.id: thread for thread in topicos_existentes
-    }
-
-    for thread in legados.values():
+    for thread in topicos_existentes:
         if thread.id in canonicos or (thread.archived and thread.locked):
             continue
         try:
             await thread.edit(
                 archived=True,
                 locked=True,
-                reason="Aposentação de tópico legado/duplicado após sincronização do Registro Global NÊMESIS",
+                reason="Tópico redundante aposentado após reorganização; conteúdo preservado",
             )
             aposentados += 1
         except discord.NotFound:
             continue
         except (discord.Forbidden, discord.HTTPException):
-            _LOG.exception("Falha ao aposentar tópico legado (%s).", thread.id)
-    if reconstruindo:
-        await _marcar_limpeza_v3_concluida(guild.id)
-        _LOG.warning(
-            "RECONSTRUÇÃO TOTAL V3 CONCLUÍDA: %s tópicos novos criados após exclusão de todos os tópicos anteriores.",
-            len(resultado),
-        )
+            _LOG.exception("Falha ao arquivar tópico redundante (%s).", thread.id)
+
     _LOG.info(
-        "Sincronização do Registro Global concluída: %s destinos canônicos; %s tópicos legados arquivados e bloqueados.",
+        "Registro Global organizado: %s áreas principais; %s tópicos antigos arquivados e preservados.",
         len(resultado), aposentados,
     )
     return resultado
