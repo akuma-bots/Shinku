@@ -885,42 +885,7 @@ class Parcerias(commands.Cog):
                 else None
             )
 
-            if cargo:
-
-                embed.add_field(
-                    name="Cargo da parceria",
-                    value=cargo.mention,
-                    inline=False,
-                )
-
-                view = ParceriaView(
-                    cargo.id
-                )
-
-            else:
-
-                embed.add_field(
-                    name="Cargo da parceria",
-                    value="Cargo não disponível.",
-                    inline=False,
-                )
-
-                view = None
-
-            if parceria.get(
-                "banner"
-            ):
-                embed.set_image(
-                    url=parceria[
-                        "banner"
-                    ]
-                )
-
-            embed.set_footer(
-                text=(
-                    f"Parceria {indice} • NÊMESIS"
-                )
-            )
+            view = ParceriaView(cargo.id) if cargo else None
 
             await interaction.followup.send(
                 embed=embed,
