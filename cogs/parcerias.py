@@ -360,7 +360,9 @@ def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | 
     embed.add_field(name="ACESSO À COMUNIDADE", value=f"[Entrar no servidor]({convite})" if convite else "Convite indisponível", inline=False)
     cargo = guild.get_role(int(parceria["cargo_id"])) if parceria.get("cargo_id") else None
     embed.add_field(name="CARGO DE PARCEIRO", value=cargo.mention if cargo else "Não vinculado", inline=True)
-    embed.add_field(name="REGISTRO", value=f"`{str(parceria.get('id', '—'))[:18]}`", inline=True)
+    embed.add_field(name="REGISTRO", value=str(parceria.get("id", "—"))[:18], inline=True)
+    if parceria.get("proxima_revisao"):
+        embed.add_field(name="PRÓXIMA REVISÃO", value=f'<t:{int(parceria.get("proxima_revisao"))}:D>', inline=True)
     banner = parceria.get("banner")
     if banner:
         try:
@@ -368,7 +370,8 @@ def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | 
         except (TypeError, discord.HTTPException):
             pass
     embed.set_author(name="NÊMESIS • RELAÇÕES INSTITUCIONAIS")
-    embed.set_footer(text=f"Aliança verificada pela administração NÊMESIS{f' • Registro {indice}' if indice else ''}")
+    sufixo = f" • Registro {indice}" if indice else ""
+    embed.set_footer(text="Aliança verificada pela administração NÊMESIS" + sufixo)
     return embed
 
 
