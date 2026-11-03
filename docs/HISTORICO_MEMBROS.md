@@ -31,7 +31,7 @@ O painel é atualizado automaticamente pelo Shinku quando o Registro Global é i
 - competitivo.json
 - Tópicos privados do Registro Global.
 
-A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (22 categorias). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem desse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
+A busca da linha do tempo percorre até 40 mensagens recentes por categoria configurada (13 áreas consolidadas). Os bancos de missões, punições, conquistas e progressão são consultados separadamente e não dependem desse recorte. Campos sem registro são exibidos como não registrados; o sistema não presume que uma ação ocorreu.
 
 ## Privacidade e segurança
 
