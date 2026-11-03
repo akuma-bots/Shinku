@@ -56,3 +56,28 @@ class TestIntegridadeFormularios(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRespostaInteracaoFormulario(unittest.IsolatedAsyncioTestCase):
+    async def test_botao_de_decisao_reconhece_interacao_antes_da_busca(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        import discord
+        from cogs.formularios import Formularios, PREFIXO_APROVAR
+
+        resposta = SimpleNamespace(defer=AsyncMock())
+        followup = SimpleNamespace(send=AsyncMock())
+        interaction = SimpleNamespace(
+            type=discord.InteractionType.component,
+            data={"custom_id": PREFIXO_APROVAR + "resp-audit"},
+            response=resposta,
+            followup=followup,
+            user=SimpleNamespace(id=123),
+        )
+        cog = object.__new__(Formularios)
+        cog.bot = SimpleNamespace(guilds=[])
+
+        await cog.on_interaction(interaction)
+
+        resposta.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
+        followup.send.assert_awaited_once()

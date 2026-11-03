@@ -991,6 +991,10 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             aprovado = custom_id.startswith(PREFIXO_APROVAR)
             resposta_id = custom_id.split(":")[-1]
 
+            # A busca no armazenamento, a validação do cargo e a decisão podem
+            # levar mais de 3 segundos. Reconhece o clique antes de iniciar I/O.
+            await interaction.response.defer(ephemeral=True, thinking=True)
+
             # O clique acontece na DM, então não existe interaction.guild —
             # procuramos em qual servidor essa resposta foi registrada.
             resposta, guild_encontrada = None, None
@@ -1001,7 +1005,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                     break
 
             if not resposta:
-                await interaction.response.send_message("Essa candidatura não existe mais.", ephemeral=True)
+                await interaction.followup.send("Essa candidatura não existe mais.", ephemeral=True)
                 return
 
             formulario_resposta = await formularios.get_formulario(
@@ -1024,14 +1028,14 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 )
             )
             if not autorizado:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Você precisa do cargo Instrutor/Aprovador ou de um cargo de liderança autorizado para revisar formulários.",
                     ephemeral=True,
                 )
                 return
 
             if resposta["status"] != "pendente":
-                await interaction.response.send_message(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
+                await interaction.followup.send(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
                 return
 
             novo_status = "aprovada" if aprovado else "recusada"
@@ -1042,20 +1046,27 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 interaction.user.id,
             )
             if not resultado:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     "Essa candidatura já foi revisada por outra pessoa.",
                     ephemeral=True,
                 )
                 return
 
-            embed = interaction.message.embeds[0]
-            embed.color = 0x57F287 if aprovado else 0xED4245
-            embed.add_field(
-                name="Decisão",
-                value=f"{'✅ Aprovado' if aprovado else '❌ Recusado'} por {interaction.user.mention}",
-                inline=False,
-            )
-            await interaction.response.edit_message(embed=embed, view=None)
+            if interaction.message and interaction.message.embeds:
+                embed = interaction.message.embeds[0]
+                embed.color = 0x57F287 if aprovado else 0xED4245
+                embed.add_field(
+                    name="Decisão",
+                    value=f"{'✅ Aprovado' if aprovado else '❌ Recusado'} por {interaction.user.mention}",
+                    inline=False,
+                )
+                try:
+                    await interaction.message.edit(embed=embed, view=None)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logging.exception(
+                        "A candidatura %s foi decidida, mas a mensagem não pôde ser atualizada.",
+                        resposta_id,
+                    )
 
             from utils.registro_global import registrar
             await registrar(
@@ -1066,6 +1077,11 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 f"Candidato: <@{resposta.get('autor_id')}> (`{resposta.get('autor_id')}`)\n"
                 f"Revisor: {interaction.user.mention} (`{interaction.user.id}`)",
                 cor=0x57F287 if aprovado else 0xED4245,
+            )
+
+            await interaction.followup.send(
+                f"Decisão registrada: candidatura **{novo_status}**. O protocolo {resposta_id} foi atualizado.",
+                ephemeral=True,
             )
 
             status_texto = "APROVADA" if aprovado else "RECUSADA"
