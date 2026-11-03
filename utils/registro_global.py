@@ -100,48 +100,6 @@ async def _ler_ids(guild_id: int) -> dict:
     return servidor if isinstance(servidor, dict) else {}
 
 
-async def _limpeza_v3_concluida(guild_id: int) -> bool:
-    ids = await _ler_ids(guild_id)
-    return ids.get("_limpeza_total_v3_concluida") is True
-
-
-async def _marcar_limpeza_v3_concluida(guild_id: int) -> None:
-    chave = str(guild_id)
-    def atualizar(dados):
-        if not isinstance(dados, dict):
-            dados = {}
-        servidor = dados.get(chave)
-        if not isinstance(servidor, dict):
-            servidor = {}
-        servidor["_limpeza_total_v3_concluida"] = True
-        dados[chave] = servidor
-        return dados
-    await atualizar_json(ARQUIVO, {}, atualizar)
-
-
-async def _excluir_todos_topicos(forum: discord.ForumChannel) -> int:
-    """Exclusão única e intencional de todos os tópicos do fórum dedicado."""
-    encontrados: dict[int, discord.Thread] = {t.id: t for t in forum.threads}
-    async for thread in forum.archived_threads(limit=None):
-        encontrados[thread.id] = thread
-
-    excluidos = 0
-    for thread in encontrados.values():
-        try:
-            await thread.delete(
-                reason="Reconstrução total autorizada do Registro Global NÊMESIS: remoção de todos os tópicos antigos"
-            )
-            excluidos += 1
-            _LOG.info("Tópico antigo excluído na reconstrução V3: %s (%s)", thread.name, thread.id)
-        except discord.NotFound:
-            continue
-        except (discord.Forbidden, discord.HTTPException):
-            _LOG.exception("Não foi possível excluir o tópico %s; a reconstrução foi interrompida.", thread.id)
-            raise
-    _LOG.warning("Limpeza total do Registro Global concluída: %s tópicos excluídos.", excluidos)
-    return excluidos
-
-
 def _embed_cabecalho_topico(nome: str, descricao: str) -> discord.Embed:
     embed = discord.Embed(
         title=nome,
