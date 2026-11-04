@@ -10,7 +10,10 @@ from discord.ext import commands
 
 from cogs.status_sistema import _resumo_tarefas_automaticas
 from utils.apresentacao import COR_AVISO, COR_ERRO, COR_SUCESSO, criar_embed
-from utils.guild_config import CARGOS_LIDERANCA_IDS, GUILD_NEMESIS_ID, membro_tem_lideranca
+from utils.guild_config import (
+    CARGOS_LIDERANCA_IDS, GUILD_NEMESIS_ID,
+    membro_tem_lideranca, membro_tem_octogono,
+)
 from utils.registro_global import CATEGORIAS, obter_topico
 from utils.storage import UPSTASH_CONFIG_INCOMPLETA, USANDO_UPSTASH, carregar, verificar_conexao_storage
 
@@ -263,6 +266,30 @@ class CentralAdministrativaView(discord.ui.View):
                     self.remove_item(item)
             for indice, (rotulo, url) in enumerate(atalhos[:10]):
                 self.add_item(discord.ui.Button(label=rotulo[:80], url=url, row=1 + indice // 5))
+
+            # A inteligência de missões já possui fluxo próprio e é exclusiva
+            # do OCTÓGONO. Integrá-la aqui facilita o acesso sem ampliar autoridade.
+            if chave == "operacoes" and membro_tem_octogono(interaction.user):
+                botao_inteligencia = discord.ui.Button(
+                    label="Inteligência de operações",
+                    emoji="📈",
+                    style=discord.ButtonStyle.primary,
+                    row=3,
+                )
+
+                async def abrir_inteligencia(clique: discord.Interaction):
+                    cog_missoes = self.bot.get_cog("Missoes")
+                    if cog_missoes is None:
+                        await clique.response.send_message(
+                            "O módulo de operações não está disponível no momento.",
+                            ephemeral=True,
+                        )
+                        return
+                    await cog_missoes.enviar_painel_inteligencia(clique)
+
+                botao_inteligencia.callback = abrir_inteligencia
+                self.add_item(botao_inteligencia)
+
             await interaction.edit_original_response(embed=embed, view=self)
         except Exception:
             _LOG.exception("Falha ao abrir seção %s da Central Administrativa.", chave)
