@@ -356,9 +356,9 @@ class Logs(commands.Cog):
             value=(
                 "01. **Leia as regras:** conheça as normas antes de participar.\n"
                 "02. **Entenda a estrutura:** visite Como funciona e Divisões.\n"
-                "03. **Aprenda os sistemas:** abra #Sistemas e selecione um tutorial.\n"
+                "03. **Conheça a organização:** consulte o Guia Oficial no canal Como funciona.\n"
                 "04. **Entre em atividade:** acompanhe missões, eventos e progressão.\n"
-                "05. **Precisa de ajuda?** acesse Atendimento pelos botões abaixo."
+                "05. **Precisa de ajuda?** localize Atendimento no menu do guia."
             ),
             inline=False,
         )
