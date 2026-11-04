@@ -35,7 +35,7 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 
 - O comando existente `/sistema status` foi aprimorado para informar loops e tarefas assíncronas encontrados nos cogs, separando tarefas em execução de tarefas paradas/com falha.
 - `/sistema diagnostico` continua verificando a conectividade com o armazenamento sem expor URL ou token.
-- Não foi criado um segundo painel administrativo concorrente: os comandos de sistema, formulários, missões, tickets, revisões e parcerias existentes continuam sendo os pontos oficiais de operação.
+- A Central Administrativa agora abre diretamente os painéis de formulários, gestão de missões e revisão de provas; tickets e parcerias mantêm seus fluxos próprios até receberem controles equivalentes.
 
 ### P2 — Documentação e avisos
 
