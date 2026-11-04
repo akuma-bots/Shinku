@@ -76,6 +76,7 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
             send=AsyncMock(),
         )
         canal = SimpleNamespace(
+            id=1563995882540498996,
             create_thread=AsyncMock(return_value=thread),
         )
         guild = SimpleNamespace(
