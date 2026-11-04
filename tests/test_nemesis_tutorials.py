@@ -25,7 +25,7 @@ def test_tutorial_is_channel_panel_not_slash_command():
 
 
 def test_welcome_guide_links_only_known_nemesis_channels():
-    ids = [canal_id for _, canal_id, _ in CANAIS_GUIA_SERVIDORES]
+    ids = [canal_id for _, canal_id, *_ in CANAIS_GUIA_SERVIDORES]
     assert len(ids) == len(set(ids))
     assert len(CANAIS_GUIA_SERVIDORES) <= 25
     assert all(canal_id > 0 for canal_id in ids)
