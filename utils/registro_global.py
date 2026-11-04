@@ -31,14 +31,14 @@ CARGOS_ACESSO_IDS = {
 # Os nomes antigos continuam aceitos pelos cogs durante a migração.
 CATEGORIAS = {
     "administracao": ("👑・Central de Administração", "Decisões administrativas, permissões, configurações e diretrizes oficiais da NÊMESIS."),
-    "historico_membros": ("👥・Arquivo de Membros", "Área exclusiva para consultar o histórico individual dos membros. Não recebe registros automáticos."),
+    "historico_membros": ("👥・Arquivo de Membros", "Entradas, saídas e ocorrências individuais essenciais. Não recebe conteúdo de mensagens editadas/excluídas, auditoria de cargos ou conquistas."),
     "moderacao": ("⚖️・Tribunal de Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
     "seguranca": ("🛡️・Muralha de Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
     "missoes": ("🎯・Operações e Missões", "Missões, operações, formulários, relatórios, atribuições, provas, validações, conclusões e recompensas."),
     "competitivo": ("🏆・Arena Competitiva", "Desafios, PvP, guerras, placares, participantes e resultados."),
     "eventos": ("🎉・Eventos e Celebrações", "Agenda, inscrições, atividades coletivas, sorteios, vencedores e entrega de prêmios."),
     "atendimento": ("🎫・Central de Atendimento", "Tickets, responsáveis, encerramentos, avaliações e transcrições."),
-    "mensagens": ("💬・Comunicação Geral", "Edições, exclusões e anexos de mensagens, com autor, canal e contexto disponíveis."),
+    "mensagens": ("💬・Comunicação Geral", "Registros técnicos de anexos e comunicação. O conteúdo de mensagens editadas e excluídas permanece somente na consulta privada de atividade."),
     "parcerias": ("🤝・Alianças e Parcerias", "Solicitações, aprovações, representantes e alterações de parcerias."),
     "integracoes": ("⚙️・Sistemas e Integrações", "Roblox, APIs externas, Upstash, conexões, health checks, tarefas e disponibilidade do Shinku."),
     "sugestoes": ("📋・Sugestões e Ideias", "Sugestões recebidas, votos, decisões e resultados."),
