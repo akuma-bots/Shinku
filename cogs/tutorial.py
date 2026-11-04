@@ -72,7 +72,7 @@ TUTORIAIS = {
             "Após aprovação, o XP é registrado no perfil e nos sistemas de progressão aplicáveis. O histórico evita créditos duplicados.",
             "Se a prova for recusada, leia o motivo enviado pela equipe, corrija a evidência e faça um novo envio quando permitido.",
         ],
-        "comandos": "Central de Operações no canal 𝖬𝗂𝗌𝗌𝗈̃𝖾𝗌 · /perfil · /painel-provas (staff)",
+        "comandos": "Central de Operações no canal 𝖬𝗂𝗌𝗌𝗈̃𝖾𝗌 · painel de perfil · Central Administrativa (staff)",
     },
     "contribuicoes": {
         "titulo": "Contribuições",
@@ -84,7 +84,7 @@ TUTORIAIS = {
             "Aguarde a aprovação do OCTÓGONO antes de considerar o XP confirmado.",
             "Não repita envios para tentar multiplicar pontos; em caso de divergência, abra um ticket.",
         ],
-        "comandos": "Central de Tutoriais no canal #Sistemas · /perfil · /painel-provas (staff)",
+        "comandos": "Central de Tutoriais no canal #Sistemas · painel de perfil · Central Administrativa (staff)",
     },
     "especiais": {
         "titulo": "Missões especiais",
@@ -96,7 +96,7 @@ TUTORIAIS = {
             "Envie a prova pelo fluxo indicado e aguarde a decisão da staff.",
             "Se a missão estiver encerrada, não envie uma nova prova sem autorização.",
         ],
-        "comandos": "/help · /painel-provas (staff)",
+        "comandos": "painéis de ajuda · Central Administrativa (staff)",
     },
     "pvp": {
         "titulo": "PvP e Desafios",
@@ -108,7 +108,7 @@ TUTORIAIS = {
             "Se houver divergência, solicite revisão em vez de criar registros duplicados.",
             "Confira XP, vitórias e derrotas no perfil depois da confirmação.",
         ],
-        "comandos": "/help · /perfil · /painel-provas (staff)",
+        "comandos": "painéis de ajuda · perfil · Central Administrativa (staff)",
     },
     "guerras": {
         "titulo": "Guerras entre gangues",
@@ -132,7 +132,7 @@ TUTORIAIS = {
             "Se a aplicação da recompensa falhar, consulte os logs e reavalie a pendência; não conceda recompensa manualmente sem verificar o estado.",
             "Registre a decisão e o motivo de rejeição de forma objetiva.",
         ],
-        "comandos": "/painel-provas · /help",
+        "comandos": "Central Administrativa · ajuda",
     },
     "perfil": {
         "titulo": "Perfil, XP e estatísticas",
@@ -321,7 +321,7 @@ TUTORIAIS = {
             "Evite conceder pontos, cargos ou prêmios manualmente sem registrar a operação.",
             "Em falhas, preserve IDs e logs, informe a equipe técnica e não repita a ação até confirmar se ela foi aplicada.",
         ],
-        "comandos": "/help · /painel-provas · comandos administrativos liberados para seu cargo",
+        "comandos": "ajuda · Central Administrativa com acesso conforme seu cargo",
     },
 }
 
