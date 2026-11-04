@@ -194,3 +194,58 @@ class TestPersistenciaMonitoramento(unittest.IsolatedAsyncioTestCase):
             await monitor.registrar_evento(1, 2, "voz_entrada", "Entrou", timestamp=1_800_000_000)
             await monitor.registrar_evento(1, 2, "voz_entrada", "Entrou", timestamp=1_800_000_000)
         self.assertEqual(len(estado[monitor._arquivo(1, 2)]["eventos"]), 1)
+
+
+class TestMonitoramentoAmpliado(unittest.IsolatedAsyncioTestCase):
+    async def test_exclusao_em_massa_vai_apenas_para_dossie_privado(self):
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from cogs.logs import Logs, GUILD_NEMESIS_ID
+
+        mensagem = SimpleNamespace(
+            guild=SimpleNamespace(id=GUILD_NEMESIS_ID),
+            author=SimpleNamespace(id=321, bot=False),
+            id=654, channel=SimpleNamespace(id=987),
+            created_at=datetime(2026, 11, 4, tzinfo=timezone.utc),
+            content="conteúdo removido", jump_url="https://discord.com/channels/1/2/3",
+            attachments=[],
+        )
+        cog = object.__new__(Logs)
+        with patch("cogs.logs.monitoramento_membros.registrar_mensagem", new=AsyncMock()) as registrar, patch.object(
+            cog, "_canal_logs", new=AsyncMock()
+        ) as publicar:
+            await cog.on_bulk_message_delete([mensagem])
+
+        registrar.assert_awaited_once()
+        dados = registrar.await_args.args[2]
+        self.assertEqual(dados["status"], "excluida")
+        self.assertEqual(dados["conteudo"], "conteúdo removido")
+        publicar.assert_not_awaited()
+
+    async def test_presenca_e_jogo_sao_registrados_sem_status_personalizado(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        import discord
+        from cogs.logs import Logs, GUILD_NEMESIS_ID
+
+        antes = SimpleNamespace(
+            guild=SimpleNamespace(id=GUILD_NEMESIS_ID), id=123, bot=False,
+            status=discord.Status.online,
+            activities=[SimpleNamespace(type=discord.ActivityType.playing, name="GTA V")],
+        )
+        depois = SimpleNamespace(
+            guild=SimpleNamespace(id=GUILD_NEMESIS_ID), id=123, bot=False,
+            status=discord.Status.dnd,
+            activities=[SimpleNamespace(type=discord.ActivityType.playing, name="Valorant")],
+        )
+        cog = object.__new__(Logs)
+        with patch("cogs.logs.monitoramento_membros.registrar_evento", new=AsyncMock()) as registrar:
+            await cog.on_presence_update(antes, depois)
+
+        registrar.assert_awaited_once()
+        self.assertEqual(registrar.await_args.args[2], "presenca")
+        self.assertIn("online → dnd", registrar.await_args.args[3])
+        self.assertIn("GTA V", registrar.await_args.args[3])
+        self.assertIn("Valorant", registrar.await_args.args[3])
+
