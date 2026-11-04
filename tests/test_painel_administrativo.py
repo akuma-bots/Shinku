@@ -70,14 +70,14 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         canais = dict(SECOES_ADMINISTRATIVAS["operacoes"]["canais"])
         self.assertEqual(canais, {
             "Missões": 1563995881315897549,
+            "Central de missões": 1556543214885019668,
+            "Envio de provas": 1556543417843056641,
+            "Desafios competitivos": 1545834386128375909,
             "Agenda": 1563995880623841337,
             "Inscrições": 1563995880623841338,
             "Divisões": 1563995880833421511,
             "Parcerias": 1563995880833421513,
         })
-        self.assertNotIn(1556543214885019668, canais.values())
-        self.assertNotIn(1556543417843056641, canais.values())
-        self.assertNotIn(1545834386128375909, canais.values())
 
     def test_dossie_nao_promete_auditoria_de_cargos_no_historico_individual(self):
         descricao = SECOES_ADMINISTRATIVAS["membros"]["descricao"].casefold()
