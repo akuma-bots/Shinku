@@ -430,6 +430,10 @@ class Logs(commands.Cog):
         ):
             return
 
+        indice_existente = await monitoramento_membros.buscar_mensagem(message.guild.id, message.id)
+        if indice_existente and indice_existente.get("status") == "excluida":
+            return
+
         agora = datetime.now(timezone.utc).timestamp()
         await monitoramento_membros.registrar_mensagem(
             message.guild.id,
@@ -454,6 +458,8 @@ class Logs(commands.Cog):
         if payload.guild_id != GUILD_NEMESIS_ID:
             return
         registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, payload.message_id)
+        if registro and registro.get("status") == "excluida":
+            return
         agora = datetime.now(timezone.utc).timestamp()
         mensagem_cache = getattr(payload, "cached_message", None)
         if registro:
@@ -492,6 +498,8 @@ class Logs(commands.Cog):
         }
         for message_id in payload.message_ids:
             registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, message_id)
+            if registro and registro.get("status") == "excluida":
+                continue
             mensagem_cache = cache.get(message_id)
             if registro:
                 user_id = int(registro["user_id"])
