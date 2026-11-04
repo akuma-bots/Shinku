@@ -755,11 +755,9 @@ class Eventos(commands.Cog):
         )
 
         for evento in eventos:
+            await self._sincronizar_evento(evento)
 
-            await self._sincronizar_evento(
-                evento
-            )
-
+        await self.atualizar_agenda(interaction.guild)
         await interaction.response.send_message(
             f"✓ {len(eventos)} evento(s) "
             "sincronizado(s) no armazenamento interno do bot.",
