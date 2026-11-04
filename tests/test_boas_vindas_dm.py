@@ -60,4 +60,4 @@ def test_entry_navigation_uses_one_select_instead_of_link_buttons():
     seletor = view.children[0]
     assert isinstance(seletor, discord.ui.Select)
     assert len(seletor.options) == len(CANAIS_GUIA_SERVIDORES) == 12
-    assert seletor.placeholder == "◈ Selecione uma área da NÊMESIS"
+    assert seletor.placeholder == "◈ Escolha uma área para conhecer"
