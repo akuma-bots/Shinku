@@ -14,6 +14,7 @@ from utils.storage import carregar, salvar
 
 ARQUIVO = "eventos.json"
 CANAL_EVENTOS_PADRAO_ID = 1563995880623841337
+CANAL_EVENTOS_LEGADO_ID = 1545835097830334536
 _EVENTOS_LOCK = asyncio.Lock()
 _LOG = logging.getLogger(__name__)
 
@@ -202,6 +203,8 @@ class Eventos(commands.Cog):
         canal_id = config.get(
             "canal_eventos_id"
         ) or CANAL_EVENTOS_PADRAO_ID
+        if int(canal_id) == CANAL_EVENTOS_LEGADO_ID:
+            canal_id = CANAL_EVENTOS_PADRAO_ID
 
         return (
             guild.get_channel(canal_id)
