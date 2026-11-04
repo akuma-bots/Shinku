@@ -117,6 +117,61 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         await botao.callback(clique)
         cog_missoes.enviar_painel_inteligencia.assert_awaited_once_with(clique)
 
+    def test_paineis_administrativos_migrados_nao_sao_comandos_slash(self):
+        from cogs.formularios import Formularios
+        from cogs.gestao_missoes import GestaoMissoes
+        from cogs.revisoes import Revisoes
+        from cogs.status_sistema import StatusSistema
+        for cog, metodo in (
+            (Formularios, "formulario_central"),
+            (GestaoMissoes, "central_missoes"),
+            (Revisoes, "painel_provas"),
+            (StatusSistema, "status"),
+            (StatusSistema, "diagnostico"),
+        ):
+            with self.subTest(cog=cog.__name__, metodo=metodo):
+                self.assertFalse(hasattr(getattr(cog, metodo), "__command__"))
+
+    async def test_acoes_de_operacoes_abrem_paineis_dos_cogs(self):
+        formularios = SimpleNamespace(formulario_central=AsyncMock())
+        gestao = SimpleNamespace(central_missoes=AsyncMock())
+        revisoes = SimpleNamespace(painel_provas=AsyncMock())
+        cogs = {"Formularios": formularios, "GestaoMissoes": gestao, "Revisoes": revisoes}
+        bot = SimpleNamespace(get_cog=lambda nome: cogs.get(nome))
+        view = CentralAdministrativaView(bot, owner_id=123, guild=SimpleNamespace(id=1563995879981981817))
+        view.seletor._values = ["operacoes"]
+        interacao_secao = SimpleNamespace(
+            user=SimpleNamespace(id=123),
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        with (
+            patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Operações"), []))),
+            patch("cogs.painel_administrativo.membro_tem_octogono", return_value=True),
+        ):
+            await view._selecionar_secao(interacao_secao)
+        botao = next(item for item in view.children if getattr(item, "label", "") == "Processos seletivos")
+        clique = SimpleNamespace()
+        with patch("cogs.painel_administrativo._tem_acesso", return_value=True):
+            await botao.callback(clique)
+        formularios.formulario_central.assert_awaited_once_with(clique)
+
+    async def test_acoes_de_sistemas_abrem_status_e_diagnostico(self):
+        status = SimpleNamespace(status=AsyncMock(), diagnostico=AsyncMock())
+        bot = SimpleNamespace(get_cog=lambda nome: status if nome == "StatusSistema" else None)
+        view = CentralAdministrativaView(bot, owner_id=123, guild=SimpleNamespace(id=1563995879981981817))
+        view.seletor._values = ["sistemas"]
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=123),
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        with patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Sistemas"), []))):
+            await view._selecionar_secao(interaction)
+        labels = {getattr(item, "label", "") for item in view.children}
+        self.assertIn("Saúde do sistema", labels)
+        self.assertIn("Diagnóstico do armazenamento", labels)
+
     def test_areas_tem_destinos_de_auditoria_e_descricao(self):
         for chave, secao in SECOES_ADMINISTRATIVAS.items():
             with self.subTest(secao=chave):
