@@ -13,12 +13,12 @@ O Painel Administrativo Central é uma navegação privada por botões e menus, 
 
 1. **Visão geral:** estado do bot, latência, tempo ativo, efetivo, módulos, tarefas automáticas, Upstash e sincronização do Registro Global.
 2. **Membros e hierarquia:** dossiê individual, progressão, entradas, saídas e atividade. A auditoria de cargos permanece separada no tópico administrativo; mensagens editadas e excluídas ficam somente na consulta privada de atividade.
-3. **Operações:** missões, provas, desafios competitivos, eventos, formulários, parcerias e relatórios. O atalho **Inteligência de operações** aparece somente para o OCTÓGONO e abre a central de métricas de missões já existente.
+3. **Operações:** botões privados para abrir Processos seletivos, Gestão de missões e Revisão de provas. O atalho **Inteligência de operações** aparece somente para o OCTÓGONO e abre a central de métricas de missões já existente. Os demais destinos continuam disponíveis pelos painéis próprios enquanto suas ferramentas administrativas são migradas.
 4. **Segurança:** segurança, AutoMod, moderação e decisões administrativas.
-5. **Sistemas e infraestrutura:** infraestrutura, integrações, configurações, sistemas e Roblox.
+5. **Sistemas e infraestrutura:** botões privados para Saúde do sistema e Diagnóstico do armazenamento, além dos destinos de infraestrutura, integrações, configurações e Roblox.
 6. **Auditoria e registros:** comunicação, atendimento, histórico individual, eventos e sugestões.
 
-Os botões de destino apontam para tópicos permanentes já existentes ou canais de sistemas existentes. A central não cria cópias de painéis nem duplica registros.
+Os botões de destino apontam para tópicos permanentes já existentes ou canais de sistemas existentes. Os atalhos slash para abrir as centrais de formulários, gestão de missões, revisão de provas, status e diagnóstico foram removidos; os fluxos agora partem dos botões da Central Administrativa. A central não cria cópias de painéis nem duplica registros.
 
 ## Regras de autoridade preservadas
 
