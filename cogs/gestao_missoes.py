@@ -1,7 +1,6 @@
 import logging
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from utils import missoes, revisoes
@@ -465,8 +464,6 @@ class GestaoMissoes(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="central-missoes", description="Abrir a central administrativa de gestão de missões.")
-    @octogono_only()
     async def central_missoes(self, interaction: discord.Interaction):
         if interaction.guild is None or not _administrador(interaction):
             await interaction.response.send_message("A central é restrita aos administradores autorizados da NÊMESIS.", ephemeral=True)
