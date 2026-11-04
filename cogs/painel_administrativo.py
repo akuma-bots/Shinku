@@ -27,7 +27,7 @@ SECOES_ADMINISTRATIVAS = {
     },
     "membros": {
         "titulo": "👥 GESTÃO DE MEMBROS E HIERARQUIA",
-        "descricao": "Consulte o dossiê individual e a linha do tempo de cada integrante. Alterações de cargos fazem parte do histórico do próprio membro.",
+        "descricao": "Consulte o dossiê individual, a progressão e a linha do tempo de participação. A auditoria de cargos permanece separada no tópico administrativo.",
         "topicos": ("historico_membros",),
         "canais": (("Progressão e XP", 1563995881315897548),),
     },
@@ -36,9 +36,11 @@ SECOES_ADMINISTRATIVAS = {
         "descricao": "Acesse missões, validações, competições, eventos, inscrições, parcerias e relatórios operacionais.",
         "topicos": ("missoes", "competitivo", "eventos", "parcerias"),
         "canais": (
-            ("Central de missões", 1556543214885019668),
-            ("Envio de provas", 1556543417843056641),
-            ("Desafios competitivos", 1545834386128375909),
+            ("Missões", 1563995881315897549),
+            ("Agenda", 1563995880623841337),
+            ("Inscrições", 1563995880623841338),
+            ("Divisões", 1563995880833421511),
+            ("Parcerias", 1563995880833421513),
         ),
     },
     "seguranca": {
