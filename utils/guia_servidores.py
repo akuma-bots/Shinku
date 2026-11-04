@@ -179,24 +179,23 @@ class GuiaCanaisSelect(discord.ui.Select):
             return
 
         url = f"https://discord.com/channels/{GUILD_NEMESIS_ID}/{canal_id}"
-        if interaction.message and interaction.message.embeds:
-            embed = discord.Embed.from_dict(interaction.message.embeds[0].to_dict())
-            embed.clear_fields()
-            embed.add_field(
-                name="◈ ÁREA SELECIONADA",
-                value=f"{emoji} **{nome}**\n{descricao}\n\n[**Abrir {nome}**]({url})",
-                inline=False,
-            )
-            embed.add_field(
-                name="◈ ORIENTAÇÃO",
-                value="Ao entrar, leia as mensagens fixadas e siga as instruções publicadas pela equipe responsável.",
-                inline=False,
-            )
-            await interaction.response.edit_message(embed=embed, view=self.view)
-            return
-
+        resposta = discord.Embed(
+            title=f"{emoji} {nome.upper()}",
+            description=(
+                f"{descricao}\n\n"
+                "Ao acessar o canal, confira as mensagens fixadas e siga as orientações "
+                "publicadas pela equipe responsável."
+            ),
+            colour=0xB3132B,
+        )
+        resposta.add_field(
+            name="◈ ACESSO DIRETO",
+            value=f"[**Abrir {nome} no Discord**]({url})",
+            inline=False,
+        )
+        resposta.set_footer(text="NÊMESIS • Orientação do servidor")
         await interaction.response.send_message(
-            f"{emoji} **{nome}**\n{descricao}\n[**Abrir canal**]({url})",
+            embed=resposta,
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -213,11 +212,26 @@ def adicionar_botoes_guia(view: discord.ui.View) -> discord.ui.View:
 
 
 class GuiaServidoresView(discord.ui.View):
-    """Seletor persistente usado no guia fixo e na mensagem de boas-vindas."""
+    """Navegação persistente do guia oficial da NÊMESIS."""
 
     def __init__(self):
         super().__init__(timeout=None)
         adicionar_seletor_guia(self)
+        self.add_item(discord.ui.Button(
+            label="Regras", emoji="📜", style=discord.ButtonStyle.link,
+            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995880833421508",
+            row=1,
+        ))
+        self.add_item(discord.ui.Button(
+            label="Divisões", emoji="⚔️", style=discord.ButtonStyle.link,
+            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995880833421511",
+            row=1,
+        ))
+        self.add_item(discord.ui.Button(
+            label="Atendimento", emoji="🎫", style=discord.ButtonStyle.link,
+            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995881655509059",
+            row=1,
+        ))
 
 
 async def publicar_guia_servidor(bot) -> bool:
