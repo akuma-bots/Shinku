@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.guild_config import get_config, set_config, lideranca_only
+from utils.guild_config import lideranca_only
 from utils.storage import carregar, salvar
 
 
@@ -193,80 +193,9 @@ class Eventos(commands.Cog):
     ):
         self.bot = bot
 
-    async def _canal_eventos(
-        self,
-        guild: discord.Guild,
-    ):
-
-        config = await get_config(
-            guild.id
-        )
-
-        canal_id = config.get(
-            "canal_eventos_id"
-        ) or CANAL_EVENTOS_PADRAO_ID
-        if int(canal_id) == CANAL_EVENTOS_LEGADO_ID:
-            canal_id = CANAL_EVENTOS_PADRAO_ID
-
-        return (
-            guild.get_channel(canal_id)
-            if canal_id
-            else None
-        )
-
-    async def _sincronizar_evento(
-        self,
-        evento: discord.ScheduledEvent,
-        criado_por_id: int | None = None,
-    ):
-
-        async with _EVENTOS_LOCK:
-            dados = await _todos_eventos()
-            antigo = dados.get(str(evento.id), {})
-            if not isinstance(antigo, dict):
-                antigo = {}
-
-            registro = _evento_para_dados(
-                evento,
-                evento.guild.id,
-                criado_por_id or antigo.get("criado_por_id"),
-            )
-            registro["criado_em"] = antigo.get("criado_em") or time.time()
-            participantes = antigo.get("participantes", [])
-            registro["participantes"] = participantes if isinstance(participantes, list) else []
-
-            dados[str(evento.id)] = registro
-            await _salvar_eventos(dados)
-            return registro
-
-    @app_commands.command(
-        name="configurar-canal-eventos",
-        description=(
-            "Define onde o bot anuncia os eventos agendados."
-        ),
-    )
-    @app_commands.describe(
-        canal=(
-            "Canal de texto para os anúncios de evento"
-        ),
-    )
-    @lideranca_only()
-    async def configurar_canal_eventos(
-        self,
-        interaction: discord.Interaction,
-        canal: discord.TextChannel,
-    ):
-
-        await set_config(
-            interaction.guild.id,
-            canal_eventos_id=canal.id,
-        )
-
-        await interaction.response.send_message(
-            f"✓ Eventos agendados agora são anunciados "
-            f"em {canal.mention}.",
-            ephemeral=True,
-        )
+    async def _canal_eventos(self, guild: discord.Guild):
+        """Retorna o canal fixo da Agenda, sem misturá-lo com publicações de sorteios."""
+        return guild.get_channel(CANAL_EVENTOS_PADRAO_ID)
 
     @app_commands.command(
         name="campeonato-agendar",
