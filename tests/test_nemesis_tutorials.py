@@ -7,7 +7,7 @@ from utils.guia_servidores import CANAIS_GUIA_SERVIDORES, CARGO_VISITANTES_ID, T
 
 def test_tutorial_catalog_has_core_systems():
     assert len(TUTORIAIS) <= 25
-    assert {"missoes", "guerras", "moderacao", "roblox", "avisos"}.issubset(TUTORIAIS)
+    assert {"missoes", "guerras", "moderacao", "roblox", "avisos", "academia"}.issubset(TUTORIAIS)
 
 
 def test_release_manifest_is_valid():
