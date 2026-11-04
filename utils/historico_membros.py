@@ -384,7 +384,7 @@ def _embed_atividade(d: dict) -> discord.Embed:
         descricao = discord.utils.escape_mentions(discord.utils.escape_markdown(str(item.get("descricao", ""))[:180]))
         linhas.append(f"• **{tipo}** · {_data(_timestamp(item.get('timestamp')))}\n↳ {descricao}")
     embed.add_field(name="◈ ATIVIDADES RECENTES", value="\n\n".join(linhas)[:4000] if linhas else "Nenhum evento de atividade foi capturado ainda.", inline=False)
-    embed.add_field(name="◈ COBERTURA", value="Entradas e saídas do servidor, alterações de apelido, ações de moderação e movimentações em canais de voz. O Discord não fornece um registro completo de tudo o que um usuário faz fora do servidor.", inline=False)
+    embed.add_field(name="◈ COBERTURA", value="Entradas e saídas; mudanças de presença e jogos; apelidos e identidade; cargos recebidos/removidos; impulsionamento; timeouts; entradas, saídas e estados de voz; banimentos e desbanimentos. Mensagens enviadas, editadas e excluídas ficam na aba própria. Captura iniciada após a implantação, com retenção de 30 dias e limites de armazenamento. Não inclui DMs, atividade fora do servidor nem histórico anterior à ativação.", inline=False)
     embed.set_footer(text="NÊMESIS • Retenção de 30 dias • Consulta restrita à liderança")
     return embed
 
