@@ -677,6 +677,23 @@ class Logs(commands.Cog):
                         "depois": timeout_depois.timestamp() if timeout_depois else None,
                     },
                 )
+            ids_antes_privados = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
+            ids_depois_privados = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
+            ganhos_privados = [cargo for cargo_id, cargo in ids_depois_privados.items() if cargo_id not in ids_antes_privados]
+            perdidos_privados = [cargo for cargo_id, cargo in ids_antes_privados.items() if cargo_id not in ids_depois_privados]
+            if ganhos_privados or perdidos_privados:
+                partes_privadas = []
+                if ganhos_privados:
+                    partes_privadas.append("Recebeu: " + ", ".join(cargo.name for cargo in ganhos_privados[:20]))
+                if perdidos_privados:
+                    partes_privadas.append("Perdeu: " + ", ".join(cargo.name for cargo in perdidos_privados[:20]))
+                await monitoramento_membros.registrar_evento(
+                    depois.guild.id, depois.id, "cargos", " | ".join(partes_privadas),
+                    detalhes={
+                        "recebidos": [{"id": cargo.id, "nome": cargo.name} for cargo in ganhos_privados[:30]],
+                        "removidos": [{"id": cargo.id, "nome": cargo.name} for cargo in perdidos_privados[:30]],
+                    },
+                )
         canal = await self._canal_logs(depois.guild)
         if not canal:
             return
@@ -727,19 +744,6 @@ class Logs(commands.Cog):
         ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
         perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
         if ganhos or perdidos:
-            partes = []
-            if ganhos:
-                partes.append("Recebeu: " + ", ".join(cargo.name for cargo in ganhos[:20]))
-            if perdidos:
-                partes.append("Perdeu: " + ", ".join(cargo.name for cargo in perdidos[:20]))
-            await monitoramento_membros.registrar_evento(
-                depois.guild.id, depois.id, "cargos",
-                " | ".join(partes),
-                detalhes={
-                    "recebidos": [{"id": cargo.id, "nome": cargo.name} for cargo in ganhos[:30]],
-                    "removidos": [{"id": cargo.id, "nome": cargo.name} for cargo in perdidos[:30]],
-                },
-            )
             embed_cargos = criar_embed(
                 title="Cargos do membro alterados",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
