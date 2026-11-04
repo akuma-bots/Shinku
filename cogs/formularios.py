@@ -574,11 +574,9 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         self.bot = bot
         self._view_inscricoes_registrada = False
 
-    @app_commands.command(name="central", description="Abre a central interativa de administração dos formulários.")
-    @lideranca_only()
     async def formulario_central(self, interaction: discord.Interaction):
-        if interaction.guild is None:
-            await interaction.response.send_message("Use este comando dentro da NÊMESIS.", ephemeral=True)
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
             return
         lista = await formularios.listar_formularios(interaction.guild.id)
         if not lista:
