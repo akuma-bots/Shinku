@@ -256,6 +256,20 @@ TUTORIAIS = {
         ],
         "comandos": "/help · painel de atendimento",
     },
+    "academia": {
+        "titulo": "Academia e treinamentos",
+        "descricao": "Como consultar treinamentos, se inscrever e acompanhar avaliações.",
+        "passos": [
+            "Use /academia listar para consultar os treinamentos abertos, objetivos, horários e vagas.",
+            "Copie o código do treinamento desejado e use /academia inscrever para registrar sua participação.",
+            "Acompanhe a data e as orientações informadas na descrição do treinamento.",
+            "Depois da atividade, a liderança registra o resultado como aprovado, reprovado ou ausente, com uma observação quando necessário.",
+            "Use /academia meu-historico para consultar seus treinamentos e resultados. A liderança também pode consultar o histórico individual.",
+            "A inscrição não confirma presença física. O resultado depende da avaliação registrada pela equipe.",
+            "A Academia registra avaliações, mas não concede XP automaticamente. Recompensas dependem de critérios oficiais definidos pela organização.",
+        ],
+        "comandos": "/academia listar · /academia inscrever · /academia meu-historico",
+    },
     "eventos": {
         "titulo": "Eventos e campeonatos",
         "descricao": "Como acompanhar e organizar atividades agendadas.",
