@@ -83,12 +83,18 @@ def _avaliar_inscrito(registro: dict, user_id: int, resultado: str, avaliador_id
         return registro, "nao_inscrito"
     agora = float(agora or time.time())
     participante = dict(inscritos[user_key])
-    participante.update({
+    avaliacao = {
         "status": resultado,
         "avaliado_em": agora,
         "avaliado_por": int(avaliador_id),
         "observacao": str(observacao or "").strip()[:500],
-    })
+    }
+    historico_avaliacoes = participante.get("historico_avaliacoes", [])
+    if not isinstance(historico_avaliacoes, list):
+        historico_avaliacoes = []
+    historico_avaliacoes.append(dict(avaliacao))
+    participante["historico_avaliacoes"] = historico_avaliacoes[-10:]
+    participante.update(avaliacao)
     inscritos[user_key] = participante
     registro["inscritos"] = inscritos
     registro["atualizado_em"] = agora
@@ -154,6 +160,8 @@ class Academia(commands.GroupCog, group_name="academia", group_description="Trei
         sessao_id = f"ACD-{secrets.token_hex(3).upper()}"
         registro = _criar_registro_sessao(sessao_id=sessao_id, nome=nome, descricao=descricao, inicio=inicio, vagas=vagas, criador_id=interaction.user.id)
 
+        resultado_criacao = {"criado": False}
+
         def aplicar(documento):
             if not isinstance(documento, dict):
                 documento = {}
@@ -164,16 +172,34 @@ class Academia(commands.GroupCog, group_name="academia", group_description="Trei
             sessoes = servidor.get("sessoes", {})
             if not isinstance(sessoes, dict):
                 sessoes = {}
+            encerradas = sorted(
+                (
+                    (chave_sessao, item)
+                    for chave_sessao, item in sessoes.items()
+                    if isinstance(item, dict) and item.get("status") == "encerrada"
+                ),
+                key=lambda item: float(item[1].get("criado_em", 0) or 0),
+            )
+            while len(sessoes) >= _LIMITE_SESSOES and encerradas:
+                chave_antiga, _ = encerradas.pop(0)
+                sessoes.pop(chave_antiga, None)
+            if len(sessoes) >= _LIMITE_SESSOES:
+                documento[chave] = {**servidor, "sessoes": sessoes}
+                return documento
             sessoes[sessao_id] = registro
-            if len(sessoes) > _LIMITE_SESSOES:
-                ordenadas = sorted(sessoes.items(), key=lambda item: float(item[1].get("criado_em", 0) or 0))
-                for chave_antiga, _ in ordenadas[:len(sessoes) - _LIMITE_SESSOES]:
-                    sessoes.pop(chave_antiga, None)
+            resultado_criacao["criado"] = True
             servidor["sessoes"] = sessoes
             documento[chave] = servidor
             return documento
 
         await atualizar_json(ARQUIVO_ACADEMIA, {}, aplicar)
+        if not resultado_criacao["criado"]:
+            await interaction.response.send_message(
+                "A Academia atingiu o limite de sessões abertas e históricas. "
+                "Encerre treinamentos concluídos antes de criar outro.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
             f"Treinamento {nome} registrado na Academia.\nCódigo: {sessao_id}\n"
             f"Início: {discord.utils.format_dt(inicio_dt, style='F')}\n"
