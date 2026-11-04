@@ -6,6 +6,7 @@ import discord
 
 from cogs import formularios as cog_formularios
 from cogs.formularios import _embeds_painel, _embeds_resposta, _paginas_modal, _limpar_sessoes_formularios
+from utils import formularios as storage_formularios
 
 
 class TestFormularios(unittest.IsolatedAsyncioTestCase):
@@ -103,6 +104,61 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         canal.create_thread.assert_awaited_once()
         thread.send.assert_awaited_once()
         self.assertIs(thread.send.await_args.kwargs["view"], view)
+
+
+    async def test_avaliacao_estruturada_e_anexada_sem_apagar_historico(self):
+        resposta = {"id": "resp-1", "status": "pendente", "avaliacoes": []}
+        dados = {"123": [resposta]}
+        with patch.object(storage_formularios, "_tudo_respostas", new=AsyncMock(return_value=dados)), patch.object(
+            storage_formularios, "_salvar_respostas_guild", new=AsyncMock()
+        ):
+            avaliacao = await storage_formularios.registrar_avaliacao(
+                123,
+                "resp-1",
+                456,
+                {
+                    "postura": 5,
+                    "responsabilidade": 4,
+                    "disponibilidade": 3,
+                    "imparcialidade": 5,
+                    "comunicacao": 4,
+                },
+                "Boa postura e respostas consistentes.",
+            )
+
+        self.assertEqual(avaliacao["media"], 4.2)
+        self.assertEqual(len(resposta["avaliacoes"]), 1)
+        self.assertEqual(resposta["avaliacoes"][0]["revisor_id"], 456)
+
+    async def test_avaliacao_nao_e_registrada_para_candidatura_encerrada(self):
+        resposta = {"id": "resp-2", "status": "aprovada"}
+        dados = {"123": [resposta]}
+        with patch.object(storage_formularios, "_tudo_respostas", new=AsyncMock(return_value=dados)), patch.object(
+            storage_formularios, "_salvar_respostas_guild", new=AsyncMock()
+        ) as salvar_respostas:
+            resultado = await storage_formularios.registrar_avaliacao(
+                123, "resp-2", 456,
+                {"postura": 5, "responsabilidade": 5, "disponibilidade": 5, "imparcialidade": 5, "comunicacao": 5},
+                "Avaliação tardia",
+            )
+
+        self.assertIsNone(resultado)
+        salvar_respostas.assert_not_awaited()
+
+    async def test_decisao_mantem_historico_com_revisor_e_data(self):
+        resposta = {"id": "resp-3", "status": "pendente"}
+        dados = {"123": [resposta]}
+        with patch.object(storage_formularios, "_tudo_respostas", new=AsyncMock(return_value=dados)), patch.object(
+            storage_formularios, "_salvar_respostas_guild", new=AsyncMock()
+        ):
+            resultado = await storage_formularios.definir_status_resposta(
+                123, "resp-3", "aprovada", 789, "Avaliação concluída."
+            )
+
+        self.assertEqual(resultado["historico_decisoes"][0]["status"], "aprovada")
+        self.assertEqual(resultado["historico_decisoes"][0]["revisor_id"], 789)
+        self.assertEqual(resultado["historico_decisoes"][0]["motivo"], "Avaliação concluída.")
+        self.assertGreater(resultado["historico_decisoes"][0]["criado_em"], 0)
 
     def test_candidatura_longa_respeita_limite_de_campos_por_embed(self):
         perguntas = [
