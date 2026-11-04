@@ -217,22 +217,6 @@ class GuiaServidoresView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         adicionar_seletor_guia(self)
-        self.add_item(discord.ui.Button(
-            label="Regras", emoji="📜", style=discord.ButtonStyle.link,
-            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995880833421508",
-            row=1,
-        ))
-        self.add_item(discord.ui.Button(
-            label="Divisões", emoji="⚔️", style=discord.ButtonStyle.link,
-            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995880833421511",
-            row=1,
-        ))
-        self.add_item(discord.ui.Button(
-            label="Atendimento", emoji="🎫", style=discord.ButtonStyle.link,
-            url=f"https://discord.com/channels/{GUILD_NEMESIS_ID}/1563995881655509059",
-            row=1,
-        ))
-
 
 async def publicar_guia_servidor(bot) -> bool:
     """Cria o guia no canal oficial ou atualiza a mensagem existente, sem duplicar."""
