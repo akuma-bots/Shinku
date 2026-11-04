@@ -66,6 +66,24 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("automod", SECOES_ADMINISTRATIVAS["seguranca"]["topicos"])
         self.assertIn("integracoes", SECOES_ADMINISTRATIVAS["sistemas"]["topicos"])
 
+    def test_operacoes_apontam_apenas_para_canais_oficiais_confirmados(self):
+        canais = dict(SECOES_ADMINISTRATIVAS["operacoes"]["canais"])
+        self.assertEqual(canais, {
+            "Missões": 1563995881315897549,
+            "Agenda": 1563995880623841337,
+            "Inscrições": 1563995880623841338,
+            "Divisões": 1563995880833421511,
+            "Parcerias": 1563995880833421513,
+        })
+        self.assertNotIn(1556543214885019668, canais.values())
+        self.assertNotIn(1556543417843056641, canais.values())
+        self.assertNotIn(1545834386128375909, canais.values())
+
+    def test_dossie_nao_promete_auditoria_de_cargos_no_historico_individual(self):
+        descricao = SECOES_ADMINISTRATIVAS["membros"]["descricao"].casefold()
+        self.assertIn("auditoria de cargos permanece separada", descricao)
+        self.assertNotIn("alterações de cargos fazem parte do histórico", descricao)
+
     def test_autorizacao_exige_servidor_e_lideranca(self):
         membro = SimpleNamespace(id=123)
         with patch("cogs.painel_administrativo.membro_tem_lideranca", return_value=True):
