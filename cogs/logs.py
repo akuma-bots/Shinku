@@ -198,6 +198,7 @@ class Logs(commands.Cog):
         self._topicos_prontos = False
         self._guia_publicado = False
         self.bot.add_view(PainelHistoricoMembrosView())
+        self.bot.add_view(GuiaServidoresView())
 
     async def _atualizar_painel_historico_membros(self, guild: discord.Guild, topicos: dict) -> None:
         thread_id = topicos.get("historico_membros")
