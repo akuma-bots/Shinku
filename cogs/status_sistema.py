@@ -3,12 +3,10 @@ import logging
 import time
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import COR_ERRO, COR_SUCESSO, COR_AVISO, criar_embed
 from utils.storage import USANDO_UPSTASH, verificar_conexao_storage, UPSTASH_CONFIG_INCOMPLETA
-from utils.guild_config import lideranca_only
 from utils.registro_global import CATEGORIAS
 
 
@@ -47,15 +45,13 @@ def _resumo_tarefas_automaticas(bot):
     return total, ativas, falhas
 
 
-class StatusSistema(commands.GroupCog, group_name="sistema", group_description="Diagnóstico dos sistemas da NÊMESIS"):
+class StatusSistema(commands.Cog):
     """Painel administrativo de estado e diagnóstico da NÊMESIS."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._inicio = time.monotonic()
 
-    @app_commands.command(name="status", description="Mostra a saúde, latência e os módulos ativos do bot.")
-    @lideranca_only()
     async def status(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -132,13 +128,11 @@ class StatusSistema(commands.GroupCog, group_name="sistema", group_description="
             )
         embed.add_field(
             name="ℹ️ OBSERVAÇÃO",
-            value="O status representa a sessão atual. Use /sistema diagnostico para testar o armazenamento.",
+            value="O status representa a sessão atual. Abra a seção Sistemas da Central Administrativa para testar o armazenamento.",
             inline=False,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="diagnostico", description="Testa a conexão com o armazenamento persistente do bot.")
-    @lideranca_only()
     async def diagnostico(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True, thinking=True)
         if UPSTASH_CONFIG_INCOMPLETA:
