@@ -15,6 +15,8 @@ from utils.storage import carregar, salvar
 ARQUIVO = "eventos.json"
 CANAL_EVENTOS_PADRAO_ID = 1563995880623841337
 CANAL_EVENTOS_LEGADO_ID = 1545835097830334536
+ARQUIVO_AGENDA_PUBLICACAO = "agenda_publicacao.json"
+ARQUIVO_METAS_MEMBROS = "agenda_metas_membros.json"
 _EVENTOS_LOCK = asyncio.Lock()
 _LOG = logging.getLogger(__name__)
 
@@ -387,6 +389,174 @@ class Eventos(commands.Cog):
             f"Evento: {evento.url}",
             ephemeral=True,
         )
+
+    async def atualizar_agenda(self, guild: discord.Guild):
+        """Mantém uma única publicação de agenda com eventos, sorteios e marcos."""
+        canal = guild.get_channel(CANAL_EVENTOS_PADRAO_ID)
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(CANAL_EVENTOS_PADRAO_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Canal Agenda não encontrado ou inacessível.")
+                return False
+        if not isinstance(canal, discord.TextChannel):
+            _LOG.error("O canal Agenda precisa ser um canal de texto.")
+            return False
+
+        agora = time.time()
+        eventos = await _todos_eventos()
+        eventos_abertos = [
+            item for item in eventos.values()
+            if isinstance(item, dict)
+            and int(item.get("guild_id", guild.id) or guild.id) == guild.id
+            and item.get("status") not in {"cancelled", "completed", "deleted"}
+            and float(item.get("inicio") or 0) >= agora
+        ]
+        eventos_abertos.sort(key=lambda item: float(item.get("inicio") or 0))
+
+        sorteios = await carregar("sorteios.json", {})
+        sorteios = sorteios if isinstance(sorteios, dict) else {}
+        sorteios_abertos = [
+            item for item in sorteios.values()
+            if isinstance(item, dict)
+            and int(item.get("guild_id", 0) or 0) == guild.id
+            and not item.get("encerrado")
+            and float(item.get("fim") or 0) >= agora
+        ]
+        sorteios_abertos.sort(key=lambda item: float(item.get("fim") or 0))
+
+        metas_dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+        metas_dados = metas_dados if isinstance(metas_dados, dict) else {}
+        metas = metas_dados.get(str(guild.id), [])
+        metas = metas if isinstance(metas, list) else []
+        metas.sort(key=lambda item: int(item.get("alvo", 0) or 0) if isinstance(item, dict) else 0)
+
+        embed = criar_embed(
+            "𓂀 NÊMESIS · AGENDA",
+            "Calendário central de eventos, encerramentos de sorteios e marcos da comunidade.",
+            color=0x9F1239,
+            rodape="NÊMESIS • AGENDA OFICIAL • Atualização automática",
+        )
+        if eventos_abertos:
+            linhas = [
+                f"**{item.get('nome', 'Evento')[:100]}**\n"
+                f"Início: <t:{int(float(item.get('inicio') or 0))}:F> "
+                f"(<t:{int(float(item.get('inicio') or 0))}:R>)"
+                for item in eventos_abertos[:10]
+            ]
+            embed.add_field(name="📅 EVENTOS PROGRAMADOS", value="\n\n".join(linhas)[:1024], inline=False)
+        else:
+            embed.add_field(name="📅 EVENTOS PROGRAMADOS", value="Nenhum evento futuro registrado.", inline=False)
+
+        if sorteios_abertos:
+            linhas = [
+                f"**{item.get('premio', 'Sorteio')[:100]}** · "
+                f"encerra <t:{int(float(item.get('fim') or 0))}:R> "
+                f"(<t:{int(float(item.get('fim') or 0))}:F>)"
+                for item in sorteios_abertos[:10]
+            ]
+            embed.add_field(name="🎁 SORTEIOS EM ANDAMENTO", value="\n".join(linhas)[:1024], inline=False)
+        else:
+            embed.add_field(name="🎁 SORTEIOS EM ANDAMENTO", value="Nenhum sorteio ativo no momento.", inline=False)
+
+        if metas:
+            linhas = []
+            for meta in metas[:10]:
+                if not isinstance(meta, dict):
+                    continue
+                alvo = int(meta.get("alvo", 0) or 0)
+                estado = "✓ ALCANÇADO" if meta.get("atingido_em") else "◷ EM PROGRESSO"
+                descricao = str(meta.get("descricao") or "Marco da comunidade")[:90]
+                linhas.append(f"**{alvo:,} membros** · {estado}\n{descricao}".replace(",", "."))
+            embed.add_field(name="👥 MARCOS DA COMUNIDADE", value="\n\n".join(linhas)[:1024] or "Nenhum marco cadastrado.", inline=False)
+        else:
+            embed.add_field(name="👥 MARCOS DA COMUNIDADE", value="Nenhum marco cadastrado.", inline=False)
+
+        estado = await carregar(ARQUIVO_AGENDA_PUBLICACAO, {})
+        estado = estado if isinstance(estado, dict) else {}
+        registro = estado.get(str(guild.id), {})
+        mensagem = None
+        if isinstance(registro, dict) and registro.get("message_id"):
+            try:
+                mensagem = await canal.fetch_message(int(registro["message_id"]))
+            except discord.NotFound:
+                mensagem = None
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Não foi possível recuperar a mensagem existente da Agenda.")
+                return False
+        if mensagem is None:
+            try:
+                async for antiga in canal.history(limit=30):
+                    if antiga.author.id == self.bot.user.id and antiga.embeds and antiga.embeds[0].title == "𓂀 NÊMESIS · AGENDA":
+                        mensagem = antiga
+                        break
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Falha ao procurar publicação anterior da Agenda.")
+        try:
+            if mensagem is None:
+                mensagem = await canal.send(embed=embed)
+            else:
+                await mensagem.edit(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            _LOG.exception("Falha ao publicar/atualizar a Agenda.")
+            return False
+        estado[str(guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id, "atualizado_em": agora}
+        await salvar(ARQUIVO_AGENDA_PUBLICACAO, estado)
+        return True
+
+    @app_commands.command(
+        name="agenda-meta-membros",
+        description="Adiciona um marco à Agenda para uma quantidade de membros.",
+    )
+    @app_commands.describe(alvo="Quantidade de membros que marca o objetivo", descricao="Descrição do marco ou celebração")
+    @lideranca_only()
+    async def agenda_meta_membros(
+        self,
+        interaction: discord.Interaction,
+        alvo: app_commands.Range[int, 1, 1000000],
+        descricao: app_commands.Range[str, 3, 200],
+    ):
+        dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+        dados = dados if isinstance(dados, dict) else {}
+        metas = dados.get(str(interaction.guild.id), [])
+        metas = metas if isinstance(metas, list) else []
+        if any(isinstance(item, dict) and int(item.get("alvo", 0) or 0) == int(alvo) for item in metas):
+            await interaction.response.send_message("Já existe um marco cadastrado para essa quantidade de membros.", ephemeral=True)
+            return
+        meta = {
+            "id": f"META-{int(alvo)}",
+            "alvo": int(alvo),
+            "descricao": str(descricao).strip(),
+            "criado_por": interaction.user.id,
+            "criado_em": time.time(),
+            "atingido_em": time.time() if (interaction.guild.member_count or 0) >= int(alvo) else None,
+        }
+        metas.append(meta)
+        dados[str(interaction.guild.id)] = metas[-100:]
+        await salvar(ARQUIVO_METAS_MEMBROS, dados)
+        await self.atualizar_agenda(interaction.guild)
+        situacao = "Esse marco já foi alcançado." if meta["atingido_em"] else "O marco aparecerá como em progresso na Agenda."
+        await interaction.response.send_message(f"Marco de **{alvo:,} membros** registrado. {situacao}".replace(",", "."), ephemeral=True)
+
+    @commands.Cog.listener()
+    async def on_member_join(self, membro: discord.Member):
+        if membro.guild.id != GUILD_NEMESIS_ID:
+            return
+        dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+        dados = dados if isinstance(dados, dict) else {}
+        metas = dados.get(str(membro.guild.id), [])
+        alterado = False
+        for meta in metas if isinstance(metas, list) else []:
+            if not isinstance(meta, dict) or meta.get("atingido_em"):
+                continue
+            if (membro.guild.member_count or 0) >= int(meta.get("alvo", 0) or 0):
+                meta["atingido_em"] = time.time()
+                meta["atingido_com_membro_id"] = membro.id
+                alterado = True
+        if alterado:
+            dados[str(membro.guild.id)] = metas
+            await salvar(ARQUIVO_METAS_MEMBROS, dados)
+            await self.atualizar_agenda(membro.guild)
 
     def _embed_evento(
         self,
