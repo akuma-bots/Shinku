@@ -66,7 +66,7 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("automod", SECOES_ADMINISTRATIVAS["seguranca"]["topicos"])
         self.assertIn("integracoes", SECOES_ADMINISTRATIVAS["sistemas"]["topicos"])
 
-    def test_operacoes_apontam_apenas_para_canais_oficiais_confirmados(self):
+    def test_operacoes_preservam_canais_oficiais_e_operacionais_configurados(self):
         canais = dict(SECOES_ADMINISTRATIVAS["operacoes"]["canais"])
         self.assertEqual(canais, {
             "Missões": 1563995881315897549,
