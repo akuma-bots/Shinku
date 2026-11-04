@@ -991,6 +991,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         await self.salvar_sorteio(
             sorteio
         )
+        agenda = self.bot.get_cog("Eventos")
+        if agenda is not None:
+            await agenda.atualizar_agenda(interaction.guild)
         from utils.registro_global import registrar as registrar_global
         detalhe_criacao = (
             f"**Sorteio:** {sorteio_id}\n"
@@ -1536,6 +1539,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
             try:
                 await canal.send(embed=embed)
                 await self._marcar_anuncio_enviado(sorteio)
+                agenda = self.bot.get_cog("Eventos")
+                if agenda is not None:
+                    await agenda.atualizar_agenda(canal.guild)
                 from utils.registro_global import registrar as registrar_global
                 await registrar_global(
                     canal.guild,
@@ -1590,6 +1596,9 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 embed=embed,
             )
             await self._marcar_anuncio_enviado(sorteio)
+            agenda = self.bot.get_cog("Eventos")
+            if agenda is not None:
+                await agenda.atualizar_agenda(canal.guild)
             from utils.registro_global import registrar as registrar_global
             detalhe_resultado = (
                 f"**Sorteio:** {sorteio_id}\n"
