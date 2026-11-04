@@ -638,7 +638,9 @@ class Eventos(commands.Cog):
                 registro["atualizado_em"] = time.time()
                 dados[str(evento.id)] = registro
                 await _salvar_eventos(dados)
-        await self.atualizar_agenda(evento.guild)
+        guild = getattr(evento, "guild", None)
+        if guild is not None:
+            await self.atualizar_agenda(guild)
 
     async def _registrar_inscricao(
         self,
