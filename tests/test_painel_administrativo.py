@@ -53,6 +53,70 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         interaction.edit_original_response.assert_awaited_once()
         self.assertEqual(interaction.edit_original_response.await_args.kwargs["embed"].title, "Membros")
 
+    async def test_inteligencia_de_operacoes_aparece_apenas_para_octogono(self):
+        bot = SimpleNamespace(get_cog=lambda _nome: None)
+        view = CentralAdministrativaView(
+            bot, owner_id=123,
+            guild=SimpleNamespace(id=1563995879981981817),
+        )
+        view.seletor._values = ["operacoes"]
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=123),
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        with (
+            patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Operações"), []))),
+            patch("cogs.painel_administrativo.membro_tem_octogono", return_value=True),
+        ):
+            await view._selecionar_secao(interaction)
+        botao = next(
+            item for item in view.children
+            if getattr(item, "label", None) == "Inteligência de operações"
+        )
+        self.assertEqual(botao.row, 3)
+
+        view_nao_octogono = CentralAdministrativaView(
+            bot, owner_id=123,
+            guild=SimpleNamespace(id=1563995879981981817),
+        )
+        view_nao_octogono.seletor._values = ["operacoes"]
+        with (
+            patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Operações"), []))),
+            patch("cogs.painel_administrativo.membro_tem_octogono", return_value=False),
+        ):
+            await view_nao_octogono._selecionar_secao(interaction)
+        self.assertFalse(any(
+            getattr(item, "label", None) == "Inteligência de operações"
+            for item in view_nao_octogono.children
+        ))
+
+    async def test_botao_inteligencia_encaminha_para_modulo_original(self):
+        cog_missoes = SimpleNamespace(enviar_painel_inteligencia=AsyncMock())
+        bot = SimpleNamespace(get_cog=lambda nome: cog_missoes if nome == "Missoes" else None)
+        view = CentralAdministrativaView(
+            bot, owner_id=123,
+            guild=SimpleNamespace(id=1563995879981981817),
+        )
+        view.seletor._values = ["operacoes"]
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=123),
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        with (
+            patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Operações"), []))),
+            patch("cogs.painel_administrativo.membro_tem_octogono", return_value=True),
+        ):
+            await view._selecionar_secao(interaction)
+        botao = next(
+            item for item in view.children
+            if getattr(item, "label", None) == "Inteligência de operações"
+        )
+        clique = SimpleNamespace()
+        await botao.callback(clique)
+        cog_missoes.enviar_painel_inteligencia.assert_awaited_once_with(clique)
+
     def test_areas_tem_destinos_de_auditoria_e_descricao(self):
         for chave, secao in SECOES_ADMINISTRATIVAS.items():
             with self.subTest(secao=chave):
