@@ -13,7 +13,7 @@ O Painel Administrativo Central é uma navegação privada por botões e menus, 
 
 1. **Visão geral:** estado do bot, latência, tempo ativo, efetivo, módulos, tarefas automáticas, Upstash e sincronização do Registro Global.
 2. **Membros e hierarquia:** dossiê individual, progressão, entradas, saídas e atividade. A auditoria de cargos permanece separada no tópico administrativo; mensagens editadas e excluídas ficam somente na consulta privada de atividade.
-3. **Operações:** missões, provas, desafios competitivos, eventos, formulários, parcerias e relatórios.
+3. **Operações:** missões, provas, desafios competitivos, eventos, formulários, parcerias e relatórios. O atalho **Inteligência de operações** aparece somente para o OCTÓGONO e abre a central de métricas de missões já existente.
 4. **Segurança:** segurança, AutoMod, moderação e decisões administrativas.
 5. **Sistemas e infraestrutura:** infraestrutura, integrações, configurações, sistemas e Roblox.
 6. **Auditoria e registros:** comunicação, atendimento, histórico individual, eventos e sugestões.
@@ -23,7 +23,7 @@ Os botões de destino apontam para tópicos permanentes já existentes ou canais
 ## Regras de autoridade preservadas
 
 - Supervisor Staff continua incluído na liderança administrativa.
-- Gestão de missões continua exclusiva do OCTÓGONO.
+- Gestão de missões e acesso à Inteligência de operações continuam exclusivos do OCTÓGONO.
 - Promoções, rebaixamentos e banimentos continuam restritos aos cargos autorizados acima de Elite, respeitando a posição hierárquica do alvo.
 - As operações sensíveis continuam sendo validadas pelos próprios sistemas e seus fluxos de confirmação.
 
