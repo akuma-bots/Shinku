@@ -22,7 +22,7 @@ CANAIS_GUIA_SERVIDORES = (
     ("Agenda", 1563995880623841337, "🗓️", "Veja a programação de atividades, eventos e compromissos."),
     ("Inscrições", 1563995880623841338, "📝", "Acesse os espaços de candidatura e inscrição disponíveis."),
     ("Missões", 1563995881315897549, "🎯", "Confira objetivos e atividades propostas pela organização."),
-    ("Progressão", 1563995881315897548, "📈", "Entenda como acompanhar sua evolução e seus resultados."),
+    ("Progressão", 1563995881315897548, "📈", "Acompanhe sua evolução por XP e os critérios oficiais de progressão."),
     ("Ranking", 1563995881508831338, "🏆", "Consulte classificações e posições divulgadas oficialmente."),
     ("Parcerias", 1563995880833421513, "🤝", "Conheça as iniciativas e oportunidades de parceria."),
     ("Atendimento", 1563995881655509059, "🎫", "Procure a equipe pelos canais oficiais de atendimento."),
@@ -69,9 +69,10 @@ def criar_embed_guia_servidor() -> discord.Embed:
         name="◈ COMO A ORGANIZAÇÃO FUNCIONA",
         value=(
             "A comunidade é organizada por áreas e divisões, cada uma com sua "
-            "finalidade. Comunicados e orientações oficiais devem ser consultados "
-            "nos canais correspondentes. Cargos e permissões definem responsabilidades "
-            "e acessos; possuir uma patente ou pontuação não significa receber "
+            "finalidade. O OCTÓGONO é o núcleo de autoridade máxima e possui a "
+            "gestão das missões. As divisões atuam em suas frentes específicas, "
+            "conforme as responsabilidades designadas. Cargos e permissões definem "
+            "responsabilidades e acessos; uma patente competitiva ou XP não concede "
             "permissões administrativas."
         ),
         inline=False,
