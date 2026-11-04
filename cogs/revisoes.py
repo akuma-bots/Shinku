@@ -4,10 +4,9 @@ import logging
 import hashlib
 import aiohttp
 import discord
-from discord import app_commands
 from discord.ext import commands
 from utils import revisoes, auditoria
-from utils.guild_config import lideranca_only, membro_tem_lideranca, membro_pode_revisar_categoria
+from utils.guild_config import membro_tem_lideranca, membro_pode_revisar_categoria
 
 CORES = {"pvp": 0x9F2035, "pve": 0x8B6A35, "missao": 0x9F2035, "contribuicao": 0x8B6A35, "especial": 0x754A9E}
 _ABRIR_REVISAO_LOCK = asyncio.Lock()
@@ -398,8 +397,6 @@ class Revisoes(commands.Cog):
             bot.processadores_revisao = {}
 
 
-    @app_commands.command(name="painel-provas", description="Acompanhar, filtrar e revisar provas por status e categoria.")
-    @lideranca_only()
     async def painel_provas(self, interaction: discord.Interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Use este comando dentro do servidor.", ephemeral=True)
@@ -424,7 +421,7 @@ class Revisoes(commands.Cog):
             or not membro_tem_lideranca(interaction.user)
         ):
             await interaction.response.send_message(
-                "Este painel é restrito ao administrador que o abriu. Reabra com /painel-provas se necessário.",
+                "Este painel é restrito ao administrador que o abriu. Reabra a Central Administrativa e selecione Revisão de provas.",
                 ephemeral=True,
             )
             return False
