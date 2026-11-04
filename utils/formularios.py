@@ -522,6 +522,30 @@ async def recusar_respostas_pendentes(
         return atualizadas
 
 
+async def atualizar_metadados_resposta(
+    guild_id: int,
+    resposta_id: str,
+    **metadados,
+) -> dict | None:
+    """Atualiza metadados operacionais sem alterar as respostas da candidatura."""
+    permitidos = {"thread_id", "canal_id", "mensagem_id", "notificacao_em"}
+    async with _STATUS_RESPOSTA_LOCK:
+        dados = await _tudo_respostas()
+        lista = dados.get(str(guild_id), [])
+        if not isinstance(lista, list):
+            return None
+        lista = [item for item in lista if isinstance(item, dict)]
+        alvo = next((item for item in lista if item.get("id") == resposta_id), None)
+        if alvo is None:
+            return None
+        for campo, valor in metadados.items():
+            if campo in permitidos and valor is not None:
+                alvo[campo] = int(valor) if campo in {"thread_id", "canal_id", "mensagem_id"} else valor
+        alvo["atualizado_em"] = time.time()
+        await _salvar_respostas_guild(guild_id, lista)
+        return alvo
+
+
 async def listar_respostas(
     guild_id: int,
     formulario_id: str = None,
