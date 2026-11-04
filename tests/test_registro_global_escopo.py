@@ -8,10 +8,9 @@ class TestEscopoTopicosRegistroGlobal(unittest.TestCase):
         descricao = CATEGORIAS["historico_membros"][1].casefold()
         self.assertIn("entradas", descricao)
         self.assertIn("saídas", descricao)
+        self.assertIn("não recebe mensagens, cargos ou conquistas", descricao)
         self.assertNotIn("mensagens editadas", descricao)
         self.assertNotIn("mensagens excluídas", descricao)
-        self.assertNotIn("auditoria de cargos", descricao)
-        self.assertNotIn("conquistas", descricao)
 
     def test_comunicacao_nao_promete_publicar_conteudo_de_edicoes_ou_exclusoes(self):
         descricao = CATEGORIAS["mensagens"][1].casefold()
