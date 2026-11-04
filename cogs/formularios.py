@@ -697,8 +697,8 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logging.exception("Canal de candidaturas inacessível: %s", CANAL_RECEBIMENTO_CANDIDATURAS)
                 return False
-        if not isinstance(canal, discord.TextChannel):
-            logging.error("O canal de candidaturas precisa ser um canal de texto.")
+        if not callable(getattr(canal, "create_thread", None)):
+            logging.error("O canal de candidaturas precisa permitir a criação de tópicos.")
             return False
 
         cargos = list(formulario.get("cargos_notificar", []))
