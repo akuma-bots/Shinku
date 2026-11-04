@@ -186,7 +186,9 @@ class TestSistemaLogs(unittest.IsolatedAsyncioTestCase):
             jump_url="https://discord.com/channels/1/654/987",
             attachments=[],
         )
-        with patch("cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock) as registrar:
+        with patch("cogs.logs.monitoramento_membros.buscar_mensagem", new_callable=AsyncMock, return_value=None), patch(
+            "cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock
+        ) as registrar:
             with patch.object(cog, "_enviar_log", new_callable=AsyncMock) as enviar:
                 await cog.on_message_delete(mensagem)
 
