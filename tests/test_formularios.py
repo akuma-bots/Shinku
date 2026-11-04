@@ -68,36 +68,40 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         paginas = _paginas_modal(formulario)
         self.assertEqual([len(p["perguntas"]) for p in paginas], [5, 5, 2])
 
-    async def test_dossie_no_registro_global_recebe_botoes_de_decisao(self):
+    async def test_candidatura_e_organizada_em_topico_individual_sem_dm_em_massa(self):
         cog = object.__new__(cog_formularios.Formularios)
         cog.bot = SimpleNamespace()
-        canal = SimpleNamespace(send=AsyncMock())
-        topico = SimpleNamespace(
-            archived=False,
-            locked=False,
+        thread = SimpleNamespace(
+            id=987654,
             send=AsyncMock(),
         )
+        canal = SimpleNamespace(
+            create_thread=AsyncMock(return_value=thread),
+        )
         guild = SimpleNamespace(
+            id=1563995879981981817,
             name="NÊMESIS",
             get_channel=lambda _channel_id: canal,
+            fetch_channel=AsyncMock(return_value=canal),
             get_role=lambda _role_id: None,
         )
         embed = discord.Embed(title="Dossiê de candidatura")
         view = object()
         with patch("cogs.formularios._embeds_resposta", return_value=[embed]), patch(
             "cogs.formularios._view_resposta", return_value=view
-        ), patch("utils.registro_global.obter_topico", AsyncMock(return_value=topico)):
+        ), patch("cogs.formularios.formularios.atualizar_metadados_resposta", new=AsyncMock()), patch(
+            "utils.registro_global.registrar", new=AsyncMock()
+        ):
             publicado = await cog.notificar_cargos(
                 guild,
-                {"id": "form-staff", "cargos_notificar": []},
-                {"id": "resp-123", "autor_id": 456, "respostas": []},
+                {"id": "form-staff", "nome": "Staff", "cargos_notificar": []},
+                {"id": "resp-123", "autor_id": 456, "nome": "Candidato"},
             )
 
         self.assertTrue(publicado)
-        canal.send.assert_awaited_once()
-        self.assertIs(canal.send.await_args.kwargs["view"], view)
-        topico.send.assert_awaited_once()
-        self.assertIs(topico.send.await_args.kwargs["view"], view)
+        canal.create_thread.assert_awaited_once()
+        thread.send.assert_awaited_once()
+        self.assertIs(thread.send.await_args.kwargs["view"], view)
 
     def test_candidatura_longa_respeita_limite_de_campos_por_embed(self):
         perguntas = [
