@@ -9,6 +9,7 @@ from utils.guia_servidores import (
     CARGO_VISITANTES_ID,
     NOME_CARGO_VISITANTES,
     TAG_ORG_NEMESIS,
+    publicar_guia_servidor,
 )
 from utils.storage import carregar
 from utils import monitoramento_membros
@@ -195,6 +196,7 @@ class Logs(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._topicos_prontos = False
+        self._guia_publicado = False
         self.bot.add_view(PainelHistoricoMembrosView())
 
     async def _atualizar_painel_historico_membros(self, guild: discord.Guild, topicos: dict) -> None:
@@ -219,19 +221,25 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if self._topicos_prontos:
-            return
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
         if guild is None:
-            logger.error("Guild NÊMESIS não está em cache; tópicos do Registro Global aguardam conexão.")
+            logger.error("Guild NÊMESIS não está em cache; guia e Registro Global aguardam conexão.")
             return
-        try:
-            topicos = await garantir_topicos(guild)
-            self._topicos_prontos = len(topicos) == len(CATEGORIAS)
-            await self._atualizar_painel_historico_membros(guild, topicos)
-            logger.info("Registro Global pronto: %s/%s tópicos permanentes verificados.", len(topicos), len(CATEGORIAS))
-        except Exception:
-            logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
+
+        if not self._topicos_prontos:
+            try:
+                topicos = await garantir_topicos(guild)
+                self._topicos_prontos = len(topicos) == len(CATEGORIAS)
+                await self._atualizar_painel_historico_membros(guild, topicos)
+                logger.info("Registro Global pronto: %s/%s tópicos permanentes verificados.", len(topicos), len(CATEGORIAS))
+            except Exception:
+                logger.exception("Não foi possível provisionar os tópicos do Registro Global.")
+
+        if not self._guia_publicado:
+            try:
+                self._guia_publicado = await publicar_guia_servidor(self.bot)
+            except Exception:
+                logger.exception("Não foi possível publicar/atualizar o guia oficial da NÊMESIS.")
 
     async def _canal_logs(self, guild: discord.Guild):
         """Resolve exclusivamente o Fórum central de registros da NÊMESIS."""
