@@ -16,7 +16,7 @@ PADRAO = {
 
     "canais_cargo_automatico": {},
 
-    "canal_eventos_id": 1545835097830334536,
+    "canal_eventos_id": 1563995880623841337,
     "canal_parcerias_id": 1545831702444777492,
     "cargo_categoria_parcerias_id": 1553019315664461934,
 
