@@ -661,11 +661,22 @@ class Logs(commands.Cog):
             if antes.name != depois.name or antes.global_name != depois.global_name:
                 await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "identidade", f"Nome de usuário alterado: {antes.name} → {depois.name}.")
             if antes.premium_since != depois.premium_since:
-                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "impulsionamento", "Status de impulsionamento alterado.")
+                await monitoramento_membros.registrar_evento(
+                    depois.guild.id, depois.id, "impulsionamento",
+                    "Começou a impulsionar o servidor." if depois.premium_since else "Deixou de impulsionar o servidor.",
+                    detalhes={"premium_since": depois.premium_since.timestamp() if depois.premium_since else None},
+                )
             timeout_antes = _timeout_membro(antes)
             timeout_depois = _timeout_membro(depois)
             if timeout_antes != timeout_depois:
-                await monitoramento_membros.registrar_evento(depois.guild.id, depois.id, "timeout", "Timeout aplicado, alterado ou removido.")
+                await monitoramento_membros.registrar_evento(
+                    depois.guild.id, depois.id, "timeout",
+                    "Timeout aplicado, alterado ou removido.",
+                    detalhes={
+                        "antes": timeout_antes.timestamp() if timeout_antes else None,
+                        "depois": timeout_depois.timestamp() if timeout_depois else None,
+                    },
+                )
         canal = await self._canal_logs(depois.guild)
         if not canal:
             return
@@ -716,6 +727,19 @@ class Logs(commands.Cog):
         ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
         perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
         if ganhos or perdidos:
+            partes = []
+            if ganhos:
+                partes.append("Recebeu: " + ", ".join(cargo.name for cargo in ganhos[:20]))
+            if perdidos:
+                partes.append("Perdeu: " + ", ".join(cargo.name for cargo in perdidos[:20]))
+            await monitoramento_membros.registrar_evento(
+                depois.guild.id, depois.id, "cargos",
+                " | ".join(partes),
+                detalhes={
+                    "recebidos": [{"id": cargo.id, "nome": cargo.name} for cargo in ganhos[:30]],
+                    "removidos": [{"id": cargo.id, "nome": cargo.name} for cargo in perdidos[:30]],
+                },
+            )
             embed_cargos = criar_embed(
                 title="Cargos do membro alterados",
                 description=f"**Membro:** {depois.mention} ({depois.id})",
@@ -840,32 +864,30 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages):
-        mensagens = [m for m in messages if m.guild and not m.author.bot]
-        if not mensagens:
-            return
-        agrupadas = {}
+        """Arquiva exclusões em massa apenas nos dossiês privados dos autores."""
+        mensagens = [
+            mensagem for mensagem in messages
+            if mensagem.guild and mensagem.guild.id == GUILD_NEMESIS_ID and not mensagem.author.bot
+        ]
         for mensagem in mensagens:
-            agrupadas.setdefault(mensagem.channel, []).append(mensagem)
-        guild = mensagens[0].guild
-        canal = await self._canal_logs(guild)
-        if not canal:
-            return
-        embed = criar_embed(
-            title="Exclusão em massa de mensagens",
-            description=f"Foram removidas {len(mensagens)} mensagens em {len(agrupadas)} canal(is).",
-            color=0xED4245,
-        )
-        for origem, itens in list(agrupadas.items())[:8]:
-            linhas = [
-                f"• {discord.utils.escape_markdown(str(m.author))}: {(m.content or '(sem texto)')[:120]}"
-                for m in itens[:5]
-            ]
-            embed.add_field(
-                name=f"Canal: {origem.name} ({len(itens)} mensagens)",
-                value="\n".join(linhas)[:1024] or "Sem conteúdo textual.",
-                inline=False,
+            await monitoramento_membros.registrar_mensagem(
+                mensagem.guild.id, mensagem.author.id,
+                {
+                    "message_id": str(mensagem.id),
+                    "canal_id": mensagem.channel.id,
+                    "timestamp": mensagem.created_at.timestamp(),
+                    "conteudo": mensagem.content or "",
+                    "url": mensagem.jump_url,
+                    "status": "excluida",
+                    "excluida_em": datetime.now(timezone.utc).timestamp(),
+                    "anexos": [{"nome": anexo.filename, "tamanho": anexo.size} for anexo in mensagem.attachments[:10]],
+                },
             )
-        await self._enviar_log(canal, embed, categoria="mensagens")
+        if mensagens:
+            logger.info(
+                "Exclusão em massa arquivada em dossiês privados: guild=%s mensagens=%s autores=%s",
+                GUILD_NEMESIS_ID, len(mensagens), len({mensagem.author.id for mensagem in mensagens}),
+            )
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, antes: discord.abc.GuildChannel, depois: discord.abc.GuildChannel):
