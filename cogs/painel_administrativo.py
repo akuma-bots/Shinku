@@ -37,6 +37,9 @@ SECOES_ADMINISTRATIVAS = {
         "topicos": ("missoes", "competitivo", "eventos", "parcerias"),
         "canais": (
             ("Missões", 1563995881315897549),
+            ("Central de missões", 1556543214885019668),
+            ("Envio de provas", 1556543417843056641),
+            ("Desafios competitivos", 1545834386128375909),
             ("Agenda", 1563995880623841337),
             ("Inscrições", 1563995880623841338),
             ("Divisões", 1563995880833421511),
