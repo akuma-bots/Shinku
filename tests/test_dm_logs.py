@@ -135,48 +135,66 @@ class TestSistemaLogs(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(registro["status"], "enviada")
         self.assertEqual(registro["message_id"], "987")
 
-    async def test_edicao_apenas_de_anexos_fica_registrada(self):
+    async def test_edicao_apenas_de_anexos_fica_registrada_privadamente(self):
+        from datetime import datetime, timezone
         bot = Mock()
         cog = Logs(bot)
-        autor = Mock()
-        autor.bot = False
-        autor.id = 123
-        autor.mention = "<@123>"
-        canal_origem = Mock()
-        canal_origem.id = 10
-        canal_origem.mention = "<#10>"
-        canal_logs = Mock()
-        canal_logs.id = 20
+        autor = Mock(bot=False, id=123)
+        canal = Mock(id=10)
         antes = Mock()
         antes.author = autor
-        antes.guild = Mock()
-        antes.guild.id = 1563995879981981817
-        antes.channel = canal_origem
+        antes.guild = Mock(id=1563995879981981817)
+        antes.channel = canal
         antes.content = "mesma mensagem"
         antes.id = 321
-        from datetime import datetime, timezone
         antes.created_at = datetime(2026, 11, 3, tzinfo=timezone.utc)
-        antes.jump_url = "https://discord.com/channels/1/10/321"
         antes.attachments = [Mock(filename="antigo.png", url="https://example.com/antigo.png")]
         depois = Mock()
         depois.author = autor
         depois.guild = antes.guild
-        depois.channel = canal_origem
+        depois.channel = canal
         depois.content = "mesma mensagem"
         depois.id = 321
         depois.created_at = antes.created_at
-        depois.jump_url = antes.jump_url
+        depois.jump_url = "https://discord.com/channels/1/10/321"
         depois.attachments = [Mock(filename="novo.png", url="https://example.com/novo.png")]
 
-        with patch.object(cog, "_canal_logs", new_callable=AsyncMock, return_value=canal_logs):
-            with patch.object(cog, "_enviar_log", new_callable=AsyncMock, return_value=True) as enviar:
+        with patch("cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock) as registrar:
+            with patch.object(cog, "_enviar_log", new_callable=AsyncMock) as enviar:
                 await cog.on_message_edit(antes, depois)
 
-        enviar.assert_awaited_once()
-        embed = enviar.await_args.args[1]
-        nomes = [campo.name for campo in embed.fields]
-        self.assertIn("Anexos anteriores", nomes)
-        self.assertIn("Anexos atuais", nomes)
+        registrar.assert_awaited_once()
+        registro = registrar.await_args.args[2]
+        self.assertEqual(registro["status"], "editada")
+        self.assertEqual(registro["anexos"][0]["nome"], "novo.png")
+        enviar.assert_not_awaited()
+
+    async def test_exclusao_fica_no_historico_privado_sem_publicacao_no_forum(self):
+        from datetime import datetime, timezone
+        bot = Mock()
+        cog = Logs(bot)
+        autor = Mock(bot=False, id=321)
+        autor.mention = "<@321>"
+        canal = Mock(id=654)
+        mensagem = Mock(
+            author=autor,
+            guild=Mock(id=1563995879981981817),
+            channel=canal,
+            id=987,
+            created_at=datetime(2026, 11, 3, tzinfo=timezone.utc),
+            content="mensagem removida",
+            jump_url="https://discord.com/channels/1/654/987",
+            attachments=[],
+        )
+        with patch("cogs.logs.monitoramento_membros.registrar_mensagem", new_callable=AsyncMock) as registrar:
+            with patch.object(cog, "_enviar_log", new_callable=AsyncMock) as enviar:
+                await cog.on_message_delete(mensagem)
+
+        registrar.assert_awaited_once()
+        registro = registrar.await_args.args[2]
+        self.assertEqual(registro["conteudo"], "mensagem removida")
+        self.assertEqual(registro["status"], "excluida")
+        enviar.assert_not_awaited()
 
     async def test_falha_de_permissao_no_canal_nao_escapa_do_listener(self):
         bot = Mock()
