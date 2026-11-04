@@ -720,7 +720,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 name=nome_thread,
                 type=discord.ChannelType.public_thread,
                 auto_archive_duration=10080,
-                invitable=False,
                 reason=f"Organizar candidatura {resposta['id']} em tópico individual",
             )
             await thread.send(
