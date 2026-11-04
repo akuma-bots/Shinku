@@ -65,6 +65,18 @@ class TestAcademia(unittest.TestCase):
         self.assertEqual(participante["avaliado_por"], 10)
         self.assertEqual(participante["observacao"], "Concluiu os objetivos.")
 
+    def test_reavaliacao_preserva_historico_das_avaliacoes(self):
+        sessao, _ = _inscrever(self.sessao, 20, agora=110)
+        sessao, _ = _avaliar_inscrito(sessao, 20, "reprovado", 10, "Primeira avaliação.", agora=120)
+        sessao, _ = _avaliar_inscrito(sessao, 20, "aprovado", 11, "Reavaliação concluída.", agora=130)
+        participante = sessao["inscritos"]["20"]
+        self.assertEqual(participante["status"], "aprovado")
+        self.assertEqual(
+            [item["status"] for item in participante["historico_avaliacoes"]],
+            ["reprovado", "aprovado"],
+        )
+        self.assertEqual(participante["historico_avaliacoes"][0]["avaliado_por"], 10)
+
     def test_resultado_invalido_nao_altera_registro(self):
         sessao, _ = _inscrever(self.sessao, 20, agora=110)
         original = dict(sessao["inscritos"]["20"])
