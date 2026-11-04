@@ -483,10 +483,18 @@ async def definir_status_resposta(
         if not alvo or alvo.get("status") != "pendente":
             return None
 
+        agora = time.time()
+        motivo_texto = str(motivo or "").strip()[:1000] or None
         alvo["status"] = status
         alvo["revisor_id"] = revisor_id
-        alvo["motivo_decisao"] = str(motivo or "").strip()[:1000] or None
-        alvo["atualizado_em"] = time.time()
+        alvo["motivo_decisao"] = motivo_texto
+        alvo.setdefault("historico_decisoes", []).append({
+            "status": status,
+            "revisor_id": int(revisor_id),
+            "motivo": motivo_texto,
+            "criado_em": agora,
+        })
+        alvo["atualizado_em"] = agora
 
         await _salvar_respostas_guild(guild_id, lista)
         return alvo
@@ -630,3 +638,59 @@ async def normalizar_registros_guild(
             respostas
         ),
     }
+
+
+async def registrar_avaliacao(
+    guild_id: int,
+    resposta_id: str,
+    revisor_id: int,
+    criterios: dict,
+    justificativa: str,
+) -> dict | None:
+    """Anexa uma avaliação estruturada ao dossiê, sem sobrescrever avaliações anteriores."""
+    campos = (
+        "postura",
+        "responsabilidade",
+        "disponibilidade",
+        "imparcialidade",
+        "comunicacao",
+    )
+    if not isinstance(criterios, dict) or any(
+        campo not in criterios or not 1 <= int(criterios[campo]) <= 5
+        for campo in campos
+    ):
+        raise ValueError("Cada critério deve receber uma nota entre 1 e 5.")
+
+    async with _STATUS_RESPOSTA_LOCK:
+        dados = await _tudo_respostas()
+        lista = dados.get(str(guild_id), [])
+        if not isinstance(lista, list):
+            return None
+        lista = [item for item in lista if isinstance(item, dict)]
+        alvo = next((item for item in lista if item.get("id") == resposta_id), None)
+        if alvo is None or alvo.get("status") != "pendente":
+            return None
+
+        agora = time.time()
+        avaliacao = {
+            "revisor_id": int(revisor_id),
+            "criterios": {campo: int(criterios[campo]) for campo in campos},
+            "media": round(sum(int(criterios[campo]) for campo in campos) / len(campos), 2),
+            "justificativa": str(justificativa or "").strip()[:1000],
+            "criado_em": agora,
+        }
+        alvo.setdefault("avaliacoes", []).append(avaliacao)
+        alvo["atualizado_em"] = agora
+        await _salvar_respostas_guild(guild_id, lista)
+        return dict(avaliacao)
+
+
+async def listar_avaliacoes(
+    guild_id: int,
+    resposta_id: str,
+) -> list[dict]:
+    resposta = await get_resposta(guild_id, resposta_id)
+    if not resposta:
+        return []
+    avaliacoes = resposta.get("avaliacoes", [])
+    return [dict(item) for item in avaliacoes if isinstance(item, dict)] if isinstance(avaliacoes, list) else []

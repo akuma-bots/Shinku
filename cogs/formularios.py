@@ -981,6 +981,51 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         else:
             await interaction.response.send_message(embeds=anexos[:10], ephemeral=True)
 
+    @app_commands.command(name="avaliar", description="Registra uma avaliação estruturada de uma candidatura.")
+    @app_commands.describe(protocolo="Código da candidatura", postura="Respeito, maturidade e conduta", responsabilidade="Confiabilidade e compromisso", disponibilidade="Compatibilidade de horários e presença", imparcialidade="Capacidade de agir sem favoritismo", comunicacao="Clareza e capacidade de trabalhar em equipe", justificativa="Evidências e observações que fundamentam as notas")
+    @app_commands.check(lambda interaction: interaction.guild is not None and (membro_tem_lideranca(interaction.user) or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))))
+    async def formulario_avaliar(self, interaction: discord.Interaction, protocolo: str, postura: app_commands.Range[int, 1, 5], responsabilidade: app_commands.Range[int, 1, 5], disponibilidade: app_commands.Range[int, 1, 5], imparcialidade: app_commands.Range[int, 1, 5], comunicacao: app_commands.Range[int, 1, 5], justificativa: str):
+        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
+        if not resposta:
+            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
+            return
+        if resposta.get("status") != "pendente":
+            await interaction.response.send_message("Esta candidatura já foi encerrada; avaliações novas não são aceitas.", ephemeral=True)
+            return
+        criterios = {"postura": postura, "responsabilidade": responsabilidade, "disponibilidade": disponibilidade, "imparcialidade": imparcialidade, "comunicacao": comunicacao}
+        avaliacao = await formularios.registrar_avaliacao(interaction.guild.id, protocolo.strip(), interaction.user.id, criterios, justificativa)
+        if not avaliacao:
+            await interaction.response.send_message("A candidatura deixou de estar pendente. Atualize o dossiê antes de avaliar.", ephemeral=True)
+            return
+        embed = criar_embed("✦・ AVALIAÇÃO REGISTRADA ・✦",
+            f"**PROTOCOLO**　{protocolo.strip()}\n**AVALIADOR**　{interaction.user.mention}\n**MÉDIA**　{avaliacao['media']:.2f}/5\n\n"
+            f"**CRITÉRIOS**\n• Postura: **{postura}/5**\n• Responsabilidade: **{responsabilidade}/5**\n• Disponibilidade: **{disponibilidade}/5**\n• Imparcialidade: **{imparcialidade}/5**\n• Comunicação: **{comunicacao}/5**\n\n"
+            f"**JUSTIFICATIVA**\n{justificativa.strip()[:1000]}", cor=0x9F1239, rodape="NÊMESIS • AVALIAÇÃO INDIVIDUAL • REGISTRO PERMANENTE")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="historico", description="Consulta avaliações e decisões de uma candidatura.")
+    @app_commands.describe(protocolo="Código da candidatura")
+    @app_commands.check(lambda interaction: interaction.guild is not None and (membro_tem_lideranca(interaction.user) or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))))
+    async def formulario_historico(self, interaction: discord.Interaction, protocolo: str):
+        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
+        if not resposta:
+            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
+            return
+        avaliacoes = resposta.get("avaliacoes", [])
+        decisoes = resposta.get("historico_decisoes", [])
+        embed = criar_embed(f"𓂀 HISTÓRICO · {protocolo.strip()}", f"**SITUAÇÃO ATUAL**　{str(resposta.get('status', 'pendente')).upper()}\n**AVALIAÇÕES**　{len(avaliacoes) if isinstance(avaliacoes, list) else 0}\n**DECISÕES**　{len(decisoes) if isinstance(decisoes, list) else 0}", cor=0x9F1239, rodape="NÊMESIS • AUDITORIA DO PROCESSO SELETIVO")
+        nomes = {"postura": "Postura", "responsabilidade": "Responsabilidade", "disponibilidade": "Disponibilidade", "imparcialidade": "Imparcialidade", "comunicacao": "Comunicação"}
+        for indice, item in enumerate(avaliacoes[-8:] if isinstance(avaliacoes, list) else [], 1):
+            criterios = item.get("criterios", {})
+            notas = " · ".join(f"{nomes.get(chave, chave)} {valor}/5" for chave, valor in criterios.items())
+            criado = int(float(item.get("criado_em", 0) or 0))
+            embed.add_field(name=f"Avaliação {indice} · <@{int(item.get('revisor_id', 0) or 0)}> · média {float(item.get('media', 0) or 0):.2f}/5", value=f"{notas}\n<t:{criado}:F>\n**Justificativa:** {str(item.get('justificativa') or 'Não informada')[:700]}", inline=False)
+        for item in (decisoes[-5:] if isinstance(decisoes, list) else []):
+            criado = int(float(item.get("criado_em", 0) or 0))
+            embed.add_field(name=f"Decisão · {str(item.get('status', 'indefinida')).upper()}", value=f"**Responsável:** <@{int(item.get('revisor_id', 0) or 0)}>\n**Data:** <t:{criado}:F>\n**Motivo:** {str(item.get('motivo') or 'Não informado')[:700]}", inline=False)
+        if not avaliacoes and not decisoes:
+            embed.add_field(name="HISTÓRICO", value="Ainda não há avaliações ou decisões registradas.", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     @app_commands.command(name="remover", description="Remove um formulário.")
     @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
     @lideranca_only()
@@ -1169,6 +1214,10 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
 
             if resposta["status"] != "pendente":
                 await interaction.followup.send(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
+                return
+
+            if not resposta.get("avaliacoes"):
+                await interaction.followup.send("Esta candidatura ainda não possui avaliação estruturada. Registre primeiro uma avaliação com /formularios avaliar.", ephemeral=True)
                 return
 
             novo_status = "aprovada" if aprovado else "recusada"
