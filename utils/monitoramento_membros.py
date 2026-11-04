@@ -92,14 +92,26 @@ async def registrar_mensagem(guild_id: int, user_id: int, registro: dict) -> Non
 
     arquivo = _arquivo(guild_id, user_id)
     try:
-        await atualizar_json(arquivo, {"mensagens": [], "eventos": []}, transformar)
+        dados_atualizados = await atualizar_json(
+            arquivo, {"mensagens": [], "eventos": []}, transformar
+        )
         await definir_expiracao(arquivo, RETENCAO_SEGUNDOS)
+
+        # O índice mantém o status efetivamente salvo no dossiê. Assim, os
+        # listeners cacheado e raw reconhecem uma exclusão já processada.
+        mensagens = dados_atualizados.get("mensagens", []) if isinstance(dados_atualizados, dict) else []
+        mensagem_atualizada = next(
+            (item for item in mensagens if str(item.get("message_id")) == message_id),
+            None,
+        )
+        status_final = (mensagem_atualizada or {}).get("status") or registro.get("status", "enviada")
 
         indice_arquivo = _arquivo_indice(guild_id, message_id)
         entrada = {
             "user_id": int(user_id),
             "channel_id": int(registro.get("canal_id") or 0),
             "timestamp": _numero(registro.get("timestamp")) or agora,
+            "status": str(status_final),
         }
         await salvar_com_expiracao(indice_arquivo, entrada, RETENCAO_SEGUNDOS)
     except Exception:

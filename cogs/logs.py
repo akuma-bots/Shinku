@@ -418,43 +418,48 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
-        if message.author.bot or not message.guild or message.guild.id != GUILD_NEMESIS_ID:
+        """Arquiva a exclusão somente no histórico privado do autor.
+
+        O tópico do Registro Global não recebe conteúdo de mensagens pessoais.
+        O listener raw continua como segunda via para exclusões sem cache.
+        """
+        if (
+            message.author.bot
+            or not message.guild
+            or message.guild.id != GUILD_NEMESIS_ID
+        ):
             return
-        canal = await self._canal_logs(message.guild)
-        if not canal or canal.id == message.channel.id:
-            return  # evita loop se o canal de logs for o mesmo onde a mensagem foi apagada
-        conteudo = message.content or "*(sem texto disponível no cache do Discord)*"
-        conteudo = conteudo[:1800]  # protege contra embeds inválidos por conteúdo excessivo
-        anexos = "\n".join(
-            f"[{anexo.filename}]({anexo.url})" for anexo in message.attachments[:8]
+
+        indice_existente = await monitoramento_membros.buscar_mensagem(message.guild.id, message.id)
+        if indice_existente and indice_existente.get("status") == "excluida":
+            return
+
+        agora = datetime.now(timezone.utc).timestamp()
+        await monitoramento_membros.registrar_mensagem(
+            message.guild.id,
+            message.author.id,
+            {
+                "message_id": str(message.id),
+                "canal_id": message.channel.id,
+                "timestamp": message.created_at.timestamp(),
+                "conteudo": message.content or "",
+                "url": message.jump_url,
+                "status": "excluida",
+                "excluida_em": agora,
+                "anexos": [
+                    {"nome": anexo.filename, "tamanho": anexo.size}
+                    for anexo in message.attachments[:10]
+                ],
+            },
         )
-        descricao = (
-            f"**Autor:** {message.author.mention} (ID: {message.author.id})\n"
-            f"**Canal de origem:** {message.channel.mention} (ID: {message.channel.id})\n"
-            f"**ID da mensagem:** {message.id}\n"
-            f"**Conteúdo registrado:**\n{conteudo[:1200]}"
-        )
-        if anexos:
-            descricao += f"\n**Anexos:**\n{anexos[:1200]}"
-        descricao += (
-            "\n\n*Auditoria informativa: o evento de exclusão do Discord não identifica "
-            "com segurança quem executou a exclusão. Este listener não apaga mensagens.*"
-        )
-        embed = criar_embed(
-            title="AUDITORIA • MENSAGEM EXCLUÍDA",
-            description=descricao[:4000],
-            color=0xED4245,
-            timestamp=datetime.now(timezone.utc),
-        )
-        await self._enviar_log(canal, embed, categoria="mensagens")
-        if message.attachments:
-            await registrar_global(message.guild, "anexos", "Anexos removidos com mensagem", descricao, cor=0xED4245)
 
     @commands.Cog.listener()
     async def on_raw_message_delete(self, payload: discord.RawMessageDeleteEvent):
         if payload.guild_id != GUILD_NEMESIS_ID:
             return
         registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, payload.message_id)
+        if registro and registro.get("status") == "excluida":
+            return
         agora = datetime.now(timezone.utc).timestamp()
         mensagem_cache = getattr(payload, "cached_message", None)
         if registro:
@@ -493,6 +498,8 @@ class Logs(commands.Cog):
         }
         for message_id in payload.message_ids:
             registro = await monitoramento_membros.buscar_mensagem(payload.guild_id, message_id)
+            if registro and registro.get("status") == "excluida":
+                continue
             mensagem_cache = cache.get(message_id)
             if registro:
                 user_id = int(registro["user_id"])
@@ -585,33 +592,35 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, antes: discord.Message, depois: discord.Message):
-        if antes.author.bot or not antes.guild or antes.guild.id != GUILD_NEMESIS_ID:
+        """Registra a nova versão no arquivo privado, sem publicar conteúdo no fórum."""
+        if (
+            antes.author.bot
+            or not antes.guild
+            or antes.guild.id != GUILD_NEMESIS_ID
+        ):
             return
+
         anexos_antes = [anexo.url for anexo in antes.attachments]
         anexos_depois = [anexo.url for anexo in depois.attachments]
         if antes.content == depois.content and anexos_antes == anexos_depois:
             return
-        embed = criar_embed(
-            title="Mensagem editada",
-            description=(
-                f"**Autor:** {antes.author.mention} ({antes.author.id})\n"
-                f"**Canal:** {antes.channel.mention} ({antes.channel.id})\n"
-                f"**Antes:**\n{antes.content[:1000] or '*vazio*'}\n"
-                f"**Depois:**\n{depois.content[:1000] or '*vazio*'}"
-            ),
-            color=0xFEE75C,
+
+        await monitoramento_membros.registrar_mensagem(
+            depois.guild.id,
+            depois.author.id,
+            {
+                "message_id": str(depois.id),
+                "canal_id": depois.channel.id,
+                "timestamp": depois.created_at.timestamp(),
+                "conteudo": depois.content or "",
+                "url": depois.jump_url,
+                "status": "editada",
+                "anexos": [
+                    {"nome": anexo.filename, "tamanho": anexo.size}
+                    for anexo in depois.attachments[:10]
+                ],
+            },
         )
-        if anexos_antes != anexos_depois:
-            antigos = "\n".join(f"[{a.filename}]({a.url})" for a in antes.attachments[:6]) or "*(nenhum)*"
-            atuais = "\n".join(f"[{a.filename}]({a.url})" for a in depois.attachments[:6]) or "*(nenhum)*"
-            embed.add_field(name="Anexos anteriores", value=antigos[:1024], inline=False)
-            embed.add_field(name="Anexos atuais", value=atuais[:1024], inline=False)
-        embed.add_field(name="ID da mensagem", value=str(antes.id), inline=True)
-        canal = await self._canal_logs(antes.guild)
-        if canal and canal.id != antes.channel.id:
-            await self._enviar_log(canal, embed, categoria="mensagens")
-            if anexos_antes != anexos_depois:
-                await registrar_global(antes.guild, "anexos", "Anexos de mensagem alterados", embed.description or "Anexos alterados.", cor=0xFEE75C)
 
     @commands.Cog.listener()
     async def on_member_ban(self, guild: discord.Guild, user: discord.User):
