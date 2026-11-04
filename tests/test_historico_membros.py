@@ -249,3 +249,29 @@ class TestMonitoramentoAmpliado(unittest.IsolatedAsyncioTestCase):
         self.assertIn("GTA V", registrar.await_args.args[3])
         self.assertIn("Valorant", registrar.await_args.args[3])
 
+
+    async def test_mudanca_de_cargo_e_salva_mesmo_sem_forum_de_registros(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from cogs.logs import Logs, GUILD_NEMESIS_ID
+
+        guild = SimpleNamespace(id=GUILD_NEMESIS_ID)
+        cargo_antigo = SimpleNamespace(id=10, name="Membro", is_default=lambda: False)
+        cargo_novo = SimpleNamespace(id=11, name="Supervisor", is_default=lambda: False)
+        antes = SimpleNamespace(
+            guild=guild, id=123, roles=[cargo_antigo], nick=None, name="membro",
+            global_name="Membro", premium_since=None,
+        )
+        depois = SimpleNamespace(
+            guild=guild, id=123, roles=[cargo_antigo, cargo_novo], nick=None, name="membro",
+            global_name="Membro", premium_since=None,
+        )
+        cog = object.__new__(Logs)
+        with patch("cogs.logs.monitoramento_membros.registrar_evento", new=AsyncMock()) as registrar, patch.object(
+            cog, "_canal_logs", new=AsyncMock(return_value=None)
+        ):
+            await cog.on_member_update(antes, depois)
+
+        registrar.assert_awaited_once()
+        self.assertEqual(registrar.await_args.args[2], "cargos")
+        self.assertIn("Supervisor", registrar.await_args.args[3])
