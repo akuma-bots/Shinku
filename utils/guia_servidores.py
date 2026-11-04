@@ -238,8 +238,13 @@ async def publicar_guia_servidor(bot) -> bool:
         logger.error("O destino configurado para o guia não é um canal de texto da NÊMESIS.")
         return False
 
-    if not canal.permissions_for(guild.me).send_messages:
-        logger.error("Shinku não possui permissão para publicar no canal do guia.")
+    bot_member = guild.me or guild.get_member(bot.user.id)
+    if bot_member is None:
+        logger.error("Não foi possível resolver o membro do Shinku na NÊMESIS.")
+        return False
+    permissoes_bot = canal.permissions_for(bot_member)
+    if not (permissoes_bot.view_channel and permissoes_bot.send_messages and permissoes_bot.read_message_history):
+        logger.error("Shinku precisa de Ver canal, Enviar mensagens e Ler histórico para manter o guia sem duplicações.")
         return False
 
     embed = criar_embed_guia_servidor()
