@@ -882,6 +882,12 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         formulario_id: str = None,
     ):
         todas = await formularios.listar_respostas(interaction.guild.id)
+        formularios_cadastrados = await formularios.listar_formularios(interaction.guild.id)
+        nomes_formularios = {
+            str(item.get("id")): str(item.get("nome") or "Formulário")
+            for item in formularios_cadastrados
+            if isinstance(item, dict) and item.get("id")
+        }
         filtro = status.value if status else "pendente"
         filtradas = todas if filtro == "todas" else [item for item in todas if item.get("status") == filtro]
         if formulario_id:
@@ -917,12 +923,15 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         for item in lote:
             criado = float(item.get("criado_em", item.get("timestamp", 0)) or 0)
             protocolo = str(item.get("id", "sem-id"))
-            formulario = await formularios.get_formulario(interaction.guild.id, item.get("formulario_id", "")) or {}
+            nome_formulario = nomes_formularios.get(
+                str(item.get("formulario_id", "")),
+                str(item.get("formTitulo") or "Formulário"),
+            )
             thread_id = item.get("thread_id")
             link = f"https://discord.com/channels/{interaction.guild.id}/{int(thread_id)}" if thread_id else None
             linha = (
                 f"**Candidato:** <@{int(item.get('autor_id', 0) or 0)}>\n"
-                f"**Processo:** {formulario.get('nome', item.get('formTitulo', 'Formulário'))}\n"
+                f"**Processo:** {nome_formulario}\n"
                 f"**Recebida:** <t:{int(criado)}:R>\n"
                 f"**Protocolo:** `{protocolo}`"
             )
