@@ -98,6 +98,82 @@ def _evento_para_dados(
     }
 
 
+def _atualizar_participantes(
+    registro: dict,
+    user_id: int,
+    inscrito: bool,
+    *,
+    timestamp: float | None = None,
+) -> tuple[dict, bool]:
+    """Atualiza inscrições sem confundir RSVP com presença efetiva."""
+    agora = float(timestamp or time.time())
+    registro = dict(registro or {})
+    historico = registro.get("participantes", [])
+    atuais = registro.get("inscritos_ids", [])
+
+    # Compatibilidade com registros antigos que guardavam apenas uma lista.
+    if not isinstance(historico, list):
+        historico = []
+    if not isinstance(atuais, list):
+        atuais = []
+
+    historico_ids = []
+    for item in historico:
+        valor = item.get("user_id") if isinstance(item, dict) else item
+        try:
+            valor = int(valor)
+        except (TypeError, ValueError):
+            continue
+        if valor not in historico_ids:
+            historico_ids.append(valor)
+
+    inscritos_ids = []
+    for item in atuais:
+        try:
+            valor = int(item)
+        except (TypeError, ValueError):
+            continue
+        if valor not in inscritos_ids:
+            inscritos_ids.append(valor)
+
+    participacoes = registro.get("historico_inscricoes", [])
+    if not isinstance(participacoes, list):
+        participacoes = []
+
+    user_id = int(user_id)
+    estava_inscrito = user_id in inscritos_ids
+    if inscrito == estava_inscrito:
+        registro["participantes"] = historico_ids
+        registro["inscritos_ids"] = inscritos_ids
+        registro["historico_inscricoes"] = participacoes[-500:]
+        registro["total_inscritos"] = len(inscritos_ids)
+        return registro, False
+
+    if inscrito:
+        inscritos_ids.append(user_id)
+        if user_id not in historico_ids:
+            historico_ids.append(user_id)
+        participacoes.append({
+            "user_id": user_id,
+            "acao": "inscricao",
+            "timestamp": agora,
+        })
+    else:
+        inscritos_ids.remove(user_id)
+        participacoes.append({
+            "user_id": user_id,
+            "acao": "cancelamento",
+            "timestamp": agora,
+        })
+
+    registro["participantes"] = historico_ids
+    registro["inscritos_ids"] = inscritos_ids
+    registro["historico_inscricoes"] = participacoes[-500:]
+    registro["total_inscritos"] = len(inscritos_ids)
+    registro["atualizado_em"] = agora
+    return registro, True
+
+
 class Eventos(commands.Cog):
     """
     Sistema de eventos da NÊMESIS.
@@ -469,6 +545,104 @@ class Eventos(commands.Cog):
             registro["atualizado_em"] = time.time()
             dados[str(evento.id)] = registro
             await _salvar_eventos(dados)
+
+    async def _registrar_inscricao(
+        self,
+        evento: discord.ScheduledEvent,
+        usuario: discord.User | discord.Member,
+        inscrito: bool,
+    ) -> bool:
+        """Persiste inscrição/cancelamento recebido pelo Gateway do Discord."""
+        await self._sincronizar_evento(evento)
+        async with _EVENTOS_LOCK:
+            dados = await _todos_eventos()
+            chave = str(evento.id)
+            registro = dados.get(chave, {})
+            if not isinstance(registro, dict):
+                registro = _evento_para_dados(evento, evento.guild.id)
+            registro, alterado = _atualizar_participantes(
+                registro,
+                usuario.id,
+                inscrito,
+            )
+            if alterado:
+                dados[chave] = registro
+                await _salvar_eventos(dados)
+            return alterado
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_user_add(
+        self,
+        evento: discord.ScheduledEvent,
+        usuario: discord.User,
+    ):
+        await self._registrar_inscricao(evento, usuario, True)
+
+    @commands.Cog.listener()
+    async def on_scheduled_event_user_remove(
+        self,
+        evento: discord.ScheduledEvent,
+        usuario: discord.User,
+    ):
+        await self._registrar_inscricao(evento, usuario, False)
+
+    @app_commands.command(
+        name="evento-relatorio",
+        description="Consulta inscrições e histórico de um evento.",
+    )
+    @app_commands.describe(evento_id="ID do evento agendado no Discord")
+    @lideranca_only()
+    async def evento_relatorio(
+        self,
+        interaction: discord.Interaction,
+        evento_id: str,
+    ):
+        dados = await _todos_eventos()
+        registro = dados.get(str(evento_id).strip())
+        if not isinstance(registro, dict):
+            await interaction.response.send_message(
+                "Não encontrei esse evento no arquivo interno. "
+                "Confira o ID ou sincronize os eventos atuais.",
+                ephemeral=True,
+            )
+            return
+
+        inscritos = registro.get("inscritos_ids", [])
+        historico = registro.get("participantes", [])
+        inscricoes = registro.get("historico_inscricoes", [])
+        inscritos = inscritos if isinstance(inscritos, list) else []
+        historico = historico if isinstance(historico, list) else []
+        inscricoes = inscricoes if isinstance(inscricoes, list) else []
+
+        embed = criar_embed(
+            title="📅 RELATÓRIO DE EVENTO · NÊMESIS",
+            description=(
+                f"**{str(registro.get('nome') or 'Evento sem nome')[:200]}**\n"
+                f"Situação: **{str(registro.get('status') or 'desconhecida').replace('_', ' ').title()}**"
+            ),
+            color=0x9F1239,
+            rodape=None,
+        )
+        embed.add_field(name="INSCRITOS ATUAIS", value=str(len(inscritos)), inline=True)
+        embed.add_field(name="JÁ SE INSCREVERAM", value=str(len(historico)), inline=True)
+        embed.add_field(name="REGISTROS DE ALTERAÇÃO", value=str(len(inscricoes)), inline=True)
+
+        if inscritos:
+            linhas = [f"• <@{int(user_id)}>" for user_id in inscritos[:25]]
+            embed.add_field(
+                name="INSCRIÇÕES ATIVAS",
+                value="\n".join(linhas),
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="INSCRIÇÕES ATIVAS",
+                value="Nenhuma inscrição ativa registrada.",
+                inline=False,
+            )
+
+        embed.set_footer(text=f"Evento {evento_id} · Inscrição não confirma presença física")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(
         name="eventos-sincronizar",
