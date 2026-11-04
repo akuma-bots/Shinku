@@ -1,6 +1,39 @@
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
-from cogs.eventos import _atualizar_participantes
+from cogs.eventos import (
+    CANAL_EVENTOS_PADRAO_ID,
+    Eventos,
+    _atualizar_participantes,
+)
+
+
+class TestCanalAgenda(unittest.IsolatedAsyncioTestCase):
+    async def test_usa_canal_oficial_quando_nao_ha_configuracao(self):
+        canal = object()
+        guild = SimpleNamespace(
+            id=1563995879981981817,
+            get_channel=lambda canal_id: canal if canal_id == CANAL_EVENTOS_PADRAO_ID else None,
+        )
+        cog = object.__new__(Eventos)
+        with patch("cogs.eventos.get_config", new=AsyncMock(return_value={})):
+            resultado = await cog._canal_eventos(guild)
+        self.assertIs(resultado, canal)
+
+    async def test_configuracao_personalizada_tem_precedencia(self):
+        canal_personalizado = object()
+        guild = SimpleNamespace(
+            id=1563995879981981817,
+            get_channel=lambda canal_id: canal_personalizado if canal_id == 123 else None,
+        )
+        cog = object.__new__(Eventos)
+        with patch(
+            "cogs.eventos.get_config",
+            new=AsyncMock(return_value={"canal_eventos_id": 123}),
+        ):
+            resultado = await cog._canal_eventos(guild)
+        self.assertIs(resultado, canal_personalizado)
 
 
 class TestParticipacaoEventos(unittest.TestCase):
