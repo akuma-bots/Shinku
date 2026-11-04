@@ -871,17 +871,31 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 )
                 return
 
-        canal_destino = (
-            canal
-            or interaction.channel
-        )
-
-        if not isinstance(
-            canal_destino,
-            discord.TextChannel,
-        ):
+        canais_oficiais = [
+            item for item in interaction.guild.text_channels
+            if item.name.casefold() == "sorteios"
+        ]
+        if canal is not None and canal.name.casefold() != "sorteios":
             await interaction.response.send_message(
-                "Não foi possível determinar o canal do sorteio.",
+                "Os sorteios devem ser publicados no canal oficial **#Sorteios**.",
+                ephemeral=True,
+            )
+            return
+        if canal is None:
+            if len(canais_oficiais) != 1:
+                await interaction.response.send_message(
+                    "Não consegui identificar um único canal oficial chamado **#Sorteios**. "
+                    "Verifique o nome do canal e tente novamente.",
+                    ephemeral=True,
+                )
+                return
+            canal_destino = canais_oficiais[0]
+        else:
+            canal_destino = canal
+
+        if not isinstance(canal_destino, discord.TextChannel):
+            await interaction.response.send_message(
+                "O canal oficial de sorteios precisa ser um canal de texto.",
                 ephemeral=True,
             )
             return
