@@ -36,7 +36,7 @@ SECOES_ADMINISTRATIVAS = {
     },
     "operacoes": {
         "titulo": "🎯 OPERAÇÕES E DESENVOLVIMENTO",
-        "descricao": "Acesse missões, validações, competições, eventos, inscrições, parcerias e relatórios operacionais.",
+        "descricao": "Abra as centrais interativas de missões, provas e processos seletivos. A inteligência avançada continua exclusiva do OCTÓGONO.",
         "topicos": ("missoes", "competitivo", "eventos", "parcerias"),
         "canais": (
             ("Missões", 1563995881315897549),
@@ -57,7 +57,7 @@ SECOES_ADMINISTRATIVAS = {
     },
     "sistemas": {
         "titulo": "⚙️ SISTEMAS E INFRAESTRUTURA",
-        "descricao": "Acesse registros de integrações, infraestrutura, configurações, sistemas e Roblox. O diagnóstico abaixo mostra o estado da sessão atual.",
+        "descricao": "Consulte a saúde do Shinku e execute verificações do armazenamento. Os diagnósticos são privados e restritos à liderança.",
         "topicos": ("integracoes",),
         "canais": (),
     },
@@ -242,6 +242,24 @@ class CentralAdministrativaView(discord.ui.View):
         )
         self.seletor.callback = self._selecionar_secao
         self.add_item(self.seletor)
+        self._botoes_acao = []
+
+    def _limpar_botoes_acao(self):
+        for item in self._botoes_acao:
+            if item in self.children:
+                self.remove_item(item)
+        self._botoes_acao.clear()
+
+    def _adicionar_acao(self, label: str, emoji: str, row: int, callback):
+        botao = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.primary, row=row)
+        async def executar(interaction: discord.Interaction):
+            if not _tem_acesso(interaction, self.owner_id):
+                await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
+                return
+            await callback(interaction)
+        botao.callback = executar
+        self.add_item(botao)
+        self._botoes_acao.append(botao)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if not _tem_acesso(interaction, self.owner_id):
@@ -261,8 +279,9 @@ class CentralAdministrativaView(discord.ui.View):
                 atalhos = []
             else:
                 embed, atalhos = await _embed_secao(self.bot, self.guild, chave)
+            self._limpar_botoes_acao()
             for item in list(self.children):
-                if isinstance(item, discord.ui.Button):
+                if isinstance(item, discord.ui.Button) and item not in self._botoes_acao:
                     self.remove_item(item)
             for indice, (rotulo, url) in enumerate(atalhos[:10]):
                 self.add_item(discord.ui.Button(label=rotulo[:80], url=url, row=1 + indice // 5))
@@ -289,6 +308,26 @@ class CentralAdministrativaView(discord.ui.View):
 
                 botao_inteligencia.callback = abrir_inteligencia
                 self.add_item(botao_inteligencia)
+                self._botoes_acao.append(botao_inteligencia)
+
+            # Atalhos abrem os painéis existentes; nenhum fluxo administrativo
+            # depende de comandos digitados.
+            if chave == "operacoes":
+                formularios = self.bot.get_cog("Formularios")
+                if formularios is not None:
+                    self._adicionar_acao("Processos seletivos", "📋", 4, formularios.formulario_central)
+                gestao = self.bot.get_cog("GestaoMissoes")
+                if gestao is not None and membro_tem_octogono(interaction.user):
+                    self._adicionar_acao("Gestão de missões", "🎯", 4, gestao.central_missoes)
+                revisoes = self.bot.get_cog("Revisoes")
+                if revisoes is not None:
+                    self._adicionar_acao("Revisão de provas", "🧾", 4, revisoes.painel_provas)
+
+            if chave == "sistemas":
+                status = self.bot.get_cog("StatusSistema")
+                if status is not None:
+                    self._adicionar_acao("Saúde do sistema", "📡", 3, status.status)
+                    self._adicionar_acao("Diagnóstico do armazenamento", "🗄️", 3, status.diagnostico)
 
             await interaction.edit_original_response(embed=embed, view=self)
         except Exception:
