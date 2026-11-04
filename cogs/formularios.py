@@ -854,6 +854,125 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         embed = criar_embed("N̷ÊMESIS ━ CENTRAL DE FORMULÁRIOS", "\n".join(linhas), rodape="NÊMESIS • Administração de formulários")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="fila", description="Consulta candidaturas com filtros e paginação.")
+    @app_commands.describe(
+        status="Situação das candidaturas",
+        pagina="Página da fila (15 candidaturas por página)",
+        formulario_id="Filtra por um formulário específico",
+    )
+    @app_commands.choices(status=[
+        app_commands.Choice(name="Pendentes", value="pendente"),
+        app_commands.Choice(name="Aprovadas", value="aprovada"),
+        app_commands.Choice(name="Recusadas", value="recusada"),
+        app_commands.Choice(name="Todas", value="todas"),
+    ])
+    @app_commands.check(
+        lambda interaction: (
+            interaction.guild is not None
+            and (
+                membro_tem_lideranca(interaction.user)
+                or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))
+            )
+        )
+    )
+    async def formulario_fila(
+        self,
+        interaction: discord.Interaction,
+        status: app_commands.Choice[str] = None,
+        pagina: app_commands.Range[int, 1, 1000] = 1,
+        formulario_id: str = None,
+    ):
+        todas = await formularios.listar_respostas(interaction.guild.id)
+        filtro = status.value if status else "pendente"
+        filtradas = todas if filtro == "todas" else [item for item in todas if item.get("status") == filtro]
+        if formulario_id:
+            filtradas = [item for item in filtradas if item.get("formulario_id") == formulario_id]
+        filtradas.sort(key=lambda item: float(item.get("criado_em", item.get("timestamp", 0)) or 0), reverse=True)
+
+        por_status = {
+            chave: sum(1 for item in todas if item.get("status") == chave)
+            for chave in ("pendente", "aprovada", "recusada")
+        }
+        por_pagina = 15
+        total_paginas = max(1, (len(filtradas) + por_pagina - 1) // por_pagina)
+        pagina_atual = min(int(pagina), total_paginas)
+        inicio = (pagina_atual - 1) * por_pagina
+        lote = filtradas[inicio:inicio + por_pagina]
+
+        embed = criar_embed(
+            "𓂀 NÊMESIS · FILA DE CANDIDATURAS",
+            (
+                f"**Pendentes:** {por_status['pendente']}　"
+                f"**Aprovadas:** {por_status['aprovada']}　"
+                f"**Recusadas:** {por_status['recusada']}\n"
+                f"**Filtro:** {filtro.upper()}　"
+                f"**Página:** {pagina_atual}/{total_paginas}\n\n"
+                "Cada candidatura é organizada em um tópico individual. "
+                "Abra o dossiê para analisar as respostas e registrar a decisão."
+            ),
+            cor=0x9F1239,
+            rodape="NÊMESIS • CENTRAL DE RECRUTAMENTO • ACESSO RESTRITO",
+        )
+        if not lote:
+            embed.add_field(name="FILA", value="Nenhuma candidatura encontrada para este filtro.", inline=False)
+        for item in lote:
+            criado = float(item.get("criado_em", item.get("timestamp", 0)) or 0)
+            protocolo = str(item.get("id", "sem-id"))
+            formulario = await formularios.get_formulario(interaction.guild.id, item.get("formulario_id", "")) or {}
+            thread_id = item.get("thread_id")
+            link = f"https://discord.com/channels/{interaction.guild.id}/{int(thread_id)}" if thread_id else None
+            linha = (
+                f"**Candidato:** <@{int(item.get('autor_id', 0) or 0)}>\n"
+                f"**Processo:** {formulario.get('nome', item.get('formTitulo', 'Formulário'))}\n"
+                f"**Recebida:** <t:{int(criado)}:R>\n"
+                f"**Protocolo:** `{protocolo}`"
+            )
+            if link:
+                linha += f"\n[ Abrir dossiê individual ]({link})"
+            embed.add_field(name=f"{str(item.get('status', 'pendente')).upper()} · {protocolo}", value=linha, inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="consultar", description="Abre o dossiê completo de uma candidatura pelo protocolo.")
+    @app_commands.describe(protocolo="Código da candidatura exibido na fila")
+    @app_commands.check(
+        lambda interaction: (
+            interaction.guild is not None
+            and (
+                membro_tem_lideranca(interaction.user)
+                or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))
+            )
+        )
+    )
+    async def formulario_consultar(self, interaction: discord.Interaction, protocolo: str):
+        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
+        if not resposta:
+            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
+            return
+        formulario = await formularios.get_formulario(interaction.guild.id, resposta.get("formulario_id", "")) or {
+            "nome": resposta.get("formTitulo", "Formulário"),
+            "paginas": [],
+        }
+        embeds = _embeds_resposta(formulario, resposta, interaction.guild, self.bot)
+        status = str(resposta.get("status", "pendente")).upper()
+        resumo = criar_embed(
+            f"DOSSIÊ · {resposta.get('id')}",
+            f"**Candidato:** <@{int(resposta.get('autor_id', 0) or 0)}>\n"
+            f"**Processo:** {formulario.get('nome', 'Formulário')}\n"
+            f"**Situação:** {status}\n"
+            f"**Recebida:** <t:{int(float(resposta.get('criado_em', resposta.get('timestamp', 0)) or 0))}:F>",
+            cor=0x9F1239,
+            rodape="NÊMESIS • ACESSO RESTRITO",
+        )
+        anexos = [resumo] + embeds
+        if resposta.get("status") == "pendente":
+            await interaction.response.send_message(
+                embeds=anexos[:10],
+                view=_view_resposta(resposta["id"]),
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(embeds=anexos[:10], ephemeral=True)
+
     @app_commands.command(name="remover", description="Remove um formulário.")
     @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
     @lideranca_only()
