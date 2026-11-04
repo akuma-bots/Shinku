@@ -619,106 +619,26 @@ class Eventos(commands.Cog):
         return embed
 
     @commands.Cog.listener()
-    async def on_scheduled_event_create(
-        self,
-        evento: discord.ScheduledEvent,
-    ):
-
-        await self._sincronizar_evento(
-            evento
-        )
-
-        canal = await self._canal_eventos(
-            evento.guild
-        )
-
-        if not canal:
-            return
-
-        try:
-
-            await canal.send(
-                content="📅 **Novo evento agendado!**",
-                embed=self._embed_evento(
-                    evento,
-                    "Evento agendado",
-                ),
-            )
-
-        except (
-            discord.Forbidden,
-            discord.HTTPException,
-        ):
-            pass
+    async def on_scheduled_event_create(self, evento: discord.ScheduledEvent):
+        await self._sincronizar_evento(evento)
+        await self.atualizar_agenda(evento.guild)
 
     @commands.Cog.listener()
-    async def on_scheduled_event_update(
-        self,
-        antes: discord.ScheduledEvent,
-        depois: discord.ScheduledEvent,
-    ):
-
-        await self._sincronizar_evento(
-            depois
-        )
-
-        canal = await self._canal_eventos(
-            depois.guild
-        )
-
-        if not canal:
-            return
-
-        try:
-
-            if (
-                antes.status
-                != discord.EventStatus.active
-                and depois.status
-                == discord.EventStatus.active
-            ):
-
-                await canal.send(
-                    content=(
-                        "🟢 **O evento começou agora!**"
-                    ),
-                    embed=self._embed_evento(
-                        depois,
-                        "Evento em andamento",
-                    ),
-                )
-
-            elif (
-                depois.status
-                == discord.EventStatus.cancelled
-            ):
-
-                await canal.send(
-                    f"❌ O evento **{depois.name}** "
-                    "foi cancelado."
-                )
-
-        except (
-            discord.Forbidden,
-            discord.HTTPException,
-        ):
-            pass
+    async def on_scheduled_event_update(self, antes: discord.ScheduledEvent, depois: discord.ScheduledEvent):
+        await self._sincronizar_evento(depois)
+        await self.atualizar_agenda(depois.guild)
 
     @commands.Cog.listener()
-    async def on_scheduled_event_delete(
-        self,
-        evento: discord.ScheduledEvent,
-    ):
-
+    async def on_scheduled_event_delete(self, evento: discord.ScheduledEvent):
         async with _EVENTOS_LOCK:
             dados = await _todos_eventos()
             registro = dados.get(str(evento.id))
-            if not isinstance(registro, dict):
-                return
-            registro["status"] = "deleted"
-            registro["atualizado_em"] = time.time()
-            dados[str(evento.id)] = registro
-            await _salvar_eventos(dados)
+            if isinstance(registro, dict):
+                registro["status"] = "deleted"
+                registro["atualizado_em"] = time.time()
+                dados[str(evento.id)] = registro
+                await _salvar_eventos(dados)
+        await self.atualizar_agenda(evento.guild)
 
     async def _registrar_inscricao(
         self,
