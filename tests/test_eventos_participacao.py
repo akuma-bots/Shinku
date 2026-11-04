@@ -21,6 +21,20 @@ class TestCanalAgenda(unittest.IsolatedAsyncioTestCase):
             resultado = await cog._canal_eventos(guild)
         self.assertIs(resultado, canal)
 
+    async def test_canal_padrao_antigo_e_migrado_para_agenda_oficial(self):
+        canal = object()
+        guild = SimpleNamespace(
+            id=1563995879981981817,
+            get_channel=lambda canal_id: canal if canal_id == CANAL_EVENTOS_PADRAO_ID else None,
+        )
+        cog = object.__new__(Eventos)
+        with patch(
+            "cogs.eventos.get_config",
+            new=AsyncMock(return_value={"canal_eventos_id": 1545835097830334536}),
+        ):
+            resultado = await cog._canal_eventos(guild)
+        self.assertIs(resultado, canal)
+
     async def test_configuracao_personalizada_tem_precedencia(self):
         canal_personalizado = object()
         guild = SimpleNamespace(
