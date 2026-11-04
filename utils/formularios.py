@@ -483,10 +483,18 @@ async def definir_status_resposta(
         if not alvo or alvo.get("status") != "pendente":
             return None
 
+        agora = time.time()
+        motivo_texto = str(motivo or "").strip()[:1000] or None
         alvo["status"] = status
         alvo["revisor_id"] = revisor_id
-        alvo["motivo_decisao"] = str(motivo or "").strip()[:1000] or None
-        alvo["atualizado_em"] = time.time()
+        alvo["motivo_decisao"] = motivo_texto
+        alvo.setdefault("historico_decisoes", []).append({
+            "status": status,
+            "revisor_id": int(revisor_id),
+            "motivo": motivo_texto,
+            "criado_em": agora,
+        })
+        alvo["atualizado_em"] = agora
 
         await _salvar_respostas_guild(guild_id, lista)
         return alvo
