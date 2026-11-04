@@ -798,6 +798,36 @@ class Logs(commands.Cog):
         await self._enviar_log(canal, criar_embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245), categoria="administracao")
 
     @commands.Cog.listener()
+    async def on_presence_update(self, antes: discord.Member, depois: discord.Member):
+        """Registra mudanças de presença e jogos, sem armazenar status personalizado ou mídia pessoal."""
+        if depois.guild.id != GUILD_NEMESIS_ID or depois.bot:
+            return
+        status_antes = str(getattr(antes, "status", "offline"))
+        status_depois = str(getattr(depois, "status", "offline"))
+        jogos_antes = sorted(
+            str(getattr(atividade, "name", ""))[:100]
+            for atividade in getattr(antes, "activities", [])
+            if getattr(atividade, "type", None) == discord.ActivityType.playing and getattr(atividade, "name", None)
+        )
+        jogos_depois = sorted(
+            str(getattr(atividade, "name", ""))[:100]
+            for atividade in getattr(depois, "activities", [])
+            if getattr(atividade, "type", None) == discord.ActivityType.playing and getattr(atividade, "name", None)
+        )
+        if status_antes == status_depois and jogos_antes == jogos_depois:
+            return
+        partes = []
+        if status_antes != status_depois:
+            partes.append(f"Presença: {status_antes} → {status_depois}")
+        if jogos_antes != jogos_depois:
+            partes.append(f"Jogos: {', '.join(jogos_antes) or 'nenhum'} → {', '.join(jogos_depois) or 'nenhum'}")
+        await monitoramento_membros.registrar_evento(
+            depois.guild.id, depois.id, "presenca", " | ".join(partes),
+            detalhes={"status_antes": status_antes, "status_depois": status_depois,
+                      "jogos_antes": jogos_antes, "jogos_depois": jogos_depois},
+        )
+
+    @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, antes: discord.VoiceState, depois: discord.VoiceState):
         if member.guild.id == GUILD_NEMESIS_ID:
             if antes.channel is None and depois.channel is not None:
@@ -806,6 +836,17 @@ class Logs(commands.Cog):
                 await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_saida", f"Saiu do canal de voz {antes.channel.name}.")
             elif antes.channel != depois.channel and antes.channel and depois.channel:
                 await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_movimentacao", f"Mudou de {antes.channel.name} para {depois.channel.name}.")
+            alteracoes_privadas = []
+            for atributo, rotulo in (("mute", "mute do servidor"), ("deaf", "surdez do servidor"), ("self_mute", "autossilenciamento"), ("self_deaf", "autossurdez"), ("self_stream", "transmissão"), ("self_video", "câmera")):
+                valor_antes = bool(getattr(antes, atributo, False))
+                valor_depois = bool(getattr(depois, atributo, False))
+                if valor_antes != valor_depois:
+                    alteracoes_privadas.append(f"{rotulo}: {'ativado' if valor_depois else 'desativado'}")
+            if alteracoes_privadas:
+                await monitoramento_membros.registrar_evento(
+                    member.guild.id, member.id, "voz_estado", "; ".join(alteracoes_privadas),
+                    detalhes={"canal_id": depois.channel.id if depois.channel else (antes.channel.id if antes.channel else None)},
+                )
         canal = await self._canal_logs(member.guild)
         if not canal:
             return
