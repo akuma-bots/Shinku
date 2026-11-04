@@ -31,7 +31,7 @@ CARGOS_ACESSO_IDS = {
 # Os nomes antigos continuam aceitos pelos cogs durante a migração.
 CATEGORIAS = {
     "administracao": ("👑・Central de Administração", "Decisões administrativas, permissões, configurações e diretrizes oficiais da NÊMESIS."),
-    "historico_membros": ("👥・Arquivo de Membros", "Entradas, saídas e ocorrências individuais essenciais. Não recebe conteúdo de mensagens editadas/excluídas, auditoria de cargos ou conquistas."),
+    "historico_membros": ("👥・Arquivo de Membros", "Entradas, saídas e ocorrências individuais essenciais. Não recebe mensagens, cargos ou conquistas."),
     "moderacao": ("⚖️・Tribunal de Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
     "seguranca": ("🛡️・Muralha de Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
     "missoes": ("🎯・Operações e Missões", "Missões, operações, formulários, relatórios, atribuições, provas, validações, conclusões e recompensas."),
