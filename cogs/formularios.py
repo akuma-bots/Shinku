@@ -687,71 +687,77 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                      acao, canal_id, mensagem.id, len(_formularios_disponiveis(lista)))
 
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict) -> bool:
-        """Publica o dossiê no canal oficial e notifica os cargos responsáveis por DM."""
+        """Abre um tópico individual por candidatura, evitando inundar o canal da comissão."""
         embeds = _embeds_resposta(formulario, resposta, guild, self.bot)
         view = _view_resposta(resposta["id"])
-        canal_enviado = False
-
-        canal_candidaturas = guild.get_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
-        if canal_candidaturas is None:
+        canal = guild.get_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
+        if canal is None:
             try:
-                canal_candidaturas = await guild.fetch_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
+                canal = await guild.fetch_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logging.exception("Canal de recebimento de candidaturas %s não encontrado ou inacessível.", CANAL_RECEBIMENTO_CANDIDATURAS)
-                canal_candidaturas = None
+                logging.exception("Canal de candidaturas inacessível: %s", CANAL_RECEBIMENTO_CANDIDATURAS)
+                return False
+        if not isinstance(canal, discord.TextChannel):
+            logging.error("O canal de candidaturas precisa ser um canal de texto.")
+            return False
 
-        if canal_candidaturas is not None and callable(getattr(canal_candidaturas, "send", None)):
+        cargos = list(formulario.get("cargos_notificar", []))
+        if CARGO_INSTRUTOR_FORMULARIO_ID not in cargos:
+            cargos.append(CARGO_INSTRUTOR_FORMULARIO_ID)
+        mencoes = []
+        for cargo_id in cargos:
             try:
-                for indice, embed in enumerate(embeds):
-                    await canal_candidaturas.send(embed=embed, view=view if indice == 0 else None)
-                canal_enviado = True
-            except (discord.Forbidden, discord.HTTPException):
-                logging.exception("Falha ao publicar candidatura %s no canal %s.", resposta.get("id"), CANAL_RECEBIMENTO_CANDIDATURAS)
-        else:
-            logging.error("O destino %s não é um canal de texto enviável.", CANAL_RECEBIMENTO_CANDIDATURAS)
-
-        cargos_notificar = list(formulario.get("cargos_notificar", []))
-        if CARGO_INSTRUTOR_FORMULARIO_ID not in cargos_notificar:
-            cargos_notificar.append(CARGO_INSTRUTOR_FORMULARIO_ID)
-        notificados = set()
-        for cargo_id in cargos_notificar:
-            try:
-                cargo_id_int = int(cargo_id)
+                cargo = guild.get_role(int(cargo_id))
             except (TypeError, ValueError):
-                continue
-            cargo = guild.get_role(cargo_id_int)
-            if not cargo:
-                continue
-            for membro in cargo.members:
-                if membro.id in notificados or membro.bot:
-                    continue
-                notificados.add(membro.id)
-                for indice, embed in enumerate(embeds):
-                    try:
-                        await membro.send(embed=embed, view=view if indice == 0 else None)
-                    except discord.Forbidden:
-                        break
-                    except discord.HTTPException:
-                        logging.exception("Falha ao enviar candidatura %s por DM ao membro %s.", resposta.get("id"), membro.id)
-                        break
+                cargo = None
+            if cargo and cargo.mention not in mencoes:
+                mencoes.append(cargo.mention)
+
+        nome_candidato = str(resposta.get("nome") or f"Membro {resposta.get('autor_id')}").strip()
+        nome_thread = f"{formulario.get('nome', 'Candidatura')} • {nome_candidato} • {resposta['id']}"[:100]
         try:
-            from utils.registro_global import obter_topico
-            topico = await obter_topico(guild, "formularios")
-            if topico.archived or topico.locked:
-                await topico.edit(archived=False, locked=False, reason="Registrar nova candidatura")
-            # Preserva no Fórum o dossiê completo, incluindo todas as respostas,
-            # não apenas um aviso resumido da existência da candidatura.
-            for indice, embed_dossie in enumerate(embeds):
-                copia = embed_dossie.copy()
-                copia.set_footer(text=f"NÊMESIS • Cópia restrita do Registro Global • {guild.name}")
-                await topico.send(
-                    embed=copia,
-                    view=view if indice == 0 else None,
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
+            thread = await canal.create_thread(
+                name=nome_thread,
+                type=discord.ChannelType.public_thread,
+                auto_archive_duration=10080,
+                invitable=False,
+                reason=f"Organizar candidatura {resposta['id']} em tópico individual",
+            )
+            await thread.send(
+                content=" ".join(mencoes) if mencoes else None,
+                embed=embeds[0],
+                view=view,
+                allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
+            )
+            for embed in embeds[1:]:
+                await thread.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await formularios.atualizar_metadados_resposta(
+                guild.id,
+                resposta["id"],
+                thread_id=thread.id,
+                canal_id=canal.id,
+                notificacao_em=time.time(),
+            )
+        except (discord.Forbidden, discord.HTTPException, TypeError):
+            logging.exception("Falha ao criar tópico individual para candidatura %s.", resposta.get("id"))
+            return False
+
+        # O Registro Global recebe somente um índice sem as respostas pessoais.
+        try:
+            from utils.registro_global import registrar
+            await registrar(
+                guild,
+                "formularios",
+                "Nova candidatura recebida",
+                f"Protocolo: `{resposta['id']}`\n"
+                f"Formulário: **{formulario.get('nome', 'Formulário')}**\n"
+                f"Candidato: <@{resposta.get('autor_id')}>\n"
+                f"Análise: [Abrir dossiê individual](https://discord.com/channels/{guild.id}/{thread.id})",
+                cor=0x9F1239,
+            )
         except Exception:
-            logging.exception("Falha ao arquivar o dossiê da candidatura %s no Registro Global.", resposta.get("id"))
-        return canal_enviado
+            logging.exception("Falha ao registrar índice da candidatura %s.", resposta.get("id"))
+        return True
 
     @app_commands.command(name="criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
     @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
