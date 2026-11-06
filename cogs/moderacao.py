@@ -30,66 +30,30 @@ class Moderacao(commands.Cog):
         )
 
     async def _carregar_regras_oficiais(self, guild: discord.Guild):
-        """
-        Carrega as regras diretamente do canal oficial.
-        Não utiliza rules.json.
-        """
-
+        """Recupera a embed oficial integral, sem reconstruí-la em várias mensagens."""
         canal = guild.get_channel(CANAL_REGRAS_ID)
-
         if canal is None:
             try:
                 canal = await guild.fetch_channel(CANAL_REGRAS_ID)
-            except (
-                discord.NotFound,
-                discord.Forbidden,
-                discord.HTTPException
-            ):
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 return None
-
         if not isinstance(canal, discord.TextChannel):
             return None
 
-        mensagens = []
-
         try:
-            async for mensagem in canal.history(
-                limit=200,
-                oldest_first=True
-            ):
-                conteudo = mensagem.content.strip()
-
-                if conteudo:
-                    mensagens.append(conteudo)
-
-                # Também lê regras que estejam dentro de embeds.
+            async for mensagem in canal.history(limit=200, oldest_first=False):
                 for embed in mensagem.embeds:
-
-                    if embed.title:
-                        mensagens.append(
-                            f"**{embed.title}**"
-                        )
-
-                    if embed.description:
-                        mensagens.append(
-                            embed.description
-                        )
-
-                    for campo in embed.fields:
-                        mensagens.append(
-                            f"**{campo.name}**\n{campo.value}"
-                        )
-
-        except (
-            discord.Forbidden,
-            discord.HTTPException
-        ):
+                    rodape = embed.footer.text or ""
+                    if (
+                        embed.title == "𓂀 NÊMESIS — CÓDIGO DE CONDUTA"
+                        and rodape.startswith("NÊMESIS • Código de Conduta oficial")
+                        and len(embed.fields) == 11
+                    ):
+                        return embed.copy()
+        except (discord.Forbidden, discord.HTTPException):
+            logging.exception("Falha ao consultar a embed oficial do Código de Conduta.")
             return None
-
-        if not mensagens:
-            return None
-
-        return "\n\n".join(mensagens)
+        return None
 
     @app_commands.command(
         name="clear",
@@ -226,78 +190,16 @@ class Moderacao(commands.Cog):
     ):
         await interaction.response.defer()
 
-        regras = await self._carregar_regras_oficiais(
-            interaction.guild
-        )
+        embed = await self._carregar_regras_oficiais(interaction.guild)
 
-        if not regras:
+        if embed is None:
             await interaction.followup.send(
-                "❌ Não foi possível carregar as regras.\n\n"
-                f"Verifique se o canal <#{CANAL_REGRAS_ID}> "
-                "existe e se o bot possui permissão para "
-                "visualizar o canal e o histórico de mensagens."
+                "❌ Não foi possível carregar a embed oficial das regras. "
+                f"Verifique o canal <#{CANAL_REGRAS_ID}> e as permissões de leitura do bot."
             )
             return
 
-        # Limite seguro para a descrição de uma embed.
-        limite = 3900
-
-        partes = []
-
-        while len(regras) > limite:
-            corte = regras.rfind(
-                "\n",
-                0,
-                limite
-            )
-
-            if corte <= 0:
-                corte = regras.rfind(
-                    " ",
-                    0,
-                    limite
-                )
-
-            if corte <= 0:
-                corte = limite
-
-            partes.append(
-                regras[:corte].strip()
-            )
-
-            regras = regras[corte:].strip()
-
-        if regras:
-            partes.append(regras)
-
-        embeds = []
-
-        for indice, parte in enumerate(
-            partes,
-            start=1
-        ):
-            titulo = "📜 Regras do Servidor"
-
-            if len(partes) > 1:
-                titulo += (
-                    f" — Parte {indice}/{len(partes)}"
-                )
-
-            embed = criar_embed(
-                title=titulo,
-                description=parte,
-                color=0x5865F2
-            )
-
-            embed.set_footer(
-                text="Fonte oficial: canal de regras"
-            )
-
-            embeds.append(embed)
-
-        await interaction.followup.send(
-            embeds=embeds
-        )
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(
         name="avisos",
