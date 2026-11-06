@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import time
 import uuid
 
@@ -9,6 +10,23 @@ ARQUIVO_FORMULARIOS = "formularios.json"
 ARQUIVO_RESPOSTAS = "formularios_respostas.json"
 
 _STATUS_RESPOSTA_LOCK = asyncio.Lock()
+_FORMULARIOS_LOCK = asyncio.Lock()
+
+
+def _int_seguro(valor, padrao: int = 0) -> int:
+    try:
+        return int(valor)
+    except (TypeError, ValueError, OverflowError):
+        return padrao
+
+
+def _serializar_formularios(func):
+    """Serializa mutações do catálogo para evitar atualizações perdidas no storage."""
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        async with _FORMULARIOS_LOCK:
+            return await func(*args, **kwargs)
+    return wrapper
 
 
 async def _tudo_formularios():
@@ -60,6 +78,7 @@ async def get_formulario(
     )
 
 
+@_serializar_formularios
 async def criar_formulario(
     guild_id: int,
     nome: str,
@@ -100,6 +119,7 @@ async def criar_formulario(
     return formulario
 
 
+@_serializar_formularios
 async def remover_formulario(
     guild_id: int,
     formulario_id: str,
@@ -144,6 +164,7 @@ def perguntas_flat(
     return achatado
 
 
+@_serializar_formularios
 async def reativar_formulario(guild_id: int, formulario_id: str) -> bool:
     lista = await listar_formularios(guild_id)
     alvo = next((item for item in lista if item.get("id") == formulario_id), None)
@@ -156,8 +177,9 @@ async def reativar_formulario(guild_id: int, formulario_id: str) -> bool:
     return True
 
 
+@_serializar_formularios
 async def atualizar_formulario(guild_id: int, formulario_id: str, **alteracoes) -> dict | None:
-    campos = {"nome", "titulo_painel", "descricao_painel", "banner_url", "ativo"}
+    campos = {"nome", "titulo_painel", "descricao_painel", "banner_url", "ativo", "versao_automatico"}
     lista = await listar_formularios(guild_id)
     alvo = next((item for item in lista if item.get("id") == formulario_id), None)
     if not alvo:
@@ -170,6 +192,7 @@ async def atualizar_formulario(guild_id: int, formulario_id: str, **alteracoes) 
     return alvo
 
 
+@_serializar_formularios
 async def adicionar_pagina(
     guild_id: int,
     formulario_id: str,
@@ -227,6 +250,38 @@ async def adicionar_pagina(
     return alvo
 
 
+@_serializar_formularios
+async def atualizar_pergunta(
+    guild_id: int,
+    formulario_id: str,
+    indice_global: int,
+    texto: str,
+) -> bool:
+    """Edita uma pergunta por posição, sem reescrever respostas já recebidas."""
+    texto = str(texto or "").strip()
+    if not texto or len(texto) > 256 or indice_global < 0:
+        return False
+    lista = await listar_formularios(guild_id)
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
+        return False
+    atual = 0
+    for pagina in alvo.get("paginas", []):
+        perguntas = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina if isinstance(pagina, list) else []
+        for indice, pergunta in enumerate(perguntas):
+            if atual == indice_global:
+                if isinstance(pergunta, dict):
+                    pergunta["texto"] = texto
+                else:
+                    perguntas[indice] = {"texto": texto, "tipo": "paragrafo", "obrigatoria": True}
+                alvo["atualizado_em"] = time.time()
+                await _salvar_formularios_guild(guild_id, lista)
+                return True
+            atual += 1
+    return False
+
+
+@_serializar_formularios
 async def remover_pagina(
     guild_id: int,
     formulario_id: str,
@@ -271,6 +326,7 @@ async def remover_pagina(
     return True
 
 
+@_serializar_formularios
 async def adicionar_cargo_notificar(
     guild_id: int,
     formulario_id: str,
@@ -311,6 +367,7 @@ async def adicionar_cargo_notificar(
     return True
 
 
+@_serializar_formularios
 async def remover_cargo_notificar(
     guild_id: int,
     formulario_id: str,
@@ -352,6 +409,27 @@ async def remover_cargo_notificar(
     return True
 
 
+@_serializar_formularios
+async def definir_cargos_notificar(guild_id: int, formulario_id: str, cargos_ids: list[int]) -> dict | None:
+    """Substitui a lista de cargos notificados em uma única operação serializada."""
+    lista = await listar_formularios(guild_id)
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
+        return None
+    normalizados = []
+    for cargo_id in cargos_ids:
+        try:
+            cargo_id = int(cargo_id)
+        except (TypeError, ValueError):
+            continue
+        if cargo_id > 0 and cargo_id not in normalizados:
+            normalizados.append(cargo_id)
+    alvo["cargos_notificar"] = normalizados[:25]
+    alvo["atualizado_em"] = time.time()
+    await _salvar_formularios_guild(guild_id, lista)
+    return alvo
+
+
 # ============================================================
 # RESPOSTAS
 # ============================================================
@@ -383,7 +461,7 @@ async def criar_resposta(
     autor_id: int,
     respostas: list,
     autor_nome: str = None,
-) -> dict:
+) -> dict | None:
     async with _STATUS_RESPOSTA_LOCK:
 
         dados = await _tudo_respostas()
@@ -392,6 +470,15 @@ async def criar_resposta(
         if not isinstance(lista, list):
             lista = []
         lista = [item for item in lista if isinstance(item, dict)]
+
+        if any(
+            isinstance(item, dict)
+            and item.get("formulario_id") == formulario_id
+            and _int_seguro(item.get("autor_id")) == int(autor_id)
+            and item.get("status") == "pendente"
+            for item in lista
+        ):
+            return None
 
         formulario = await get_formulario(guild_id, formulario_id) or {}
         perguntas = perguntas_flat(formulario)
@@ -482,13 +569,20 @@ async def definir_status_resposta(
 
         if not alvo or alvo.get("status") != "pendente":
             return None
+        avaliacoes = alvo.get("avaliacoes", [])
+        if not isinstance(avaliacoes, list) or not avaliacoes:
+            return None
 
         agora = time.time()
         motivo_texto = str(motivo or "").strip()[:1000] or None
         alvo["status"] = status
-        alvo["revisor_id"] = revisor_id
+        alvo["revisor_id"] = int(revisor_id)
         alvo["motivo_decisao"] = motivo_texto
-        alvo.setdefault("historico_decisoes", []).append({
+        historico = alvo.get("historico_decisoes")
+        if not isinstance(historico, list):
+            historico = []
+            alvo["historico_decisoes"] = historico
+        historico.append({
             "status": status,
             "revisor_id": int(revisor_id),
             "motivo": motivo_texto,
@@ -522,7 +616,18 @@ async def recusar_respostas_pendentes(
                 continue
             resposta["status"] = "recusada"
             resposta["revisor_id"] = int(revisor_id)
-            resposta["motivo_decisao"] = str(motivo or "").strip()[:1000]
+            motivo_texto = str(motivo or "").strip()[:1000] or None
+            resposta["motivo_decisao"] = motivo_texto
+            historico = resposta.get("historico_decisoes")
+            if not isinstance(historico, list):
+                historico = []
+                resposta["historico_decisoes"] = historico
+            historico.append({
+                "status": "recusada",
+                "revisor_id": int(revisor_id),
+                "motivo": motivo_texto,
+                "criado_em": agora,
+            })
             resposta["atualizado_em"] = agora
             atualizadas.append(dict(resposta))
         if atualizadas:
@@ -660,6 +765,9 @@ async def registrar_avaliacao(
         for campo in campos
     ):
         raise ValueError("Cada critério deve receber uma nota entre 1 e 5.")
+    justificativa = str(justificativa or "").strip()
+    if not justificativa:
+        raise ValueError("A justificativa da avaliação é obrigatória.")
 
     async with _STATUS_RESPOSTA_LOCK:
         dados = await _tudo_respostas()
@@ -679,7 +787,11 @@ async def registrar_avaliacao(
             "justificativa": str(justificativa or "").strip()[:1000],
             "criado_em": agora,
         }
-        alvo.setdefault("avaliacoes", []).append(avaliacao)
+        avaliacoes_existentes = alvo.get("avaliacoes")
+        if not isinstance(avaliacoes_existentes, list):
+            avaliacoes_existentes = []
+            alvo["avaliacoes"] = avaliacoes_existentes
+        avaliacoes_existentes.append(avaliacao)
         alvo["atualizado_em"] = agora
         await _salvar_respostas_guild(guild_id, lista)
         return dict(avaliacao)

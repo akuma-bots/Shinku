@@ -115,15 +115,96 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
             lista=[{"id": "form-1", "nome": "Staff", "paginas": []}],
         )
 
-        self.assertEqual(len(central.children), 3)
+        self.assertEqual(len(central.children), 5)
         self.assertEqual(
-            central.children[2].custom_id,
+            central.children[3].custom_id,
             "nemesis:formularios:fila_pendentes",
         )
         self.assertEqual(
-            central.children[2].options[0].value,
+            central.children[3].options[0].value,
             "abrir_pendentes",
         )
+        self.assertEqual(central.children[4].custom_id, "nemesis:formularios:historico_fichas")
+
+    def test_gerenciamento_de_formularios_nao_registra_grupo_slash(self):
+        from discord.ext import commands
+        self.assertTrue(issubclass(cog_formularios.Formularios, commands.Cog))
+        self.assertFalse(issubclass(cog_formularios.Formularios, commands.GroupCog))
+        self.assertFalse(any(hasattr(cog_formularios.Formularios, nome) for nome in (
+            "formulario_criar", "formulario_pagina_adicionar", "formulario_pagina_remover",
+            "formulario_fila", "formulario_consultar", "formulario_avaliar",
+            "formulario_historico", "formulario_cargo_adicionar", "formulario_cargo_remover",
+        )))
+
+    def test_configuracao_de_comissao_usa_seletor_de_cargos_e_botao_salvar(self):
+        class Guild:
+            id = 123
+            roles = []
+        cog = object.__new__(cog_formularios.Formularios)
+        view = cog_formularios.GerenciarCargosView(cog, Guild(), 456, {"id": "form-1", "cargos_notificar": []})
+        self.assertEqual(len(view.children), 2)
+        self.assertTrue(any(isinstance(item, discord.ui.RoleSelect) for item in view.children))
+        self.assertTrue(any(isinstance(item, discord.ui.Button) and item.label == "Salvar cargos" for item in view.children))
+
+    def test_central_sem_formularios_ainda_oferece_criacao(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        central = cog_formularios.CentralFormulariosView(cog, 123, 456, [])
+        self.assertEqual(len(central.children), 1)
+        self.assertEqual(central.children[0].label, "Novo formulário")
+
+    def test_modal_de_criacao_e_edicao_respeita_limites_do_discord(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        criar = cog_formularios.ModalCriarFormulario(cog, 123, 456)
+        editar = cog_formularios.ModalEditarFormulario(cog, 123, 456, {
+            "id": "form-1", "nome": "Staff", "titulo_painel": "Staff", "descricao_painel": "Descrição", "banner_url": ""
+        })
+        self.assertEqual(len(criar.children), 4)
+        self.assertEqual(len(editar.children), 4)
+        self.assertTrue(all(len(campo.label) <= 45 for campo in criar.children + editar.children))
+
+    def test_dossie_usa_snapshot_das_perguntas_originais(self):
+        formulario = {"nome": "Staff", "paginas": [["Pergunta editada depois"]]}
+        resposta = {
+            "id": "resp-snapshot", "autor_id": 456, "nome": "Candidato", "formTitulo": "Nome original do processo",
+            "respostas": ["Resposta antiga"],
+            "itens": [{"pergunta": "Pergunta original", "resposta": "Resposta antiga"}],
+        }
+        embeds = _embeds_resposta(formulario, resposta, SimpleNamespace(name="NÊMESIS"))
+        texto = "\n".join(field.name + " " + field.value for embed in embeds for field in embed.fields)
+        self.assertIn("Pergunta original", texto)
+        self.assertNotIn("Pergunta editada depois", texto)
+        self.assertIn("Nome original do processo", embeds[0].title)
+
+    def test_historico_de_candidaturas_tem_paginacao_de_25_fichas(self):
+        central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
+        respostas = [
+            {"id": f"resp-{i}", "nome": f"Candidato {i}", "status": "aprovada" if i % 2 else "recusada"}
+            for i in range(26)
+        ]
+        view = cog_formularios.FilaHistoricoView(central, respostas)
+        self.assertEqual(view.total_paginas, 2)
+        self.assertEqual(len(view.children[0].options), 25)
+        view.pagina = 1
+        view._montar()
+        self.assertEqual(len(view.children[0].options), 1)
+
+    def test_seletor_de_edicao_de_perguntas_e_paginado_em_blocos_de_25(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        formulario = {"id": "f1", "paginas": [[f"Pergunta {i}" for i in range(26)]]}
+        view = cog_formularios.EditarPerguntasView(cog, 123, 456, formulario)
+        self.assertEqual(view.total_paginas, 2)
+        self.assertEqual(len(view.children[0].options), 25)
+        view.pagina = 1
+        view._montar()
+        self.assertEqual(len(view.children[0].options), 1)
+        self.assertEqual(view.children[0].options[0].value, "25")
+
+    def test_modal_de_perguntas_oferece_no_maximo_cinco_campos(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        modal = cog_formularios.ModalAdicionarPerguntas(cog, 123, 456, "form-1")
+        self.assertEqual(len(modal.children), 5)
+        self.assertTrue(modal.children[0].required)
+        self.assertTrue(all(not campo.required for campo in modal.children[1:]))
 
     def test_modais_de_avaliacao_e_decisao_respeitam_limites_do_discord(self):
         avaliacao = cog_formularios.ModalAvaliacaoFormulario("resp-123")
@@ -195,7 +276,7 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         salvar_respostas.assert_not_awaited()
 
     async def test_decisao_mantem_historico_com_revisor_e_data(self):
-        resposta = {"id": "resp-3", "status": "pendente"}
+        resposta = {"id": "resp-3", "status": "pendente", "avaliacoes": [{"media": 4.0}]}
         dados = {"123": [resposta]}
         with patch.object(storage_formularios, "_tudo_respostas", new=AsyncMock(return_value=dados)), patch.object(
             storage_formularios, "_salvar_respostas_guild", new=AsyncMock()

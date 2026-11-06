@@ -3,19 +3,19 @@ import logging
 import time
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 from utils.apresentacao import criar_embed, aplicar_identidade_servidor
 from utils.storage import carregar, salvar
 
 from utils import formularios
-from utils.guild_config import lideranca_only, membro_tem_lideranca
+from utils.guild_config import membro_tem_lideranca
 
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
 PREFIXO_RECUSAR = "formulario:recusar:"
 PREFIXO_AVALIAR = "formulario:avaliar:"
+PREFIXO_HISTORICO = "formulario:historico:"
 PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
@@ -51,7 +51,6 @@ CARGO_INSTRUTOR_FORMULARIO_ID = 1558909311315607723
 NOME_FORMULARIO_STAFF = "Inscrição para Staff"
 _LOCK_PAINÉIS_AUTOMÁTICOS = asyncio.Lock()
 ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
-ARQUIVO_LIMPEZA_PENDENCIAS = "limpeza_pendencias_staff_v1.json"
 
 FORMULARIOS_AUTOMATICOS = [
     {
@@ -376,6 +375,12 @@ class ModalFormulario(discord.ui.Modal):
             autor_nome=getattr(interaction.user, "global_name", None)
             or interaction.user.display_name,
         )
+        if resposta is None:
+            await interaction.followup.send(
+                "Você já possui uma candidatura pendente para este formulário. Aguarde a avaliação da equipe.",
+                ephemeral=True,
+            )
+            return
         cog = interaction.client.get_cog("Formularios")
         canal_recebido = False
         if cog is not None:
@@ -404,10 +409,18 @@ class ModalFormulario(discord.ui.Modal):
 
 def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild, bot: discord.Client | None = None) -> list[discord.Embed]:
     """Apresenta a candidatura como dossiê de avaliação, respeitando limites do Discord."""
-    titulo = f"DOSSIÊ DE CANDIDATURA  /  {formulario.get('nome') or 'FORMULÁRIO'}"
-    perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
-    respostas = resposta.get("respostas") or []
-    pares = list(zip(perguntas, respostas))
+    titulo = f"DOSSIÊ DE CANDIDATURA  /  {resposta.get('formTitulo') or formulario.get('nome') or 'FORMULÁRIO'}"
+    itens_salvos = resposta.get("itens")
+    if isinstance(itens_salvos, list) and itens_salvos and all(isinstance(item, dict) for item in itens_salvos):
+        # Cada candidatura conserva o enunciado original, mesmo que o formulário seja editado depois.
+        pares = [
+            (str(item.get("pergunta") or "Questão"), str(item.get("resposta") if item.get("resposta") is not None else "—"))
+            for item in itens_salvos
+        ]
+    else:
+        perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
+        respostas = resposta.get("respostas") or []
+        pares = list(zip(perguntas, respostas))
     blocos = [pares[i:i + 20] for i in range(0, len(pares), 20)] or [[]]
     embeds = []
     for indice, bloco in enumerate(blocos, start=1):
@@ -449,6 +462,12 @@ def _view_resposta(resposta_id: str) -> discord.ui.View:
         style=discord.ButtonStyle.danger,
         emoji="❌",
         custom_id=f"{PREFIXO_RECUSAR}{resposta_id}",
+    ))
+    view.add_item(discord.ui.Button(
+        label="Histórico",
+        style=discord.ButtonStyle.secondary,
+        emoji="📚",
+        custom_id=f"{PREFIXO_HISTORICO}{resposta_id}",
     ))
     return view
 
@@ -721,6 +740,7 @@ class FilaCandidaturasView(discord.ui.View):
         self.proxima.disabled = self.pagina >= self.total_paginas - 1
         self.add_item(self.anterior)
         self.add_item(self.proxima)
+        self.add_item(self.atualizar_fila)
 
     async def _validar_interacao(self, interaction: discord.Interaction):
         if interaction.user.id != self.central.usuario_id:
@@ -744,6 +764,21 @@ class FilaCandidaturasView(discord.ui.View):
         if not await self._validar_interacao(interaction):
             return
         self.pagina = min(self.total_paginas - 1, self.pagina + 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+
+    @discord.ui.button(label="Atualizar fila", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def atualizar_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_interacao(interaction):
+            return
+        atuais = await formularios.listar_respostas(
+            interaction.guild.id,
+            formulario_id=self.central.formulario_id,
+            status="pendente",
+        )
+        atuais.sort(key=lambda item: float(item.get("criado_em", item.get("timestamp", 0)) or 0), reverse=True)
+        self.pendentes = atuais
+        self.pagina = min(self.pagina, self.total_paginas - 1)
         self._montar()
         await interaction.response.edit_message(embed=self.montar_embed(), view=self)
 
@@ -809,6 +844,288 @@ class SeletorFichaPendente(discord.ui.Select):
             view=_view_resposta(protocolo),
             ephemeral=True,
         )
+        for inicio in range(10, len(anexos), 10):
+            await interaction.followup.send(embeds=anexos[inicio:inicio + 10], ephemeral=True)
+
+
+def _administrador_formularios(interaction: discord.Interaction, usuario_id: int) -> bool:
+    return bool(
+        interaction.guild is not None
+        and interaction.user.id == usuario_id
+        and membro_tem_lideranca(interaction.user)
+    )
+
+
+class ModalCriarFormulario(discord.ui.Modal):
+    def __init__(self, cog, guild_id: int, usuario_id: int):
+        super().__init__(title="Novo formulário · NÊMESIS")
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.nome = discord.ui.TextInput(label="Nome interno", placeholder="Ex.: Recrutamento Staff", max_length=100)
+        self.titulo = discord.ui.TextInput(label="Título do painel", placeholder="Título exibido aos membros", max_length=200)
+        self.descricao = discord.ui.TextInput(label="Descrição do painel", style=discord.TextStyle.paragraph, max_length=4000)
+        self.banner = discord.ui.TextInput(label="URL do banner (opcional)", required=False, placeholder="https://...", max_length=500)
+        for campo in (self.nome, self.titulo, self.descricao, self.banner):
+            self.add_item(campo)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A criação de formulários é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        nome = str(self.nome.value or "").strip()
+        titulo = str(self.titulo.value or "").strip()
+        descricao = str(self.descricao.value or "").strip()
+        if not nome or not titulo or not descricao:
+            await interaction.response.send_message("Nome, título e descrição são obrigatórios.", ephemeral=True)
+            return
+        banner = str(self.banner.value or "").strip()
+        if banner and not banner.startswith("https://"):
+            await interaction.response.send_message("O banner precisa ser uma URL HTTPS válida.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        formulario = await formularios.criar_formulario(
+            self.guild_id, nome, titulo, descricao, banner or None, interaction.user.id,
+        )
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(
+            interaction, self.guild_id, self.usuario_id, formulario["id"],
+            f"Formulário **{formulario['nome']}** criado. Configure as perguntas e a comissão antes de publicar.",
+        )
+
+
+class ModalEditarFormulario(discord.ui.Modal):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict):
+        super().__init__(title=f"Editar · {str(formulario.get('nome') or 'Formulário')[:30]}")
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id = str(formulario["id"])
+        self.nome = discord.ui.TextInput(label="Nome interno", default=str(formulario.get("nome") or "")[:100], max_length=100)
+        self.titulo = discord.ui.TextInput(label="Título do painel", default=str(formulario.get("titulo_painel") or formulario.get("nome") or "")[:200], max_length=200)
+        self.descricao = discord.ui.TextInput(label="Descrição do painel", style=discord.TextStyle.paragraph, default=str(formulario.get("descricao_painel") or "")[:4000], max_length=4000)
+        self.banner = discord.ui.TextInput(label="Banner: URL, REMOVER ou vazio", required=False, default=str(formulario.get("banner_url") or "")[:500], placeholder="URL HTTPS; REMOVER apaga; vazio mantém", max_length=500)
+        for campo in (self.nome, self.titulo, self.descricao, self.banner):
+            self.add_item(campo)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A edição é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        nome = str(self.nome.value or "").strip()
+        titulo = str(self.titulo.value or "").strip()
+        descricao = str(self.descricao.value or "").strip()
+        if not nome or not titulo or not descricao:
+            await interaction.response.send_message("Nome, título e descrição são obrigatórios.", ephemeral=True)
+            return
+        banner = str(self.banner.value or "").strip()
+        if banner and banner.upper() != "REMOVER" and not banner.startswith("https://"):
+            await interaction.response.send_message("O banner precisa ser uma URL HTTPS válida ou o texto REMOVER.", ephemeral=True)
+            return
+        alteracoes = {"nome": nome, "titulo_painel": titulo, "descricao_painel": descricao}
+        if banner.upper() == "REMOVER":
+            alteracoes["banner_url"] = ""
+        elif banner:
+            alteracoes["banner_url"] = banner
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        atualizado = await formularios.atualizar_formulario(self.guild_id, self.formulario_id, **alteracoes)
+        if not atualizado:
+            await interaction.followup.send("O formulário não existe mais. Atualize a central.", ephemeral=True)
+            return
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, "Dados do formulário atualizados.")
+
+
+class ModalAdicionarPerguntas(discord.ui.Modal):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str):
+        super().__init__(title="Adicionar etapa · até 5 perguntas")
+        self.cog, self.guild_id, self.usuario_id, self.formulario_id = cog, guild_id, usuario_id, formulario_id
+        self.perguntas = []
+        for indice in range(5):
+            campo = discord.ui.TextInput(
+                label=f"Pergunta {indice + 1}",
+                placeholder="Enunciado da pergunta" if indice == 0 else "Opcional",
+                required=(indice == 0),
+                style=discord.TextStyle.paragraph,
+                max_length=256,
+            )
+            self.perguntas.append(campo)
+            self.add_item(campo)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A edição de perguntas é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        perguntas = [str(campo.value).strip() for campo in self.perguntas if str(campo.value).strip()]
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        formulario = await formularios.adicionar_pagina(self.guild_id, self.formulario_id, perguntas)
+        if not formulario:
+            await interaction.followup.send("Não foi possível adicionar a etapa. Confira se o formulário ainda existe.", ephemeral=True)
+            return
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, f"Etapa {len(formulario.get('paginas', []))} adicionada com {len(perguntas)} pergunta(s).")
+
+
+class ConfirmarRemocaoPaginaView(discord.ui.View):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str, indice: int):
+        super().__init__(timeout=120)
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id, self.indice = formulario_id, indice
+
+    @discord.ui.button(label="Confirmar remoção da etapa", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A remoção é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        ok = await formularios.remover_pagina(self.guild_id, self.formulario_id, self.indice)
+        if not ok:
+            await interaction.followup.send("A etapa não existe mais. Atualize a central.", ephemeral=True)
+            return
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, "Etapa removida. As candidaturas já recebidas foram preservadas.")
+
+
+class SeletorPaginaRemover(discord.ui.Select):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict):
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id = str(formulario["id"])
+        opcoes = []
+        for indice, pagina in enumerate(formulario.get("paginas", [])):
+            perguntas = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina
+            titulo = pagina.get("titulo") if isinstance(pagina, dict) else f"Etapa {indice + 1}"
+            opcoes.append(discord.SelectOption(label=f"Etapa {indice + 1} · {str(titulo or '')[:65]}", value=str(indice), description=f"{len(perguntas)} pergunta(s)"))
+        super().__init__(placeholder="Selecione a etapa que deseja remover", min_values=1, max_values=1, options=opcoes[:25])
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A remoção é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        indice = int(self.values[0])
+        await interaction.response.send_message(
+            f"Confirme a remoção da etapa **{indice + 1}**. As candidaturas existentes não serão apagadas.",
+            view=ConfirmarRemocaoPaginaView(self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice),
+            ephemeral=True,
+        )
+
+
+class GerenciarCargosView(discord.ui.View):
+    def __init__(self, cog, guild: discord.Guild, usuario_id: int, formulario: dict):
+        super().__init__(timeout=180)
+        self.cog, self.guild_id, self.usuario_id = cog, guild.id, usuario_id
+        self.formulario_id = str(formulario["id"])
+        ids_atuais = {int(item) for item in formulario.get("cargos_notificar", []) if str(item).isdigit()}
+        padroes = [cargo for cargo in guild.roles if cargo.id in ids_atuais and not cargo.is_default() and not cargo.managed]
+        self.selected_role_ids = {cargo.id for cargo in padroes}
+        self.seletor = discord.ui.RoleSelect(
+            placeholder="Escolha os cargos que receberão as fichas",
+            min_values=0, max_values=25, default_values=padroes,
+            custom_id="nemesis:formularios:cargos_notificar",
+        )
+        self.seletor.callback = self.atualizar_selecao
+        self.add_item(self.seletor)
+
+    async def atualizar_selecao(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("Configuração restrita à administração.", ephemeral=True)
+            return
+        self.selected_role_ids = {role.id for role in self.seletor.values if not role.is_default() and not role.managed}
+        await interaction.response.edit_message(content=f"Cargos selecionados: **{len(self.selected_role_ids)}**. Salve para aplicar.", view=self)
+
+    @discord.ui.button(label="Salvar cargos", style=discord.ButtonStyle.success, emoji="💾")
+    async def salvar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("Configuração restrita à administração.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        cargos = sorted(self.selected_role_ids)
+        formulario = await formularios.definir_cargos_notificar(self.guild_id, self.formulario_id, cargos)
+        if not formulario:
+            await interaction.followup.send("O formulário não existe mais.", ephemeral=True)
+            return
+        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, f"Lista de cargos atualizada: **{len(cargos)}** cargo(s).")
+
+
+class ModalEditarPergunta(discord.ui.Modal):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str, indice_global: int, texto_atual: str):
+        super().__init__(title=f"Editar pergunta {indice_global + 1}")
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id, self.indice_global = formulario_id, indice_global
+        self.texto = discord.ui.TextInput(label="Enunciado da pergunta", style=discord.TextStyle.paragraph, default=texto_atual[:256], max_length=256)
+        self.add_item(self.texto)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A edição de perguntas é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        ok = await formularios.atualizar_pergunta(self.guild_id, self.formulario_id, self.indice_global, self.texto.value)
+        if not ok:
+            await interaction.followup.send("Não foi possível localizar essa pergunta. Atualize a central.", ephemeral=True)
+            return
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, "Pergunta atualizada. Os dossiês existentes continuam exibindo os enunciados originais.")
+
+
+class EditarPerguntasView(discord.ui.View):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict):
+        super().__init__(timeout=180)
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario = formulario
+        self.pagina = 0
+        self._montar()
+
+    @property
+    def total_paginas(self):
+        return max(1, (len(_perguntas_flat(self.formulario)) + 24) // 25)
+
+    def _montar(self):
+        self.clear_items()
+        self.add_item(SeletorPerguntaEditar(self.cog, self.guild_id, self.usuario_id, self.formulario, self.pagina))
+        self.anterior.disabled = self.pagina <= 0
+        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+        self.add_item(self.anterior)
+        self.add_item(self.proxima)
+
+    async def _validar(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A edição é restrita à administração que abriu a central.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️")
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        self.pagina = max(0, self.pagina - 1)
+        self._montar()
+        await interaction.response.edit_message(view=self)
+
+    @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        self.pagina = min(self.total_paginas - 1, self.pagina + 1)
+        self._montar()
+        await interaction.response.edit_message(view=self)
+
+
+class SeletorPerguntaEditar(discord.ui.Select):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict, pagina: int = 0):
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id = str(formulario["id"])
+        self.perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
+        inicio = pagina * 25
+        opcoes = [
+            discord.SelectOption(label=f"Questão {indice + 1:02d}", value=str(indice), description=texto[:100])
+            for indice, texto in enumerate(self.perguntas[inicio:inicio + 25], start=inicio)
+        ]
+        super().__init__(placeholder=f"Selecione uma pergunta · página {pagina + 1}", min_values=1, max_values=1, options=opcoes)
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+            await interaction.response.send_message("A edição é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        indice = int(self.values[0])
+        await interaction.response.send_modal(ModalEditarPergunta(
+            self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice, self.perguntas[indice]
+        ))
 
 
 class SeletorAcaoFormulario(discord.ui.Select):
@@ -818,6 +1135,11 @@ class SeletorAcaoFormulario(discord.ui.Select):
             placeholder="Escolha uma ação para o formulário",
             min_values=1, max_values=1,
             options=[
+                discord.SelectOption(label="Editar dados do formulário", value="editar"),
+                discord.SelectOption(label="Adicionar etapa de perguntas", value="adicionar_etapa"),
+                discord.SelectOption(label="Editar pergunta", value="editar_pergunta"),
+                discord.SelectOption(label="Remover etapa de perguntas", value="remover_etapa"),
+                discord.SelectOption(label="Configurar cargos notificados", value="cargos"),
                 discord.SelectOption(label="Atualizar central pública", value="publicar"),
                 discord.SelectOption(label="Pausar inscrições", value="pausar"),
                 discord.SelectOption(label="Reativar inscrições", value="reativar"),
@@ -838,6 +1160,39 @@ class SeletorAcaoFormulario(discord.ui.Select):
             await interaction.response.send_message("O formulário selecionado não existe mais.", ephemeral=True)
             return
         acao = self.values[0]
+        if acao == "editar":
+            await interaction.response.send_modal(ModalEditarFormulario(central.cog, interaction.guild.id, interaction.user.id, formulario))
+            return
+        if acao == "adicionar_etapa":
+            await interaction.response.send_modal(ModalAdicionarPerguntas(central.cog, interaction.guild.id, interaction.user.id, central.formulario_id))
+            return
+        if acao == "editar_pergunta":
+            perguntas = _perguntas_flat(formulario)
+            if not perguntas:
+                await interaction.response.send_message("Este formulário ainda não possui perguntas.", ephemeral=True)
+                return
+            view = EditarPerguntasView(central.cog, interaction.guild.id, interaction.user.id, formulario)
+            await interaction.response.send_message(
+                f"Selecione a pergunta que deseja editar. Total: **{len(perguntas)}** · página **1/{view.total_paginas}**.",
+                view=view, ephemeral=True,
+            )
+            return
+        if acao == "remover_etapa":
+            paginas = formulario.get("paginas", [])
+            if not paginas:
+                await interaction.response.send_message("Este formulário ainda não possui etapas.", ephemeral=True)
+                return
+            view = discord.ui.View(timeout=120)
+            view.add_item(SeletorPaginaRemover(central.cog, interaction.guild.id, interaction.user.id, formulario))
+            await interaction.response.send_message("Escolha a etapa que deseja remover. A remoção exige confirmação.", view=view, ephemeral=True)
+            return
+        if acao == "cargos":
+            view = GerenciarCargosView(central.cog, interaction.guild, interaction.user.id, formulario)
+            await interaction.response.send_message(
+                f"**Comissão de análise · {formulario.get('nome', 'Formulário')}**\nSelecione a lista completa de cargos que deve receber as fichas. O cargo de instrutor padrão continua sendo notificado automaticamente.",
+                view=view, ephemeral=True,
+            )
+            return
         if acao == "publicar":
             if not _perguntas_flat(formulario):
                 await interaction.response.send_message("Adicione perguntas antes de disponibilizar a inscrição.", ephemeral=True)
@@ -861,6 +1216,138 @@ class SeletorAcaoFormulario(discord.ui.Select):
         await central.atualizar(interaction, mensagem=f"Ação aplicada: **{acao.upper()}**.")
 
 
+class SeletorHistoricoCandidaturas(discord.ui.Select):
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Consultar candidaturas encerradas",
+            min_values=1,
+            max_values=1,
+            options=[discord.SelectOption(
+                label="Abrir histórico de candidaturas",
+                value="encerradas",
+                description="Consultar fichas aprovadas e recusadas deste formulário",
+                emoji="📚",
+            )],
+            custom_id="nemesis:formularios:historico_fichas",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        central = self.central
+        if interaction.user.id != central.usuario_id or interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("O histórico é restrito à administração que abriu a central.", ephemeral=True)
+            return
+        respostas = await formularios.listar_respostas(interaction.guild.id, formulario_id=central.formulario_id)
+        encerradas = [item for item in respostas if item.get("status") in {"aprovada", "recusada"}]
+        encerradas.sort(key=lambda item: float(item.get("atualizado_em", item.get("criado_em", 0)) or 0), reverse=True)
+        if not encerradas:
+            await interaction.response.send_message("Ainda não existem candidaturas encerradas para este formulário.", ephemeral=True)
+            return
+        view = FilaHistoricoView(central, encerradas)
+        await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
+
+
+class FilaHistoricoView(discord.ui.View):
+    def __init__(self, central, respostas: list[dict]):
+        super().__init__(timeout=300)
+        self.central, self.respostas, self.pagina = central, respostas, 0
+        self._montar()
+
+    @property
+    def total_paginas(self):
+        return max(1, (len(self.respostas) + 24) // 25)
+
+    def montar_embed(self):
+        aprovadas = sum(item.get("status") == "aprovada" for item in self.respostas)
+        recusadas = sum(item.get("status") == "recusada" for item in self.respostas)
+        return criar_embed(
+            "𓂀 HISTÓRICO · CANDIDATURAS ENCERRADAS",
+            f"**FORMULÁRIO**　{self.central.formulario_id}\n"
+            f"**TOTAL**　{len(self.respostas)}\n"
+            f"**APROVADAS**　{aprovadas}　 **RECUSADAS**　{recusadas}\n"
+            f"**PÁGINA**　{self.pagina + 1}/{self.total_paginas}\n\n"
+            "Selecione uma ficha para consultar o dossiê e a trilha de auditoria.",
+            cor=0x9F1239,
+            rodape="NÊMESIS • HISTÓRICO RESTRITO",
+        )
+
+    def _montar(self):
+        self.clear_items()
+        inicio = self.pagina * 25
+        self.add_item(SeletorFichaHistorica(self.central, self.respostas[inicio:inicio + 25]))
+        self.anterior.disabled = self.pagina <= 0
+        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+        self.add_item(self.anterior)
+        self.add_item(self.proxima)
+
+    async def _validar(self, interaction: discord.Interaction):
+        if interaction.user.id != self.central.usuario_id or interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("O histórico é restrito à administração que abriu a central.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️")
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        self.pagina = max(0, self.pagina - 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+
+    @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        self.pagina = min(self.total_paginas - 1, self.pagina + 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+
+
+class SeletorFichaHistorica(discord.ui.Select):
+    def __init__(self, central, respostas: list[dict]):
+        self.central = central
+        opcoes = []
+        for item in respostas[:25]:
+            protocolo = str(item.get("id") or "")
+            nome = str(item.get("nome") or f"Membro {item.get('autor_id', 'desconhecido')}")
+            status = str(item.get("status") or "encerrada").upper()
+            opcoes.append(discord.SelectOption(
+                label=f"{nome[:58]} · {protocolo}"[:100],
+                value=protocolo,
+                description=f"{status} · protocolo {protocolo}"[:100],
+                emoji="✅" if status == "APROVADA" else "❌",
+            ))
+        super().__init__(placeholder="Selecione uma candidatura encerrada", min_values=1, max_values=1, options=opcoes)
+
+    async def callback(self, interaction: discord.Interaction):
+        central = self.central
+        if interaction.user.id != central.usuario_id or interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("A consulta é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        protocolo = self.values[0]
+        resposta = await formularios.get_resposta(interaction.guild.id, protocolo)
+        if not resposta or resposta.get("status") not in {"aprovada", "recusada"}:
+            await interaction.response.send_message("Esta candidatura não está mais encerrada ou não existe.", ephemeral=True)
+            return
+        formulario = await formularios.get_formulario(interaction.guild.id, resposta.get("formulario_id", "")) or {"nome": resposta.get("formTitulo", "Formulário"), "paginas": []}
+        criado = int(float(resposta.get("criado_em", resposta.get("timestamp", 0)) or 0))
+        resumo = criar_embed(
+            f"𓂀 DOSSIÊ · {protocolo}",
+            f"**CANDIDATO**　<@{int(resposta.get('autor_id', 0) or 0)}>\n"
+            f"**PROCESSO**　{formulario.get('nome', 'Formulário')}\n"
+            f"**SITUAÇÃO**　{str(resposta.get('status')).upper()}\n"
+            f"**RECEBIDA**　<t:{criado}:F>",
+            cor=0x9F1239,
+            rodape="NÊMESIS • DOSSIÊ HISTÓRICO • ADMINISTRAÇÃO",
+        )
+        anexos = [resumo] + _embeds_resposta(formulario, resposta, interaction.guild, central.cog.bot)
+        view = discord.ui.View(timeout=120)
+        view.add_item(discord.ui.Button(label="Consultar histórico", style=discord.ButtonStyle.secondary, emoji="📚", custom_id=f"{PREFIXO_HISTORICO}{protocolo}"))
+        await interaction.response.send_message(embeds=anexos[:10], view=view, ephemeral=True)
+        for inicio in range(10, len(anexos), 10):
+            await interaction.followup.send(embeds=anexos[inicio:inicio + 10], ephemeral=True)
+
+
 class CentralFormulariosView(discord.ui.View):
     def __init__(self, cog, guild_id: int, usuario_id: int, lista: list, formulario_id: str | None = None):
         super().__init__(timeout=300)
@@ -873,10 +1360,19 @@ class CentralFormulariosView(discord.ui.View):
 
     def _montar_seletores(self):
         self.clear_items()
+        criar = discord.ui.Button(label="Novo formulário", style=discord.ButtonStyle.success, emoji="➕")
+        async def abrir_criacao(interaction: discord.Interaction):
+            if interaction.user.id != self.usuario_id or interaction.guild is None or not membro_tem_lideranca(interaction.user):
+                await interaction.response.send_message("A criação é restrita à administração que abriu a central.", ephemeral=True)
+                return
+            await interaction.response.send_modal(ModalCriarFormulario(self.cog, self.guild_id, self.usuario_id))
+        criar.callback = abrir_criacao
+        self.add_item(criar)
         if self.lista:
             self.add_item(SeletorFormularioCentral(self))
             self.add_item(SeletorAcaoFormulario(self))
             self.add_item(SeletorFilaCandidaturas(self))
+            self.add_item(SeletorHistoricoCandidaturas(self))
 
     def montar_embed(self, mensagem: str | None = None):
         formulario = next((item for item in self.lista if str(item.get("id")) == str(self.formulario_id)), None)
@@ -911,7 +1407,7 @@ class CentralFormulariosView(discord.ui.View):
         await interaction.response.edit_message(embed=self.montar_embed(mensagem), view=self)
 
 
-class Formularios(commands.GroupCog, group_name="formularios", group_description="Gerenciamento dos formulários da NÊMESIS"):
+class Formularios(commands.Cog):
     """Sistema de formulários/candidaturas por páginas: cada formulário tem
     seu painel customizável (título, descrição, banner) e é dividido em
     páginas de até 5 perguntas — o bot encadeia os modais automaticamente
@@ -922,14 +1418,24 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
         self.bot = bot
         self._view_inscricoes_registrada = False
 
+    async def enviar_central_formularios(
+        self,
+        interaction: discord.Interaction,
+        guild_id: int,
+        usuario_id: int,
+        formulario_id: str | None = None,
+        mensagem: str | None = None,
+    ):
+        lista = await formularios.listar_formularios(guild_id)
+        lista.sort(key=lambda item: (bool(item.get("arquivado")), str(item.get("nome", "")).casefold()))
+        view = CentralFormulariosView(self, guild_id, usuario_id, lista, formulario_id=formulario_id)
+        await interaction.followup.send(embed=view.montar_embed(mensagem), view=view, ephemeral=True)
+
     async def formulario_central(self, interaction: discord.Interaction):
         if interaction.guild is None or not membro_tem_lideranca(interaction.user):
             await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
             return
         lista = await formularios.listar_formularios(interaction.guild.id)
-        if not lista:
-            await interaction.response.send_message("Ainda não existem formulários cadastrados.", ephemeral=True)
-            return
         lista.sort(key=lambda item: (bool(item.get("arquivado")), str(item.get("nome", "")).casefold()))
         view = CentralFormulariosView(self, interaction.guild.id, interaction.user.id, lista)
         await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
@@ -942,30 +1448,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             if guild is None:
                 logging.warning("Central de inscrições: servidor NÊMESIS não está disponível.")
                 return
-            # Limpeza única das candidaturas antigas: não expõe comando administrativo.
-            # O marcador persistente impede que a rotina volte a recusar inscrições futuras.
-            try:
-                controle_limpeza = await carregar(ARQUIVO_LIMPEZA_PENDENCIAS, {})
-                if not isinstance(controle_limpeza, dict):
-                    controle_limpeza = {}
-                if not controle_limpeza.get(str(guild.id)):
-                    recusadas = await formularios.recusar_respostas_pendentes(
-                        guild.id,
-                        self.bot.user.id if self.bot.user else 0,
-                        motivo="Encerramento administrativo das pendências antigas na limpeza inicial.",
-                    )
-                    controle_limpeza[str(guild.id)] = {
-                        "concluida": True,
-                        "quantidade": len(recusadas),
-                        "concluida_em": time.time(),
-                    }
-                    await salvar(ARQUIVO_LIMPEZA_PENDENCIAS, controle_limpeza)
-                    logging.info(
-                        "Formulários: limpeza inicial concluída; candidaturas pendentes recusadas=%s.",
-                        len(recusadas),
-                    )
-            except Exception:
-                logging.exception("Formulários: falha ao executar a limpeza inicial de pendências.")
             for definicao in FORMULARIOS_AUTOMATICOS:
                 try:
                     lista = await formularios.listar_formularios(guild.id)
@@ -975,21 +1457,27 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                             guild.id, definicao["nome"], definicao["titulo"],
                             definicao["descricao"], None, self.bot.user.id if self.bot.user else 0,
                         )
-                    # Migração incremental: formulários antigos podem já ter 5 perguntas.
-                    # Acrescenta somente as perguntas novas da definição, sem duplicar nem apagar respostas.
-                    existentes = set(formularios.perguntas_flat(formulario))
-                    faltantes = []
-                    for pagina_definida in definicao["paginas"]:
-                        for pergunta in pagina_definida:
-                            if pergunta not in existentes:
-                                faltantes.append(pergunta)
-                                existentes.add(pergunta)
-                    for inicio in range(0, len(faltantes), 5):
-                        formulario = await formularios.adicionar_pagina(
-                            guild.id, formulario["id"], faltantes[inicio:inicio + 5]
+                    # A definição padrão é aplicada uma única vez. Depois disso, edições
+                    # administrativas de perguntas não são desfeitas no próximo on_ready.
+                    if int(formulario.get("versao_automatico", 0) or 0) < 1:
+                        existentes = set(formularios.perguntas_flat(formulario))
+                        faltantes = []
+                        for pagina_definida in definicao["paginas"]:
+                            for pergunta in pagina_definida:
+                                if pergunta not in existentes:
+                                    faltantes.append(pergunta)
+                                    existentes.add(pergunta)
+                        for inicio in range(0, len(faltantes), 5):
+                            formulario = await formularios.adicionar_pagina(
+                                guild.id, formulario["id"], faltantes[inicio:inicio + 5]
+                            )
+                            if formulario is None:
+                                raise RuntimeError(f"Não foi possível atualizar as perguntas de {definicao['nome']}.")
+                        formulario = await formularios.atualizar_formulario(
+                            guild.id, formulario["id"], versao_automatico=1
                         )
                         if formulario is None:
-                            raise RuntimeError(f"Não foi possível atualizar as perguntas de {definicao['nome']}.")
+                            raise RuntimeError(f"Não foi possível registrar a versão automática de {definicao['nome']}.")
                 except Exception:
                     logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
             try:
@@ -1102,366 +1590,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             logging.exception("Falha ao registrar índice da candidatura %s.", resposta.get("id"))
         return True
 
-    @app_commands.command(name="criar", description="Cria um formulário (painel). Adicione as páginas de perguntas depois.")
-    @app_commands.describe(nome="Nome interno do formulário (ex: Parceria)",
-                            titulo_painel="Título mostrado no painel", descricao_painel="Descrição mostrada no painel",
-                            banner="Imagem de banner do painel (opcional)")
-    @lideranca_only()
-    async def formulario_criar(self, interaction: discord.Interaction, nome: str, titulo_painel: str,
-                                descricao_painel: str, banner: discord.Attachment = None):
-        formulario = await formularios.criar_formulario(
-            interaction.guild.id, nome, titulo_painel, descricao_painel,
-            banner.url if banner else None, interaction.user.id,
-        )
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(
-            f"✅ Formulário **{nome}** criado (ID: `{formulario['id']}`). "
-            f"Agora use `/formularios pagina-adicionar` pra adicionar as perguntas (até 5 por página, "
-            f"quantas páginas quiser), depois `/formularios cargo-adicionar` e `/formularios painel`.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(name="pagina-adicionar", description="Adiciona uma página de perguntas (até 5) a um formulário.")
-    @app_commands.describe(
-        formulario_id="ID do formulário (aparece em /formularios listar)",
-        pergunta1="1ª pergunta desta página", pergunta2="2ª pergunta (opcional)",
-        pergunta3="3ª pergunta (opcional)", pergunta4="4ª pergunta (opcional)", pergunta5="5ª pergunta (opcional)",
-    )
-    @lideranca_only()
-    async def formulario_pagina_adicionar(self, interaction: discord.Interaction, formulario_id: str,
-                                           pergunta1: str, pergunta2: str = None, pergunta3: str = None,
-                                           pergunta4: str = None, pergunta5: str = None):
-        perguntas = [p for p in [pergunta1, pergunta2, pergunta3, pergunta4, pergunta5] if p]
-        formulario = await formularios.adicionar_pagina(interaction.guild.id, formulario_id, perguntas)
-        if not formulario:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(
-            f"✅ Página {len(formulario['paginas'])} adicionada ({len(perguntas)} pergunta(s)). "
-            f"Total agora: {len(formulario['paginas'])} página(s).", ephemeral=True,
-        )
-
-    @app_commands.command(name="pagina-remover", description="Remove uma página de um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário", numero_pagina="Número da página (1, 2, 3...) — veja em /formularios paginas-listar")
-    @lideranca_only()
-    async def formulario_pagina_remover(self, interaction: discord.Interaction, formulario_id: str, numero_pagina: int):
-        ok = await formularios.remover_pagina(interaction.guild.id, formulario_id, numero_pagina - 1)
-        if not ok:
-            await interaction.response.send_message("Não achei essa página nesse formulário.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(f"🗑️ Página {numero_pagina} removida.", ephemeral=True)
-
-    @app_commands.command(name="paginas-listar", description="Lista as páginas e perguntas de um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário")
-    @lideranca_only()
-    async def formulario_paginas_listar(self, interaction: discord.Interaction, formulario_id: str):
-        formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
-        if not formulario:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        if not formulario["paginas"]:
-            await interaction.response.send_message("Esse formulário ainda não tem nenhuma página de pergunta.", ephemeral=True)
-            return
-
-        blocos = []
-        for i, pagina in enumerate(formulario["paginas"], start=1):
-            perguntas_pagina = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina
-            perguntas_texto = "\n".join(
-                f"  {j}. {_texto_pergunta(p)}" for j, p in enumerate(perguntas_pagina, start=1)
-            )
-            titulo_pagina = pagina.get("titulo") if isinstance(pagina, dict) else f"Página {i}"
-            blocos.append(f"**{titulo_pagina or f'Página {i}'}**\n{perguntas_texto}")
-        embed = criar_embed(f"📋 Páginas — {formulario['nome']}", "\n\n".join(blocos), rodape="NÊMESIS • Configuração de formulários")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="listar", description="Lista os formulários configurados.")
-    @lideranca_only()
-    async def formulario_listar(self, interaction: discord.Interaction):
-        lista = await formularios.listar_formularios(interaction.guild.id)
-        if not lista:
-            await interaction.response.send_message("Nenhum formulário criado ainda.", ephemeral=True)
-            return
-        linhas = [
-            f"**{f['nome']}** (ID: `{f['id']}`) — "
-            f"{'ARQUIVADO' if f.get('arquivado') else 'ATIVO' if f.get('ativo', True) else 'PAUSADO'}, "
-            f"{len(f.get('paginas', []))} etapa(s), "
-            f"{len(formularios.perguntas_flat(f))} pergunta(s), "
-            f"{len(f.get('cargos_notificar', []))} cargo(s) notificado(s)"
-            for f in lista
-        ]
-        embed = criar_embed("N̷ÊMESIS ━ CENTRAL DE FORMULÁRIOS", "\n".join(linhas), rodape="NÊMESIS • Administração de formulários")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="fila", description="Consulta candidaturas com filtros e paginação.")
-    @app_commands.describe(
-        status="Situação das candidaturas",
-        pagina="Página da fila (15 candidaturas por página)",
-        formulario_id="Filtra por um formulário específico",
-    )
-    @app_commands.choices(status=[
-        app_commands.Choice(name="Pendentes", value="pendente"),
-        app_commands.Choice(name="Aprovadas", value="aprovada"),
-        app_commands.Choice(name="Recusadas", value="recusada"),
-        app_commands.Choice(name="Todas", value="todas"),
-    ])
-    @app_commands.check(
-        lambda interaction: (
-            interaction.guild is not None
-            and (
-                membro_tem_lideranca(interaction.user)
-                or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))
-            )
-        )
-    )
-    async def formulario_fila(
-        self,
-        interaction: discord.Interaction,
-        status: app_commands.Choice[str] = None,
-        pagina: app_commands.Range[int, 1, 1000] = 1,
-        formulario_id: str = None,
-    ):
-        todas = await formularios.listar_respostas(interaction.guild.id)
-        formularios_cadastrados = await formularios.listar_formularios(interaction.guild.id)
-        nomes_formularios = {
-            str(item.get("id")): str(item.get("nome") or "Formulário")
-            for item in formularios_cadastrados
-            if isinstance(item, dict) and item.get("id")
-        }
-        filtro = status.value if status else "pendente"
-        filtradas = todas if filtro == "todas" else [item for item in todas if item.get("status") == filtro]
-        if formulario_id:
-            filtradas = [item for item in filtradas if item.get("formulario_id") == formulario_id]
-        filtradas.sort(key=lambda item: float(item.get("criado_em", item.get("timestamp", 0)) or 0), reverse=True)
-
-        por_status = {
-            chave: sum(1 for item in todas if item.get("status") == chave)
-            for chave in ("pendente", "aprovada", "recusada")
-        }
-        por_pagina = 15
-        total_paginas = max(1, (len(filtradas) + por_pagina - 1) // por_pagina)
-        pagina_atual = min(int(pagina), total_paginas)
-        inicio = (pagina_atual - 1) * por_pagina
-        lote = filtradas[inicio:inicio + por_pagina]
-
-        embed = criar_embed(
-            "𓂀 NÊMESIS · FILA DE CANDIDATURAS",
-            (
-                f"**Pendentes:** {por_status['pendente']}　"
-                f"**Aprovadas:** {por_status['aprovada']}　"
-                f"**Recusadas:** {por_status['recusada']}\n"
-                f"**Filtro:** {filtro.upper()}　"
-                f"**Página:** {pagina_atual}/{total_paginas}\n\n"
-                "Cada candidatura é organizada em um tópico individual. "
-                "Abra o dossiê para analisar as respostas e registrar a decisão."
-            ),
-            cor=0x9F1239,
-            rodape="NÊMESIS • CENTRAL DE RECRUTAMENTO • ACESSO RESTRITO",
-        )
-        if not lote:
-            embed.add_field(name="FILA", value="Nenhuma candidatura encontrada para este filtro.", inline=False)
-        for item in lote:
-            criado = float(item.get("criado_em", item.get("timestamp", 0)) or 0)
-            protocolo = str(item.get("id", "sem-id"))
-            nome_formulario = nomes_formularios.get(
-                str(item.get("formulario_id", "")),
-                str(item.get("formTitulo") or "Formulário"),
-            )
-            thread_id = item.get("thread_id")
-            link = f"https://discord.com/channels/{interaction.guild.id}/{int(thread_id)}" if thread_id else None
-            linha = (
-                f"**Candidato:** <@{int(item.get('autor_id', 0) or 0)}>\n"
-                f"**Processo:** {nome_formulario}\n"
-                f"**Recebida:** <t:{int(criado)}:R>\n"
-                f"**Protocolo:** `{protocolo}`"
-            )
-            if link:
-                linha += f"\n[ Abrir dossiê individual ]({link})"
-            embed.add_field(name=f"{str(item.get('status', 'pendente')).upper()} · {protocolo}", value=linha, inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="consultar", description="Abre o dossiê completo de uma candidatura pelo protocolo.")
-    @app_commands.describe(protocolo="Código da candidatura exibido na fila")
-    @app_commands.check(
-        lambda interaction: (
-            interaction.guild is not None
-            and (
-                membro_tem_lideranca(interaction.user)
-                or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))
-            )
-        )
-    )
-    async def formulario_consultar(self, interaction: discord.Interaction, protocolo: str):
-        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
-        if not resposta:
-            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
-            return
-        formulario = await formularios.get_formulario(interaction.guild.id, resposta.get("formulario_id", "")) or {
-            "nome": resposta.get("formTitulo", "Formulário"),
-            "paginas": [],
-        }
-        embeds = _embeds_resposta(formulario, resposta, interaction.guild, self.bot)
-        status = str(resposta.get("status", "pendente")).upper()
-        resumo = criar_embed(
-            f"DOSSIÊ · {resposta.get('id')}",
-            f"**Candidato:** <@{int(resposta.get('autor_id', 0) or 0)}>\n"
-            f"**Processo:** {formulario.get('nome', 'Formulário')}\n"
-            f"**Situação:** {status}\n"
-            f"**Recebida:** <t:{int(float(resposta.get('criado_em', resposta.get('timestamp', 0)) or 0))}:F>",
-            cor=0x9F1239,
-            rodape="NÊMESIS • ACESSO RESTRITO",
-        )
-        anexos = [resumo] + embeds
-        if resposta.get("status") == "pendente":
-            await interaction.response.send_message(
-                embeds=anexos[:10],
-                view=_view_resposta(resposta["id"]),
-                ephemeral=True,
-            )
-        else:
-            await interaction.response.send_message(embeds=anexos[:10], ephemeral=True)
-
-    @app_commands.command(name="avaliar", description="Registra uma avaliação estruturada de uma candidatura.")
-    @app_commands.describe(protocolo="Código da candidatura", postura="Respeito, maturidade e conduta", responsabilidade="Confiabilidade e compromisso", disponibilidade="Compatibilidade de horários e presença", imparcialidade="Capacidade de agir sem favoritismo", comunicacao="Clareza e capacidade de trabalhar em equipe", justificativa="Evidências e observações que fundamentam as notas")
-    @app_commands.check(lambda interaction: interaction.guild is not None and (membro_tem_lideranca(interaction.user) or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))))
-    async def formulario_avaliar(self, interaction: discord.Interaction, protocolo: str, postura: app_commands.Range[int, 1, 5], responsabilidade: app_commands.Range[int, 1, 5], disponibilidade: app_commands.Range[int, 1, 5], imparcialidade: app_commands.Range[int, 1, 5], comunicacao: app_commands.Range[int, 1, 5], justificativa: str):
-        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
-        if not resposta:
-            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
-            return
-        if resposta.get("status") != "pendente":
-            await interaction.response.send_message("Esta candidatura já foi encerrada; avaliações novas não são aceitas.", ephemeral=True)
-            return
-        criterios = {"postura": postura, "responsabilidade": responsabilidade, "disponibilidade": disponibilidade, "imparcialidade": imparcialidade, "comunicacao": comunicacao}
-        avaliacao = await formularios.registrar_avaliacao(interaction.guild.id, protocolo.strip(), interaction.user.id, criterios, justificativa)
-        if not avaliacao:
-            await interaction.response.send_message("A candidatura deixou de estar pendente. Atualize o dossiê antes de avaliar.", ephemeral=True)
-            return
-        embed = criar_embed("✦・ AVALIAÇÃO REGISTRADA ・✦",
-            f"**PROTOCOLO**　{protocolo.strip()}\n**AVALIADOR**　{interaction.user.mention}\n**MÉDIA**　{avaliacao['media']:.2f}/5\n\n"
-            f"**CRITÉRIOS**\n• Postura: **{postura}/5**\n• Responsabilidade: **{responsabilidade}/5**\n• Disponibilidade: **{disponibilidade}/5**\n• Imparcialidade: **{imparcialidade}/5**\n• Comunicação: **{comunicacao}/5**\n\n"
-            f"**JUSTIFICATIVA**\n{justificativa.strip()[:1000]}", cor=0x9F1239, rodape="NÊMESIS • AVALIAÇÃO INDIVIDUAL • REGISTRO PERMANENTE")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="historico", description="Consulta avaliações e decisões de uma candidatura.")
-    @app_commands.describe(protocolo="Código da candidatura")
-    @app_commands.check(lambda interaction: interaction.guild is not None and (membro_tem_lideranca(interaction.user) or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in getattr(interaction.user, "roles", []))))
-    async def formulario_historico(self, interaction: discord.Interaction, protocolo: str):
-        resposta = await formularios.get_resposta(interaction.guild.id, protocolo.strip())
-        if not resposta:
-            await interaction.response.send_message("Não encontrei uma candidatura com esse protocolo.", ephemeral=True)
-            return
-        avaliacoes = resposta.get("avaliacoes", [])
-        decisoes = resposta.get("historico_decisoes", [])
-        embed = criar_embed(f"𓂀 HISTÓRICO · {protocolo.strip()}", f"**SITUAÇÃO ATUAL**　{str(resposta.get('status', 'pendente')).upper()}\n**AVALIAÇÕES**　{len(avaliacoes) if isinstance(avaliacoes, list) else 0}\n**DECISÕES**　{len(decisoes) if isinstance(decisoes, list) else 0}", cor=0x9F1239, rodape="NÊMESIS • AUDITORIA DO PROCESSO SELETIVO")
-        nomes = {"postura": "Postura", "responsabilidade": "Responsabilidade", "disponibilidade": "Disponibilidade", "imparcialidade": "Imparcialidade", "comunicacao": "Comunicação"}
-        for indice, item in enumerate(avaliacoes[-8:] if isinstance(avaliacoes, list) else [], 1):
-            criterios = item.get("criterios", {})
-            notas = " · ".join(f"{nomes.get(chave, chave)} {valor}/5" for chave, valor in criterios.items())
-            criado = int(float(item.get("criado_em", 0) or 0))
-            embed.add_field(name=f"Avaliação {indice} · <@{int(item.get('revisor_id', 0) or 0)}> · média {float(item.get('media', 0) or 0):.2f}/5", value=f"{notas}\n<t:{criado}:F>\n**Justificativa:** {str(item.get('justificativa') or 'Não informada')[:700]}", inline=False)
-        for item in (decisoes[-5:] if isinstance(decisoes, list) else []):
-            criado = int(float(item.get("criado_em", 0) or 0))
-            embed.add_field(name=f"Decisão · {str(item.get('status', 'indefinida')).upper()}", value=f"**Responsável:** <@{int(item.get('revisor_id', 0) or 0)}>\n**Data:** <t:{criado}:F>\n**Motivo:** {str(item.get('motivo') or 'Não informado')[:700]}", inline=False)
-        if not avaliacoes and not decisoes:
-            embed.add_field(name="HISTÓRICO", value="Ainda não há avaliações ou decisões registradas.", inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    @app_commands.command(name="remover", description="Remove um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário (aparece em /formularios listar)")
-    @lideranca_only()
-    async def formulario_remover(self, interaction: discord.Interaction, formulario_id: str):
-        ok = await formularios.remover_formulario(interaction.guild.id, formulario_id)
-        if not ok:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(
-            "✦ Formulário arquivado. O histórico de candidaturas foi preservado.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(name="reativar", description="Reabre um formulário arquivado ou pausado.")
-    @app_commands.describe(formulario_id="ID do formulário")
-    @lideranca_only()
-    async def formulario_reativar(self, interaction: discord.Interaction, formulario_id: str):
-        formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
-        if not formulario:
-            await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
-            return
-        await formularios.reativar_formulario(interaction.guild.id, formulario_id)
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(
-            f"✦ **{formulario.get('nome', 'Formulário')}** reativado e já está disponível no seletor de inscrições.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(name="pausar", description="Pausa inscrições sem arquivar o formulário.")
-    @app_commands.describe(formulario_id="ID do formulário")
-    @lideranca_only()
-    async def formulario_pausar(self, interaction: discord.Interaction, formulario_id: str):
-        formulario = await formularios.atualizar_formulario(interaction.guild.id, formulario_id, ativo=False)
-        if not formulario:
-            await interaction.response.send_message("Não encontrei esse formulário.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await self.atualizar_central_inscricoes(interaction.guild)
-        await interaction.followup.send(
-            f"Inscrições de **{formulario.get('nome', 'Formulário')}** pausadas. O histórico foi preservado.",
-            ephemeral=True,
-        )
-
-    @app_commands.command(name="cargo-adicionar", description="Adiciona um cargo que recebe as candidaturas por DM.")
-    @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo que vai receber as candidaturas")
-    @lideranca_only()
-    async def formulario_cargo_adicionar(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
-        ok = await formularios.adicionar_cargo_notificar(interaction.guild.id, formulario_id, cargo.id)
-        if not ok:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        await interaction.response.send_message(f"✅ {cargo.mention} agora recebe candidaturas desse formulário.", ephemeral=True)
-
-    @app_commands.command(name="cargo-remover", description="Remove um cargo da lista de notificação de um formulário.")
-    @app_commands.describe(formulario_id="ID do formulário", cargo="Cargo a remover")
-    @lideranca_only()
-    async def formulario_cargo_remover(self, interaction: discord.Interaction, formulario_id: str, cargo: discord.Role):
-        ok = await formularios.remover_cargo_notificar(interaction.guild.id, formulario_id, cargo.id)
-        if not ok:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        await interaction.response.send_message(f"✅ {cargo.mention} não recebe mais candidaturas desse formulário.", ephemeral=True)
-
-    @app_commands.command(name="painel", description="Atualiza a central pública com os formulários disponíveis.")
-    @app_commands.describe(formulario_id="ID do formulário que deseja disponibilizar")
-    @lideranca_only()
-    async def formulario_painel(self, interaction: discord.Interaction, formulario_id: str):
-        formulario = await formularios.get_formulario(interaction.guild.id, formulario_id)
-        if not formulario:
-            await interaction.response.send_message("Não achei nenhum formulário com esse ID.", ephemeral=True)
-            return
-        if not _perguntas_flat(formulario):
-            await interaction.response.send_message(
-                "Esse formulário ainda não tem perguntas. Use `/formularios pagina-adicionar` primeiro.",
-                ephemeral=True,
-            )
-            return
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        try:
-            await self.atualizar_central_inscricoes(interaction.guild)
-        except (discord.Forbidden, discord.HTTPException, TypeError):
-            logging.exception("Falha ao atualizar central pública pelo comando painel.")
-            await interaction.followup.send("Não consegui atualizar a central. Verifique as permissões do bot.", ephemeral=True)
-            return
-        await interaction.followup.send(
-            f"Central atualizada. **{formulario.get('nome')}** aparece no seletor se estiver ativo.",
-            ephemeral=True,
-        )
-
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if interaction.type != discord.InteractionType.component:
@@ -1507,6 +1635,37 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
                 await interaction.response.send_message("Esse formulário não está disponível ou ainda não tem perguntas.", ephemeral=True)
                 return
             await interaction.response.send_modal(ModalFormulario(formulario, usuario_id=interaction.user.id))
+            return
+
+        if custom_id.startswith(PREFIXO_HISTORICO):
+            if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+                await interaction.response.send_message("O histórico é restrito à administração autorizada.", ephemeral=True)
+                return
+            protocolo = custom_id[len(PREFIXO_HISTORICO):]
+            resposta = await formularios.get_resposta(interaction.guild.id, protocolo)
+            if not resposta:
+                await interaction.response.send_message("Não encontrei esta candidatura.", ephemeral=True)
+                return
+            avaliacoes = resposta.get("avaliacoes", [])
+            decisoes = resposta.get("historico_decisoes", [])
+            embed = criar_embed(
+                f"𓂀 HISTÓRICO · {protocolo}",
+                f"**SITUAÇÃO**　{str(resposta.get('status', 'pendente')).upper()}\n"
+                f"**AVALIAÇÕES**　{len(avaliacoes) if isinstance(avaliacoes, list) else 0}\n"
+                f"**DECISÕES**　{len(decisoes) if isinstance(decisoes, list) else 0}",
+                cor=0x9F1239,
+                rodape="NÊMESIS • AUDITORIA DO PROCESSO SELETIVO",
+            )
+            nomes = {"postura": "Postura", "responsabilidade": "Responsabilidade", "disponibilidade": "Disponibilidade", "imparcialidade": "Imparcialidade", "comunicacao": "Comunicação"}
+            for indice, item in enumerate(avaliacoes[-8:] if isinstance(avaliacoes, list) else [], 1):
+                criterios = item.get("criterios", {})
+                notas = " · ".join(f"{nomes.get(chave, chave)} {valor}/5" for chave, valor in criterios.items())
+                criado = int(float(item.get("criado_em", 0) or 0))
+                embed.add_field(name=f"Avaliação {indice} · <@{int(item.get('revisor_id', 0) or 0)}> · média {float(item.get('media', 0) or 0):.2f}/5", value=f"{notas}\n<t:{criado}:F>\n**Justificativa:** {str(item.get('justificativa') or 'Não informada')[:700]}", inline=False)
+            for item in (decisoes[-5:] if isinstance(decisoes, list) else []):
+                criado = int(float(item.get("criado_em", 0) or 0))
+                embed.add_field(name=f"Decisão · {str(item.get('status', 'indefinida')).upper()}", value=f"**Responsável:** <@{int(item.get('revisor_id', 0) or 0)}>\n**Data:** <t:{criado}:F>\n**Motivo:** {str(item.get('motivo') or 'Não informado')[:700]}", inline=False)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         if custom_id.startswith(PREFIXO_AVALIAR):

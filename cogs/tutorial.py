@@ -294,11 +294,11 @@ TUTORIAIS = {
             "Revise as respostas antes de enviar; não envie candidaturas duplicadas.",
             "Aguarde a análise da equipe responsável. Cada candidatura é organizada em um tópico individual, evitando que os dossiês se misturem.",
             "A aprovação não é automática e pode depender de entrevista ou avaliação.",
-            "A equipe autorizada pode consultar a fila por situação, navegar por páginas e abrir um dossiê pelo protocolo.",
+            "A administração autorizada consulta as fichas pendentes e o histórico de candidaturas encerradas pela Central Administrativa.",
             "Antes da decisão, cada candidatura deve receber ao menos uma avaliação estruturada. Os avaliadores registram notas de 1 a 5 para postura, responsabilidade, disponibilidade, imparcialidade e comunicação, sempre com justificativa.",
             "O histórico da candidatura mantém as avaliações e identifica quem avaliou e quem tomou a decisão. As notas não substituem a análise qualitativa nem aprovam automaticamente o candidato.",
         ],
-        "comandos": "/formularios fila · /formularios consultar · /formularios avaliar · /formularios historico (liderança e instrutores) · painel público de inscrições.",
+        "comandos": "Central Administrativa → Operações → Processos seletivos · painel público de inscrições.",
     },
     "avisos": {
         "titulo": "Avisos oficiais por mensagem privada",

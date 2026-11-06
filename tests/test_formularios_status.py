@@ -4,7 +4,7 @@ from utils import formularios
 
 class TestStatusCandidatura(unittest.IsolatedAsyncioTestCase):
     async def test_revisao_pendente_atualiza_status(self):
-        resposta = {'id': 'resp-1', 'status': 'pendente'}
+        resposta = {'id': 'resp-1', 'status': 'pendente', 'avaliacoes': [{'media': 4.0}]}
         dados = {'1563995879981981817': [resposta]}
         with patch.object(formularios, '_tudo_respostas', new=AsyncMock(return_value=dados)), patch.object(formularios, '_salvar_respostas_guild', new=AsyncMock()) as salvar:
             resultado = await formularios.definir_status_resposta(1563995879981981817, 'resp-1', 'aprovada', 99)

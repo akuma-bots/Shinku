@@ -74,3 +74,39 @@ O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tick
 4. Testar com contas de Supervisor Staff, direção, OCTÓGONO, membro comum e cargos competitivos.
 5. Verificar os painéis e permissões no Discord e confirmar conexão persistente com Upstash.
 6. Preservar backup e plano de rollback antes de qualquer migração de dados.
+
+## Atualização técnica — 2026-11-06
+
+### Formulários e recrutamento
+
+- A gestão foi movida para a Central Administrativa; o grupo slash de gerenciamento de formulários foi removido depois de implementar os fluxos equivalentes em componentes do Discord.
+- A central oferece criação e edição dos dados do formulário, adição de etapas (até cinco perguntas por modal), edição individual de perguntas com paginação, remoção de etapas com confirmação, configuração de cargos notificados, publicação, pausa, reativação e arquivamento.
+- A fila administrativa separa fichas pendentes de candidaturas encerradas. Ambas têm paginação; a fila pendente pode ser atualizada sem reabrir a central.
+- A avaliação exige cinco notas de 1 a 5 e justificativa. A decisão exige justificativa e ao menos uma avaliação estruturada; a camada de storage aplica a mesma regra e serializa decisões concorrentes.
+- As mutações do catálogo são serializadas para evitar perda de atualizações concorrentes. Candidaturas novas não são duplicadas enquanto houver uma ficha pendente do mesmo membro e formulário.
+- Os dossiês usam os enunciados capturados no momento do envio, preservando a leitura histórica mesmo após edição das perguntas. O encerramento em lote registra responsável, motivo e data no histórico.
+- O tutorial foi atualizado para orientar o acesso pela Central Administrativa, não por comandos slash.
+
+### Inventário preliminar da migração administrativa
+
+A busca por decorators de comandos na branch `main` ainda identifica operações de staff/admin distribuídas pelos módulos abaixo. A presença de um comando não significa que ele deva ser removido: cada handler precisa ser classificado por permissão e finalidade, e qualquer operação administrativa só pode perder o comando depois que o painel equivalente estiver implementado e testado.
+
+| Módulo | Próxima análise de migração |
+|---|---|
+| `automod.py` | Configuração de níveis, estatísticas e consulta de decisões pela seção Segurança |
+| `autocargo.py`, `contadores.py` | Configuração de cargos automáticos e contadores por seletores/menus |
+| `eventos.py`, `temporadas.py`, `guerras.py` | Gestão de agenda, temporadas e confrontos com formulários de confirmação |
+| `parcerias.py`, `sorteios.py` | Revisão/aprovação de parcerias e administração de sorteios |
+| `academia.py` | Criação, inscrição e avaliação de treinamentos; separar ações de membros e da administração |
+| `progressao_gangue.py`, `perfil.py` | Configuração administrativa de ranks/patentes separada de perfil, ranking e operações dos membros |
+| `roblox.py` | Configuração de grupo/mapeamentos/sincronização separada de vinculação e consulta de membros |
+| `missoes.py` | Inventariar comandos remanescentes contra os painéis de missão e inteligência já existentes |
+
+Não foram removidos comandos desses módulos nesta etapa. A migração permanece incremental e sem dashboard.
+
+### Validação desta etapa
+
+- `python -m compileall -q bot.py cogs utils tests` — aprovado.
+- `python -m pytest -q` — **433 testes aprovados e 32 subtestes aprovados**; 52 avisos de depreciação das bibliotecas/componentes, sem falhas.
+- `git diff --check` — aprovado antes do commit final.
+- CI e deploy Render precisam ser verificados para o commit final desta etapa.
