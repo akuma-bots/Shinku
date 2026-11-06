@@ -103,8 +103,27 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(publicado)
         canal.create_thread.assert_awaited_once()
         thread.send.assert_awaited_once()
-        self.assertIs(thread.send.await_args.kwargs["view"], view)
+        self.assertNotIn("view", thread.send.await_args.kwargs)
 
+
+    def test_central_de_formularios_inclui_seletor_privado_de_fichas_pendentes(self):
+        cog = object.__new__(cog_formularios.Formularios)
+        central = cog_formularios.CentralFormulariosView(
+            cog,
+            guild_id=123,
+            usuario_id=456,
+            lista=[{"id": "form-1", "nome": "Staff", "paginas": []}],
+        )
+
+        self.assertEqual(len(central.children), 3)
+        self.assertEqual(
+            central.children[2].custom_id,
+            "nemesis:formularios:fila_pendentes",
+        )
+        self.assertEqual(
+            central.children[2].options[0].value,
+            "abrir_pendentes",
+        )
 
     async def test_avaliacao_estruturada_e_anexada_sem_apagar_historico(self):
         resposta = {"id": "resp-1", "status": "pendente", "avaliacoes": []}
