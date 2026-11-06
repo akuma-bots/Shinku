@@ -59,25 +59,28 @@ if __name__ == "__main__":
 
 
 class TestRespostaInteracaoFormulario(unittest.IsolatedAsyncioTestCase):
-    async def test_botao_de_decisao_reconhece_interacao_antes_da_busca(self):
+    async def test_botao_de_decisao_abre_modal_privado_com_validacao_administrativa(self):
         from types import SimpleNamespace
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock, patch
         import discord
-        from cogs.formularios import Formularios, PREFIXO_APROVAR
+        from cogs.formularios import Formularios, ModalDecisaoFormulario, PREFIXO_APROVAR
 
-        resposta = SimpleNamespace(defer=AsyncMock())
-        followup = SimpleNamespace(send=AsyncMock())
+        response = SimpleNamespace(send_modal=AsyncMock())
         interaction = SimpleNamespace(
             type=discord.InteractionType.component,
             data={"custom_id": PREFIXO_APROVAR + "resp-audit"},
-            response=resposta,
-            followup=followup,
-            user=SimpleNamespace(id=123),
+            response=response,
+            guild=SimpleNamespace(id=123),
+            user=SimpleNamespace(id=456),
         )
         cog = object.__new__(Formularios)
         cog.bot = SimpleNamespace(guilds=[])
 
-        await cog.on_interaction(interaction)
+        with patch("cogs.formularios.membro_tem_lideranca", return_value=True), patch(
+            "cogs.formularios.formularios.get_resposta",
+            new=AsyncMock(return_value={"id": "resp-audit", "status": "pendente", "avaliacoes": [{"media": 4.5}]}),
+        ):
+            await cog.on_interaction(interaction)
 
-        resposta.defer.assert_awaited_once_with(ephemeral=True, thinking=True)
-        followup.send.assert_awaited_once()
+        response.send_modal.assert_awaited_once()
+        self.assertIsInstance(response.send_modal.await_args.args[0], ModalDecisaoFormulario)
