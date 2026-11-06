@@ -509,17 +509,73 @@ class SeletorFilaCandidaturas(discord.ui.Select):
             )
             return
 
-        view = SeletorFichaPendente(central, pendentes[:25])
-        embed = criar_embed(
+        view = FilaCandidaturasView(central, pendentes)
+        await interaction.response.send_message(
+            embed=view.montar_embed(),
+            view=view,
+            ephemeral=True,
+        )
+
+
+class FilaCandidaturasView(discord.ui.View):
+    """Fila paginada; cada seletor respeita o limite de 25 opções do Discord."""
+
+    def __init__(self, central, pendentes: list[dict]):
+        super().__init__(timeout=300)
+        self.central = central
+        self.pendentes = pendentes
+        self.pagina = 0
+        self._montar()
+
+    @property
+    def total_paginas(self):
+        return max(1, (len(self.pendentes) + 24) // 25)
+
+    def montar_embed(self):
+        inicio = self.pagina * 25
+        return criar_embed(
             "𓂀 FILA RESTRITA · CANDIDATURAS",
-            f"**FORMULÁRIO**　{central.formulario_id}\n"
-            f"**PENDENTES**　{len(pendentes)}\n\n"
-            "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação. "
-            "A lista apresenta as 25 candidaturas pendentes mais recentes.",
+            f"**FORMULÁRIO**　{self.central.formulario_id}\n"
+            f"**PENDENTES**　{len(self.pendentes)}\n"
+            f"**PÁGINA**　{self.pagina + 1}/{self.total_paginas}\n\n"
+            "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação.",
             cor=0x9F1239,
             rodape="NÊMESIS • ACESSO ADMINISTRATIVO",
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    def _montar(self):
+        self.clear_items()
+        inicio = self.pagina * 25
+        self.add_item(SeletorFichaPendente(self.central, self.pendentes[inicio:inicio + 25]))
+        self.anterior.disabled = self.pagina <= 0
+        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+        self.add_item(self.anterior)
+        self.add_item(self.proxima)
+
+    async def _validar_interacao(self, interaction: discord.Interaction):
+        if interaction.user.id != self.central.usuario_id:
+            await interaction.response.send_message("Esta fila pertence a outra pessoa.", ephemeral=True)
+            return False
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("A fila de candidaturas é restrita à administração autorizada.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️")
+    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_interacao(interaction):
+            return
+        self.pagina = max(0, self.pagina - 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+
+    @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
+    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_interacao(interaction):
+            return
+        self.pagina = min(self.total_paginas - 1, self.pagina + 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
 
 
 class SeletorFichaPendente(discord.ui.Select):
@@ -690,7 +746,7 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
     seu painel customizável (título, descrição, banner) e é dividido em
     páginas de até 5 perguntas — o bot encadeia os modais automaticamente
     até completar todas. As respostas vão por DM pros cargos configurados,
-    com botões de Aprovar/Recusar; o candidato é avisado do resultado."""
+    com análise e decisão pela fila administrativa privada; o candidato é avisado do resultado."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
