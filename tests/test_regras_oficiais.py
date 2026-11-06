@@ -1,0 +1,52 @@
+import re
+import unittest
+
+from cogs.regras_oficiais import SECOES_REGRAS, construir_embed_regras
+
+
+class TestRegrasOficiais(unittest.TestCase):
+    def test_regulamento_completo_cabe_em_uma_unica_embed(self):
+        embed = construir_embed_regras()
+        self.assertEqual(len(embed.fields), 11)
+        self.assertLessEqual(len(embed.fields), 25)
+        total = len(embed.title or "") + len(embed.description or "")
+        total += sum(len(field.name) + len(field.value) for field in embed.fields)
+        total += len(embed.footer.text or "")
+        self.assertLessEqual(total, 6000)
+        self.assertTrue(all(len(field.value) <= 1024 for field in embed.fields))
+
+    def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
+        embed = construir_embed_regras()
+        texto = "\n".join([embed.title or "", embed.description or ""] + [
+            parte for field in embed.fields for parte in (field.name, field.value)
+        ])
+        encontrados = re.findall(r"(?:^|\n)\s*(\d{2})\.\s+([^\n]+)", texto)
+        self.assertEqual([numero for numero, _ in encontrados], [f"{i:02d}" for i in range(1, 12)])
+        self.assertEqual(len(SECOES_REGRAS), 11)
+
+    def test_niveis_disciplinares_correspondem_a_medidas_padrao_do_automod(self):
+        texto = construir_embed_regras().fields[9].value
+        esperado = (
+            "NÍVEL I — NORMAL",
+            "advertência formal",
+            "NÍVEL II — MÉDIO",
+            "timeout de 10 minutos",
+            "NÍVEL III — GRAVE",
+            "expulsão do servidor",
+            "NÍVEL IV — MUITO GRAVE",
+            "banimento temporário de 24 horas",
+            "NÍVEL V — CRÍTICO",
+            "banimento permanente",
+        )
+        for trecho in esperado:
+            self.assertIn(trecho.casefold(), texto.casefold())
+
+    def test_regras_nao_dependem_de_comando_slash_para_publicacao(self):
+        import inspect
+        from cogs.regras_oficiais import RegrasOficiais
+        self.assertTrue(hasattr(RegrasOficiais, "sincronizar_regras"))
+        self.assertFalse(hasattr(RegrasOficiais, "regras_publicar"))
+
+
+if __name__ == "__main__":
+    unittest.main()
