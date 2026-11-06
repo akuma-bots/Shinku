@@ -125,6 +125,27 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
             "abrir_pendentes",
         )
 
+    def test_fila_de_candidaturas_tem_paginacao_no_limite_do_discord(self):
+        central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
+        pendentes = [
+            {"id": f"resp-{i}", "nome": f"Candidato {i}", "autor_id": i, "criado_em": i}
+            for i in range(26)
+        ]
+
+        view = cog_formularios.FilaCandidaturasView(central, pendentes)
+
+        self.assertEqual(view.total_paginas, 2)
+        self.assertEqual(len(view.children[0].options), 25)
+        self.assertTrue(view.anterior.disabled)
+        self.assertFalse(view.proxima.disabled)
+
+        view.pagina = 1
+        view._montar()
+
+        self.assertEqual(len(view.children[0].options), 1)
+        self.assertFalse(view.anterior.disabled)
+        self.assertTrue(view.proxima.disabled)
+
     async def test_avaliacao_estruturada_e_anexada_sem_apagar_historico(self):
         resposta = {"id": "resp-1", "status": "pendente", "avaliacoes": []}
         dados = {"123": [resposta]}
