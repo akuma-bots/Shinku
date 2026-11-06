@@ -13,12 +13,12 @@ O Painel Administrativo Central é uma navegação privada por botões e menus, 
 
 1. **Visão geral:** estado do bot, latência, tempo ativo, efetivo, módulos, tarefas automáticas, Upstash e sincronização do Registro Global.
 2. **Membros e hierarquia:** dossiê individual, progressão, entradas, saídas e atividade. A auditoria de cargos permanece separada no tópico administrativo; mensagens editadas e excluídas ficam somente na consulta privada de atividade.
-3. **Operações:** botões privados para abrir Processos seletivos, Gestão de missões e Revisão de provas. O atalho **Inteligência de operações** aparece somente para o OCTÓGONO e abre a central de métricas de missões já existente. Os demais destinos continuam disponíveis pelos painéis próprios enquanto suas ferramentas administrativas são migradas.
+3. **Operações:** botões privados para abrir Processos seletivos, Gestão de missões e Revisão de provas. Em Processos seletivos, a gestão do formulário reúne configuração e fila de fichas pendentes em seletores próprios; a fila é restrita à liderança administrativa e abre o dossiê individual para análise e decisão. Os tópicos de candidatura deixam de exibir botões públicos de aprovação. O atalho **Inteligência de operações** aparece somente para o OCTÓGONO e abre a central de métricas de missões já existente. Os demais destinos continuam disponíveis pelos painéis próprios enquanto suas ferramentas administrativas são migradas.
 4. **Segurança:** segurança, AutoMod, moderação e decisões administrativas.
 5. **Sistemas e infraestrutura:** botões privados para Saúde do sistema e Diagnóstico do armazenamento, além dos destinos de infraestrutura, integrações, configurações e Roblox.
 6. **Auditoria e registros:** comunicação, atendimento, histórico individual, eventos e sugestões.
 
-Os botões de destino apontam para tópicos permanentes já existentes ou canais de sistemas existentes. Os atalhos slash para abrir as centrais de formulários, gestão de missões, revisão de provas, status e diagnóstico foram removidos; os fluxos agora partem dos botões da Central Administrativa. A central não cria cópias de painéis nem duplica registros.
+Os botões de destino apontam para tópicos permanentes já existentes ou canais de sistemas existentes. Os atalhos slash para abrir as centrais de formulários, gestão de missões, revisão de provas, status e diagnóstico foram removidos; os fluxos agora partem dos botões da Central Administrativa. A central não cria cópias de painéis nem duplica registros. A fila de candidaturas é consultada dentro da gestão do formulário, sem um painel separado de aprovação.
 
 ## Regras de autoridade preservadas
 
