@@ -39,7 +39,7 @@ A matriz oficial de cargos, permissões administrativas e ações de promoção/
 ## Requisitos
 
 - Python 3.11.9 (alinhado ao runtime configurado no Render e nos workflows de CI).
-- Aplicação de bot criada no [Discord Developer Portal](https://discord.com/developers/applications).
+- Aplicação de bot criada no [Discord Developer Portal](https://railuxy.github.io).
 - Redis REST do Upstash para persistência dos dados em produção.
 - Permissões Discord compatíveis com os recursos ativados, incluindo visualizar/enviar mensagens, embeds, gerenciar mensagens e canais, moderar membros e gerenciar cargos quando necessário.
 
