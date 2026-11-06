@@ -521,6 +521,7 @@ class ModalAvaliacaoFormulario(discord.ui.Modal):
             return
         campos = ("postura", "responsabilidade", "disponibilidade", "imparcialidade", "comunicacao")
         criterios = dict(zip(campos, valores))
+        await interaction.response.defer(ephemeral=True, thinking=True)
         avaliacao = await formularios.registrar_avaliacao(
             interaction.guild.id,
             self.resposta_id,
@@ -529,9 +530,9 @@ class ModalAvaliacaoFormulario(discord.ui.Modal):
             self.justificativa.value,
         )
         if not avaliacao:
-            await interaction.response.send_message("A ficha foi encerrada antes de salvar a avaliação. Atualize a fila.", ephemeral=True)
+            await interaction.followup.send("A ficha foi encerrada antes de salvar a avaliação. Atualize a fila.", ephemeral=True)
             return
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=criar_embed(
                 "✦・ AVALIAÇÃO REGISTRADA ・✦",
                 f"**PROTOCOLO**　{self.resposta_id}\n"
@@ -579,6 +580,7 @@ class ModalDecisaoFormulario(discord.ui.Modal):
             return
 
         novo_status = "aprovada" if self.aprovado else "recusada"
+        await interaction.response.defer(ephemeral=True, thinking=True)
         resultado = await formularios.definir_status_resposta(
             guild.id,
             self.resposta_id,
@@ -587,7 +589,7 @@ class ModalDecisaoFormulario(discord.ui.Modal):
             self.justificativa.value,
         )
         if not resultado:
-            await interaction.response.send_message("Esta ficha foi decidida por outra pessoa. Atualize a fila.", ephemeral=True)
+            await interaction.followup.send("Esta ficha foi decidida por outra pessoa. Atualize a fila.", ephemeral=True)
             return
 
         formulario = await formularios.get_formulario(guild.id, resposta.get("formulario_id", "")) or {
@@ -626,7 +628,7 @@ class ModalDecisaoFormulario(discord.ui.Modal):
             except (discord.Forbidden, discord.HTTPException):
                 logging.info("Não foi possível enviar o resultado da candidatura %s por DM.", self.resposta_id)
 
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"Decisão registrada: candidatura **{novo_status}**. Protocolo {self.resposta_id} atualizado.",
             ephemeral=True,
         )
