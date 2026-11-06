@@ -125,6 +125,15 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
             "abrir_pendentes",
         )
 
+    def test_modais_de_avaliacao_e_decisao_respeitam_limites_do_discord(self):
+        avaliacao = cog_formularios.ModalAvaliacaoFormulario("resp-123")
+        decisao = cog_formularios.ModalDecisaoFormulario("resp-123", aprovado=True)
+
+        self.assertEqual(len(avaliacao.children), 2)
+        self.assertTrue(all(len(campo.label) <= 45 for campo in avaliacao.children))
+        self.assertEqual(len(decisao.children), 1)
+        self.assertTrue(all(len(campo.label) <= 45 for campo in decisao.children))
+
     def test_fila_de_candidaturas_tem_paginacao_no_limite_do_discord(self):
         central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
         pendentes = [
