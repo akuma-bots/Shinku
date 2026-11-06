@@ -103,14 +103,13 @@ class RegrasOficiais(commands.Cog):
         async with self._sincronizacao_lock:
             if self._sincronizado:
                 return
-            await self.sincronizar_regras()
-            self._sincronizado = True
+            self._sincronizado = await self.sincronizar_regras()
 
     async def sincronizar_regras(self):
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
         if guild is None:
             logging.warning("Código de Conduta: servidor oficial ainda não está disponível.")
-            return
+            return False
 
         canal = guild.get_channel(CANAL_REGRAS_ID)
         if canal is None:
@@ -118,15 +117,15 @@ class RegrasOficiais(commands.Cog):
                 canal = await guild.fetch_channel(CANAL_REGRAS_ID)
             except discord.HTTPException:
                 logging.exception("Código de Conduta: não foi possível localizar o canal oficial.")
-                return
+                return False
         if not isinstance(canal, discord.TextChannel):
             logging.error("Código de Conduta: o canal configurado não é um canal de texto.")
-            return
+            return False
 
         membro_bot = guild.me or (guild.get_member(self.bot.user.id) if self.bot.user else None)
         if membro_bot is None:
             logging.warning("Código de Conduta: não foi possível validar as permissões do bot.")
-            return
+            return False
         permissoes = canal.permissions_for(membro_bot)
         if not (permissoes.view_channel and permissoes.read_message_history
                 and permissoes.send_messages and permissoes.embed_links):
@@ -135,7 +134,7 @@ class RegrasOficiais(commands.Cog):
                 "(visualizar, ler histórico, enviar mensagens e inserir links).",
                 CANAL_REGRAS_ID,
             )
-            return
+            return False
 
         embed = construir_embed_regras()
         existentes = []
@@ -150,7 +149,7 @@ class RegrasOficiais(commands.Cog):
                     existentes.append(mensagem)
         except discord.HTTPException:
             logging.exception("Código de Conduta: falha ao consultar publicações anteriores.")
-            return
+            return False
 
         if existentes:
             principal = existentes[0]
@@ -158,7 +157,7 @@ class RegrasOficiais(commands.Cog):
                 await principal.edit(content=None, embed=embed, allowed_mentions=discord.AllowedMentions.none())
             except discord.HTTPException:
                 logging.exception("Código de Conduta: falha ao atualizar a publicação existente.")
-                return
+                return False
             for duplicada in existentes[1:]:
                 try:
                     await duplicada.delete()
@@ -171,14 +170,15 @@ class RegrasOficiais(commands.Cog):
                 "Código de Conduta atualizado em uma única embed no canal %s; publicações antigas do bot consolidadas.",
                 CANAL_REGRAS_ID,
             )
-            return
+            return True
 
         try:
             await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
             logging.exception("Código de Conduta: falha ao publicar a embed oficial.")
-            return
+            return False
         logging.info("Código de Conduta publicado em uma única embed no canal %s.", CANAL_REGRAS_ID)
+        return True
 
 
 async def setup(bot: commands.Bot):
