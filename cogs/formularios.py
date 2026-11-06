@@ -15,6 +15,7 @@ from utils.guild_config import lideranca_only, membro_tem_lideranca
 PREFIXO_ABRIR = "formulario:abrir:"
 PREFIXO_APROVAR = "formulario:aprovar:"
 PREFIXO_RECUSAR = "formulario:recusar:"
+PREFIXO_AVALIAR = "formulario:avaliar:"
 PREFIXO_CONTINUAR = "formulario:continuar:"
 SESSOES_FORMULARIOS = {}
 TEMPO_SESSAO_FORMULARIO = 15 * 60
@@ -431,10 +432,24 @@ def _embeds_resposta(formulario: dict, resposta: dict, guild: discord.Guild, bot
 
 def _view_resposta(resposta_id: str) -> discord.ui.View:
     view = discord.ui.View(timeout=None)
-    view.add_item(discord.ui.Button(label="Aprovar", style=discord.ButtonStyle.success, emoji="✅",
-                                     custom_id=f"{PREFIXO_APROVAR}{resposta_id}"))
-    view.add_item(discord.ui.Button(label="Recusar", style=discord.ButtonStyle.danger, emoji="❌",
-                                     custom_id=f"{PREFIXO_RECUSAR}{resposta_id}"))
+    view.add_item(discord.ui.Button(
+        label="Registrar avaliação",
+        style=discord.ButtonStyle.primary,
+        emoji="📝",
+        custom_id=f"{PREFIXO_AVALIAR}{resposta_id}",
+    ))
+    view.add_item(discord.ui.Button(
+        label="Aprovar",
+        style=discord.ButtonStyle.success,
+        emoji="✅",
+        custom_id=f"{PREFIXO_APROVAR}{resposta_id}",
+    ))
+    view.add_item(discord.ui.Button(
+        label="Recusar",
+        style=discord.ButtonStyle.danger,
+        emoji="❌",
+        custom_id=f"{PREFIXO_RECUSAR}{resposta_id}",
+    ))
     return view
 
 
@@ -462,6 +477,159 @@ class SeletorFormularioCentral(discord.ui.Select):
             return
         self.central.formulario_id = self.values[0]
         await self.central.atualizar(interaction)
+
+
+class ModalAvaliacaoFormulario(discord.ui.Modal):
+    """Avaliação estruturada por modal, sem depender de comandos digitados."""
+
+    def __init__(self, resposta_id: str):
+        super().__init__(title=f"Avaliar candidatura · {resposta_id[:12]}")
+        self.resposta_id = resposta_id
+        self.notas = discord.ui.TextInput(
+            label="Notas 1–5 (postura, responsabilidade, disponibilidade, imparcialidade, comunicação)",
+            placeholder="Ex.: 5, 4, 4, 5, 5",
+            required=True,
+            max_length=25,
+        )
+        self.justificativa = discord.ui.TextInput(
+            label="Justificativa técnica",
+            placeholder="Registre evidências que sustentam a avaliação.",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000,
+        )
+        self.add_item(self.notas)
+        self.add_item(self.justificativa)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("Somente a administração autorizada pode avaliar candidaturas.", ephemeral=True)
+            return
+        resposta = await formularios.get_resposta(interaction.guild.id, self.resposta_id)
+        if not resposta or resposta.get("status") != "pendente":
+            await interaction.response.send_message("Esta candidatura não está mais pendente.", ephemeral=True)
+            return
+        try:
+            valores = [int(valor.strip()) for valor in str(self.notas.value).replace(";", ",").split(",")]
+        except (TypeError, ValueError):
+            valores = []
+        if len(valores) != 5 or any(valor < 1 or valor > 5 for valor in valores):
+            await interaction.response.send_message(
+                "Informe exatamente cinco notas inteiras entre 1 e 5, separadas por vírgulas.",
+                ephemeral=True,
+            )
+            return
+        campos = ("postura", "responsabilidade", "disponibilidade", "imparcialidade", "comunicacao")
+        criterios = dict(zip(campos, valores))
+        avaliacao = await formularios.registrar_avaliacao(
+            interaction.guild.id,
+            self.resposta_id,
+            interaction.user.id,
+            criterios,
+            self.justificativa.value,
+        )
+        if not avaliacao:
+            await interaction.response.send_message("A ficha foi encerrada antes de salvar a avaliação. Atualize a fila.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            embed=criar_embed(
+                "✦・ AVALIAÇÃO REGISTRADA ・✦",
+                f"**PROTOCOLO**　{self.resposta_id}\n"
+                f"**AVALIADOR**　{interaction.user.mention}\n"
+                f"**MÉDIA**　{avaliacao['media']:.2f}/5\n"
+                f"**NOTAS**　{' · '.join(str(valor) for valor in valores)}\n\n"
+                f"**JUSTIFICATIVA**\n{self.justificativa.value[:1000]}",
+                cor=0x9F1239,
+                rodape="NÊMESIS • AVALIAÇÃO ESTRUTURADA",
+            ),
+            ephemeral=True,
+        )
+
+
+class ModalDecisaoFormulario(discord.ui.Modal):
+    """Exige justificativa auditável para aprovar ou recusar uma candidatura."""
+
+    def __init__(self, resposta_id: str, aprovado: bool):
+        super().__init__(title=f"{'Aprovar' if aprovado else 'Recusar'} candidatura · {resposta_id[:12]}")
+        self.resposta_id = resposta_id
+        self.aprovado = aprovado
+        self.justificativa = discord.ui.TextInput(
+            label="Justificativa da decisão",
+            placeholder="Explique objetivamente os fundamentos da decisão.",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000,
+        )
+        self.add_item(self.justificativa)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild = interaction.guild
+        if guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("Somente a administração autorizada pode decidir candidaturas.", ephemeral=True)
+            return
+        resposta = await formularios.get_resposta(guild.id, self.resposta_id)
+        if not resposta or resposta.get("status") != "pendente":
+            await interaction.response.send_message("Esta candidatura já foi encerrada ou não existe.", ephemeral=True)
+            return
+        if not resposta.get("avaliacoes"):
+            await interaction.response.send_message(
+                "Registre primeiro a avaliação estruturada desta ficha.",
+                ephemeral=True,
+            )
+            return
+
+        novo_status = "aprovada" if self.aprovado else "recusada"
+        resultado = await formularios.definir_status_resposta(
+            guild.id,
+            self.resposta_id,
+            novo_status,
+            interaction.user.id,
+            self.justificativa.value,
+        )
+        if not resultado:
+            await interaction.response.send_message("Esta ficha foi decidida por outra pessoa. Atualize a fila.", ephemeral=True)
+            return
+
+        formulario = await formularios.get_formulario(guild.id, resposta.get("formulario_id", "")) or {
+            "nome": resposta.get("formTitulo", "Formulário")
+        }
+        from utils.registro_global import registrar
+        try:
+            await registrar(
+                guild,
+                "formularios",
+                f"Candidatura {novo_status}",
+                f"Protocolo: {self.resposta_id}\n"
+                f"Formulário: **{formulario.get('nome', 'Formulário')}**\n"
+                f"Candidato: <@{resposta.get('autor_id')}> ({resposta.get('autor_id')})\n"
+                f"Revisor: {interaction.user.mention} ({interaction.user.id})\n"
+                f"Justificativa: {self.justificativa.value[:1000]}",
+                cor=0x57F287 if self.aprovado else 0xED4245,
+            )
+        except Exception:
+            logging.exception("Falha ao registrar a decisão da candidatura %s.", self.resposta_id)
+
+        candidato = guild.get_member(int(resposta.get("autor_id", 0) or 0))
+        if candidato is None:
+            try:
+                candidato = await guild.fetch_member(int(resposta.get("autor_id", 0) or 0))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                candidato = None
+        status_texto = "APROVADA" if self.aprovado else "RECUSADA"
+        if candidato:
+            try:
+                await candidato.send(
+                    f"{'🎉' if self.aprovado else '❌'} Sua candidatura para **{formulario.get('nome', 'Formulário')}** "
+                    f"foi **{status_texto}** pela administração da NÊMESIS.\n"
+                    f"**Justificativa:** {self.justificativa.value[:1000]}"
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                logging.info("Não foi possível enviar o resultado da candidatura %s por DM.", self.resposta_id)
+
+        await interaction.response.send_message(
+            f"Decisão registrada: candidatura **{novo_status}**. Protocolo {self.resposta_id} atualizado.",
+            ephemeral=True,
+        )
 
 
 class SeletorFilaCandidaturas(discord.ui.Select):
@@ -1339,139 +1507,33 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             await interaction.response.send_modal(ModalFormulario(formulario, usuario_id=interaction.user.id))
             return
 
+        if custom_id.startswith(PREFIXO_AVALIAR):
+            if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+                await interaction.response.send_message("Somente a administração autorizada pode avaliar candidaturas.", ephemeral=True)
+                return
+            resposta_id = custom_id[len(PREFIXO_AVALIAR):]
+            resposta = await formularios.get_resposta(interaction.guild.id, resposta_id)
+            if not resposta or resposta.get("status") != "pendente":
+                await interaction.response.send_message("Esta candidatura não está mais pendente.", ephemeral=True)
+                return
+            await interaction.response.send_modal(ModalAvaliacaoFormulario(resposta_id))
+            return
+
         if custom_id.startswith(PREFIXO_APROVAR) or custom_id.startswith(PREFIXO_RECUSAR):
+            if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+                await interaction.response.send_message("Somente a administração autorizada pode decidir candidaturas.", ephemeral=True)
+                return
             aprovado = custom_id.startswith(PREFIXO_APROVAR)
             resposta_id = custom_id.split(":")[-1]
-
-            # A busca no armazenamento, a validação do cargo e a decisão podem
-            # levar mais de 3 segundos. Reconhece o clique antes de iniciar I/O.
-            await interaction.response.defer(ephemeral=True, thinking=True)
-
-            # O clique acontece na DM, então não existe interaction.guild —
-            # procuramos em qual servidor essa resposta foi registrada.
-            resposta, guild_encontrada = None, None
-            for guild in self.bot.guilds:
-                candidata = await formularios.get_resposta(guild.id, resposta_id)
-                if candidata:
-                    resposta, guild_encontrada = candidata, guild
-                    break
-
-            if not resposta:
-                await interaction.followup.send("Essa candidatura não existe mais.", ephemeral=True)
+            resposta = await formularios.get_resposta(interaction.guild.id, resposta_id)
+            if not resposta or resposta.get("status") != "pendente":
+                await interaction.response.send_message("Esta candidatura já foi encerrada ou não existe.", ephemeral=True)
                 return
-
-            formulario_resposta = await formularios.get_formulario(
-                guild_encontrada.id,
-                resposta.get("formulario_id", ""),
-            )
-            # Apenas instrutores/aprovadores e administradores podem revisar formulários.
-            membro_revisor = guild_encontrada.get_member(interaction.user.id)
-            if membro_revisor is None:
-                try:
-                    membro_revisor = await guild_encontrada.fetch_member(interaction.user.id)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    membro_revisor = None
-
-            autorizado = bool(
-                membro_revisor
-                and (
-                    membro_tem_lideranca(membro_revisor)
-                    or any(cargo.id == CARGO_INSTRUTOR_FORMULARIO_ID for cargo in membro_revisor.roles)
-                )
-            )
-            if not autorizado:
-                await interaction.followup.send(
-                    "Você precisa do cargo Instrutor/Aprovador ou de um cargo de liderança autorizado para revisar formulários.",
-                    ephemeral=True,
-                )
-                return
-
-            if resposta["status"] != "pendente":
-                await interaction.followup.send(f"Essa candidatura já foi **{resposta['status']}**.", ephemeral=True)
-                return
-
             if not resposta.get("avaliacoes"):
-                await interaction.followup.send("Esta candidatura ainda não possui avaliação estruturada. Registre primeiro uma avaliação com /formularios avaliar.", ephemeral=True)
+                await interaction.response.send_message("Registre primeiro a avaliação estruturada desta ficha.", ephemeral=True)
                 return
-
-            novo_status = "aprovada" if aprovado else "recusada"
-            resultado = await formularios.definir_status_resposta(
-                guild_encontrada.id,
-                resposta_id,
-                novo_status,
-                interaction.user.id,
-            )
-            if not resultado:
-                await interaction.followup.send(
-                    "Essa candidatura já foi revisada por outra pessoa.",
-                    ephemeral=True,
-                )
-                return
-
-            if interaction.message and interaction.message.embeds:
-                embed = interaction.message.embeds[0]
-                embed.color = 0x57F287 if aprovado else 0xED4245
-                embed.add_field(
-                    name="Decisão",
-                    value=f"{'✅ Aprovado' if aprovado else '❌ Recusado'} por {interaction.user.mention}",
-                    inline=False,
-                )
-                try:
-                    await interaction.message.edit(embed=embed, view=None)
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    logging.exception(
-                        "A candidatura %s foi decidida, mas a mensagem não pôde ser atualizada.",
-                        resposta_id,
-                    )
-
-            from utils.registro_global import registrar
-            await registrar(
-                guild_encontrada,
-                "formularios",
-                f"Candidatura {novo_status}",
-                f"Protocolo: `{resposta_id}`\nFormulário: **{(formulario_resposta or {}).get('nome', 'Formulário')}**\n"
-                f"Candidato: <@{resposta.get('autor_id')}> (`{resposta.get('autor_id')}`)\n"
-                f"Revisor: {interaction.user.mention} (`{interaction.user.id}`)",
-                cor=0x57F287 if aprovado else 0xED4245,
-            )
-
-            await interaction.followup.send(
-                f"Decisão registrada: candidatura **{novo_status}**. O protocolo {resposta_id} foi atualizado.",
-                ephemeral=True,
-            )
-
-            status_texto = "APROVADA" if aprovado else "RECUSADA"
-            nome_formulario = (formulario_resposta or {}).get("nome", "Formulário")
-            texto_resultado = (
-                f"{'🎉' if aprovado else '❌'} Sua candidatura para **{nome_formulario}** foi "
-                f"**{status_texto}** por {interaction.user} no servidor **{guild_encontrada.name}**."
-            )
-
-            candidato = guild_encontrada.get_member(int(resposta["autor_id"]))
-            if candidato is None:
-                try:
-                    candidato = await guild_encontrada.fetch_member(int(resposta["autor_id"]))
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    candidato = None
-            if candidato:
-                try:
-                    await candidato.send(texto_resultado)
-                except (discord.Forbidden, discord.HTTPException):
-                    logging.info("Não foi possível enviar o resultado da candidatura %s ao candidato %s por DM.", resposta_id, resposta["autor_id"])
-
-            # Informa os instrutores/aprovadores do resultado.
-            cargo_instrutor = guild_encontrada.get_role(CARGO_INSTRUTOR_FORMULARIO_ID)
-            if cargo_instrutor:
-                for instrutor in cargo_instrutor.members:
-                    if instrutor.bot:
-                        continue
-                    try:
-                        await instrutor.send(
-                            f"Resultado de formulário: {nome_formulario} — candidatura ID {resposta_id} "
-                            f"de {resposta['autor_id']} foi {status_texto} por {interaction.user}."
-                        )
-                    except (discord.Forbidden, discord.HTTPException):
-                        logging.info("Não foi possível notificar instrutor %s sobre candidatura %s.", instrutor.id, resposta_id)
+            await interaction.response.send_modal(ModalDecisaoFormulario(resposta_id, aprovado))
+            return
 
 
 async def setup(bot: commands.Bot):
