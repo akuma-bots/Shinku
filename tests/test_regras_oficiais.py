@@ -21,8 +21,8 @@ class TestRegrasOficiais(unittest.TestCase):
         texto = "\n".join([embed.title or "", embed.description or ""] + [
             parte for field in embed.fields for parte in (field.name, field.value)
         ])
-        encontrados = re.findall(r"(?:^|\n)\s*(\d{2})\.\s+([^\n]+)", texto)
-        self.assertEqual([numero for numero, _ in encontrados], [f"{i}" for i in range(1, 12)])
+        encontrados = re.findall(r"(?:^|\n)#\s*(\d+)°\s+([^\n]+)", texto)
+        self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
     def test_niveis_disciplinares_correspondem_a_medidas_padrao_do_automod(self):
@@ -43,7 +43,6 @@ class TestRegrasOficiais(unittest.TestCase):
             self.assertIn(trecho.casefold(), texto.casefold())
 
     def test_regras_nao_dependem_de_comando_slash_para_publicacao(self):
-        import inspect
         from cogs.regras_oficiais import RegrasOficiais
         self.assertTrue(hasattr(RegrasOficiais, "sincronizar_regras"))
         self.assertFalse(hasattr(RegrasOficiais, "regras_publicar"))
