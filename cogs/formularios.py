@@ -464,6 +464,127 @@ class SeletorFormularioCentral(discord.ui.Select):
         await self.central.atualizar(interaction)
 
 
+class SeletorFilaCandidaturas(discord.ui.Select):
+    """Entrada da fila privada de fichas pendentes dentro da gestão do formulário."""
+
+    def __init__(self, central):
+        self.central = central
+        super().__init__(
+            placeholder="Administração · consultar fichas pendentes",
+            min_values=1,
+            max_values=1,
+            options=[
+                discord.SelectOption(
+                    label="Abrir fila de candidaturas pendentes",
+                    value="abrir_pendentes",
+                    description="Consultar, avaliar e decidir fichas deste formulário",
+                    emoji="🗂️",
+                )
+            ],
+            custom_id="nemesis:formularios:fila_pendentes",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        central = self.central
+        if interaction.user.id != central.usuario_id:
+            await interaction.response.send_message("Esta central pertence a outra pessoa.", ephemeral=True)
+            return
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("A fila de candidaturas é restrita à administração autorizada.", ephemeral=True)
+            return
+
+        pendentes = await formularios.listar_respostas(
+            interaction.guild.id,
+            formulario_id=central.formulario_id,
+            status="pendente",
+        )
+        pendentes.sort(
+            key=lambda item: float(item.get("criado_em", item.get("timestamp", 0)) or 0),
+            reverse=True,
+        )
+        if not pendentes:
+            await interaction.response.send_message(
+                "Não há fichas pendentes para este formulário.",
+                ephemeral=True,
+            )
+            return
+
+        view = SeletorFichaPendente(central, pendentes[:25])
+        embed = criar_embed(
+            "𓂀 FILA RESTRITA · CANDIDATURAS",
+            f"**FORMULÁRIO**　{central.formulario_id}\n"
+            f"**PENDENTES**　{len(pendentes)}\n\n"
+            "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação. "
+            "A lista apresenta as 25 candidaturas pendentes mais recentes.",
+            cor=0x9F1239,
+            rodape="NÊMESIS • ACESSO ADMINISTRATIVO",
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+class SeletorFichaPendente(discord.ui.Select):
+    def __init__(self, central, pendentes: list[dict]):
+        self.central = central
+        opcoes = []
+        for item in pendentes[:25]:
+            protocolo = str(item.get("id") or "")
+            nome = str(item.get("nome") or f"Membro {item.get('autor_id', 'desconhecido')}")
+            criado = int(float(item.get("criado_em", item.get("timestamp", 0)) or 0))
+            opcoes.append(discord.SelectOption(
+                label=f"{nome[:65]} · {protocolo}"[:100],
+                value=protocolo,
+                description=f"Recebida <t:{criado}:R> · aguardando análise"[:100],
+                emoji="📄",
+            ))
+        super().__init__(
+            placeholder="Selecione a ficha que deseja analisar",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id="nemesis:formularios:ficha_pendente",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        central = self.central
+        if interaction.user.id != central.usuario_id:
+            await interaction.response.send_message("Esta consulta pertence a outra pessoa.", ephemeral=True)
+            return
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            await interaction.response.send_message("A consulta de fichas é restrita à administração autorizada.", ephemeral=True)
+            return
+
+        protocolo = self.values[0]
+        resposta = await formularios.get_resposta(interaction.guild.id, protocolo)
+        if not resposta or resposta.get("status") != "pendente":
+            await interaction.response.send_message(
+                "Esta ficha não está mais pendente. Atualize a fila para consultar o estado atual.",
+                ephemeral=True,
+            )
+            return
+        formulario = await formularios.get_formulario(
+            interaction.guild.id,
+            resposta.get("formulario_id", ""),
+        ) or {"nome": resposta.get("formTitulo", "Formulário"), "paginas": []}
+        criado = int(float(resposta.get("criado_em", resposta.get("timestamp", 0)) or 0))
+        avaliacoes = resposta.get("avaliacoes", [])
+        resumo = criar_embed(
+            f"𓂀 DOSSIÊ · {protocolo}",
+            f"**CANDIDATO**　<@{int(resposta.get('autor_id', 0) or 0)}>\n"
+            f"**PROCESSO**　{formulario.get('nome', 'Formulário')}\n"
+            "**SITUAÇÃO**　🟠 PENDENTE\n"
+            f"**RECEBIDA**　<t:{criado}:F>\n"
+            f"**AVALIAÇÕES**　{len(avaliacoes) if isinstance(avaliacoes, list) else 0}",
+            cor=0x9F1239,
+            rodape="NÊMESIS • DOSSIÊ RESTRITO • ADMINISTRAÇÃO",
+        )
+        anexos = [resumo] + _embeds_resposta(formulario, resposta, interaction.guild, central.cog.bot)
+        await interaction.response.send_message(
+            embeds=anexos[:10],
+            view=_view_resposta(protocolo),
+            ephemeral=True,
+        )
+
+
 class SeletorAcaoFormulario(discord.ui.Select):
     def __init__(self, central):
         self.central = central
@@ -529,6 +650,7 @@ class CentralFormulariosView(discord.ui.View):
         if self.lista:
             self.add_item(SeletorFormularioCentral(self))
             self.add_item(SeletorAcaoFormulario(self))
+            self.add_item(SeletorFilaCandidaturas(self))
 
     def montar_embed(self, mensagem: str | None = None):
         formulario = next((item for item in self.lista if str(item.get("id")) == str(self.formulario_id)), None)
@@ -687,7 +809,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
     async def notificar_cargos(self, guild: discord.Guild, formulario: dict, resposta: dict) -> bool:
         """Abre um tópico individual por candidatura, evitando inundar o canal da comissão."""
         embeds = _embeds_resposta(formulario, resposta, guild, self.bot)
-        view = _view_resposta(resposta["id"])
         canal = guild.get_channel(CANAL_RECEBIMENTO_CANDIDATURAS)
         if canal is None:
             try:
@@ -723,7 +844,6 @@ class Formularios(commands.GroupCog, group_name="formularios", group_description
             await thread.send(
                 content=" ".join(mencoes) if mencoes else None,
                 embed=embeds[0],
-                view=view,
                 allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
             )
             for embed in embeds[1:]:
