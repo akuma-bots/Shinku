@@ -486,8 +486,8 @@ class ModalAvaliacaoFormulario(discord.ui.Modal):
         super().__init__(title=f"Avaliar candidatura · {resposta_id[:12]}")
         self.resposta_id = resposta_id
         self.notas = discord.ui.TextInput(
-            label="Notas 1–5 (postura, responsabilidade, disponibilidade, imparcialidade, comunicação)",
-            placeholder="Ex.: 5, 4, 4, 5, 5",
+            label="Notas P/R/D/I/C (1–5)",
+            placeholder="Postura, responsabilidade, disponibilidade, imparcialidade, comunicação: 5,4,4,5,5",
             required=True,
             max_length=25,
         )
