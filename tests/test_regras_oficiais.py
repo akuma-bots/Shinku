@@ -8,6 +8,7 @@ class TestRegrasOficiais(unittest.TestCase):
     def test_regulamento_completo_cabe_em_uma_unica_embed(self):
         embed = construir_embed_regras()
         self.assertEqual(len(embed.fields), 11)
+        self.assertTrue(all(field.name.startswith("# ") for field in embed.fields))
         self.assertLessEqual(len(embed.fields), 25)
         total = len(embed.title or "") + len(embed.description or "")
         total += sum(len(field.name) + len(field.value) for field in embed.fields)
@@ -21,21 +22,21 @@ class TestRegrasOficiais(unittest.TestCase):
             parte for field in embed.fields for parte in (field.name, field.value)
         ])
         encontrados = re.findall(r"(?:^|\n)\s*(\d{2})\.\s+([^\n]+)", texto)
-        self.assertEqual([numero for numero, _ in encontrados], [f"{i:02d}" for i in range(1, 12)])
+        self.assertEqual([numero for numero, _ in encontrados], [f"{i}" for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
     def test_niveis_disciplinares_correspondem_a_medidas_padrao_do_automod(self):
         texto = construir_embed_regras().fields[9].value
         esperado = (
-            "NÍVEL I — NORMAL",
+            "10.1° Nível I — Normal",
             "advertência formal",
-            "NÍVEL II — MÉDIO",
+            "10.2° Nível II — Médio",
             "timeout de 10 minutos",
-            "NÍVEL III — GRAVE",
+            "10.3° Nível III — Grave",
             "expulsão do servidor",
-            "NÍVEL IV — MUITO GRAVE",
+            "10.4° Nível IV — Muito grave",
             "banimento temporário de 24 horas",
-            "NÍVEL V — CRÍTICO",
+            "10.5° Nível V — Crítico",
             "banimento permanente",
         )
         for trecho in esperado:
