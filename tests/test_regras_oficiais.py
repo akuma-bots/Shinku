@@ -12,7 +12,10 @@ class TestRegrasOficiais(unittest.TestCase):
         self.assertEqual(embed.fields[-1].name, "11 - Disposições finais")
         self.assertTrue(all(field.value for field in embed.fields))
         self.assertTrue(all(len(field.value) <= 1024 for field in embed.fields))
-        total = len(embed.title or "") + len(embed.description or "") + len(embed.footer.text or "")
+        total = (
+            len(embed.title or "") + len(embed.description or "")
+            + len(embed.author.name or "") + len(embed.footer.text or "")
+        )
         total += sum(len(field.name) + len(field.value) for field in embed.fields)
         self.assertLessEqual(total, 6000)
     def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
