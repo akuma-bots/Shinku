@@ -4,6 +4,7 @@ Requer yt-dlp, PyNaCl e imageio-ffmpeg (FFmpeg empacotado).
 Aceita links e buscas; a reprodução depende da disponibilidade do provedor de áudio.
 """
 from utils.apresentacao import criar_embed
+from utils.storage import atualizar_json, carregar
 import asyncio
 import logging
 import random
@@ -111,6 +112,32 @@ class MusicControlView(discord.ui.View):
         random.shuffle(fila)
         await interaction.response.send_message(f"🔀 Fila embaralhada ({len(fila)} músicas).", ephemeral=True)
 
+    @discord.ui.button(label="Playlists", emoji="🎼", style=discord.ButtonStyle.secondary, row=1)
+    async def playlists(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        await self.cog.abrir_playlists(interaction)
+
+    @discord.ui.button(label="Ver fila", emoji="📜", style=discord.ButtonStyle.secondary, row=1)
+    async def ver_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        fila = self.cog.filas.get(self.guild_id, [])
+        atual = self.cog.agora.get(self.guild_id)
+        linhas = []
+        if atual:
+            linhas.append(f"**Tocando:** [{discord.utils.escape_markdown(atual['title'])}]({atual['webpage_url']})")
+        linhas.extend(
+            f"**{i}.** {discord.utils.escape_markdown(item.get('title', 'Música'))} · {self.cog._tempo(item.get('duration', 0))}"
+            for i, item in enumerate(fila[:20], start=1)
+        )
+        if len(fila) > 20:
+            linhas.append(f"… e mais {len(fila) - 20} música(s).")
+        await interaction.response.send_message(
+            embed=self.cog._embed_musica("📜 Fila de reprodução", "\n".join(linhas) if linhas else "A fila está vazia."),
+            ephemeral=True,
+        )
+
     @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary)
     async def repeticao(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
@@ -122,6 +149,283 @@ class MusicControlView(discord.ui.View):
         rotulos = {"off": "desligada", "track": "música atual", "queue": "fila"}
         button.label = f"Repetição: {rotulos[novo]}"
         await interaction.response.send_message(f"🔁 Repetição definida para **{rotulos[novo]}**.", ephemeral=True)
+
+
+PLAYLISTS_ARQUIVO = "playlists_musica.json"
+MAX_PLAYLISTS_USUARIO = 20
+MAX_FAIXAS_PLAYLIST = 100
+
+
+def _normalizar_faixas_playlist(faixas: list[dict]) -> list[dict]:
+    """Mantém apenas metadados estáveis; URLs temporárias de streaming nunca são persistidas."""
+    resultado = []
+    for item in (faixas or [])[:MAX_FAIXAS_PLAYLIST]:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("webpage_url") or "").strip()
+        if not url.startswith(("https://youtube.com/", "https://www.youtube.com/", "https://youtu.be/",
+                               "https://soundcloud.com/", "https://www.soundcloud.com/")):
+            continue
+        resultado.append({
+            "title": str(item.get("title") or "Áudio sem título")[:256],
+            "webpage_url": url[:2048],
+            "duration": max(0, int(item.get("duration") or 0)),
+        })
+    return resultado
+
+
+async def _listar_playlists(guild_id: int, user_id: int) -> list[dict]:
+    dados = await carregar(PLAYLISTS_ARQUIVO, {})
+    if not isinstance(dados, dict):
+        return []
+    por_servidor = dados.get(str(guild_id), {})
+    if not isinstance(por_servidor, dict):
+        return []
+    lista = por_servidor.get(str(user_id), [])
+    return [item for item in lista if isinstance(item, dict) and item.get("id")]
+
+
+async def _salvar_playlist(guild_id: int, user_id: int, nome: str, faixas: list[dict]) -> dict:
+    nome = " ".join(str(nome or "").split()).strip()
+    if not nome or len(nome) > 50:
+        raise ValueError("O nome da playlist deve ter entre 1 e 50 caracteres.")
+    normalizadas = _normalizar_faixas_playlist(faixas)
+    if not normalizadas:
+        raise ValueError("Adicione pelo menos uma música antes de salvar a playlist.")
+    resultado = {}
+
+    def transformar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        servidor = dados.setdefault(str(guild_id), {})
+        if not isinstance(servidor, dict):
+            servidor = {}
+            dados[str(guild_id)] = servidor
+        lista = servidor.setdefault(str(user_id), [])
+        if not isinstance(lista, list):
+            lista = []
+            servidor[str(user_id)] = lista
+        existente = next((item for item in lista if str(item.get("nome", "")).casefold() == nome.casefold()), None)
+        if existente is None and len(lista) >= MAX_PLAYLISTS_USUARIO:
+            resultado["erro"] = "limite"
+            return dados
+        if existente is not None:
+            existente["faixas"] = normalizadas
+            existente["atualizado_em"] = discord.utils.utcnow().timestamp()
+            resultado["playlist"] = dict(existente)
+        else:
+            playlist = {
+                "id": discord.utils.MD5(str(guild_id) + ":" + str(user_id) + ":" + nome + ":" + str(discord.utils.utcnow().timestamp())),
+                "nome": nome,
+                "faixas": normalizadas,
+                "criado_em": discord.utils.utcnow().timestamp(),
+                "atualizado_em": discord.utils.utcnow().timestamp(),
+            }
+            lista.append(playlist)
+            resultado["playlist"] = dict(playlist)
+        return dados
+
+    await atualizar_json(PLAYLISTS_ARQUIVO, {}, transformar)
+    if resultado.get("erro") == "limite":
+        raise ValueError(f"Você já atingiu o limite de {MAX_PLAYLISTS_USUARIO} playlists.")
+    return resultado["playlist"]
+
+
+async def _excluir_playlist(guild_id: int, user_id: int, playlist_id: str) -> bool:
+    removida = {"valor": False}
+
+    def transformar(dados):
+        if not isinstance(dados, dict):
+            return {}
+        servidor = dados.get(str(guild_id), {})
+        if not isinstance(servidor, dict):
+            return dados
+        lista = servidor.get(str(user_id), [])
+        if not isinstance(lista, list):
+            return dados
+        nova = [item for item in lista if str(item.get("id")) != str(playlist_id)]
+        removida["valor"] = len(nova) != len(lista)
+        servidor[str(user_id)] = nova
+        return dados
+
+    await atualizar_json(PLAYLISTS_ARQUIVO, {}, transformar)
+    return removida["valor"]
+
+
+class ModalSalvarPlaylist(discord.ui.Modal):
+    def __init__(self, cog: "Musica", guild_id: int, user_id: int):
+        super().__init__(title="Salvar fila como playlist")
+        self.cog = cog
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.nome = discord.ui.TextInput(
+            label="Nome da playlist",
+            placeholder="Ex.: Treinos, favoritas, foco...",
+            min_length=1,
+            max_length=50,
+        )
+        self.add_item(self.nome)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild_id != self.guild_id or interaction.user.id != self.user_id:
+            await interaction.response.send_message("Esta ação pertence a outra pessoa ou servidor.", ephemeral=True)
+            return
+        faixas = []
+        atual = self.cog.agora.get(self.guild_id)
+        if atual:
+            faixas.append(atual)
+        faixas.extend(self.cog.filas.get(self.guild_id, []))
+        try:
+            playlist = await _salvar_playlist(self.guild_id, self.user_id, self.nome.value, faixas)
+        except ValueError as erro:
+            await interaction.response.send_message(str(erro), ephemeral=True)
+            return
+        await interaction.response.send_message(
+            embed=self.cog._embed_musica(
+                "🎼 Playlist salva",
+                f"**{discord.utils.escape_markdown(playlist['nome'])}**\n"
+                f"{len(playlist['faixas'])} música(s) armazenada(s) na sua biblioteca.",
+            ),
+            ephemeral=True,
+        )
+
+
+class SeletorPlaylist(discord.ui.Select):
+    def __init__(self, view: "MusicPlaylistView", playlists: list[dict]):
+        self.library = view
+        opcoes = [
+            discord.SelectOption(
+                label=str(item.get("nome") or "Playlist")[:100],
+                value=str(item["id"]),
+                description=f"{len(item.get('faixas', []))} música(s)"[:100],
+                emoji="🎼",
+            )
+            for item in playlists[:25]
+        ]
+        super().__init__(
+            placeholder="Selecione uma playlist da sua biblioteca",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+            custom_id="nemesis:musica:playlist_selecionar",
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild_id != self.library.guild_id or interaction.user.id != self.library.user_id:
+            await interaction.response.send_message("Esta biblioteca pertence a outra pessoa.", ephemeral=True)
+            return
+        self.library.playlist_id = self.values[0]
+        playlist = next((item for item in self.library.playlists if str(item.get("id")) == self.values[0]), None)
+        nome = playlist.get("nome", "Playlist") if playlist else "Playlist"
+        self.library.carregar.disabled = playlist is None
+        self.library.excluir.disabled = playlist is None
+        await interaction.response.edit_message(
+            content=f"Playlist selecionada: **{discord.utils.escape_markdown(nome)}**.",
+            view=self.library,
+        )
+
+
+class MusicPlaylistView(discord.ui.View):
+    def __init__(self, cog: "Musica", guild_id: int, user_id: int, playlists: list[dict]):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.playlists = playlists
+        self.playlist_id = None
+        if playlists:
+            self.add_item(SeletorPlaylist(self, playlists))
+        else:
+            self.add_item(discord.ui.Button(
+                label="Nenhuma playlist salva",
+                style=discord.ButtonStyle.secondary,
+                disabled=True,
+            ))
+
+    async def _validar(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != self.guild_id or interaction.user.id != self.user_id:
+            await interaction.response.send_message("Esta biblioteca pertence a outra pessoa ou servidor.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Salvar fila como playlist", emoji="💾", style=discord.ButtonStyle.success, row=1)
+    async def salvar_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        await interaction.response.send_modal(ModalSalvarPlaylist(self.cog, self.guild_id, self.user_id))
+
+    @discord.ui.button(label="Carregar na fila", emoji="▶️", style=discord.ButtonStyle.primary, row=1)
+    async def carregar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        playlist = next((item for item in self.playlists if str(item.get("id")) == str(self.playlist_id)), None)
+        if not playlist:
+            await interaction.response.send_message("Selecione uma playlist primeiro.", ephemeral=True)
+            return
+        faixas = _normalizar_faixas_playlist(playlist.get("faixas", []))
+        fila = self.cog.filas.setdefault(self.guild_id, [])
+        if len(fila) + len(faixas) > MAX_QUEUE:
+            await interaction.response.send_message(
+                f"A fila comporta até {MAX_QUEUE} músicas. Remova algumas antes de carregar esta playlist.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        voz = await self.cog._conectar(interaction)
+        if voz is None:
+            return
+        fila.extend({
+            **faixa,
+            "text_channel_id": interaction.channel_id,
+            "http_headers": {},
+        } for faixa in faixas)
+        await self.cog._garantir_reprodutor(interaction.guild)
+        await interaction.followup.send(
+            f"▶️ Playlist **{discord.utils.escape_markdown(playlist['nome'])}** carregada: "
+            f"**{len(faixas)}** música(s) adicionada(s) à fila.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Excluir playlist", emoji="🗑️", style=discord.ButtonStyle.danger, row=1)
+    async def excluir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        playlist = next((item for item in self.playlists if str(item.get("id")) == str(self.playlist_id)), None)
+        if not playlist:
+            await interaction.response.send_message("Selecione uma playlist primeiro.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Confirma excluir a playlist **{discord.utils.escape_markdown(playlist['nome'])}**?",
+            view=ConfirmarExclusaoPlaylistView(self, self.playlist_id),
+            ephemeral=True,
+        )
+
+
+class ConfirmarExclusaoPlaylistView(discord.ui.View):
+    def __init__(self, biblioteca: MusicPlaylistView, playlist_id: str):
+        super().__init__(timeout=90)
+        self.biblioteca = biblioteca
+        self.playlist_id = playlist_id
+
+    @discord.ui.button(label="Confirmar exclusão", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def confirmar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild_id != self.biblioteca.guild_id or interaction.user.id != self.biblioteca.user_id:
+            await interaction.response.send_message("Somente o proprietário pode excluir esta playlist.", ephemeral=True)
+            return
+        ok = await _excluir_playlist(self.biblioteca.guild_id, self.biblioteca.user_id, self.playlist_id)
+        await interaction.response.edit_message(
+            content="Playlist excluída da sua biblioteca." if ok else "A playlist não existe mais.",
+            view=None,
+        )
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary)
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.guild_id != self.biblioteca.guild_id or interaction.user.id != self.biblioteca.user_id:
+            await interaction.response.send_message("Esta confirmação pertence a outra pessoa.", ephemeral=True)
+            return
+        await interaction.response.edit_message(content="Exclusão cancelada.", view=None)
+
+
 
 
 class Musica(commands.Cog):
@@ -141,6 +445,22 @@ class Musica(commands.Cog):
         # empacotado pelo imageio-ffmpeg fica como fallback.
         self.ffmpeg = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
         LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
+
+    async def abrir_playlists(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("As playlists só funcionam dentro da NÊMESIS.", ephemeral=True)
+            return
+        playlists = await _listar_playlists(interaction.guild.id, interaction.user.id)
+        view = MusicPlaylistView(self, interaction.guild.id, interaction.user.id, playlists)
+        descricao = (
+            f"Você possui **{len(playlists)} / {MAX_PLAYLISTS_USUARIO}** playlists. "
+            "Selecione uma para carregar na fila ou excluir. Você também pode salvar a fila atual."
+        )
+        await interaction.response.send_message(
+            embed=self._embed_musica("🎼 Sua biblioteca musical", descricao),
+            view=view,
+            ephemeral=True,
+        )
 
     async def _extrair(self, consulta: str) -> dict[str, Any]:
         consulta = str(consulta or "").strip()
