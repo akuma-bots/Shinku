@@ -129,7 +129,7 @@ def construir_embed_regras() -> discord.Embed:
     for titulo, texto in SECOES_REGRAS:
         valor = texto.strip()
         if len(titulo) > 256 or len(valor) > 1024:
-            raise ValueError(f" O artigo {titulo!r} excede os limites de campo do Discord.")
+            raise ValueError(f"O artigo {titulo!r} excede os limites de campo do Discord.")
         embed.add_field(name=titulo, value=valor, inline=False)
     embed.set_footer(text=MARCADOR_PUBLICACAO)
     total = len(embed.title or "") + len(embed.description or "") + len(embed.author.name if embed.author else "") + len(embed.footer.text if embed.footer else "") + sum(len(campo.name) + len(campo.value) for campo in embed.fields)
@@ -230,12 +230,6 @@ class RegrasOficiais(commands.Cog):
         logging.info("Código de Conduta atualizado em uma única embed com 11 artigos no canal %s.", CANAL_REGRAS_ID)
         return True
 
-        logging.info(
-            "Código de Conduta atualizado em %s mensagens com 11 títulos nativos no canal %s.",
-            len(lotes),
-            CANAL_REGRAS_ID,
-        )
-        return True
 
 
 async def setup(bot: commands.Bot):
