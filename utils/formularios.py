@@ -179,7 +179,7 @@ async def reativar_formulario(guild_id: int, formulario_id: str) -> bool:
 
 @_serializar_formularios
 async def atualizar_formulario(guild_id: int, formulario_id: str, **alteracoes) -> dict | None:
-    campos = {"nome", "titulo_painel", "descricao_painel", "banner_url", "ativo", "versao_automatico"}
+    campos = {"nome", "titulo_painel", "descricao_painel", "banner_url", "ativo", "versao_automatico", "paginas"}
     lista = await listar_formularios(guild_id)
     alvo = next((item for item in lista if item.get("id") == formulario_id), None)
     if not alvo:
