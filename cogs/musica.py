@@ -11,6 +11,7 @@ import random
 import shlex
 import shutil
 import uuid
+import unicodedata
 from typing import Any
 from urllib.parse import urlparse
 
@@ -437,6 +438,117 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
 
 
 
+GUILD_NEMESIS_ID = 1563995879981981817
+MARCADOR_PAINEL_MUSICA = "NÊMESIS • Painel de música"
+ARQUIVO_PAINEL_MUSICA = "painel_musica.json"
+
+
+class ModalPesquisaMusica(discord.ui.Modal):
+    def __init__(self, cog: "Musica", guild_id: int):
+        super().__init__(title="Adicionar música à reprodução")
+        self.cog = cog
+        self.guild_id = guild_id
+        self.consulta = discord.ui.TextInput(
+            label="Nome da música ou link",
+            placeholder="Pesquise uma faixa ou cole um link do YouTube/SoundCloud",
+            max_length=300,
+        )
+        self.add_item(self.consulta)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message("Este painel pertence à NÊMESIS.", ephemeral=True)
+            return
+        await self.cog.adicionar_consulta(interaction, self.consulta.value)
+
+
+class MusicPanelView(discord.ui.View):
+    """Painel persistente de música; todas as ações são feitas por botões e modais."""
+
+    def __init__(self, cog: "Musica"):
+        super().__init__(timeout=None)
+        self.cog = cog
+
+    async def _validar_guild(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != GUILD_NEMESIS_ID:
+            await interaction.response.send_message("Este painel é exclusivo da NÊMESIS.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Adicionar música", emoji="🔎", style=discord.ButtonStyle.primary,
+                       custom_id="nemesis:musica:buscar", row=0)
+    async def buscar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self._validar_guild(interaction):
+            await interaction.response.send_modal(ModalPesquisaMusica(self.cog, GUILD_NEMESIS_ID))
+
+    @discord.ui.button(label="Playlists", emoji="🎼", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:playlists", row=0)
+    async def playlists(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if await self._validar_guild(interaction):
+            await self.cog.abrir_playlists(interaction)
+
+    @discord.ui.button(label="Ver fila", emoji="📜", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:fila", row=0)
+    async def fila(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        gid = interaction.guild_id
+        atual = self.cog.agora.get(gid)
+        pendentes = self.cog.filas.get(gid, [])
+        linhas = []
+        if atual:
+            linhas.append(f"**Tocando:** [{discord.utils.escape_markdown(atual['title'])}]({atual['webpage_url']})")
+        linhas.extend(
+            f"**{indice}.** {discord.utils.escape_markdown(item.get('title', 'Música'))} · "
+            f"{self.cog._tempo(item.get('duration', 0))}"
+            for indice, item in enumerate(pendentes[:20], start=1)
+        )
+        if len(pendentes) > 20:
+            linhas.append(f"… e mais {len(pendentes) - 20} música(s).")
+        await interaction.response.send_message(
+            embed=self.cog._embed_musica(
+                f"📜 Fila de reprodução · {len(pendentes)} aguardando",
+                "\n".join(linhas) if linhas else "A fila está vazia.",
+            ),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Pausar / Retomar", emoji="⏯️", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:pausar", row=1)
+    async def pausar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        voz = interaction.guild.voice_client
+        if voz.is_playing():
+            voz.pause()
+            mensagem = "⏸ Reprodução pausada."
+        elif voz.is_paused():
+            voz.resume()
+            mensagem = "▶ Reprodução retomada."
+        else:
+            mensagem = "Não há música tocando agora."
+        await interaction.response.send_message(mensagem, ephemeral=True)
+
+    @discord.ui.button(label="Pular", emoji="⏭️", style=discord.ButtonStyle.primary,
+                       custom_id="nemesis:musica:pular", row=1)
+    async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        voz = interaction.guild.voice_client
+        if not (voz.is_playing() or voz.is_paused()):
+            await interaction.response.send_message("Não há música para pular.", ephemeral=True)
+            return
+        self.cog.skip_requested.add(interaction.guild_id)
+        voz.stop()
+        await interaction.response.send_message("⏭ Música pulada.", ephemeral=True)
+
+
+
+
 class Musica(commands.Cog):
     """Reprodução de música em canais de voz."""
 
@@ -448,12 +560,119 @@ class Musica(commands.Cog):
         self.agora: dict[int, dict[str, Any]] = {}
         self.loop_modes: dict[int, str] = {}
         self.skip_requested: set[int] = set()
+        self._painel_sync = False
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
         self._extrair_lock = asyncio.Lock()
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
         # empacotado pelo imageio-ffmpeg fica como fallback.
         self.ffmpeg = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
         LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._painel_sync:
+            return
+        self.bot.add_view(MusicPanelView(self))
+        guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+        if guild is None:
+            LOG.warning("Painel musical: servidor NÊMESIS não está disponível.")
+            return
+        normalizar = lambda valor: "".join(
+            caractere for caractere in unicodedata.normalize("NFKD", str(valor).casefold())
+            if caractere.isalnum()
+        )
+        canais = [
+            canal for canal in guild.text_channels
+            if "musica" in normalizar(canal.name) or "music" in normalizar(canal.name)
+        ]
+        if not canais:
+            LOG.warning("Painel musical não publicado: crie ou renomeie um canal de texto para Música.")
+            self._painel_sync = True
+            return
+        canal = next((item for item in canais if normalizar(item.name) in {"musica", "music"}), canais[0])
+        permissoes = canal.permissions_for(guild.me) if guild.me else None
+        if not permissoes or not (permissoes.view_channel and permissoes.send_messages and permissoes.embed_links):
+            LOG.error("Painel musical sem permissões para publicar no canal %s.", canal.id)
+            return
+        estado = await carregar(ARQUIVO_PAINEL_MUSICA, {})
+        estado = estado if isinstance(estado, dict) else {}
+        registro = estado.get(str(guild.id), {})
+        mensagem = None
+        if registro.get("canal_id") == canal.id and registro.get("mensagem_id"):
+            try:
+                mensagem = await canal.fetch_message(int(registro["mensagem_id"]))
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                mensagem = None
+        if mensagem is None:
+            async for antiga in canal.history(limit=100, oldest_first=False):
+                if antiga.author.id != self.bot.user.id:
+                    continue
+                if any(
+                    embed.footer and embed.footer.text == MARCADOR_PAINEL_MUSICA
+                    for embed in antiga.embeds
+                ):
+                    mensagem = antiga
+                    break
+        embed = self._embed_musica(
+            "𓂀 CENTRAL MUSICAL",
+            "Pesquise músicas, organize sua fila e mantenha suas playlists pessoais. "
+            "Entre em um canal de voz antes de iniciar a reprodução.\\n\\n"
+            "**RECURSOS**\\n"
+            "🔎 Buscar e adicionar faixas\\n"
+            "🎼 Criar, salvar, carregar e excluir playlists\\n"
+            "📜 Consultar a fila de reprodução\\n"
+            "⏯️ Pausar, retomar e pular músicas",
+        )
+        embed.set_footer(text=MARCADOR_PAINEL_MUSICA)
+        view = MusicPanelView(self)
+        if mensagem:
+            await mensagem.edit(content=None, embed=embed, view=view)
+        else:
+            mensagem = await canal.send(embed=embed, view=view)
+        estado[str(guild.id)] = {"canal_id": canal.id, "mensagem_id": mensagem.id}
+        await salvar(ARQUIVO_PAINEL_MUSICA, estado)
+        self._painel_sync = True
+        LOG.info("Painel musical sincronizado no canal %s (mensagem=%s).", canal.id, mensagem.id)
+
+    async def adicionar_consulta(self, interaction: discord.Interaction, consulta: str):
+        if interaction.guild is None:
+            await interaction.response.send_message("Use o painel dentro da NÊMESIS.", ephemeral=True)
+            return
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        gid = interaction.guild.id
+        if len(self.filas.get(gid, [])) >= MAX_QUEUE:
+            await interaction.followup.send(f"A fila atingiu o limite de {MAX_QUEUE} músicas.", ephemeral=True)
+            return
+        voz = await self._conectar(interaction)
+        if voz is None:
+            return
+        try:
+            item = await self._extrair(consulta)
+        except Exception as erro:
+            LOG.info("Não foi possível pesquisar áudio: %s", erro)
+            await interaction.followup.send(
+                "Não encontrei essa música ou o provedor bloqueou a consulta. Tente outro nome ou link.",
+                ephemeral=True,
+            )
+            return
+        item["text_channel_id"] = interaction.channel_id
+        fila = self.filas.setdefault(gid, [])
+        if len(fila) >= MAX_QUEUE:
+            await interaction.followup.send(f"A fila atingiu o limite de {MAX_QUEUE} músicas.", ephemeral=True)
+            return
+        fila.append(item)
+        posicao = len(fila)
+        estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
+        await interaction.followup.send(
+            embed=self._embed_musica(
+                f"♫ {estado}",
+                f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\\n"
+                f"Duração: {self._tempo(item['duration'])} • Posição na fila: {posicao}",
+            ),
+            ephemeral=True,
+        )
+        await self._garantir_reprodutor(interaction.guild)
 
     async def abrir_playlists(self, interaction: discord.Interaction):
         if interaction.guild is None:
