@@ -15,6 +15,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Check whitespace in pushed changes
+        shell: bash
+        run: |
+          BASE="${{ github.event.before }}"
+          if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            BASE="$(git rev-parse "${BASE}^^" 2>/dev/null || git rev-parse "${BASE}^")"
+          else
+            BASE="${{ github.event.pull_request.base.sha }}"
+          fi
+          if [ -n "$BASE" ]; then
+            git diff --check "$BASE" "${{ github.sha }}"
+          else
+            git diff --check HEAD^ HEAD
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
