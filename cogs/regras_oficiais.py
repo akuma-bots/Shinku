@@ -99,7 +99,7 @@ SECOES_REGRAS = (
         "10 - Níveis e medidas disciplinares",
         ""
         "**10.1° NÍVEL I — NORMAL:** advertência formal.\n\n"
-        "**10.2° NÍVEL II — MÉDIO:** timeout padrão de 10 minutos.\n\n"
+        "**10.2° NÍVEL II — MÉDIO:** timeout de 10 minutos.\n\n"
         "**10.3° NÍVEL III — GRAVE:** expulsão do servidor.\n\n"
         "**10.4° NÍVEL IV — MUITO GRAVE:** banimento temporário padrão de 24 horas.\n\n"
         "**10.5° NÍVEL V — CRÍTICO:** banimento permanente.\n\n"
@@ -200,6 +200,7 @@ class RegrasOficiais(commands.Cog):
             return False
 
         if existentes:
+            existentes.sort(key=lambda mensagem: mensagem.created_at)
             principal = existentes[0]
             try:
                 await principal.edit(content=None, embeds=lotes[0], allowed_mentions=discord.AllowedMentions.none())
