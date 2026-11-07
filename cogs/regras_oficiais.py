@@ -119,24 +119,28 @@ SECOES_REGRAS = (
 )
 
 
-def construir_embeds_regras() -> list[discord.Embed]:
-    """Monta um embed por artigo, com título nativo e subtítulos em destaque."""
-    embeds = []
-    for indice, (titulo, texto) in enumerate(SECOES_REGRAS, start=1):
-        embed = criar_embed(title=titulo, description=texto.strip(), color=COR)
-        embed.set_footer(text=f"{MARCADOR_PUBLICACAO} • Artigo {indice}/11")
-        if len(embed.title or "") > 256 or len(embed.description or "") > 4096:
-            raise ValueError(f"O artigo {indice} excede os limites de uma embed do Discord.")
-        embeds.append(embed)
-    return embeds
-
-
 def construir_embed_regras() -> discord.Embed:
-    """Compatibilidade: retorna a primeira embed do Código de Conduta."""
-    return construir_embeds_regras()[0]
+    """Monta todo o Código de Conduta em uma única embed."""
+    embed = criar_embed(
+        title="CÓDIGO DE CONDUTA • NÊMESIS",
+        description="Leia todos os artigos e cumpra as diretrizes da organização.",
+        color=COR,
+    )
+    total = len(embed.title or "") + len(embed.description or "")
+    for titulo, texto in SECOES_REGRAS:
+        valor = texto.strip()
+        if len(titulo) > 256 or len(valor) > 1024:
+            raise ValueError(f"O artigo '{titulo}' excede o limite de um campo da embed.")
+        total += len(titulo) + len(valor)
+        embed.add_field(name=titulo, value=valor, inline=False)
+    embed.set_footer(text=MARCADOR_PUBLICACAO)
+    total += len(embed.footer.text or "")
+    if len(embed.fields) > 25 or total > 6000:
+        raise ValueError("O Código de Conduta excede o limite de uma única embed do Discord.")
+    return embed
 
 class RegrasOficiais(commands.Cog):
-    """Mantém os 11 artigos do Código de Conduta no canal oficial de regras."""
+    """Mantém os 11 artigos do Código de Conduta em uma única embed no canal oficial de regras."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -183,8 +187,7 @@ class RegrasOficiais(commands.Cog):
             )
             return False
 
-        embeds = construir_embeds_regras()
-        lotes = [embeds[:10], embeds[10:]]
+        embed = construir_embed_regras()
         existentes = []
         try:
             async for mensagem in canal.history(limit=200, oldest_first=False):
@@ -203,15 +206,11 @@ class RegrasOficiais(commands.Cog):
             existentes.sort(key=lambda mensagem: mensagem.created_at)
             principal = existentes[0]
             try:
-                await principal.edit(content=None, embeds=lotes[0], allowed_mentions=discord.AllowedMentions.none())
-                if len(existentes) >= 2:
-                    await existentes[1].edit(content=None, embeds=lotes[1], allowed_mentions=discord.AllowedMentions.none())
-                else:
-                    await canal.send(embeds=lotes[1], allowed_mentions=discord.AllowedMentions.none())
+                await principal.edit(content=None, embed=embed, allowed_mentions=discord.AllowedMentions.none())
             except discord.HTTPException:
                 logging.exception("Código de Conduta: falha ao atualizar a publicação existente.")
                 return False
-            for duplicada in existentes[2:]:
+            for duplicada in existentes[1:]:
                 try:
                     await duplicada.delete()
                 except discord.HTTPException:
@@ -220,7 +219,7 @@ class RegrasOficiais(commands.Cog):
                         duplicada.id,
                     )
             logging.info(
-                "Código de Conduta atualizado em 11 embeds, distribuídas em duas mensagens no canal %s; publicações antigas do bot consolidadas.",
+                "Código de Conduta atualizado em uma única embed no canal %s; publicações antigas do bot consolidadas.",
                 CANAL_REGRAS_ID,
             )
             return True
@@ -231,7 +230,7 @@ class RegrasOficiais(commands.Cog):
         except discord.HTTPException:
             logging.exception("Código de Conduta: falha ao publicar a embed oficial.")
             return False
-        logging.info("Código de Conduta publicado em 11 embeds, distribuídas em duas mensagens no canal %s.", CANAL_REGRAS_ID)
+        logging.info("Código de Conduta publicado em uma única embed no canal %s.", CANAL_REGRAS_ID)
         return True
 
 
