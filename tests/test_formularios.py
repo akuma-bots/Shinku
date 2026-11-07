@@ -41,13 +41,20 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         self.assertIn((1, 2, "recente"), cog_formularios.SESSOES_FORMULARIOS)
         cog_formularios.SESSOES_FORMULARIOS.clear()
 
-    def test_formulario_staff_tem_20_perguntas_em_quatro_etapas(self):
+    def test_inscricao_nemesis_tem_15_perguntas_em_tres_etapas(self):
         formulario = cog_formularios.FORMULARIOS_AUTOMATICOS[0]
-        self.assertEqual(len(cog_formularios._perguntas_flat(formulario)), 20)
+        self.assertEqual(formulario["nome"], "Inscrição para NÊMESIS")
+        self.assertEqual(len(cog_formularios._perguntas_flat(formulario)), 15)
         self.assertEqual(
             [len(pagina["perguntas"]) for pagina in cog_formularios._paginas_modal(formulario)],
-            [5, 5, 5, 5],
+            [5, 5, 5],
         )
+        escolhas = [
+            pergunta for pergunta in cog_formularios._perguntas_flat(formulario)
+            if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha"
+        ]
+        self.assertEqual(len(escolhas), 2)
+        self.assertTrue(all(len(pergunta.get("opcoes", [])) >= 2 for pergunta in escolhas))
 
     def test_canal_de_recebimento_e_o_canal_oficial_configurado(self):
         self.assertEqual(
