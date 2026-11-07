@@ -10,6 +10,7 @@ import logging
 import random
 import shlex
 import shutil
+import uuid
 from typing import Any
 from urllib.parse import urlparse
 
@@ -159,17 +160,25 @@ MAX_FAIXAS_PLAYLIST = 100
 def _normalizar_faixas_playlist(faixas: list[dict]) -> list[dict]:
     """Mantém apenas metadados estáveis; URLs temporárias de streaming nunca são persistidas."""
     resultado = []
-    for item in (faixas or [])[:MAX_FAIXAS_PLAYLIST]:
+    if not isinstance(faixas, list):
+        return resultado
+    permitidos = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+                  "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com"}
+    for item in faixas[:MAX_FAIXAS_PLAYLIST]:
         if not isinstance(item, dict):
             continue
         url = str(item.get("webpage_url") or "").strip()
-        if not url.startswith(("https://youtube.com/", "https://www.youtube.com/", "https://youtu.be/",
-                               "https://soundcloud.com/", "https://www.soundcloud.com/")):
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in {"http", "https"} or (parsed.hostname or "").lower() not in permitidos:
             continue
+        try:
+            duracao = max(0, int(item.get("duration") or 0))
+        except (TypeError, ValueError, OverflowError):
+            duracao = 0
         resultado.append({
             "title": str(item.get("title") or "Áudio sem título")[:256],
             "webpage_url": url[:2048],
-            "duration": max(0, int(item.get("duration") or 0)),
+            "duration": duracao,
         })
     return resultado
 
@@ -215,7 +224,7 @@ async def _salvar_playlist(guild_id: int, user_id: int, nome: str, faixas: list[
             resultado["playlist"] = dict(existente)
         else:
             playlist = {
-                "id": discord.utils.MD5(str(guild_id) + ":" + str(user_id) + ":" + nome + ":" + str(discord.utils.utcnow().timestamp())),
+                "id": uuid.uuid4().hex[:12],
                 "nome": nome,
                 "faixas": normalizadas,
                 "criado_em": discord.utils.utcnow().timestamp(),
