@@ -126,7 +126,11 @@ def construir_embed_regras() -> discord.Embed:
         description="Leia todos os artigos e cumpra as diretrizes da organização.",
         color=COR,
     )
-    total = len(embed.title or "") + len(embed.description or "")
+    total = (
+        len(embed.title or "")
+        + len(embed.description or "")
+        + len(embed.author.name or "")
+    )
     for titulo, texto in SECOES_REGRAS:
         valor = texto.strip()
         if len(titulo) > 256 or len(valor) > 1024:
