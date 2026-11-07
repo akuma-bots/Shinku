@@ -8,7 +8,7 @@ class TestRegrasOficiais(unittest.TestCase):
     def test_regulamento_completo_cabe_em_uma_unica_embed(self):
         embed = construir_embed_regras()
         self.assertEqual(len(embed.fields), 11)
-        self.assertTrue(all(field.name.startswith("# ") for field in embed.fields))
+        self.assertTrue(all(field.name == "ㅤ" for field in embed.fields))
         self.assertLessEqual(len(embed.fields), 25)
         total = len(embed.title or "") + len(embed.description or "")
         total += sum(len(field.name) + len(field.value) for field in embed.fields)
@@ -21,7 +21,7 @@ class TestRegrasOficiais(unittest.TestCase):
         texto = "\n".join([embed.title or "", embed.description or ""] + [
             parte for field in embed.fields for parte in (field.name, field.value)
         ])
-        encontrados = re.findall(r"(?:^|\n)#\s*(\d+)°\s+([^\n]+)", texto)
+        encontrados = re.findall(r"(?:^|\n)#\s*(\d+)\s+-\s+([^\n]+)", texto)
         self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
