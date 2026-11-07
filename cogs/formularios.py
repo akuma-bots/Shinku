@@ -54,47 +54,64 @@ ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
 
 FORMULARIOS_AUTOMATICOS = [
     {
-        "chave": "staff",
-        "nome": "Inscrição para Staff",
-        "titulo": "NÊMESIS — RECRUTAMENTO STAFF",
+        "chave": "ingresso_nemesis",
+        "nome": "Inscrição para NÊMESIS",
+        "titulo": "NÊMESIS — PROCESSO DE INGRESSO",
         "descricao": (
-            "CENTRAL DE RECRUTAMENTO • EQUIPE NÊMESIS\n\n"
-            "Use este formulário para se candidatar à equipe. Responda com clareza e sinceridade; "
-            "candidaturas incompletas ou com informações falsas poderão ser recusadas.\n\n"
+            "CENTRAL DE RECRUTAMENTO • 𓂀 NÊMESIS - ORG\n\n"
+            "Este é o processo oficial para quem deseja ingressar na NÊMESIS. "
+            "Responda às 15 perguntas com sinceridade e atenção. "
+            "A candidatura será analisada pela administração; o envio não garante aprovação.\n\n"
             "REQUISITOS\n"
-            "— Conhecer e respeitar as regras da NÊMESIS.\n"
-            "— Ter postura respeitosa, responsabilidade e maturidade.\n"
-            "— Conseguir agir com imparcialidade em conflitos.\n"
-            "— Ter disponibilidade para auxiliar a comunidade.\n\n"
-            "O envio não garante aprovação. A equipe analisará sua candidatura."
+            "— Respeitar as regras, a hierarquia e os integrantes.\n"
+            "— Manter postura responsável e colaboração com a organização.\n"
+            "— Ter disponibilidade para participar das atividades.\n"
+            "— Informar corretamente seus dados e experiências.\n\n"
+            "Após o envio, sua candidatura receberá um protocolo e ficará em análise. "
+            "A decisão será comunicada por mensagem privada."
         ),
         "canal_id": 1563995880623841338,
-        "paginas": [[
-            "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
-            "Por que deseja fazer parte da Staff da NÊMESIS?",
-            "Qual é sua disponibilidade semanal para ajudar no servidor?",
-            "Você já teve experiência com moderação ou organização? Explique.",
-            "Como agiria se dois membros começassem uma discussão séria?"
-        ], [
-            "Quais são seus principais pontos fortes para atuar na equipe?",
-            "Em quais áreas da NÊMESIS você acredita que poderia contribuir melhor?",
-            "Como reagiria se um membro desrespeitasse uma regra mesmo após ser alertado?",
-            "O que faria se um amigo próximo cometesse uma infração?",
-            "Como lidaria com uma situação em que não soubesse qual decisão tomar?"
-        ], [
-            "Como você organiza seu tempo para cumprir responsabilidades?",
-            "O que faria ao perceber um problema importante enquanto nenhum líder está online?",
-            "Como receberia uma crítica da liderança sobre seu trabalho?",
-            "Na sua opinião, o que caracteriza uma postura imparcial dentro da Staff?",
-            "Existe algo mais sobre sua experiência ou disponibilidade que queira acrescentar?"
-        ], [
-            "Como você priorizaria tarefas quando várias demandas chegassem ao mesmo tempo?",
-            "O que faria se percebesse que outro membro da equipe está abusando das permissões?",
-            "Como manteria a confidencialidade de informações internas e denúncias?",
-            "Que iniciativa concreta você proporia para melhorar a experiência dos membros?",
-            "Por que a liderança deveria confiar a você responsabilidades dentro da NÊMESIS?"
-        ]],
-    },
+        "paginas": [
+            {
+                "titulo": "Identificação e disponibilidade",
+                "perguntas": [
+                    {"texto": "Como gostaria de ser chamado dentro da NÊMESIS?", "tipo": "texto"},
+                    {"texto": "Qual é seu usuário Roblox e o link do seu perfil?", "tipo": "texto"},
+                    {"texto": "Há quanto tempo participa de grupos ou organizações no Roblox? Conte brevemente.", "tipo": "paragrafo"},
+                    {"texto": "Qual é sua disponibilidade semanal e em quais horários costuma estar ativo?", "tipo": "paragrafo"},
+                    {"texto": "Por que deseja ingressar na NÊMESIS?", "tipo": "paragrafo"}
+                ]
+            },
+            {
+                "titulo": "Perfil e atuação",
+                "perguntas": [
+                    {
+                        "texto": "Qual divisão mais desperta seu interesse?",
+                        "tipo": "escolha",
+                        "opcoes": ["N1 Alpha", "N2 Vanguard", "N3 Elite", "N4 Recon", "N5 Assault", "N6 Guard", "Ainda não sei"]
+                    },
+                    {
+                        "texto": "Em qual tipo de atividade você acredita que se destaca?",
+                        "tipo": "escolha",
+                        "opcoes": ["Combate", "Reconhecimento", "Defesa", "Suporte e organização", "Treinamento", "Ainda estou descobrindo"]
+                    },
+                    {"texto": "Quais experiências você possui em jogos, combate ou trabalho em equipe?", "tipo": "paragrafo"},
+                    {"texto": "O que você entende sobre o propósito e o funcionamento de uma organização como a NÊMESIS?", "tipo": "paragrafo"},
+                    {"texto": "Quais habilidades ou qualidades você pode oferecer à organização?", "tipo": "paragrafo"}
+                ]
+            },
+            {
+                "titulo": "Conduta e compromisso",
+                "perguntas": [
+                    {"texto": "Como você lida com ordens, regras e a hierarquia de uma organização?", "tipo": "paragrafo"},
+                    {"texto": "Como agiria ao presenciar um conflito entre integrantes da NÊMESIS?", "tipo": "paragrafo"},
+                    {"texto": "Se discordasse de uma decisão de um superior, como apresentaria sua posição?", "tipo": "paragrafo"},
+                    {"texto": "Como pretende conciliar seus compromissos pessoais com as atividades da NÊMESIS?", "tipo": "paragrafo"},
+                    {"texto": "Existe algo mais que gostaria que a comissão soubesse sobre você ou sua candidatura?", "tipo": "paragrafo"}
+                ]
+            }
+        ]
+    }
 ]
 
 
@@ -1677,33 +1694,28 @@ class Formularios(commands.Cog):
             for definicao in FORMULARIOS_AUTOMATICOS:
                 try:
                     lista = await formularios.listar_formularios(guild.id)
+                    nomes_anteriores = {definicao["nome"], "Inscrição para Staff"}
                     formulario = next((item for item in lista if item.get("nome") == definicao["nome"]), None)
+                    if formulario is None:
+                        formulario = next((item for item in lista if item.get("nome") in nomes_anteriores), None)
                     if formulario is None:
                         formulario = await formularios.criar_formulario(
                             guild.id, definicao["nome"], definicao["titulo"],
                             definicao["descricao"], None, self.bot.user.id if self.bot.user else 0,
                         )
-                    # A definição padrão é aplicada uma única vez. Depois disso, edições
-                    # administrativas de perguntas não são desfeitas no próximo on_ready.
-                    if int(formulario.get("versao_automatico", 0) or 0) < 1:
-                        existentes = set(formularios.perguntas_flat(formulario))
-                        faltantes = []
-                        for pagina_definida in definicao["paginas"]:
-                            for pergunta in pagina_definida:
-                                if pergunta not in existentes:
-                                    faltantes.append(pergunta)
-                                    existentes.add(pergunta)
-                        for inicio in range(0, len(faltantes), 5):
-                            formulario = await formularios.adicionar_pagina(
-                                guild.id, formulario["id"], faltantes[inicio:inicio + 5]
-                            )
-                            if formulario is None:
-                                raise RuntimeError(f"Não foi possível atualizar as perguntas de {definicao['nome']}.")
+                    # Migra o formulário antigo sem apagar candidaturas já recebidas.
+                    if int(formulario.get("versao_automatico", 0) or 0) < 2:
                         formulario = await formularios.atualizar_formulario(
-                            guild.id, formulario["id"], versao_automatico=1
+                            guild.id,
+                            formulario["id"],
+                            nome=definicao["nome"],
+                            titulo_painel=definicao["titulo"],
+                            descricao_painel=definicao["descricao"],
+                            paginas=definicao["paginas"],
+                            versao_automatico=2,
                         )
                         if formulario is None:
-                            raise RuntimeError(f"Não foi possível registrar a versão automática de {definicao['nome']}.")
+                            raise RuntimeError(f"Não foi possível migrar o formulário {definicao['nome']}.")
                 except Exception:
                     logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
             try:
