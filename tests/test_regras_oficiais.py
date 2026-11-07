@@ -20,8 +20,8 @@ class TestRegrasOficiais(unittest.TestCase):
         self.assertTrue(embed.footer.text.startswith(MARCADOR_PUBLICACAO))
 
     def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
-        texto = "\\n".join(campo.name + "\\n" + campo.value for campo in construir_embed_regras().fields)
-        encontrados = re.findall(r"(?m)^(\\d+)\\s+-\\s+([^\\n]+)", texto)
+        texto = "\n".join(campo.name + "\n" + campo.value for campo in construir_embed_regras().fields)
+        encontrados = re.findall(r"(?m)^(\d+)\s+-\s+([^\n]+)", texto)
         self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
