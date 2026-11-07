@@ -216,14 +216,13 @@ async def _salvar_playlist(guild_id: int, user_id: int, nome: str, faixas: list[
             lista = []
             servidor[str(user_id)] = lista
         existente = next((item for item in lista if str(item.get("nome", "")).casefold() == nome.casefold()), None)
-        if existente is None and len(lista) >= MAX_PLAYLISTS_USUARIO:
+        if existente is not None:
+            resultado["erro"] = "duplicada"
+            return dados
+        if len(lista) >= MAX_PLAYLISTS_USUARIO:
             resultado["erro"] = "limite"
             return dados
-        if existente is not None:
-            existente["faixas"] = normalizadas
-            existente["atualizado_em"] = discord.utils.utcnow().timestamp()
-            resultado["playlist"] = dict(existente)
-        else:
+        if existente is None:
             playlist = {
                 "id": uuid.uuid4().hex[:12],
                 "nome": nome,
@@ -238,6 +237,8 @@ async def _salvar_playlist(guild_id: int, user_id: int, nome: str, faixas: list[
     await atualizar_json(PLAYLISTS_ARQUIVO, {}, transformar)
     if resultado.get("erro") == "limite":
         raise ValueError(f"Você já atingiu o limite de {MAX_PLAYLISTS_USUARIO} playlists.")
+    if resultado.get("erro") == "duplicada":
+        raise ValueError("Já existe uma playlist com esse nome. Escolha outro nome.")
     return resultado["playlist"]
 
 
@@ -245,6 +246,7 @@ async def _excluir_playlist(guild_id: int, user_id: int, playlist_id: str) -> bo
     removida = {"valor": False}
 
     def transformar(dados):
+        removida["valor"] = False
         if not isinstance(dados, dict):
             return {}
         servidor = dados.get(str(guild_id), {})
@@ -561,6 +563,7 @@ class Musica(commands.Cog):
         self.loop_modes: dict[int, str] = {}
         self.skip_requested: set[int] = set()
         self._painel_sync = False
+        self._painel_view_registrada = False
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
         self._extrair_lock = asyncio.Lock()
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
@@ -572,7 +575,9 @@ class Musica(commands.Cog):
     async def on_ready(self):
         if self._painel_sync:
             return
-        self.bot.add_view(MusicPanelView(self))
+        if not self._painel_view_registrada:
+            self.bot.add_view(MusicPanelView(self))
+            self._painel_view_registrada = True
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
         if guild is None:
             LOG.warning("Painel musical: servidor NÊMESIS não está disponível.")
@@ -587,7 +592,6 @@ class Musica(commands.Cog):
         ]
         if not canais:
             LOG.warning("Painel musical não publicado: crie ou renomeie um canal de texto para Música.")
-            self._painel_sync = True
             return
         canal = next((item for item in canais if normalizar(item.name) in {"musica", "music"}), canais[0])
         permissoes = canal.permissions_for(guild.me) if guild.me else None
@@ -616,11 +620,11 @@ class Musica(commands.Cog):
         embed = self._embed_musica(
             "𓂀 CENTRAL MUSICAL",
             "Pesquise músicas, organize sua fila e mantenha suas playlists pessoais. "
-            "Entre em um canal de voz antes de iniciar a reprodução.\\n\\n"
-            "**RECURSOS**\\n"
-            "🔎 Buscar e adicionar faixas\\n"
-            "🎼 Criar, salvar, carregar e excluir playlists\\n"
-            "📜 Consultar a fila de reprodução\\n"
+            "Entre em um canal de voz antes de iniciar a reprodução.\n\n"
+            "**RECURSOS**\n"
+            "🔎 Buscar e adicionar faixas\n"
+            "🎼 Criar, salvar, carregar e excluir playlists\n"
+            "📜 Consultar a fila de reprodução\n"
             "⏯️ Pausar, retomar e pular músicas",
         )
         embed.set_footer(text=MARCADOR_PAINEL_MUSICA)
@@ -667,7 +671,7 @@ class Musica(commands.Cog):
         await interaction.followup.send(
             embed=self._embed_musica(
                 f"♫ {estado}",
-                f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\\n"
+                f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
                 f"Duração: {self._tempo(item['duration'])} • Posição na fila: {posicao}",
             ),
             ephemeral=True,
@@ -815,9 +819,9 @@ class Musica(commands.Cog):
                             f"{chave}: {valor}"
                             for chave, valor in cabecalhos.items()
                             if "\\r" not in str(chave)
-                            and "\\n" not in str(chave)
+                            and "\n" not in str(chave)
                             and "\\r" not in str(valor)
-                            and "\\n" not in str(valor)
+                            and "\n" not in str(valor)
                         ]
                         if linhas:
                             argumentos_headers = "-headers " + shlex.quote("\r\n".join(linhas) + "\r\n")
