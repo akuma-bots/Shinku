@@ -1,34 +1,47 @@
 import re
 import unittest
 
-from cogs.regras_oficiais import SECOES_REGRAS, construir_embed_regras
+from cogs.regras_oficiais import (
+    MARCADOR_PUBLICACAO,
+    SECOES_REGRAS,
+    agrupar_embeds_regras,
+    construir_embed_regras,
+    construir_embeds_regras,
+)
 
 
 class TestRegrasOficiais(unittest.TestCase):
-    def test_todos_os_artigos_ficam_em_uma_unica_embed(self):
-        embed = construir_embed_regras()
-        self.assertEqual(len(embed.fields), 11)
-        self.assertEqual(embed.fields[0].name, "1 - Conduta e respeito")
-        self.assertEqual(embed.fields[-1].name, "11 - Disposições finais")
-        self.assertTrue(all(field.value for field in embed.fields))
-        self.assertTrue(all(len(field.value) <= 1024 for field in embed.fields))
-        total = (
-            len(embed.title or "") + len(embed.description or "")
-            + len(embed.author.name or "") + len(embed.footer.text or "")
-        )
-        total += sum(len(field.name) + len(field.value) for field in embed.fields)
-        self.assertLessEqual(total, 6000)
+    def test_cada_artigo_usa_o_titulo_nativo_da_embed(self):
+        embeds = construir_embeds_regras()
+        self.assertEqual(len(embeds), 11)
+        self.assertEqual([embed.title for embed in embeds], [titulo for titulo, _ in SECOES_REGRAS])
+        self.assertTrue(all(not embed.fields for embed in embeds))
+        self.assertTrue(all(embed.description for embed in embeds))
+        self.assertTrue(all(
+            embed.footer.text.startswith(MARCADOR_PUBLICACAO)
+            for embed in embeds
+        ))
+        self.assertTrue(all(len(embed) <= 6000 for embed in embeds))
+
+    def test_artigos_sao_agrupados_dentro_dos_limites_de_cada_mensagem(self):
+        lotes = agrupar_embeds_regras(construir_embeds_regras())
+        self.assertGreaterEqual(len(lotes), 2)
+        self.assertEqual(sum(len(lote) for lote in lotes), 11)
+        for lote in lotes:
+            self.assertLessEqual(len(lote), 10)
+            self.assertLessEqual(sum(len(embed) for embed in lote), 6000)
+
     def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
-        embed = construir_embed_regras()
-        texto = "\n".join([embed.title or "", embed.description or ""] + [
-            parte for field in embed.fields for parte in (field.name, field.value)
-        ])
-        encontrados = re.findall(r"(?:^|\n)(\d+)\s+-\s+([^\n]+)", texto)
+        texto = "\\n".join(
+            [embed.title or "", embed.description or ""]
+            for embed in construir_embeds_regras()
+        )
+        encontrados = re.findall(r"(?m)^(\\d+)\\s+-\\s+([^\\n]+)", texto)
         self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
     def test_niveis_disciplinares_correspondem_a_medidas_padrao_do_automod(self):
-        texto = construir_embed_regras().fields[9].value
+        texto = construir_embeds_regras()[9].description
         esperado = (
             "10.1° Nível I — Normal",
             "advertência formal",
@@ -43,6 +56,9 @@ class TestRegrasOficiais(unittest.TestCase):
         )
         for trecho in esperado:
             self.assertIn(trecho.casefold(), texto.casefold())
+
+    def test_compatibilidade_com_a_funcao_antiga(self):
+        self.assertEqual(construir_embed_regras().title, SECOES_REGRAS[0][0])
 
     def test_regras_nao_dependem_de_comando_slash_para_publicacao(self):
         from cogs.regras_oficiais import RegrasOficiais

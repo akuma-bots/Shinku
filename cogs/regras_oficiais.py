@@ -101,7 +101,7 @@ SECOES_REGRAS = (
         "**10.1° NÍVEL I — NORMAL:** advertência formal.\n\n"
         "**10.2° NÍVEL II — MÉDIO:** timeout de 10 minutos.\n\n"
         "**10.3° NÍVEL III — GRAVE:** expulsão do servidor.\n\n"
-        "**10.4° NÍVEL IV — MUITO GRAVE:** banimento temporário padrão de 24 horas.\n\n"
+        "**10.4° NÍVEL IV — MUITO GRAVE:** banimento temporário de 24 horas.\n\n"
         "**10.5° NÍVEL V — CRÍTICO:** banimento permanente.\n\n"
         "**10.6° AJUSTES** — Durações podem ser personalizadas por configuração autorizada. Casos críticos admitem ação imediata.\n\n"
         "**10.7° REINCIDÊNCIA AUTOMÁTICA** — 2 registros recentes podem elevar um nível; 4 ou mais, dois níveis, limitado ao V.\n\n"
@@ -119,29 +119,64 @@ SECOES_REGRAS = (
 )
 
 
+def construir_embeds_regras() -> list[discord.Embed]:
+    """Cria uma embed por artigo para usar o título nativo, visualmente maior, do Discord."""
+    introducao = (
+        "Regulamento oficial da organização. Aplica-se a todos os integrantes, "
+        "sem distinção de cargo. Leia as diretrizes e consulte a equipe pelos "
+        "canais oficiais em caso de dúvida ou denúncia."
+    )
+    embeds = []
+    for indice, (titulo, texto) in enumerate(SECOES_REGRAS, start=1):
+        descricao = texto.strip()
+        if indice == 1:
+            descricao = f"{introducao}\\n\\n{descricao}"
+
+        embed = criar_embed(
+            title=titulo,
+            description=descricao,
+            color=COR,
+        )
+        embed.set_footer(text=f"{MARCADOR_PUBLICACAO} • Artigo {indice}/11")
+
+        if len(embed.title or "") > 256 or len(embed.description or "") > 4096:
+            raise ValueError(f"O artigo {indice} excede os limites de uma embed do Discord.")
+        if len(embed) > 6000:
+            raise ValueError(f"O artigo {indice} excede o limite total de caracteres da embed.")
+        embeds.append(embed)
+
+    if len(embeds) != 11:
+        raise ValueError("O Código de Conduta deve conter exatamente 11 artigos.")
+    return embeds
+
+
+def agrupar_embeds_regras(embeds: list[discord.Embed]) -> list[list[discord.Embed]]:
+    """Agrupa artigos sem ultrapassar 10 embeds ou 6.000 caracteres por mensagem."""
+    lotes: list[list[discord.Embed]] = []
+    lote_atual: list[discord.Embed] = []
+    total_atual = 0
+
+    for embed in embeds:
+        tamanho = len(embed)
+        if tamanho > 6000:
+            raise ValueError("Um artigo excede o limite de caracteres de uma mensagem do Discord.")
+        if lote_atual and (len(lote_atual) >= 10 or total_atual + tamanho > 6000):
+            lotes.append(lote_atual)
+            lote_atual = []
+            total_atual = 0
+        lote_atual.append(embed)
+        total_atual += tamanho
+
+    if lote_atual:
+        lotes.append(lote_atual)
+    return lotes
+
+
+# Compatibilidade para módulos e testes que ainda consultam a primeira embed.
 def construir_embed_regras() -> discord.Embed:
-    """Monta todo o Código de Conduta em uma única embed."""
-    embed = criar_embed(
-        title="CÓDIGO DE CONDUTA • NÊMESIS",
-        description="Leia todos os artigos e cumpra as diretrizes da organização.",
-        color=COR,
-    )
-    total = (
-        len(embed.title or "")
-        + len(embed.description or "")
-        + len(embed.author.name or "")
-    )
-    for titulo, texto in SECOES_REGRAS:
-        valor = texto.strip()
-        if len(titulo) > 256 or len(valor) > 1024:
-            raise ValueError(f"O artigo '{titulo}' excede o limite de um campo da embed.")
-        total += len(titulo) + len(valor)
-        embed.add_field(name=titulo, value=valor, inline=False)
-    embed.set_footer(text=MARCADOR_PUBLICACAO)
-    total += len(embed.footer.text or "")
-    if len(embed.fields) > 25 or total > 6000:
-        raise ValueError("O Código de Conduta excede o limite de uma única embed do Discord.")
-    return embed
+    """Retorna o primeiro artigo no formato de embed."""
+    return construir_embeds_regras()[0]
+
 
 class RegrasOficiais(commands.Cog):
     """Mantém os 11 artigos do Código de Conduta em uma única embed no canal oficial de regras."""
@@ -182,8 +217,12 @@ class RegrasOficiais(commands.Cog):
             logging.warning("Código de Conduta: não foi possível validar as permissões do bot.")
             return False
         permissoes = canal.permissions_for(membro_bot)
-        if not (permissoes.view_channel and permissoes.read_message_history
-                and permissoes.send_messages and permissoes.embed_links):
+        if not (
+            permissoes.view_channel
+            and permissoes.read_message_history
+            and permissoes.send_messages
+            and permissoes.embed_links
+        ):
             logging.error(
                 "Código de Conduta: faltam permissões no canal %s "
                 "(visualizar, ler histórico, enviar mensagens e inserir links).",
@@ -191,7 +230,7 @@ class RegrasOficiais(commands.Cog):
             )
             return False
 
-        embed = construir_embed_regras()
+        lotes = agrupar_embeds_regras(construir_embeds_regras())
         existentes = []
         try:
             async for mensagem in canal.history(limit=200, oldest_first=False):
@@ -206,35 +245,52 @@ class RegrasOficiais(commands.Cog):
             logging.exception("Código de Conduta: falha ao consultar publicações anteriores.")
             return False
 
-        if existentes:
-            existentes.sort(key=lambda mensagem: mensagem.created_at)
-            principal = existentes[0]
-            try:
-                await principal.edit(content=None, embed=embed, allowed_mentions=discord.AllowedMentions.none())
-            except discord.HTTPException:
-                logging.exception("Código de Conduta: falha ao atualizar a publicação existente.")
-                return False
-            for duplicada in existentes[1:]:
+        existentes.sort(key=lambda mensagem: mensagem.created_at)
+        mensagens_atualizadas = []
+        for indice, lote in enumerate(lotes):
+            if indice < len(existentes):
+                mensagem = existentes[indice]
                 try:
-                    await duplicada.delete()
-                except discord.HTTPException:
-                    logging.warning(
-                        "Código de Conduta: não foi possível remover uma publicação duplicada do bot (message_id=%s).",
-                        duplicada.id,
+                    await mensagem.edit(
+                        content=None,
+                        embeds=lote,
+                        allowed_mentions=discord.AllowedMentions.none(),
                     )
-            logging.info(
-                "Código de Conduta atualizado em uma única embed no canal %s; publicações antigas do bot consolidadas.",
-                CANAL_REGRAS_ID,
-            )
-            return True
+                except discord.HTTPException:
+                    logging.exception(
+                        "Código de Conduta: falha ao atualizar o bloco %s.",
+                        indice + 1,
+                    )
+                    return False
+                mensagens_atualizadas.append(mensagem)
+            else:
+                try:
+                    mensagem = await canal.send(
+                        embeds=lote,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                except discord.HTTPException:
+                    logging.exception(
+                        "Código de Conduta: falha ao publicar o bloco %s.",
+                        indice + 1,
+                    )
+                    return False
+                mensagens_atualizadas.append(mensagem)
 
-        try:
-            for lote in lotes:
-                await canal.send(embeds=lote, allowed_mentions=discord.AllowedMentions.none())
-        except discord.HTTPException:
-            logging.exception("Código de Conduta: falha ao publicar a embed oficial.")
-            return False
-        logging.info("Código de Conduta publicado em uma única embed no canal %s.", CANAL_REGRAS_ID)
+        for duplicada in existentes[len(lotes):]:
+            try:
+                await duplicada.delete()
+            except discord.HTTPException:
+                logging.warning(
+                    "Código de Conduta: não foi possível remover publicação antiga (message_id=%s).",
+                    duplicada.id,
+                )
+
+        logging.info(
+            "Código de Conduta atualizado em %s mensagens com 11 títulos nativos no canal %s.",
+            len(lotes),
+            CANAL_REGRAS_ID,
+        )
         return True
 
 
