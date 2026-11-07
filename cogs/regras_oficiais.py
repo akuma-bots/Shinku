@@ -15,8 +15,8 @@ MARCADOR_PUBLICACAO = "NÊMESIS • Código de Conduta oficial"
 # atualizar também as referências de infração em cogs/automod.py.
 SECOES_REGRAS = (
     (
-        "ㅤ",
-        "# 1 - CONDUTA E RESPEITO\n\n"
+        "1 - Conduta e respeito",
+        ""
         "**1.1° RESPEITO** — Trate todos com dignidade, sem ataques por cargo, opinião ou tempo de servidor.\n\n"
         "**1.2° OFENSAS** — São proibidos insultos, ameaças, humilhação e discriminação.\n\n"
         "**1.3° ASSÉDIO** — Não persiga, intimide ou constranja membros, nem incentive terceiros.\n\n"
@@ -24,8 +24,8 @@ SECOES_REGRAS = (
         "**1.5° ORIENTAÇÕES** — Cumpra orientações legítimas da Staff e apresente discordâncias com respeito.",
     ),
     (
-        "ㅤ",
-        "# 2 - COMUNICAÇÃO E ORGANIZAÇÃO\n\n"
+        "2 - Comunicação e organização",
+        ""
         "**2.1° CANAIS** — Use cada canal para sua finalidade.\n\n"
         "**2.2° SPAM** — Não envie mensagens repetidas, excessivas ou destinadas a poluir canais.\n\n"
         "**2.3° MENÇÕES** — Não abuse de menções a membros, cargos ou @everyone/@here.\n\n"
@@ -33,8 +33,8 @@ SECOES_REGRAS = (
         "**2.5° EVASÃO** — Não burle filtros, restrições ou punições.",
     ),
     (
-        "ㅤ",
-        "# 3 - CONTEÚDO E SEGURANÇA DIGITAL\n\n"
+        "3 - Conteúdo e segurança digital",
+        ""
         "**3.1° CONTEÚDO** — Não publique pornografia, conteúdo sexual explícito ou violência gráfica extrema.\n\n"
         "**3.2° MENORES** — É proibido qualquer conteúdo de exploração ou sexualização de menores.\n\n"
         "**3.3° FRAUDES** — Não divulgue golpes, phishing, links maliciosos ou falsos sorteios.\n\n"
@@ -42,8 +42,8 @@ SECOES_REGRAS = (
         "**3.5° DANO DIGITAL** — Não facilite invasões ou ataques contra sistemas e terceiros.",
     ),
     (
-        "ㅤ",
-        "# 4 - PRIVACIDADE E IDENTIDADE\n\n"
+        "4 - Privacidade e identidade",
+        ""
         "**4.1° DADOS PESSOAIS** — Não exponha endereço, telefone, IP, documentos ou dados privados sem autorização.\n\n"
         "**4.2° DOXXING** — É proibido expor dados para ameaçar, constranger ou prejudicar alguém.\n\n"
         "**4.3° CREDENCIAIS** — Não solicite nem publique senhas, tokens ou códigos de autenticação.\n\n"
@@ -51,8 +51,8 @@ SECOES_REGRAS = (
         "**4.5° IDENTIDADE** — Não se passe por membros, Staff ou bots para enganar ou obter vantagem.",
     ),
     (
-        "ㅤ",
-        "# 5 - DIVULGAÇÃO E PARCERIAS\n\n"
+        "5 - Divulgação e parcerias",
+        ""
         "**5.1° PUBLICIDADE** — Divulgue somente nos canais e formatos autorizados.\n\n"
         "**5.2° MENSAGENS PRIVADAS** — Não envie anúncios não solicitados nem insista por DM.\n\n"
         "**5.3° CONVITES** — Não espalhe convites fraudulentos ou links enganosos.\n\n"
@@ -60,8 +60,8 @@ SECOES_REGRAS = (
         "**5.5° USO DA COMUNIDADE** — Não utilize a NÊMESIS para autopromoção irregular.",
     ),
     (
-        "ㅤ",
-        "# 6 - ATENDIMENTO E DENÚNCIAS\n\n"
+        "6 - Atendimento e denúncias",
+        ""
         "**6.1° SOLICITAÇÕES** — Use a categoria correta e trate assuntos pertinentes.\n\n"
         "**6.2° EVIDÊNCIAS** — Forneça contexto claro e provas originais.\n\n"
         "**6.3° ABUSO** — Não abra tickets duplicados nem pressione a equipe com cobranças insistentes.\n\n"
@@ -69,8 +69,8 @@ SECOES_REGRAS = (
         "**6.5° DISCRIÇÃO** — Evite acusações públicas; denúncia não implica punição automática.",
     ),
     (
-        "ㅤ",
-        "# 7 - STAFF, HIERARQUIA E AUTORIDADE\n\n"
+        "7 - Staff, hierarquia e autoridade",
+        ""
         "**7.1° IMPARCIALIDADE** — A Staff deve agir com respeito, neutralidade e responsabilidade.\n\n"
         "**7.2° ABUSO DE PODER** — É proibido perseguir, retaliar, favorecer ou obter vantagem pelo cargo.\n\n"
         "**7.3° CONFIDENCIALIDADE** — Não divulgue informações internas sem autorização.\n\n"
@@ -78,8 +78,8 @@ SECOES_REGRAS = (
         "**7.5° ESTRUTURA** — O OCTÓGONO é a instância máxima; Supervisores Staff exercem atribuições administrativas conforme suas permissões.",
     ),
     (
-        "ㅤ",
-        "# 8 - COMPETIÇÕES, MISSÕES E SISTEMAS\n\n"
+        "8 - Competições, missões e sistemas",
+        ""
         "**8.1° NORMAS ESPECÍFICAS** — Cumpra regras de jogos, eventos, competições e missões.\n\n"
         "**8.2° VANTAGEM INDEVIDA** — São proibidos cheats, exploits e scripts vedados.\n\n"
         "**8.3° INTEGRIDADE** — Não falsifique provas, participação ou resultados, nem sabote atividades.\n\n"
@@ -87,8 +87,8 @@ SECOES_REGRAS = (
         "**8.5° CONSEQUÊNCIAS** — Infrações também podem gerar medidas na atividade ou competição.",
     ),
     (
-        "ㅤ",
-        "# 9 - REINCIDÊNCIA E AGRAVANTES\n\n"
+        "9 - Reincidência e agravantes",
+        ""
         "**9.1° REINCIDÊNCIA** — Infrações repetidas no período de análise podem elevar a medida.\n\n"
         "**9.2° EVASÃO** — Contas alternativas ou tentativa de contornar punições agravam a ocorrência.\n\n"
         "**9.3° RETALIAÇÃO** — Ameaças contra denunciantes ou testemunhas são agravantes.\n\n"
@@ -96,8 +96,8 @@ SECOES_REGRAS = (
         "**9.5° ANÁLISE** — Gravidade, intenção, dano, contexto, provas e histórico serão considerados; casos críticos podem exigir ação imediata.",
     ),
     (
-        "ㅤ",
-        "# 10 - NÍVEIS E MEDIDAS DISCIPLINARES\n\n"
+        "10 - Níveis e medidas disciplinares",
+        ""
         "**10.1° NÍVEL I — NORMAL:** advertência formal.\n\n"
         "**10.2° NÍVEL II — MÉDIO:** timeout padrão de 10 minutos.\n\n"
         "**10.3° NÍVEL III — GRAVE:** expulsão do servidor.\n\n"
@@ -108,8 +108,8 @@ SECOES_REGRAS = (
         "**10.8° REVISÃO** — Solicite revisão nos canais oficiais, com justificativa e informações pertinentes.",
     ),
     (
-        "ㅤ",
-        "# 11 - DISPOSIÇÕES FINAIS\n\n"
+        "11 - Disposições finais",
+        ""
         "**11.1° ABRANGÊNCIA** — As regras valem para todos, sem distinção de cargo.\n\n"
         "**11.2° COMPLEMENTOS** — Normas de sistemas, missões e competições complementam este Código.\n\n"
         "**11.3° OMISSÕES** — Casos não previstos serão avaliados com proporcionalidade e foco na integridade da organização.\n\n"
@@ -119,35 +119,24 @@ SECOES_REGRAS = (
 )
 
 
+def construir_embeds_regras() -> list[discord.Embed]:
+    """Monta um embed por artigo, com título nativo e subtítulos em destaque."""
+    embeds = []
+    for indice, (titulo, texto) in enumerate(SECOES_REGRAS, start=1):
+        embed = criar_embed(title=titulo, description=texto.strip(), color=COR)
+        embed.set_footer(text=f"{MARCADOR_PUBLICACAO} • Artigo {indice}/11")
+        if len(embed.title or "") > 256 or len(embed.description or "") > 4096:
+            raise ValueError(f"O artigo {indice} excede os limites de uma embed do Discord.")
+        embeds.append(embed)
+    return embeds
+
+
 def construir_embed_regras() -> discord.Embed:
-    """Monta o regulamento completo em uma única embed dentro dos limites do Discord."""
-    embed = criar_embed(
-        title="𓂀 NÊMESIS — CÓDIGO DE CONDUTA",
-        description=(
-            "Regulamento oficial da organização. Aplica-se a todos os integrantes, "
-            "sem distinção de cargo. Leia as diretrizes e consulte a equipe pelos "
-            "canais oficiais em caso de dúvida ou denúncia."
-        ),
-        color=COR,
-    )
-    for titulo, texto in SECOES_REGRAS:
-        embed.add_field(name=titulo, value=texto, inline=False)
-    embed.set_footer(
-        text=f"{MARCADOR_PUBLICACAO} • Documento integral • 11 seções"
-    )
-
-    total = len(embed.title or "") + len(embed.description or "")
-    total += sum(len(field.name) + len(field.value) for field in embed.fields)
-    total += len(embed.footer.text or "")
-    if len(embed.fields) > 25 or total > 6000:
-        raise ValueError("O Código de Conduta excede os limites de uma única embed do Discord.")
-    if any(len(field.name) > 256 or len(field.value) > 1024 for field in embed.fields):
-        raise ValueError("Uma seção do Código de Conduta excede o limite de campos do Discord.")
-    return embed
-
+    """Compatibilidade: retorna a primeira embed do Código de Conduta."""
+    return construir_embeds_regras()[0]
 
 class RegrasOficiais(commands.Cog):
-    """Mantém o Código de Conduta oficial em uma única embed no canal de regras."""
+    """Mantém os 11 artigos do Código de Conduta no canal oficial de regras."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -194,7 +183,8 @@ class RegrasOficiais(commands.Cog):
             )
             return False
 
-        embed = construir_embed_regras()
+        embeds = construir_embeds_regras()
+        lotes = [embeds[:10], embeds[10:]]
         existentes = []
         try:
             async for mensagem in canal.history(limit=200, oldest_first=False):
@@ -212,11 +202,15 @@ class RegrasOficiais(commands.Cog):
         if existentes:
             principal = existentes[0]
             try:
-                await principal.edit(content=None, embed=embed, allowed_mentions=discord.AllowedMentions.none())
+                await principal.edit(content=None, embeds=lotes[0], allowed_mentions=discord.AllowedMentions.none())
+                if len(existentes) >= 2:
+                    await existentes[1].edit(content=None, embeds=lotes[1], allowed_mentions=discord.AllowedMentions.none())
+                else:
+                    await canal.send(embeds=lotes[1], allowed_mentions=discord.AllowedMentions.none())
             except discord.HTTPException:
                 logging.exception("Código de Conduta: falha ao atualizar a publicação existente.")
                 return False
-            for duplicada in existentes[1:]:
+            for duplicada in existentes[2:]:
                 try:
                     await duplicada.delete()
                 except discord.HTTPException:
@@ -225,17 +219,18 @@ class RegrasOficiais(commands.Cog):
                         duplicada.id,
                     )
             logging.info(
-                "Código de Conduta atualizado em uma única embed no canal %s; publicações antigas do bot consolidadas.",
+                "Código de Conduta atualizado em 11 embeds, distribuídas em duas mensagens no canal %s; publicações antigas do bot consolidadas.",
                 CANAL_REGRAS_ID,
             )
             return True
 
         try:
-            await canal.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            for lote in lotes:
+                await canal.send(embeds=lote, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
             logging.exception("Código de Conduta: falha ao publicar a embed oficial.")
             return False
-        logging.info("Código de Conduta publicado em uma única embed no canal %s.", CANAL_REGRAS_ID)
+        logging.info("Código de Conduta publicado em 11 embeds, distribuídas em duas mensagens no canal %s.", CANAL_REGRAS_ID)
         return True
 
 
