@@ -22,6 +22,7 @@ class TestRegrasOficiais(unittest.TestCase):
             for embed in embeds
         ))
         self.assertTrue(all(len(embed) <= 6000 for embed in embeds))
+        self.assertNotIn("\\n", embeds[0].description)
 
     def test_artigos_sao_agrupados_dentro_dos_limites_de_cada_mensagem(self):
         lotes = agrupar_embeds_regras(construir_embeds_regras())
@@ -32,11 +33,12 @@ class TestRegrasOficiais(unittest.TestCase):
             self.assertLessEqual(sum(len(embed) for embed in lote), 6000)
 
     def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
-        texto = "\\n".join(
-            [embed.title or "", embed.description or ""]
+        texto = "\n".join(
+            parte
             for embed in construir_embeds_regras()
+            for parte in (embed.title or "", embed.description or "")
         )
-        encontrados = re.findall(r"(?m)^(\\d+)\\s+-\\s+([^\\n]+)", texto)
+        encontrados = re.findall(r"(?m)^(\d+)\s+-\s+([^\n]+)", texto)
         self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 

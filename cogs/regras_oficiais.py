@@ -130,7 +130,7 @@ def construir_embeds_regras() -> list[discord.Embed]:
     for indice, (titulo, texto) in enumerate(SECOES_REGRAS, start=1):
         descricao = texto.strip()
         if indice == 1:
-            descricao = f"{introducao}\\n\\n{descricao}"
+            descricao = f"{introducao}\n\n{descricao}"
 
         embed = criar_embed(
             title=titulo,
