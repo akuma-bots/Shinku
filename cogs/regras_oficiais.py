@@ -179,7 +179,7 @@ def construir_embed_regras() -> discord.Embed:
 
 
 class RegrasOficiais(commands.Cog):
-    """Mantém os 11 artigos do Código de Conduta em uma única embed no canal oficial de regras."""
+    """Mantém os 11 artigos em embeds com títulos nativos no canal oficial de regras."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -246,7 +246,6 @@ class RegrasOficiais(commands.Cog):
             return False
 
         existentes.sort(key=lambda mensagem: mensagem.created_at)
-        mensagens_atualizadas = []
         for indice, lote in enumerate(lotes):
             if indice < len(existentes):
                 mensagem = existentes[indice]
@@ -262,7 +261,6 @@ class RegrasOficiais(commands.Cog):
                         indice + 1,
                     )
                     return False
-                mensagens_atualizadas.append(mensagem)
             else:
                 try:
                     mensagem = await canal.send(
@@ -275,7 +273,6 @@ class RegrasOficiais(commands.Cog):
                         indice + 1,
                     )
                     return False
-                mensagens_atualizadas.append(mensagem)
 
         for duplicada in existentes[len(lotes):]:
             try:
