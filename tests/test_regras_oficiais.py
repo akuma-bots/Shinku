@@ -25,7 +25,7 @@ class TestRegrasOficiais(unittest.TestCase):
         texto = "\n".join([embed.title or "" for embed in embeds] + [
             embed.description or "" for embed in embeds
         ])
-        encontrados = re.findall(r"(?:^|\n)#\s*(\d+)\s+-\s+([^\n]+)", texto)
+        encontrados = re.findall(r"(?:^|\n)(\d+)\s+-\s+([^\n]+)", texto)
         self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
         self.assertEqual(len(SECOES_REGRAS), 11)
 
