@@ -4,7 +4,7 @@ Requer yt-dlp, PyNaCl e imageio-ffmpeg (FFmpeg empacotado).
 Aceita links e buscas; a reprodução depende da disponibilidade do provedor de áudio.
 """
 from utils.apresentacao import criar_embed
-from utils.storage import atualizar_json, carregar
+from utils.storage import atualizar_json, carregar, salvar
 import asyncio
 import logging
 import random
@@ -859,8 +859,23 @@ class Musica(commands.Cog):
                             self.filas.setdefault(gid, []).insert(0, item)
                         elif modo_repeticao == "queue":
                             self.filas.setdefault(gid, []).append(item)
-                except (discord.HTTPException, discord.ClientException, OSError):
-                    LOG.exception("Falha ao reproduzir áudio no servidor %s.", gid)
+                except Exception as erro:
+                    # Antes a falha do FFmpeg/VoiceClient podia encerrar a faixa
+                    # sem explicar ao membro por que não houve som.
+                    LOG.exception("Falha ao iniciar ou manter o áudio no servidor %s.", gid)
+                    canal_id = item.get("text_channel_id", 0)
+                    canal = self.bot.get_channel(canal_id)
+                    if canal:
+                        try:
+                            detalhe = str(erro).strip().replace("\\n", " ")[:180]
+                            await canal.send(
+                                "⚠️ Não consegui reproduzir o áudio. "
+                                "Verifique se o bot tem as permissões **Conectar** e **Falar** "
+                                "no canal de voz e tente outra faixa."
+                                + (f"\\nDetalhe técnico: `{discord.utils.escape_markdown(detalhe)}`" if detalhe else "")
+                            )
+                        except (discord.Forbidden, discord.HTTPException):
+                            LOG.warning("Não foi possível enviar o diagnóstico de reprodução no canal %s.", canal_id)
                 finally:
                     if self.agora.get(gid) is item:
                         self.agora.pop(gid, None)
@@ -891,6 +906,13 @@ class Musica(commands.Cog):
             return None
         voz = interaction.guild.voice_client
         try:
+            permissoes = estado.channel.permissions_for(interaction.guild.me)
+            if not permissoes.connect or not permissoes.speak:
+                await interaction.followup.send(
+                    "Não tenho as permissões **Conectar** e **Falar** nesse canal de voz.",
+                    ephemeral=True,
+                )
+                return None
             if voz and voz.is_connected():
                 if voz.channel != estado.channel:
                     await interaction.followup.send(
