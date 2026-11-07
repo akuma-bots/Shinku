@@ -205,6 +205,7 @@ async def _salvar_playlist(guild_id: int, user_id: int, nome: str, faixas: list[
     resultado = {}
 
     def transformar(dados):
+        resultado.clear()
         if not isinstance(dados, dict):
             dados = {}
         servidor = dados.setdefault(str(guild_id), {})
@@ -607,16 +608,19 @@ class Musica(commands.Cog):
                 mensagem = await canal.fetch_message(int(registro["mensagem_id"]))
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 mensagem = None
-        if mensagem is None:
-            async for antiga in canal.history(limit=100, oldest_first=False):
-                if antiga.author.id != self.bot.user.id:
-                    continue
-                if any(
-                    embed.footer and embed.footer.text == MARCADOR_PAINEL_MUSICA
-                    for embed in antiga.embeds
-                ):
-                    mensagem = antiga
-                    break
+        if mensagem is None and self.bot.user is not None:
+            try:
+                async for antiga in canal.history(limit=100, oldest_first=False):
+                    if antiga.author.id != self.bot.user.id:
+                        continue
+                    if any(
+                        embed.footer and embed.footer.text == MARCADOR_PAINEL_MUSICA
+                        for embed in antiga.embeds
+                    ):
+                        mensagem = antiga
+                        break
+            except (discord.Forbidden, discord.HTTPException):
+                LOG.warning("Painel musical: sem acesso ao histórico do canal %s; será criada uma nova mensagem.", canal.id)
         embed = self._embed_musica(
             "𓂀 CENTRAL MUSICAL",
             "Pesquise músicas, organize sua fila e mantenha suas playlists pessoais. "
