@@ -15,12 +15,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check whitespace in pushed changes
         shell: bash
         run: |
           BASE="${{ github.event.before }}"
           if [ -n "$BASE" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
-            BASE="$(git rev-parse "${BASE}^^" 2>/dev/null || git rev-parse "${BASE}^")"
+            BASE="$(git rev-parse "${BASE}^^^" 2>/dev/null || git rev-parse "${BASE}^")"
           else
             BASE="${{ github.event.pull_request.base.sha }}"
           fi
