@@ -256,29 +256,120 @@ async def atualizar_pergunta(
     formulario_id: str,
     indice_global: int,
     texto: str,
+    *,
+    tipo: str | None = None,
+    obrigatoria: bool | None = None,
+    opcoes: list[str] | None = None,
 ) -> bool:
-    """Edita uma pergunta por posição, sem reescrever respostas já recebidas."""
+    """Edita enunciado e configuração sem reescrever candidaturas existentes."""
     texto = str(texto or "").strip()
     if not texto or len(texto) > 256 or indice_global < 0:
         return False
+
+    tipo_normalizado = str(tipo).strip().lower() if tipo is not None else None
+    if tipo_normalizado is not None and tipo_normalizado not in {"texto", "paragrafo", "escolha"}:
+        return False
+
+    opcoes_normalizadas = None
+    if opcoes is not None:
+        opcoes_normalizadas = []
+        vistos = set()
+        for opcao in opcoes:
+            valor = str(opcao or "").strip()
+            if not valor:
+                continue
+            if len(valor) > 100:
+                return False
+            chave = valor.casefold()
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            opcoes_normalizadas.append(valor)
+        if len(opcoes_normalizadas) > 25:
+            return False
+    if tipo_normalizado == "escolha" and opcoes_normalizadas is not None and len(opcoes_normalizadas) < 2:
+        return False
+
     lista = await listar_formularios(guild_id)
     alvo = next((item for item in lista if item.get("id") == formulario_id), None)
     if not alvo:
         return False
+
     atual = 0
     for pagina in alvo.get("paginas", []):
         perguntas = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina if isinstance(pagina, list) else []
         for indice, pergunta in enumerate(perguntas):
-            if atual == indice_global:
-                if isinstance(pergunta, dict):
-                    pergunta["texto"] = texto
+            if atual != indice_global:
+                atual += 1
+                continue
+
+            item = pergunta if isinstance(pergunta, dict) else {
+                "texto": str(pergunta),
+                "tipo": "paragrafo",
+                "obrigatoria": True,
+            }
+            opcoes_da_pergunta = opcoes_normalizadas
+            if tipo_normalizado == "escolha" and opcoes_da_pergunta is None:
+                opcoes_existentes = item.get("opcoes") or []
+                opcoes_da_pergunta = [
+                    str(valor).strip()[:100]
+                    for valor in opcoes_existentes
+                    if str(valor).strip()
+                ][:25]
+                if len(opcoes_da_pergunta) < 2:
+                    return False
+
+            item["texto"] = texto
+            if tipo_normalizado is not None:
+                item["tipo"] = tipo_normalizado
+                if tipo_normalizado == "escolha":
+                    item["opcoes"] = opcoes_da_pergunta
                 else:
-                    perguntas[indice] = {"texto": texto, "tipo": "paragrafo", "obrigatoria": True}
-                alvo["atualizado_em"] = time.time()
-                await _salvar_formularios_guild(guild_id, lista)
-                return True
-            atual += 1
+                    item["opcoes"] = []
+            elif opcoes_normalizadas is not None:
+                item["opcoes"] = opcoes_normalizadas
+
+            item["obrigatoria"] = bool(item.get("obrigatoria", True)) if obrigatoria is None else bool(obrigatoria)
+            perguntas[indice] = item
+            alvo["atualizado_em"] = time.time()
+            await _salvar_formularios_guild(guild_id, lista)
+            return True
     return False
+
+
+@_serializar_formularios
+async def atualizar_pagina(
+    guild_id: int,
+    formulario_id: str,
+    indice: int,
+    titulo: str,
+) -> bool:
+    """Renomeia uma etapa e converte páginas legadas sem perder suas perguntas."""
+    titulo = str(titulo or "").strip()
+    if not titulo or len(titulo) > 100 or indice < 0:
+        return False
+
+    lista = await listar_formularios(guild_id)
+    alvo = next((item for item in lista if item.get("id") == formulario_id), None)
+    if not alvo:
+        return False
+
+    paginas = alvo.setdefault("paginas", [])
+    if not isinstance(paginas, list) or not 0 <= indice < len(paginas):
+        return False
+
+    pagina = paginas[indice]
+    if isinstance(pagina, dict):
+        pagina["titulo"] = titulo
+        pagina.setdefault("perguntas", [])
+    elif isinstance(pagina, list):
+        paginas[indice] = {"titulo": titulo, "perguntas": pagina}
+    else:
+        paginas[indice] = {"titulo": titulo, "perguntas": []}
+
+    alvo["atualizado_em"] = time.time()
+    await _salvar_formularios_guild(guild_id, lista)
+    return True
 
 
 @_serializar_formularios

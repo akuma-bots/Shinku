@@ -316,5 +316,56 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class TestFormulariosConfiguracaoInterativa(unittest.TestCase):
+    def test_modal_de_candidatura_renderiza_escolha_com_select_nativo(self):
+        modal = cog_formularios.ModalFormulario({
+            "id": "form-escolha",
+            "nome": "Recrutamento",
+            "paginas": [{
+                "titulo": "Perfil",
+                "perguntas": [{
+                    "texto": "Qual divisão prefere?",
+                    "tipo": "escolha",
+                    "obrigatoria": False,
+                    "opcoes": ["Alpha", "Vanguard", "Recon"],
+                }],
+            }],
+        }, usuario_id=456)
+
+        self.assertEqual(len(modal.children), 1)
+        campo = modal.children[0]
+        self.assertIsInstance(campo, discord.ui.Label)
+        self.assertIsInstance(campo.component, discord.ui.Select)
+        self.assertFalse(campo.component.required)
+        self.assertEqual(campo.component.min_values, 0)
+        self.assertEqual([opcao.value for opcao in campo.component.options], ["Alpha", "Vanguard", "Recon"])
+        self.assertIn("Perfil", modal.title)
+
+    def test_modal_de_edicao_expoe_tipo_obrigatoriedade_e_opcoes(self):
+        modal = cog_formularios.ModalEditarPergunta(
+            object(), 123, 456, "form-1", 0,
+            "Qual divisão?", "escolha", False, ["Alpha", "Recon"],
+        )
+
+        self.assertEqual(len(modal.children), 4)
+        self.assertTrue(all(isinstance(item, discord.ui.Label) for item in modal.children))
+        self.assertEqual([opcao.value for opcao in modal.tipo.options], ["texto", "paragrafo", "escolha"])
+        self.assertEqual([opcao.value for opcao in modal.obrigatoria.options], ["sim", "nao"])
+        self.assertEqual(modal.opcoes.default, "Alpha\nRecon")
+
+    def test_central_de_formularios_oferece_renomear_etapa(self):
+        central = SimpleNamespace(cog=object(), usuario_id=456, guild_id=123, formulario_id="form-1")
+        seletor = cog_formularios.SeletorAcaoFormulario(central)
+        self.assertIn("editar_etapa", {opcao.value for opcao in seletor.options})
+
+    def test_seletor_de_etapas_expoe_titulos_atuais(self):
+        seletor = cog_formularios.SeletorPaginaEditar(
+            object(), 123, 456,
+            {"id": "form-1", "paginas": [{"titulo": "Informações pessoais", "perguntas": ["Nome"]}]},
+        )
+        self.assertEqual(len(seletor.options), 1)
+        self.assertIn("Informações pessoais", seletor.options[0].label)
+
+
 if __name__ == "__main__":
     unittest.main()

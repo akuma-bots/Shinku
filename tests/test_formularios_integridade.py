@@ -163,3 +163,63 @@ class TestRespostaInteracaoFormulario(unittest.IsolatedAsyncioTestCase):
 
         response.send_modal.assert_awaited_once()
         self.assertIsInstance(response.send_modal.await_args.args[0], ModalDecisaoFormulario)
+
+
+
+class TestConfiguracaoEstruturadaFormularios(unittest.IsolatedAsyncioTestCase):
+    async def test_edicao_de_pergunta_atualiza_tipo_obrigatoriedade_e_opcoes(self):
+        pergunta = {
+            "id": "questao-1",
+            "texto": "Qual seu nome?",
+            "tipo": "paragrafo",
+            "obrigatoria": True,
+        }
+        formulario = {
+            "id": "form-1",
+            "paginas": [{"titulo": "Perfil", "perguntas": [pergunta]}],
+        }
+        dados = {"123": [formulario]}
+        with patch.object(formularios, "_tudo_formularios", new=AsyncMock(return_value=dados)), patch.object(
+            formularios, "_salvar_formularios_guild", new=AsyncMock()
+        ) as salvar:
+            ok = await formularios.atualizar_pergunta(
+                123, "form-1", 0, "Qual divisão prefere?",
+                tipo="escolha", obrigatoria=False, opcoes=["Alpha", "Recon"],
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual(pergunta["id"], "questao-1")
+        self.assertEqual(pergunta["texto"], "Qual divisão prefere?")
+        self.assertEqual(pergunta["tipo"], "escolha")
+        self.assertFalse(pergunta["obrigatoria"])
+        self.assertEqual(pergunta["opcoes"], ["Alpha", "Recon"])
+        salvar.assert_awaited_once()
+
+    async def test_pergunta_de_escolha_exige_duas_opcoes_validas(self):
+        pergunta = {"texto": "Escolha", "tipo": "paragrafo", "obrigatoria": True}
+        dados = {"123": [{"id": "form-1", "paginas": [[pergunta]]}]}
+        with patch.object(formularios, "_tudo_formularios", new=AsyncMock(return_value=dados)), patch.object(
+            formularios, "_salvar_formularios_guild", new=AsyncMock()
+        ) as salvar:
+            ok = await formularios.atualizar_pergunta(
+                123, "form-1", 0, "Escolha", tipo="escolha",
+                obrigatoria=True, opcoes=["Somente uma"],
+            )
+
+        self.assertFalse(ok)
+        self.assertEqual(pergunta["tipo"], "paragrafo")
+        salvar.assert_not_awaited()
+
+    async def test_renomear_etapa_preserva_perguntas_de_formato_legado(self):
+        perguntas = ["Nome", "Disponibilidade"]
+        formulario = {"id": "form-1", "paginas": [perguntas]}
+        dados = {"123": [formulario]}
+        with patch.object(formularios, "_tudo_formularios", new=AsyncMock(return_value=dados)), patch.object(
+            formularios, "_salvar_formularios_guild", new=AsyncMock()
+        ) as salvar:
+            ok = await formularios.atualizar_pagina(123, "form-1", 0, "Informações pessoais")
+
+        self.assertTrue(ok)
+        self.assertEqual(formulario["paginas"][0]["titulo"], "Informações pessoais")
+        self.assertEqual(formulario["paginas"][0]["perguntas"], perguntas)
+        salvar.assert_awaited_once()

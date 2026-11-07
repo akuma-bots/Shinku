@@ -129,6 +129,11 @@ def _texto_pergunta(pergunta) -> str:
     return str(pergunta)
 
 
+def _tipo_pergunta(pergunta) -> str:
+    tipo = str(pergunta.get("tipo") or "paragrafo").lower() if isinstance(pergunta, dict) else "paragrafo"
+    return tipo if tipo in {"texto", "paragrafo", "escolha"} else "paragrafo"
+
+
 def _perguntas_flat(formulario: dict) -> list:
     return [
         pergunta
@@ -280,45 +285,87 @@ def _view_painel(formulario: dict) -> discord.ui.View:
 
 
 class ModalFormulario(discord.ui.Modal):
-    """Modal de UMA página do formulário (até 5 perguntas, limite do
-    Discord). Ao enviar, se ainda houver mais páginas, abre a próxima
-    automaticamente — encadeando os modais até completar o formulário
-    inteiro. As respostas vão sendo acumuladas de página em página."""
+    """Modal de até cinco perguntas, com campos de texto e escolhas nativas do Discord."""
 
     def __init__(self, formulario: dict, pagina_indice: int = 0, respostas_acumuladas: list = None, usuario_id: int = None):
-        pagina = _perguntas_pagina(formulario, pagina_indice)
-        total_paginas = len(_paginas_modal(formulario))
-        titulo = str(formulario.get("nome") or formulario.get("titulo_painel") or "Formulário")[:34]
+        paginas = _paginas_modal(formulario)
+        pagina_info = paginas[pagina_indice] if 0 <= pagina_indice < len(paginas) else {
+            "titulo": f"Etapa {pagina_indice + 1}",
+            "perguntas": [],
+        }
+        pagina = pagina_info["perguntas"]
+        total_paginas = len(paginas)
+        nome_formulario = str(formulario.get("nome") or formulario.get("titulo_painel") or "Formulário")
+        nome_etapa = str(pagina_info.get("titulo") or f"Etapa {pagina_indice + 1}")
+        titulo = f"{nome_formulario[:18]} · {nome_etapa[:18]}"
         if total_paginas > 1:
-            titulo = f"{titulo} ({pagina_indice + 1}/{total_paginas})"[:45]
-        super().__init__(title=titulo)
+            titulo = f"{titulo} ({pagina_indice + 1}/{total_paginas})"
+        super().__init__(title=titulo[:45])
 
         self.formulario = formulario
         self.pagina_indice = pagina_indice
         self.respostas_acumuladas = respostas_acumuladas or []
         self.usuario_id = usuario_id
         self.inputs = []
-        for pergunta in pagina[:5]:
+
+        for indice, pergunta in enumerate(pagina[:5], start=1):
             texto = _texto_pergunta(pergunta)
             obrigatoria = pergunta.get("obrigatoria", True) if isinstance(pergunta, dict) else True
-            opcoes = pergunta.get("opcoes") or [] if isinstance(pergunta, dict) else []
-            # O Discord limita o rótulo de cada campo a 45 caracteres.
-            # Usamos um rótulo curto e reservamos o placeholder para exibir
-            # o enunciado da questão, evitando cortar perguntas longas no modal.
-            rotulo = f"Questão {len(self.inputs) + 1:02d} • Resposta"
-            placeholder = texto[:100] or "Digite sua resposta..."
+            tipo = _tipo_pergunta(pergunta)
+            rotulo = f"Questão {indice:02d}"
+
+            if tipo == "escolha":
+                opcoes = []
+                vistos = set()
+                for opcao in (pergunta.get("opcoes") or []):
+                    valor = str(opcao or "").strip()
+                    if not valor:
+                        continue
+                    chave = valor.casefold()
+                    if chave in vistos:
+                        continue
+                    vistos.add(chave)
+                    opcoes.append(valor[:100])
+                    if len(opcoes) == 25:
+                        break
+                if len(opcoes) >= 2:
+                    campo = discord.ui.Select(
+                        placeholder="Selecione uma opção",
+                        min_values=1 if obrigatoria else 0,
+                        max_values=1,
+                        required=bool(obrigatoria),
+                        options=[discord.SelectOption(label=opcao, value=opcao) for opcao in opcoes],
+                    )
+                    self.inputs.append(campo)
+                    self.add_item(discord.ui.Label(
+                        text=rotulo,
+                        description=texto[:100] or "Escolha uma das opções disponíveis.",
+                        component=campo,
+                    ))
+                    continue
+
+            estilo = discord.TextStyle.short if tipo == "texto" else discord.TextStyle.paragraph
             campo = discord.ui.TextInput(
-                label=rotulo,
-                style=discord.TextStyle.paragraph,
+                style=estilo,
                 required=bool(obrigatoria),
                 max_length=1000,
-                placeholder=placeholder,
+                placeholder=texto[:100] or "Digite sua resposta...",
             )
             self.inputs.append(campo)
-            self.add_item(campo)
+            self.add_item(discord.ui.Label(
+                text=rotulo,
+                description=texto[:100] or None,
+                component=campo,
+            ))
 
     async def on_submit(self, interaction: discord.Interaction):
-        respostas_desta_pagina = [str(campo.value) for campo in self.inputs]
+        respostas_desta_pagina = []
+        for campo in self.inputs:
+            if isinstance(campo, discord.ui.Select):
+                valor = campo.values[0] if campo.values else ""
+            else:
+                valor = str(campo.value or "")
+            respostas_desta_pagina.append(str(valor).strip() or "—")
         todas_respostas = self.respostas_acumuladas + respostas_desta_pagina
 
         proxima_pagina = self.pagina_indice + 1
@@ -353,7 +400,6 @@ class ModalFormulario(discord.ui.Modal):
                 ephemeral=True,
             )
             return
-        # Impede candidaturas duplicadas enquanto uma análise anterior estiver pendente.
         pendentes = await formularios.listar_respostas(
             guild.id, formulario_id=self.formulario["id"], status="pendente"
         )
@@ -364,8 +410,6 @@ class ModalFormulario(discord.ui.Modal):
             )
             return
 
-        # A publicação no canal e as DMs podem levar mais que o prazo inicial
-        # da interação; defer evita que o Discord mostre falha na interação.
         await interaction.response.defer(ephemeral=True, thinking=True)
         resposta = await formularios.criar_resposta(
             guild.id,
@@ -491,8 +535,8 @@ class SeletorFormularioCentral(discord.ui.Select):
         super().__init__(placeholder="Selecione um formulário", min_values=1, max_values=1, options=opcoes)
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.user.id != self.central.usuario_id:
-            await interaction.response.send_message("Esta central pertence a outra pessoa.", ephemeral=True)
+        if not _administrador_formularios(interaction, self.central.usuario_id, self.central.guild_id):
+            await interaction.response.send_message("Esta central pertence a outra pessoa ou servidor.", ephemeral=True)
             return
         self.central.formulario_id = self.values[0]
         await self.central.atualizar(interaction)
@@ -848,9 +892,14 @@ class SeletorFichaPendente(discord.ui.Select):
             await interaction.followup.send(embeds=anexos[inicio:inicio + 10], ephemeral=True)
 
 
-def _administrador_formularios(interaction: discord.Interaction, usuario_id: int) -> bool:
+def _administrador_formularios(
+    interaction: discord.Interaction,
+    usuario_id: int,
+    guild_id: int | None = None,
+) -> bool:
     return bool(
         interaction.guild is not None
+        and (guild_id is None or interaction.guild.id == guild_id)
         and interaction.user.id == usuario_id
         and membro_tem_lideranca(interaction.user)
     )
@@ -962,6 +1011,74 @@ class ModalAdicionarPerguntas(discord.ui.Modal):
         await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, f"Etapa {len(formulario.get('paginas', []))} adicionada com {len(perguntas)} pergunta(s).")
 
 
+class ModalEditarEtapa(discord.ui.Modal):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str, indice: int, titulo_atual: str):
+        super().__init__(title=f"Editar etapa {indice + 1}")
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id, self.indice = formulario_id, indice
+        self.titulo = discord.ui.TextInput(
+            default=str(titulo_atual or f"Etapa {indice + 1}")[:100],
+            max_length=100,
+            placeholder="Ex.: Informações pessoais",
+        )
+        self.add_item(discord.ui.Label(text="Nome da etapa", component=self.titulo))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id, self.guild_id):
+            await interaction.response.send_message("A edição da etapa é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        titulo = str(self.titulo.value or "").strip()
+        if not titulo:
+            await interaction.response.send_message("Informe um nome para a etapa.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        ok = await formularios.atualizar_pagina(self.guild_id, self.formulario_id, self.indice, titulo)
+        if not ok:
+            await interaction.followup.send("A etapa não existe mais. Atualize a central.", ephemeral=True)
+            return
+        await self.cog.atualizar_central_inscricoes(interaction.guild)
+        await self.cog.enviar_central_formularios(
+            interaction, self.guild_id, self.usuario_id, self.formulario_id,
+            f"Etapa {self.indice + 1} renomeada para **{titulo}**.",
+        )
+
+
+class SeletorPaginaEditar(discord.ui.Select):
+    def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict):
+        self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
+        self.formulario_id = str(formulario["id"])
+        opcoes = []
+        for indice, pagina in enumerate(formulario.get("paginas", [])):
+            perguntas = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina if isinstance(pagina, list) else []
+            titulo = pagina.get("titulo") if isinstance(pagina, dict) else f"Etapa {indice + 1}"
+            opcoes.append(discord.SelectOption(
+                label=f"Etapa {indice + 1} · {str(titulo or '')[:65]}"[:100],
+                value=str(indice),
+                description=f"{len(perguntas)} pergunta(s)",
+            ))
+        super().__init__(
+            placeholder="Selecione a etapa que deseja renomear",
+            min_values=1,
+            max_values=1,
+            options=opcoes[:25],
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if not _administrador_formularios(interaction, self.usuario_id, self.guild_id):
+            await interaction.response.send_message("A edição da etapa é restrita à administração que abriu a central.", ephemeral=True)
+            return
+        indice = int(self.values[0])
+        formulario = await formularios.get_formulario(self.guild_id, self.formulario_id)
+        if not formulario or not 0 <= indice < len(formulario.get("paginas", [])):
+            await interaction.response.send_message("A etapa não existe mais. Atualize a central.", ephemeral=True)
+            return
+        pagina = formulario["paginas"][indice]
+        titulo = pagina.get("titulo") if isinstance(pagina, dict) else f"Etapa {indice + 1}"
+        await interaction.response.send_modal(ModalEditarEtapa(
+            self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice, str(titulo or "")
+        ))
+
+
 class ConfirmarRemocaoPaginaView(discord.ui.View):
     def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str, indice: int):
         super().__init__(timeout=120)
@@ -1043,24 +1160,84 @@ class GerenciarCargosView(discord.ui.View):
 
 
 class ModalEditarPergunta(discord.ui.Modal):
-    def __init__(self, cog, guild_id: int, usuario_id: int, formulario_id: str, indice_global: int, texto_atual: str):
-        super().__init__(title=f"Editar pergunta {indice_global + 1}")
+    def __init__(
+        self, cog, guild_id: int, usuario_id: int, formulario_id: str,
+        indice_global: int, texto_atual: str, tipo_atual: str = "paragrafo",
+        obrigatoria_atual: bool = True, opcoes_atuais: list[str] | None = None,
+    ):
+        super().__init__(title=f"Editar pergunta {indice_global + 1}"[:45])
         self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
         self.formulario_id, self.indice_global = formulario_id, indice_global
-        self.texto = discord.ui.TextInput(label="Enunciado da pergunta", style=discord.TextStyle.paragraph, default=texto_atual[:256], max_length=256)
-        self.add_item(self.texto)
+        tipo_atual = tipo_atual if tipo_atual in {"texto", "paragrafo", "escolha"} else "paragrafo"
+        self.texto = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph, default=str(texto_atual or "")[:256], max_length=256,
+        )
+        self.tipo = discord.ui.Select(
+            placeholder="Tipo de resposta", min_values=1, max_values=1, required=True,
+            options=[
+                discord.SelectOption(label="Texto curto", value="texto", default=tipo_atual == "texto"),
+                discord.SelectOption(label="Texto longo", value="paragrafo", default=tipo_atual == "paragrafo"),
+                discord.SelectOption(label="Escolha única", value="escolha", default=tipo_atual == "escolha"),
+            ],
+        )
+        self.obrigatoria = discord.ui.Select(
+            placeholder="Obrigatoriedade", min_values=1, max_values=1, required=True,
+            options=[
+                discord.SelectOption(label="Obrigatória", value="sim", default=bool(obrigatoria_atual)),
+                discord.SelectOption(label="Opcional", value="nao", default=not bool(obrigatoria_atual)),
+            ],
+        )
+        texto_opcoes = "\n".join(str(item) for item in (opcoes_atuais or []))[:3000]
+        self.opcoes = discord.ui.TextInput(
+            style=discord.TextStyle.paragraph, required=False, default=texto_opcoes or None,
+            placeholder="Uma opção por linha (ou separadas por |). Máximo: 25.", max_length=3000,
+        )
+        self.add_item(discord.ui.Label(text="Enunciado", component=self.texto))
+        self.add_item(discord.ui.Label(text="Tipo de resposta", component=self.tipo))
+        self.add_item(discord.ui.Label(text="Obrigatoriedade", component=self.obrigatoria))
+        self.add_item(discord.ui.Label(
+            text="Opções da escolha", description="Usado somente no tipo Escolha única.",
+            component=self.opcoes,
+        ))
 
     async def on_submit(self, interaction: discord.Interaction):
-        if not _administrador_formularios(interaction, self.usuario_id) or interaction.guild.id != self.guild_id:
+        if not _administrador_formularios(interaction, self.usuario_id, self.guild_id):
             await interaction.response.send_message("A edição de perguntas é restrita à administração que abriu a central.", ephemeral=True)
             return
+        tipo = self.tipo.values[0] if self.tipo.values else "paragrafo"
+        obrigatoria = bool(self.obrigatoria.values and self.obrigatoria.values[0] == "sim")
+        opcoes = [
+            parte.strip()
+            for linha in str(self.opcoes.value or "").splitlines()
+            for parte in linha.split("|")
+            if parte.strip()
+        ]
+        if tipo == "escolha":
+            if len(opcoes) < 2:
+                await interaction.response.send_message("Uma pergunta de escolha única precisa de pelo menos duas opções.", ephemeral=True)
+                return
+            if len(opcoes) > 25:
+                await interaction.response.send_message("O Discord permite no máximo 25 opções por pergunta.", ephemeral=True)
+                return
+            if any(len(opcao) > 100 for opcao in opcoes):
+                await interaction.response.send_message("Cada opção pode ter no máximo 100 caracteres.", ephemeral=True)
+                return
+        else:
+            opcoes = []
+
         await interaction.response.defer(ephemeral=True, thinking=True)
-        ok = await formularios.atualizar_pergunta(self.guild_id, self.formulario_id, self.indice_global, self.texto.value)
+        ok = await formularios.atualizar_pergunta(
+            self.guild_id, self.formulario_id, self.indice_global, self.texto.value,
+            tipo=tipo, obrigatoria=obrigatoria, opcoes=opcoes,
+        )
         if not ok:
-            await interaction.followup.send("Não foi possível localizar essa pergunta. Atualize a central.", ephemeral=True)
+            await interaction.followup.send("Não foi possível salvar a pergunta. Confira o enunciado e as opções.", ephemeral=True)
             return
         await self.cog.atualizar_central_inscricoes(interaction.guild)
-        await self.cog.enviar_central_formularios(interaction, self.guild_id, self.usuario_id, self.formulario_id, "Pergunta atualizada. Os dossiês existentes continuam exibindo os enunciados originais.")
+        await self.cog.enviar_central_formularios(
+            interaction, self.guild_id, self.usuario_id, self.formulario_id,
+            "Pergunta e configuração atualizadas. Os dossiês existentes continuam exibindo os enunciados originais.",
+        )
 
 
 class EditarPerguntasView(discord.ui.View):
@@ -1110,11 +1287,15 @@ class SeletorPerguntaEditar(discord.ui.Select):
     def __init__(self, cog, guild_id: int, usuario_id: int, formulario: dict, pagina: int = 0):
         self.cog, self.guild_id, self.usuario_id = cog, guild_id, usuario_id
         self.formulario_id = str(formulario["id"])
-        self.perguntas = [_texto_pergunta(pergunta) for pergunta in _perguntas_flat(formulario)]
+        self.perguntas = _perguntas_flat(formulario)
         inicio = pagina * 25
         opcoes = [
-            discord.SelectOption(label=f"Questão {indice + 1:02d}", value=str(indice), description=texto[:100])
-            for indice, texto in enumerate(self.perguntas[inicio:inicio + 25], start=inicio)
+            discord.SelectOption(
+                label=f"Questão {indice + 1:02d}",
+                value=str(indice),
+                description=_texto_pergunta(pergunta)[:100],
+            )
+            for indice, pergunta in enumerate(self.perguntas[inicio:inicio + 25], start=inicio)
         ]
         super().__init__(placeholder=f"Selecione uma pergunta · página {pagina + 1}", min_values=1, max_values=1, options=opcoes)
 
@@ -1123,8 +1304,13 @@ class SeletorPerguntaEditar(discord.ui.Select):
             await interaction.response.send_message("A edição é restrita à administração que abriu a central.", ephemeral=True)
             return
         indice = int(self.values[0])
+        pergunta = self.perguntas[indice]
+        tipo = _tipo_pergunta(pergunta)
+        obrigatoria = pergunta.get("obrigatoria", True) if isinstance(pergunta, dict) else True
+        opcoes = pergunta.get("opcoes", []) if isinstance(pergunta, dict) else []
         await interaction.response.send_modal(ModalEditarPergunta(
-            self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice, self.perguntas[indice]
+            self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice,
+            _texto_pergunta(pergunta), tipo, bool(obrigatoria), opcoes,
         ))
 
 
@@ -1137,6 +1323,7 @@ class SeletorAcaoFormulario(discord.ui.Select):
             options=[
                 discord.SelectOption(label="Editar dados do formulário", value="editar"),
                 discord.SelectOption(label="Adicionar etapa de perguntas", value="adicionar_etapa"),
+                discord.SelectOption(label="Renomear etapa", value="editar_etapa"),
                 discord.SelectOption(label="Editar pergunta", value="editar_pergunta"),
                 discord.SelectOption(label="Remover etapa de perguntas", value="remover_etapa"),
                 discord.SelectOption(label="Configurar cargos notificados", value="cargos"),
@@ -1165,6 +1352,17 @@ class SeletorAcaoFormulario(discord.ui.Select):
             return
         if acao == "adicionar_etapa":
             await interaction.response.send_modal(ModalAdicionarPerguntas(central.cog, interaction.guild.id, interaction.user.id, central.formulario_id))
+            return
+        if acao == "editar_etapa":
+            paginas = formulario.get("paginas", [])
+            if not paginas:
+                await interaction.response.send_message("Este formulário ainda não possui etapas.", ephemeral=True)
+                return
+            view = discord.ui.View(timeout=120)
+            view.add_item(SeletorPaginaEditar(central.cog, interaction.guild.id, interaction.user.id, formulario))
+            await interaction.response.send_message(
+                "Escolha a etapa cujo título deseja alterar.", view=view, ephemeral=True,
+            )
             return
         if acao == "editar_pergunta":
             perguntas = _perguntas_flat(formulario)
@@ -1374,18 +1572,46 @@ class CentralFormulariosView(discord.ui.View):
             self.add_item(SeletorFilaCandidaturas(self))
             self.add_item(SeletorHistoricoCandidaturas(self))
 
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if not _administrador_formularios(interaction, self.usuario_id, self.guild_id):
+            await interaction.response.send_message(
+                "Esta central é privada e só pode ser utilizada pela liderança que a abriu no servidor de origem.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
     def montar_embed(self, mensagem: str | None = None):
         formulario = next((item for item in self.lista if str(item.get("id")) == str(self.formulario_id)), None)
         if not formulario:
             return criar_embed("✦・ CENTRAL DE FORMULÁRIOS ・✦", "Nenhum formulário disponível.", cor=0x9F1239)
         status = "ARQUIVADO" if formulario.get("arquivado") else "ATIVO" if formulario.get("ativo", True) else "PAUSADO"
+        paginas = formulario.get("paginas", []) if isinstance(formulario.get("paginas", []), list) else []
+        linhas_etapas = []
+        for indice, pagina in enumerate(paginas[:6], start=1):
+            perguntas_pagina = pagina.get("perguntas", []) if isinstance(pagina, dict) else pagina if isinstance(pagina, list) else []
+            titulo_etapa = pagina.get("titulo") if isinstance(pagina, dict) else f"Etapa {indice}"
+            linhas_etapas.append(f"• **{indice}. {str(titulo_etapa or f'Etapa {indice}')[:55]}** — {len(perguntas_pagina)} pergunta(s)")
+        if len(paginas) > 6:
+            linhas_etapas.append(f"• + {len(paginas) - 6} etapa(s)")
+        if not linhas_etapas:
+            linhas_etapas = ["• Nenhuma etapa configurada."]
+        contagem_tipos = {"texto": 0, "paragrafo": 0, "escolha": 0}
+        for pergunta in _perguntas_flat(formulario):
+            contagem_tipos[_tipo_pergunta(pergunta)] += 1
+        resumo_tipos = (
+            f"Texto curto: {contagem_tipos['texto']} · Texto longo: {contagem_tipos['paragrafo']} · "
+            f"Escolha única: {contagem_tipos['escolha']}"
+        )
         corpo = (
             f"**FORMULÁRIO**\n{formulario.get('nome', 'Sem nome')}\n\n"
             f"**SITUAÇÃO**　{status}\n"
             f"**IDENTIFICADOR**　{formulario.get('id')}\n"
             f"**ETAPAS**　{len(_paginas_modal(formulario)):02d}\n"
             f"**PERGUNTAS**　{len(_perguntas_flat(formulario)):02d}\n"
-            f"**CARGOS NOTIFICADOS**　{len(formulario.get('cargos_notificar', [])):02d}"
+            f"**CARGOS NOTIFICADOS**　{len(formulario.get('cargos_notificar', [])):02d}\n\n"
+            f"**ESTRUTURA DAS ETAPAS**\n{chr(10).join(linhas_etapas)}\n\n"
+            f"**TIPOS DE RESPOSTA**\n{resumo_tipos}"
         )
         if mensagem:
             corpo += f"\n\n{mensagem}"
