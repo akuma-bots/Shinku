@@ -9,6 +9,8 @@ import asyncio
 import base64
 import json
 import os
+import math
+import array
 import time
 import logging
 import random
@@ -760,6 +762,63 @@ class MusicPanelView(discord.ui.View):
         )
 
 
+class AudioDiagnostico(discord.AudioSource):
+    """Mede o PCM entregue ao player sem alterar os bytes enviados."""
+
+    def __init__(self, original: discord.AudioSource, guild_id: int, titulo: str):
+        self.original = original
+        self.guild_id = guild_id
+        self.titulo = titulo
+        self.frames = 0
+        self.bytes_lidos = 0
+        self.amostras = 0
+        self.amostras_nao_zero = 0
+        self.soma_quadrados = 0
+        self.pico = 0
+
+    def is_opus(self) -> bool:
+        return self.original.is_opus()
+
+    def read(self) -> bytes:
+        dados = self.original.read()
+        if not dados:
+            self._registrar("fim")
+            return dados
+
+        self.frames += 1
+        self.bytes_lidos += len(dados)
+        if len(dados) % 2 == 0:
+            amostras = array.array("h")
+            amostras.frombytes(dados)
+            if amostras:
+                pico = max(abs(valor) for valor in amostras)
+                self.pico = max(self.pico, pico)
+                self.amostras += len(amostras)
+                self.amostras_nao_zero += sum(1 for valor in amostras if valor != 0)
+                self.soma_quadrados += sum(valor * valor for valor in amostras)
+
+        if self.frames % 250 == 0:
+            self._registrar("janela")
+        return dados
+
+    def _registrar(self, etapa: str) -> None:
+        rms = math.sqrt(self.soma_quadrados / self.amostras) if self.amostras else 0.0
+        LOG.info(
+            "Diagnóstico PCM (%s): guild=%s, faixa=%s, frames=%s, bytes=%s, "
+            "amostras=%s, nao_zero=%s, pico=%s, rms=%.2f.",
+            etapa, self.guild_id, self.titulo, self.frames, self.bytes_lidos,
+            self.amostras, self.amostras_nao_zero, self.pico, rms,
+        )
+        self.bytes_lidos = 0
+        self.amostras = 0
+        self.amostras_nao_zero = 0
+        self.soma_quadrados = 0
+        self.pico = 0
+
+    def cleanup(self) -> None:
+        self.original.cleanup()
+
+
 class Musica(commands.Cog):
     """Reprodução de música em canais de voz."""
 
@@ -1221,7 +1280,67 @@ class Musica(commands.Cog):
                         before_options=antes,
                         options=FFMPEG_OPCOES["options"],
                     )
-                    fonte = discord.PCMVolumeTransformer(fonte_pcm, volume=volume)
+                    fonte_volume = discord.PCMVolumeTransformer(fonte_pcm, volume=volume)
+
+                    # O handshake de voz pode terminar antes da sessão DAVE ficar pronta.
+                    # Se o servidor já negociou DAVE, não iniciar envio em texto claro.
+                    conexao = getattr(voz, "_connection", None)
+                    protocolo_dave = getattr(conexao, "dave_protocol_version", 0)
+                    if protocolo_dave > 0 and not getattr(conexao, "can_encrypt", False):
+                        LOG.warning(
+                            "Sessão DAVE ainda não está pronta; aguardando antes de iniciar áudio "
+                            "(guild=%s, protocolo=%s, sessão=%s).",
+                            gid, protocolo_dave, getattr(conexao, "dave_session", None) is not None,
+                        )
+                        limite = asyncio.get_running_loop().time() + 20
+                        while (
+                            protocolo_dave > 0
+                            and not getattr(conexao, "can_encrypt", False)
+                            and asyncio.get_running_loop().time() < limite
+                        ):
+                            await asyncio.sleep(0.25)
+                        if protocolo_dave > 0 and not getattr(conexao, "can_encrypt", False):
+                            raise RuntimeError(
+                                "A sessão segura de voz DAVE não ficou pronta em 20 segundos."
+                            )
+
+                    sessao_dave = getattr(conexao, "dave_session", None)
+                    LOG.info(
+                        "Estado de voz antes do áudio (guild=%s, protocolo_dave=%s, "
+                        "sessao_dave=%s, dave_pronto=%s, pode_criptografar=%s, modo=%s).",
+                        gid,
+                        getattr(conexao, "dave_protocol_version", 0),
+                        sessao_dave is not None,
+                        getattr(sessao_dave, "ready", False),
+                        getattr(conexao, "can_encrypt", False),
+                        getattr(voz, "mode", None),
+                    )
+
+                    # Mede o PCM e confirma se os datagramas UDP são aceitos pelo socket.
+                    # Os contadores permitem separar silêncio na fonte de falha no envio.
+                    fonte = AudioDiagnostico(fonte_volume, gid, item.get("title", "Música"))
+                    envio = getattr(conexao, "send_packet", None)
+                    if conexao is not None and callable(envio):
+                        contagem_udp = {"pacotes": 0, "bytes": 0}
+                        def enviar_monitorado(pacote):
+                            try:
+                                resultado = envio(pacote)
+                            except OSError:
+                                LOG.exception(
+                                    "Falha ao enviar pacote UDP de voz (guild=%s, pacote=%s, bytes=%s).",
+                                    gid, contagem_udp["pacotes"] + 1, len(pacote),
+                                )
+                                raise
+                            contagem_udp["pacotes"] += 1
+                            contagem_udp["bytes"] += len(pacote)
+                            if contagem_udp["pacotes"] % 250 == 0:
+                                LOG.info(
+                                    "Diagnóstico UDP: guild=%s, pacotes=%s, bytes=%s.",
+                                    gid, contagem_udp["pacotes"], contagem_udp["bytes"],
+                                )
+                            return resultado
+                        conexao.send_packet = enviar_monitorado
+
                     LOG.info(
                         "Iniciando transmissão PCM->Opus (guild=%s, faixa=%s, volume=%.2f, "
                         "ffmpeg=%s, opus_carregado=%s, headers=%s).",
