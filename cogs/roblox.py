@@ -9,7 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.guild_config import lideranca_only, membro_tem_lideranca
+from utils.guild_config import (\n    lideranca_only, membro_tem_lideranca,\n    CARGOS_AUTORIZADOS_HIERARQUIA_IDS, CARGOS_LIDERANCA_IDS,\n)
 from utils.storage import carregar, salvar
 
 ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {roblox_id, roblox_username} } }
@@ -131,10 +131,7 @@ class SeletorCargoRoblox(discord.ui.View):
                 ephemeral=True,
             )
             return
-        if cargo.id in {
-            1563995880007139425, 1563995880007139424,
-            1563995880007139423, 1563995880007139422,
-        }:
+        if cargo.id in (CARGOS_AUTORIZADOS_HIERARQUIA_IDS | CARGOS_LIDERANCA_IDS):
             await interaction.response.send_message(
                 "Cargos administrativos da NÊMESIS não podem ser concedidos por patente Roblox.",
                 ephemeral=True,
