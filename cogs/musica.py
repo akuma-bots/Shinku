@@ -994,7 +994,7 @@ class Musica(commands.Cog):
             host_conhecido = any(host == dominio or host.endswith("." + dominio) for dominio in permitidos)
             url_direta = parsed.path.lower().endswith(extensoes_audio)
             if parsed.scheme.lower() not in {"http", "https"} or not (host_conhecido or url_direta):
-                raise ValueError("Este link ainda não é de uma fonte musical compatível.")
+                raise ValueError("Provedor não permitido: este link ainda não é de uma fonte musical compatível.")
 
         def extrair():
             if "open.spotify.com/" in consulta.lower():
