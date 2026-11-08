@@ -34,7 +34,7 @@ class TestRegrasOficiais(unittest.TestCase):
             ],
         )
         self.assertTrue(embed.fields[0].value.startswith("1 "))
-        self.assertIn("\\n\\n2 ", embed.fields[0].value)
+        self.assertIn("\n\n2 ", embed.fields[0].value)
 
     def test_sete_niveis_de_punicao_na_ordem_solicitada(self):
         texto = construir_embed_regras().fields[9].value
