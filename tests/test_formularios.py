@@ -247,6 +247,28 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(view.anterior.disabled)
         self.assertTrue(view.proxima.disabled)
 
+    def test_fila_de_candidaturas_nao_cria_seletor_sem_opcoes_quando_esvazia(self):
+        central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
+        pendentes = [
+            {"id": "resp-1", "nome": "Candidato", "autor_id": 789, "criado_em": 1}
+        ]
+
+        view = cog_formularios.FilaCandidaturasView(central, pendentes)
+        self.assertTrue(any(isinstance(item, discord.ui.Select) for item in view.children))
+
+        # Simula a última candidatura sendo decidida enquanto a fila está aberta.
+        view.pendentes = []
+        view._montar()
+
+        self.assertFalse(any(isinstance(item, discord.ui.Select) for item in view.children))
+        self.assertTrue(view.anterior.disabled)
+        self.assertTrue(view.proxima.disabled)
+        self.assertTrue(any(
+            isinstance(item, discord.ui.Button) and item.label == "Atualizar fila"
+            for item in view.children
+        ))
+        self.assertIn("Nenhuma ficha está pendente", view.montar_embed().description)
+
     async def test_avaliacao_estruturada_e_anexada_sem_apagar_historico(self):
         resposta = {"id": "resp-1", "status": "pendente", "avaliacoes": []}
         dados = {"123": [resposta]}
