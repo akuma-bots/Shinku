@@ -576,6 +576,35 @@ class ModalPesquisaMusica(discord.ui.Modal):
         await self.cog.adicionar_consulta(interaction, self.consulta.value)
 
 
+class ModalVolumeMusica(discord.ui.Modal):
+    def __init__(self, cog: "Musica", guild_id: int):
+        super().__init__(title="Ajustar volume")
+        self.cog = cog
+        self.guild_id = guild_id
+        self.percentual = discord.ui.TextInput(label="Volume (1 a 150%)", placeholder="Ex.: 80", min_length=1, max_length=3)
+        self.add_item(self.percentual)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message("Este painel pertence a outro servidor.", ephemeral=True)
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        try:
+            valor = int(str(self.percentual.value).strip())
+        except ValueError:
+            await interaction.response.send_message("Informe um número inteiro entre 1 e 150.", ephemeral=True)
+            return
+        if not 1 <= valor <= 150:
+            await interaction.response.send_message("O volume deve ficar entre 1% e 150%.", ephemeral=True)
+            return
+        self.cog.volumes[self.guild_id] = valor / 100
+        voz = interaction.guild.voice_client
+        if voz and isinstance(voz.source, discord.PCMVolumeTransformer):
+            voz.source.volume = valor / 100
+        await interaction.response.send_message(f"🔊 Volume ajustado para **{valor}%**.", ephemeral=True)
+
+
 class MusicPanelView(discord.ui.View):
     """Painel persistente de música; todas as ações são feitas por botões e modais."""
 
@@ -663,6 +692,62 @@ class MusicPanelView(discord.ui.View):
 
 
 
+    @discord.ui.button(label="Histórico", emoji="🕘", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:historico", row=0)
+    async def historico(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        recentes = self.cog.historico.get(interaction.guild_id, [])
+        linhas = [
+            f"**{i}.** {discord.utils.escape_markdown(item.get('title', 'Música'))} · {self.cog._tempo(item.get('duration', 0))}"
+            for i, item in enumerate(reversed(recentes[-20:]), start=1)
+        ]
+        await interaction.response.send_message(
+            embed=self.cog._embed_musica("🕘 Reproduzidas recentemente", "\\n".join(linhas) if linhas else "Ainda não há músicas no histórico."),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Volume", emoji="🔊", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:volume", row=2)
+    async def volume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        await interaction.response.send_modal(ModalVolumeMusica(self.cog, GUILD_NEMESIS_ID))
+
+    @discord.ui.button(label="Autoplay: desligado", emoji="♾️", style=discord.ButtonStyle.secondary,
+                       custom_id="nemesis:musica:autoplay", row=2)
+    async def autoplay(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        ativo = not self.cog.autoplay.get(interaction.guild_id, False)
+        self.cog.autoplay[interaction.guild_id] = ativo
+        button.label = "Autoplay: ligado" if ativo else "Autoplay: desligado"
+        await interaction.response.send_message(
+            "♾️ Autoplay ativado: quando a fila terminar, vou procurar uma faixa relacionada."
+            if ativo else "Autoplay desativado.",
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Limpar fila", emoji="🧹", style=discord.ButtonStyle.danger,
+                       custom_id="nemesis:musica:limpar_fila", row=2)
+    async def limpar_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar_guild(interaction):
+            return
+        if not await self.cog._exigir_mesmo_canal(interaction):
+            return
+        fila = self.cog.filas.setdefault(interaction.guild_id, [])
+        total = len(fila)
+        fila.clear()
+        await interaction.response.send_message(
+            f"🧹 Fila limpa. A música atual continua tocando; {total} faixa(s) removida(s).",
+            ephemeral=True,
+        )
+
+
 class Musica(commands.Cog):
     """Reprodução de música em canais de voz."""
 
@@ -674,6 +759,8 @@ class Musica(commands.Cog):
         self.agora: dict[int, dict[str, Any]] = {}
         self.loop_modes: dict[int, str] = {}
         self.skip_requested: set[int] = set()
+        self.autoplay: dict[int, bool] = {}
+        self.historico: dict[int, list[dict[str, Any]]] = {}
         self._painel_sync = False
         self._painel_view_registrada = False
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
@@ -1055,6 +1142,13 @@ class Musica(commands.Cog):
                             f"Repetição: { {'off': 'desligada', 'track': 'música atual', 'queue': 'fila'}.get(self.loop_modes.get(gid, 'off'), 'desligada') }",
                         ), view=MusicControlView(self, gid))
                     await terminou.wait()
+                    historico = self.historico.setdefault(gid, [])
+                    historico.append({
+                        "title": item.get("title", "Música"),
+                        "webpage_url": item.get("webpage_url", ""),
+                        "duration": item.get("duration", 0),
+                    })
+                    del historico[:-50]
                     # O modo de repetição só é aplicado quando a faixa termina
                     # naturalmente; /skip e o botão Pular não repetem a faixa.
                     if gid in self.skip_requested:
@@ -1065,6 +1159,19 @@ class Musica(commands.Cog):
                             self.filas.setdefault(gid, []).insert(0, item)
                         elif modo_repeticao == "queue":
                             self.filas.setdefault(gid, []).append(item)
+                    if (
+                        not self.filas.get(gid)
+                        and self.autoplay.get(gid, False)
+                        and self.loop_modes.get(gid, "off") == "off"
+                    ):
+                        try:
+                            relacionadas = await self._extrair_varios(f"{item.get('title', '')} músicas relacionadas")
+                            if relacionadas:
+                                proxima = relacionadas[0]
+                                proxima["text_channel_id"] = item.get("text_channel_id", 0)
+                                self.filas.setdefault(gid, []).append(proxima)
+                        except Exception:
+                            LOG.exception("Autoplay não conseguiu localizar faixa relacionada no servidor %s.", gid)
                 except Exception as erro:
                     # Antes a falha do FFmpeg/VoiceClient podia encerrar a faixa
                     # sem explicar ao membro por que não houve som.
