@@ -6,11 +6,11 @@ import discord
 from discord.ext import commands
 from utils.apresentacao import criar_embed
 from utils.guild_config import membro_tem_lideranca
-from utils.registro_global import obter_topico
 from utils.storage import carregar, salvar
 
 logger = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = 1563995879981981817
+CANAL_CONVITES_ID = 1563995880623841332
 ARQUIVO_CONVITES = "convites_nemesis.json"
 
 
@@ -292,16 +292,60 @@ class ConvitesNemesis(commands.Cog):
 
     async def _atualizar_painel(self, guild):
         try:
-            thread = await obter_topico(guild, "convites")
-            if thread.archived or thread.locked:
-                await thread.edit(archived=False, locked=False)
-            msg = await thread.fetch_message(thread.id)
-            await msg.edit(
-                view=PainelConsultaConvitesView(),
-                allowed_mentions=discord.AllowedMentions.none(),
+            canal = guild.get_channel(CANAL_CONVITES_ID)
+            if canal is None:
+                canal = await guild.fetch_channel(CANAL_CONVITES_ID)
+            if not isinstance(canal, discord.TextChannel):
+                raise TypeError(
+                    f"O canal {CANAL_CONVITES_ID} precisa ser um canal de texto."
+                )
+
+            painel = None
+            async for mensagem in canal.history(limit=50):
+                if (
+                    mensagem.author.id == self.bot.user.id
+                    and mensagem.embeds
+                    and mensagem.embeds[0].title == "🔗 CENTRAL DE CONVITES"
+                ):
+                    painel = mensagem
+                    break
+
+            embed = criar_embed(
+                title="🔗 CENTRAL DE CONVITES",
+                description=(
+                    "**Consulte os convites de qualquer integrante.**\n"
+                    "Selecione uma pessoa para visualizar a quantidade de convidados, "
+                    "os links utilizados e quem permanece no servidor. "
+                    "A consulta é individual e privada; não existe ranking."
+                ),
+                cor=0x991B33,
+                rodape="NÊMESIS • CENTRAL DE CONVITES",
             )
+            if painel is None:
+                await canal.send(
+                    embed=embed,
+                    view=PainelConsultaConvitesView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                logger.info(
+                    "Painel da Central de Convites publicado no canal %s.",
+                    CANAL_CONVITES_ID,
+                )
+            else:
+                await painel.edit(
+                    embed=embed,
+                    view=PainelConsultaConvitesView(),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                logger.info(
+                    "Painel da Central de Convites atualizado no canal %s.",
+                    CANAL_CONVITES_ID,
+                )
         except Exception:
-            logger.exception("Falha ao publicar painel de convites.")
+            logger.exception(
+                "Falha ao publicar a Central de Convites no canal %s.",
+                CANAL_CONVITES_ID,
+            )
 
     @commands.Cog.listener()
     async def on_ready(self):
