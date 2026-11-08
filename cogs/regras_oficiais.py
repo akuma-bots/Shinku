@@ -197,10 +197,17 @@ class RegrasOficiais(commands.Cog):
             async for mensagem in canal.history(limit=200, oldest_first=False):
                 if self.bot.user is None or mensagem.author.id != self.bot.user.id:
                     continue
-                if any(
-                    item.footer and (item.footer.text or "").startswith(MARCADOR_PUBLICACAO)
+                titulos_artigos = {titulo for titulo, _ in SECOES_REGRAS}
+                eh_publicacao_oficial = any(
+                    (
+                        item.footer
+                        and (item.footer.text or "").startswith(MARCADOR_PUBLICACAO)
+                    )
+                    or item.title == "CÓDIGO DE CONDUTA • NÊMESIS"
+                    or any(campo.name in titulos_artigos for campo in item.fields)
                     for item in mensagem.embeds
-                ):
+                )
+                if eh_publicacao_oficial:
                     existentes.append(mensagem)
         except discord.HTTPException:
             logging.exception("Código de Conduta: falha ao consultar publicações anteriores.")
