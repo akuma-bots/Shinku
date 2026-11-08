@@ -1230,6 +1230,10 @@ class Musica(commands.Cog):
                 loop = asyncio.get_running_loop()
                 terminou = asyncio.Event()
 
+                conexao = None
+                envio_original = None
+                contagem_udp = None
+
                 def ao_terminar(erro):
                     if erro:
                         LOG.error("Erro de reprodução no servidor %s: %s", gid, erro)
@@ -1294,12 +1298,15 @@ class Musica(commands.Cog):
                         )
                         limite = asyncio.get_running_loop().time() + 20
                         while (
-                            protocolo_dave > 0
+                            getattr(conexao, "dave_protocol_version", 0) > 0
                             and not getattr(conexao, "can_encrypt", False)
                             and asyncio.get_running_loop().time() < limite
                         ):
                             await asyncio.sleep(0.25)
-                        if protocolo_dave > 0 and not getattr(conexao, "can_encrypt", False):
+                        if (
+                            getattr(conexao, "dave_protocol_version", 0) > 0
+                            and not getattr(conexao, "can_encrypt", False)
+                        ):
                             raise RuntimeError(
                                 "A sessão segura de voz DAVE não ficou pronta em 20 segundos."
                             )
@@ -1319,12 +1326,12 @@ class Musica(commands.Cog):
                     # Mede o PCM e confirma se os datagramas UDP são aceitos pelo socket.
                     # Os contadores permitem separar silêncio na fonte de falha no envio.
                     fonte = AudioDiagnostico(fonte_volume, gid, item.get("title", "Música"))
-                    envio = getattr(conexao, "send_packet", None)
-                    if conexao is not None and callable(envio):
+                    envio_original = getattr(conexao, "send_packet", None)
+                    if conexao is not None and callable(envio_original):
                         contagem_udp = {"pacotes": 0, "bytes": 0}
                         def enviar_monitorado(pacote):
                             try:
-                                resultado = envio(pacote)
+                                resultado = envio_original(pacote)
                             except OSError:
                                 LOG.exception(
                                     "Falha ao enviar pacote UDP de voz (guild=%s, pacote=%s, bytes=%s).",
@@ -1418,6 +1425,13 @@ class Musica(commands.Cog):
                         except (discord.Forbidden, discord.HTTPException):
                             LOG.warning("Não foi possível enviar o diagnóstico de reprodução no canal %s.", canal_id)
                 finally:
+                    if conexao is not None and callable(envio_original):
+                        conexao.send_packet = envio_original
+                    if contagem_udp is not None:
+                        LOG.info(
+                            "Resumo UDP da faixa: guild=%s, pacotes=%s, bytes=%s.",
+                            gid, contagem_udp["pacotes"], contagem_udp["bytes"],
+                        )
                     if self.agora.get(gid) is item:
                         self.agora.pop(gid, None)
         finally:
