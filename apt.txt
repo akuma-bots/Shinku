@@ -1,1 +1,2 @@
 ffmpeg
+libopus0
