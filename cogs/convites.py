@@ -1,12 +1,12 @@
-from utils.apresentacao import criar_embed
-import asyncio
-import logging
+from __future__ import annotations
+import asyncio, logging
 from collections import defaultdict
-
+from datetime import datetime, timezone
 import discord
-from discord import app_commands
 from discord.ext import commands
-
+from utils.apresentacao import criar_embed
+from utils.guild_config import membro_tem_lideranca
+from utils.registro_global import obter_topico
 from utils.storage import carregar, salvar
 
 logger = logging.getLogger(__name__)
@@ -14,222 +14,443 @@ GUILD_NEMESIS_ID = 1563995879981981817
 ARQUIVO_CONVITES = "convites_nemesis.json"
 
 
+def _autorizado(interaction):
+    return bool(
+        interaction.guild_id == GUILD_NEMESIS_ID
+        and membro_tem_lideranca(interaction.user)
+    )
+
+
+def _resumo(servidor, inviter_id):
+    membros = servidor.get("_membros", {})
+    registro = servidor.get(str(inviter_id), {})
+    ativos_legados = (
+        set(map(str, registro.get("membros", [])))
+        if isinstance(registro, dict)
+        else set()
+    )
+    historico = servidor.get("_historico", {})
+    itens = []
+    for mid, item in membros.items() if isinstance(membros, dict) else []:
+        if isinstance(item, dict) and str(item.get("inviter_id")) == str(inviter_id):
+            itens.append({"member_id": str(mid), **item})
+    ids = {item["member_id"] for item in itens}
+    # O histórico antigo preserva convidados que já saíram; o campo membros
+    # representa apenas os que continuam presentes no servidor.
+    for mid, convidador in historico.items() if isinstance(historico, dict) else []:
+        if str(convidador) == str(inviter_id) and str(mid) not in ids:
+            itens.append(
+                {
+                    "member_id": str(mid),
+                    "active": str(mid) in ativos_legados,
+                    "legacy": True,
+                }
+            )
+    return itens
+
+
+def _total_paginas(servidor, inviter_id):
+    codigos = {item.get("code") or "legado" for item in _resumo(servidor, inviter_id)}
+    return max(1, (len(codigos) + 7) // 8)
+
+
+def _embed(membro, servidor, pagina=0):
+    itens = _resumo(servidor, membro.id)
+    ativos = sum(1 for x in itens if x.get("active", True))
+    embed = criar_embed(
+        title="🔗・CONSULTA INDIVIDUAL DE CONVITES",
+        description=(
+            f"**Integrante:** {membro.mention}\n**Convites atribuídos:** {len(itens)}"
+            f"\n**Convidados presentes:** {ativos}\n**Saídas:** {len(itens)-ativos}"
+        ),
+        cor=0x991B33,
+    )
+    embed.set_thumbnail(url=membro.display_avatar.url)
+    agrupados = {}
+    for item in itens:
+        agrupados.setdefault(item.get("code") or "legado", []).append(item)
+    if not agrupados:
+        embed.add_field(
+            name="Links utilizados",
+            value="Nenhum convite atribuído foi registrado.",
+            inline=False,
+        )
+    grupos = list(agrupados.items())
+    total_paginas = max(1, (len(grupos) + 7) // 8)
+    pagina = max(0, min(pagina, total_paginas - 1))
+    inicio = pagina * 8
+    for code, grupo in grupos[inicio : inicio + 8]:
+        url = next((x.get("url") for x in grupo if x.get("url")), None)
+        presentes = sum(1 for x in grupo if x.get("active", True))
+        linhas = [
+            f"**Convidados:** {len(grupo)} • **Presentes:** {presentes}",
+            f"**Link:** {url or 'Não registrado (dado legado)'}",
+        ]
+        nomes = [
+            f"• {x.get('member_name') or x['member_id']} — {'presente' if x.get('active', True) else 'saiu'}"
+            for x in grupo[:3]
+        ]
+        if nomes:
+            linhas.append("**Membros:**\n" + "\n".join(nomes))
+        if len(grupo) > 3:
+            linhas.append(f"… e mais {len(grupo)-3}.")
+        embed.add_field(
+            name=f"Convite {code}" if code != "legado" else "Registros antigos",
+            value="\n".join(linhas)[:1024],
+            inline=False,
+        )
+    embed.set_footer(
+        text=f"Consulta privada • Página {pagina + 1}/{total_paginas} • Links exibidos somente quando registrados."
+    )
+    return embed
+
+
+class SeletorConvitesView(discord.ui.View):
+    def __init__(self, owner_id):
+        super().__init__(timeout=180)
+        self.owner_id = owner_id
+        self.seletor = discord.ui.UserSelect(
+            placeholder="Pesquise e selecione um integrante",
+            min_values=1,
+            max_values=1,
+            custom_id="nemesis:convites:membro:selecionar",
+        )
+        self.seletor.callback = self.selecionar
+        self.add_item(self.seletor)
+
+    async def interaction_check(self, interaction):
+        if interaction.user.id != self.owner_id or not _autorizado(interaction):
+            await interaction.response.send_message(
+                "Acesso restrito à liderança autorizada.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def selecionar(self, interaction):
+        membro = self.seletor.values[0]
+        if not isinstance(membro, discord.Member):
+            try:
+                membro = await interaction.guild.fetch_member(membro.id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                await interaction.response.send_message(
+                    "Integrante não encontrado.", ephemeral=True
+                )
+                return
+        if membro.bot:
+            await interaction.response.send_message(
+                "Bots não possuem consulta de convites.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        try:
+            dados = await carregar(ARQUIVO_CONVITES, {})
+            servidor = (
+                dados.get(str(GUILD_NEMESIS_ID), {}) if isinstance(dados, dict) else {}
+            )
+            await interaction.edit_original_response(
+                content=None,
+                embed=_embed(membro, servidor),
+                view=VoltarConvitesView(
+                    self.owner_id,
+                    membro.id,
+                    0,
+                    _total_paginas(servidor, membro.id),
+                ),
+            )
+        except Exception:
+            logger.exception("Falha na consulta de convites do membro %s.", membro.id)
+            await interaction.edit_original_response(
+                content="Não foi possível carregar os convites.", embed=None, view=None
+            )
+
+
+class VoltarConvitesView(discord.ui.View):
+    def __init__(self, owner_id, membro_id, pagina, total_paginas):
+        super().__init__(timeout=180)
+        self.owner_id = owner_id
+        self.membro_id = membro_id
+        self.pagina = pagina
+        self.total_paginas = total_paginas
+        self.anterior.disabled = pagina <= 0
+        self.proxima.disabled = pagina >= total_paginas - 1
+
+    async def _mudar_pagina(self, interaction, delta):
+        if interaction.user.id != self.owner_id or not _autorizado(interaction):
+            await interaction.response.send_message(
+                "Acesso restrito à liderança autorizada.", ephemeral=True
+            )
+            return
+        try:
+            membro = await interaction.guild.fetch_member(self.membro_id)
+            dados = await carregar(ARQUIVO_CONVITES, {})
+            servidor = (
+                dados.get(str(GUILD_NEMESIS_ID), {}) if isinstance(dados, dict) else {}
+            )
+            self.pagina = max(0, min(self.total_paginas - 1, self.pagina + delta))
+            self.anterior.disabled = self.pagina <= 0
+            self.proxima.disabled = self.pagina >= self.total_paginas - 1
+            await interaction.response.edit_message(
+                embed=_embed(membro, servidor, self.pagina), view=self
+            )
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message(
+                "Não foi possível atualizar esta consulta.", ephemeral=True
+            )
+
+    @discord.ui.button(
+        label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=0
+    )
+    async def anterior(self, interaction, button):
+        await self._mudar_pagina(interaction, -1)
+
+    @discord.ui.button(
+        label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary, row=0
+    )
+    async def proxima(self, interaction, button):
+        await self._mudar_pagina(interaction, 1)
+
+    @discord.ui.button(
+        label="Consultar outro integrante",
+        emoji="🔎",
+        style=discord.ButtonStyle.primary,
+        row=1,
+    )
+    async def voltar(self, interaction, button):
+        if interaction.user.id != self.owner_id or not _autorizado(interaction):
+            await interaction.response.send_message(
+                "Acesso restrito à liderança autorizada.", ephemeral=True
+            )
+            return
+        await interaction.response.edit_message(
+            content="Selecione um integrante.",
+            embed=None,
+            view=SeletorConvitesView(self.owner_id),
+        )
+
+
+class PainelConsultaConvitesView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Consultar convites de membro",
+        emoji="🔗",
+        style=discord.ButtonStyle.primary,
+        custom_id="nemesis:convites:abrir",
+    )
+    async def abrir(self, interaction, button):
+        if not _autorizado(interaction):
+            await interaction.response.send_message(
+                "Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            embed=criar_embed(
+                title="🔗 CENTRAL DE CONVITES",
+                description="Selecione um integrante para consultar quantos convites trouxe, quais links foram utilizados e quem continua no servidor. Consulta individual, não é um ranking.",
+                cor=0x991B33,
+                rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+            ),
+            view=SeletorConvitesView(interaction.user.id),
+            ephemeral=True,
+        )
+
+
 class ConvitesNemesis(commands.Cog):
-    """Rastreia o convidador original e conta apenas membros atualmente presentes."""
-
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot):
         self.bot = bot
-        self._convites: dict[int, dict[str, tuple[int, int | None]]] = {}
-        self._locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._inicializados: set[int] = set()
+        self._convites = {}
+        self._locks = defaultdict(asyncio.Lock)
+        self._inicializados = set()
+        self.bot.add_view(PainelConsultaConvitesView())
 
-    async def _buscar_convites(self, guild: discord.Guild):
+    async def _buscar_convites(self, guild):
         try:
             convites = await guild.invites()
         except (discord.Forbidden, discord.HTTPException):
-            logger.exception("Não foi possível ler convites da guild=%s. Verifique Gerenciar servidor.", guild.id)
+            logger.exception(
+                "Não foi possível ler convites; verifique Gerenciar servidor."
+            )
             return None
         return {
-            invite.code: (invite.uses or 0, invite.inviter.id if invite.inviter else None)
-            for invite in convites
+            i.code: (i.uses or 0, i.inviter.id if i.inviter else None) for i in convites
         }
 
-    async def _carregar_dados(self):
+    async def _carregar(self):
         dados = await carregar(ARQUIVO_CONVITES, {})
         if not isinstance(dados, dict):
             dados = {}
         servidor = dados.setdefault(str(GUILD_NEMESIS_ID), {})
-        historico = servidor.setdefault("_historico", {})
-        # Migra os registros antigos para preservar o convidador original.
-        for inviter_id, registro in servidor.items():
-            if inviter_id.startswith("_") or not isinstance(registro, dict):
+        servidor.setdefault("_historico", {})
+        servidor.setdefault("_membros", {})
+        for uid, reg in servidor.items():
+            if uid.startswith("_") or not isinstance(reg, dict):
                 continue
-            for member_id in registro.get("membros", []):
-                historico.setdefault(str(member_id), inviter_id)
+            for mid in reg.get("membros", []):
+                servidor["_historico"].setdefault(str(mid), uid)
         return dados, servidor
 
-    async def _salvar_dados(self, dados):
-        await salvar(ARQUIVO_CONVITES, dados)
+    async def _atualizar_painel(self, guild):
+        try:
+            thread = await obter_topico(guild, "convites")
+            if thread.archived or thread.locked:
+                await thread.edit(archived=False, locked=False)
+            msg = await thread.fetch_message(thread.id)
+            await msg.edit(
+                view=PainelConsultaConvitesView(),
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except Exception:
+            logger.exception("Falha ao publicar painel de convites.")
 
     @commands.Cog.listener()
     async def on_ready(self):
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
-        if guild is None or guild.id in self._inicializados:
+        if guild is None:
             return
-        cache = await self._buscar_convites(guild)
-        if cache is not None:
-            self._convites[guild.id] = cache
-            self._inicializados.add(guild.id)
-            await self._reconciliar_membros_ativos(guild)
-            logger.info("Cache de convites inicializado (guild=%s, convites=%s).", guild.id, len(cache))
+        if guild.id not in self._inicializados:
+            cache = await self._buscar_convites(guild)
+            if cache is not None:
+                self._convites[guild.id] = cache
+                self._inicializados.add(guild.id)
+                await self._reconciliar(guild)
+        await self._atualizar_painel(guild)
 
-    async def _reconciliar_membros_ativos(self, guild: discord.Guild):
+    async def _reconciliar(self, guild):
         try:
-            presentes = {str(member.id) async for member in guild.fetch_members(limit=None) if not member.bot}
+            presentes = {
+                str(m.id) async for m in guild.fetch_members(limit=None) if not m.bot
+            }
             async with self._locks[guild.id]:
-                dados, servidor = await self._carregar_dados()
-                alterado = False
-                for inviter_id, registro in servidor.items():
-                    if inviter_id.startswith("_") or not isinstance(registro, dict):
+                dados, servidor = await self._carregar()
+                membros = servidor["_membros"]
+                for mid, item in membros.items():
+                    if isinstance(item, dict):
+                        item["active"] = mid in presentes
+                for uid, reg in servidor.items():
+                    if uid.startswith("_") or not isinstance(reg, dict):
                         continue
-                    ativos = set(map(str, registro.get("membros", [])))
-                    filtrados = ativos & presentes
-                    if filtrados != ativos:
-                        registro["membros"] = sorted(filtrados)
-                        registro["total"] = len(filtrados)
-                        alterado = True
-                if alterado:
-                    await self._salvar_dados(dados)
+                    ativos = {
+                        mid
+                        for mid, item in membros.items()
+                        if isinstance(item, dict)
+                        and str(item.get("inviter_id")) == uid
+                        and item.get("active")
+                    }
+                    antigos = {
+                        str(mid)
+                        for mid in reg.get("membros", [])
+                        if str(mid) in presentes and str(mid) not in membros
+                    }
+                    reg["membros"] = sorted(ativos | antigos)
+                    reg["total"] = len(reg["membros"])
+                await salvar(ARQUIVO_CONVITES, dados)
         except (discord.Forbidden, discord.HTTPException):
-            logger.exception("Não foi possível reconciliar convidados ativos (guild=%s).", guild.id)
+            logger.exception("Falha ao reconciliar convites ativos.")
 
     @commands.Cog.listener()
-    async def on_invite_create(self, invite: discord.Invite):
-        if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
-            return
-        async with self._locks[invite.guild.id]:
-            self._convites.setdefault(invite.guild.id, {})[invite.code] = (
-                invite.uses or 0, invite.inviter.id if invite.inviter else None
-            )
+    async def on_invite_create(self, invite):
+        if invite.guild and invite.guild.id == GUILD_NEMESIS_ID:
+            async with self._locks[invite.guild.id]:
+                self._convites.setdefault(invite.guild.id, {})[invite.code] = (
+                    invite.uses or 0,
+                    invite.inviter.id if invite.inviter else None,
+                )
 
     @commands.Cog.listener()
-    async def on_invite_delete(self, invite: discord.Invite):
-        if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
-            return
-        async with self._locks[invite.guild.id]:
-            self._convites.setdefault(invite.guild.id, {}).pop(invite.code, None)
+    async def on_invite_delete(self, invite):
+        if invite.guild and invite.guild.id == GUILD_NEMESIS_ID:
+            async with self._locks[invite.guild.id]:
+                self._convites.setdefault(invite.guild.id, {}).pop(invite.code, None)
 
     @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member):
+    async def on_member_join(self, member):
         guild = member.guild
         if guild.id != GUILD_NEMESIS_ID or member.bot:
             return
         async with self._locks[guild.id]:
-            dados, servidor = await self._carregar_dados()
-            historico = servidor.setdefault("_historico", {})
-            member_key = str(member.id)
-
-            # Retorno de membro conhecido: reativa o vínculo original sem duplicar nem reatribuir.
-            convidador_salvo = historico.get(member_key)
-            if convidador_salvo:
-                registro = servidor.setdefault(str(convidador_salvo), {"total": 0, "membros": []})
-                ativos = set(map(str, registro.setdefault("membros", [])))
-                ativos.add(member_key)
-                registro["membros"] = sorted(ativos)
-                registro["total"] = len(ativos)
-                await self._salvar_dados(dados)
-                logger.info("Membro retornou; vínculo original restaurado (guild=%s, member=%s, inviter=%s).",
-                            guild.id, member.id, convidador_salvo)
-                return
-
+            dados, servidor = await self._carregar()
+            hist, membros = servidor["_historico"], servidor["_membros"]
+            mid = str(member.id)
             anterior = self._convites.get(guild.id)
             atual = await self._buscar_convites(guild)
             if atual is None:
                 return
             self._convites[guild.id] = atual
+            if hist.get(mid):
+                item = membros.setdefault(
+                    mid, {"inviter_id": str(hist[mid]), "legacy": True}
+                )
+                item.update(
+                    active=True,
+                    returned_at=datetime.now(timezone.utc).timestamp(),
+                    member_name=member.display_name,
+                )
+                reg = servidor.setdefault(str(hist[mid]), {"total": 0, "membros": []})
+                ativos = set(map(str, reg.get("membros", [])))
+                ativos.add(mid)
+                reg["membros"] = sorted(ativos)
+                reg["total"] = len(ativos)
+                await salvar(ARQUIVO_CONVITES, dados)
+                return
             if anterior is None:
                 return
-
             usados = [
-                (code, invite_data)
-                for code, invite_data in atual.items()
-                if code in anterior and invite_data[0] > anterior[code][0]
+                (code, info)
+                for code, info in atual.items()
+                if code in anterior and info[0] > anterior[code][0]
             ]
             if len(usados) != 1:
-                logger.info("Convite não identificado com segurança (guild=%s, member=%s, candidatos=%s).",
-                            guild.id, member.id, len(usados))
+                logger.info(
+                    "Convite não identificado com segurança: member=%s candidates=%s",
+                    member.id,
+                    len(usados),
+                )
                 return
-
-            code, (_, inviter_id) = usados[0]
-            if not inviter_id or inviter_id == member.id:
+            code, (_, inviter) = usados[0]
+            if not inviter or inviter == member.id:
                 return
-
-            historico[member_key] = str(inviter_id)
-            registro = servidor.setdefault(str(inviter_id), {"total": 0, "membros": []})
-            ativos = set(map(str, registro.setdefault("membros", [])))
-            ativos.add(member_key)
-            registro["membros"] = sorted(ativos)
-            registro["total"] = len(ativos)
-            registro["ultimo_membro"] = member.id
-            registro["ultimo_codigo"] = code
-            await self._salvar_dados(dados)
-            logger.info("Convite atribuído (guild=%s, inviter=%s, member=%s, code=%s).",
-                        guild.id, inviter_id, member.id, code)
+            hist[mid] = str(inviter)
+            membros[mid] = {
+                "inviter_id": str(inviter),
+                "code": code,
+                "url": f"https://discord.gg/{code}",
+                "joined_at": datetime.now(timezone.utc).timestamp(),
+                "member_name": member.display_name,
+                "active": True,
+            }
+            reg = servidor.setdefault(str(inviter), {"total": 0, "membros": []})
+            ativos = set(map(str, reg.get("membros", [])))
+            ativos.add(mid)
+            reg["membros"] = sorted(ativos)
+            reg["total"] = len(ativos)
+            reg["ultimo_membro"] = member.id
+            reg["ultimo_codigo"] = code
+            await salvar(ARQUIVO_CONVITES, dados)
 
     @commands.Cog.listener()
-    async def on_member_remove(self, member: discord.Member):
+    async def on_member_remove(self, member):
         if member.guild.id != GUILD_NEMESIS_ID or member.bot:
             return
         async with self._locks[member.guild.id]:
-            dados, servidor = await self._carregar_dados()
-            member_key = str(member.id)
-            removido = False
-            for user_id, registro in servidor.items():
-                if user_id.startswith("_") or not isinstance(registro, dict):
-                    continue
-                ativos = set(map(str, registro.get("membros", [])))
-                if member_key in ativos:
-                    ativos.remove(member_key)
-                    registro["membros"] = sorted(ativos)
-                    registro["total"] = len(ativos)
-                    removido = True
-            # O histórico é preservado para que uma reentrada não conte como novo convite.
-            if removido:
-                await self._salvar_dados(dados)
-                logger.info("Membro saiu; removido da contagem ativa (guild=%s, member=%s).",
-                            member.guild.id, member.id)
-
-    @app_commands.command(name="convites", description="Mostra quantos convidados seus continuam na NÊMESIS.")
-    @app_commands.guild_only()
-    async def meus_convites(self, interaction: discord.Interaction):
-        if interaction.guild_id != GUILD_NEMESIS_ID:
-            await interaction.response.send_message("Este comando só funciona na NÊMESIS.", ephemeral=True)
-            return
-        try:
-            dados, servidor = await self._carregar_dados()
-            registro = servidor.get(str(interaction.user.id), {})
-            ativos = set(map(str, registro.get("membros", [])))
-            embed = criar_embed(
-                title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — SEUS CONVITES・✦",
-                description=f"Você tem **{len(ativos)}** membro(s) convidado(s) que continuam no servidor.",
-                color=0x9F1239,
-            )
-            embed.set_thumbnail(url=interaction.user.display_avatar.url)
-            embed.set_footer(text="Saídas são descontadas; reentradas não geram duplicatas.")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception:
-            logger.exception("Falha ao consultar convites do usuário=%s.", interaction.user.id)
-            await interaction.response.send_message("Não consegui consultar seus convites agora. A equipe técnica foi avisada.", ephemeral=True)
-
-    @app_commands.command(name="ranking-convites", description="Ranking de convidados que continuam na NÊMESIS.")
-    @app_commands.guild_only()
-    async def ranking_convites(self, interaction: discord.Interaction):
-        if interaction.guild_id != GUILD_NEMESIS_ID:
-            await interaction.response.send_message("Este comando só funciona na NÊMESIS.", ephemeral=True)
-            return
-        try:
-            _, servidor = await self._carregar_dados()
-            ranking = sorted(
-                ((user_id, len(set(map(str, item.get("membros", [])))))
-                 for user_id, item in servidor.items()
-                 if not user_id.startswith("_") and isinstance(item, dict)),
-                key=lambda item: item[1],
-                reverse=True,
-            )
-            linhas = []
-            for posicao, (user_id, total) in enumerate([item for item in ranking if item[1] > 0][:10], start=1):
-                linhas.append(f"**{posicao}.** <@{user_id}> — **{total}** membro(s) ativo(s)")
-            embed = criar_embed(
-                title="✦・𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 — RANKING DE CONVITES・✦",
-                description="\n".join(linhas) if linhas else "Ainda não há convidados ativos contabilizados.",
-                color=0x9F1239,
-            )
-            embed.set_footer(text="Só contam membros presentes no servidor; sem duplicatas.")
-            await interaction.response.send_message(embed=embed, allowed_mentions=discord.AllowedMentions.none())
-        except Exception:
-            logger.exception("Falha ao montar ranking de convites.")
-            await interaction.response.send_message("Não consegui carregar o ranking agora. A equipe técnica foi avisada.", ephemeral=True)
+            dados, servidor = await self._carregar()
+            mid = str(member.id)
+            item = servidor["_membros"].get(mid)
+            if isinstance(item, dict):
+                item.update(
+                    active=False,
+                    left_at=datetime.now(timezone.utc).timestamp(),
+                    member_name=member.display_name,
+                )
+            inviter = servidor["_historico"].get(mid)
+            if inviter:
+                reg = servidor.setdefault(str(inviter), {"total": 0, "membros": []})
+                ativos = set(map(str, reg.get("membros", [])))
+                ativos.discard(mid)
+                reg["membros"] = sorted(ativos)
+                reg["total"] = len(ativos)
+                await salvar(ARQUIVO_CONVITES, dados)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(ConvitesNemesis(bot))
