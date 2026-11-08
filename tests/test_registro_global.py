@@ -14,7 +14,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
             "administracao", "seguranca", "missoes",
         }
         self.assertTrue(essenciais.issubset(registro_global.CATEGORIAS))
-        self.assertEqual(len(registro_global.CATEGORIAS), 12)
+        self.assertEqual(len(registro_global.CATEGORIAS), 13)
         nomes = [nome for nome, _ in registro_global.CATEGORIAS.values()]
         self.assertEqual(len(nomes), len(set(nomes)))
 
