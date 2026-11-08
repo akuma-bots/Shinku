@@ -15,107 +15,49 @@ MARCADOR_PUBLICACAO = "NÊMESIS • Código de Conduta oficial"
 # atualizar também as referências de infração em cogs/automod.py.
 SECOES_REGRAS = (
     (
-        "1 - Conduta e respeito",
-        ""
-        "**1.1° RESPEITO** — Trate todos com dignidade, sem ataques por cargo, opinião ou tempo de servidor.\n\n"
-        "**1.2° OFENSAS** — São proibidos insultos, ameaças, humilhação e discriminação.\n\n"
-        "**1.3° ASSÉDIO** — Não persiga, intimide ou constranja membros, nem incentive terceiros.\n\n"
-        "**1.4° CONVIVÊNCIA** — Interrompa brincadeiras quando causarem desconforto.\n\n"
-        "**1.5° ORIENTAÇÕES** — Cumpra orientações legítimas da Staff e apresente discordâncias com respeito.",
+        "1 Conduta",
+        "1 Respeite todos os integrantes, independentemente de cargo, opinião ou tempo de servidor.\n\n2 Não são permitidos insultos, ameaças, humilhação ou discriminação.\n\n3 Não persiga, intimide ou constranja membros, nem incentive terceiros a fazê-lo.\n\n4 Interrompa brincadeiras quando causarem desconforto.\n\n5 Cumpra orientações legítimas da Staff e apresente discordâncias com respeito.",
     ),
     (
-        "2 - Comunicação e organização",
-        ""
-        "**2.1° CANAIS** — Use cada canal para sua finalidade.\n\n"
-        "**2.2° SPAM** — Não envie mensagens repetidas, excessivas ou destinadas a poluir canais.\n\n"
-        "**2.3° MENÇÕES** — Não abuse de menções a membros, cargos ou @everyone/@here.\n\n"
-        "**2.4° TUMULTO** — É proibido organizar raids, invasões ou perturbações.\n\n"
-        "**2.5° EVASÃO** — Não burle filtros, restrições ou punições.",
+        "2 Comunicação e organização",
+        "1 Use cada canal para sua finalidade.\n\n2 Não envie mensagens repetidas, excessivas ou destinadas a poluir os canais.\n\n3 Não abuse de menções a membros, cargos, @everyone ou @here.\n\n4 É proibido organizar raids, invasões ou perturbações.\n\n5 Não burle filtros, restrições ou punições.",
     ),
     (
-        "3 - Conteúdo e segurança digital",
-        ""
-        "**3.1° CONTEÚDO** — Não publique pornografia, conteúdo sexual explícito ou violência gráfica extrema.\n\n"
-        "**3.2° MENORES** — É proibido qualquer conteúdo de exploração ou sexualização de menores.\n\n"
-        "**3.3° FRAUDES** — Não divulgue golpes, phishing, links maliciosos ou falsos sorteios.\n\n"
-        "**3.4° MALWARE** — Não compartilhe arquivos ou ferramentas destinados a comprometer dispositivos.\n\n"
-        "**3.5° DANO DIGITAL** — Não facilite invasões ou ataques contra sistemas e terceiros.",
+        "3 Conteúdo e segurança digital",
+        "1 Não publique pornografia, conteúdo sexual explícito ou violência gráfica extrema.\n\n2 É proibido qualquer conteúdo de exploração ou sexualização de menores.\n\n3 Não divulgue golpes, phishing, links maliciosos ou falsos sorteios.\n\n4 Não compartilhe arquivos ou ferramentas destinados a comprometer dispositivos.\n\n5 Não facilite invasões ou ataques contra sistemas e terceiros.",
     ),
     (
-        "4 - Privacidade e identidade",
-        ""
-        "**4.1° DADOS PESSOAIS** — Não exponha endereço, telefone, IP, documentos ou dados privados sem autorização.\n\n"
-        "**4.2° DOXXING** — É proibido expor dados para ameaçar, constranger ou prejudicar alguém.\n\n"
-        "**4.3° CREDENCIAIS** — Não solicite nem publique senhas, tokens ou códigos de autenticação.\n\n"
-        "**4.4° CONVERSAS** — Não divulgue conteúdo privado sem autorização, salvo denúncia legítima.\n\n"
-        "**4.5° IDENTIDADE** — Não se passe por membros, Staff ou bots para enganar ou obter vantagem.",
+        "4 Privacidade e identidade",
+        "1 Não exponha endereço, telefone, IP, documentos ou dados privados sem autorização.\n\n2 É proibido expor dados para ameaçar, constranger ou prejudicar alguém.\n\n3 Não solicite nem publique senhas, tokens ou códigos de autenticação.\n\n4 Não divulgue conteúdo privado sem autorização, salvo para uma denúncia legítima.\n\n5 Não se passe por membros, Staff ou bots para enganar ou obter vantagem.",
     ),
     (
-        "5 - Divulgação e parcerias",
-        ""
-        "**5.1° PUBLICIDADE** — Divulgue somente nos canais e formatos autorizados.\n\n"
-        "**5.2° MENSAGENS PRIVADAS** — Não envie anúncios não solicitados nem insista por DM.\n\n"
-        "**5.3° CONVITES** — Não espalhe convites fraudulentos ou links enganosos.\n\n"
-        "**5.4° PARCERIAS** — Toda parceria depende de análise e aprovação da autoridade responsável.\n\n"
-        "**5.5° USO DA COMUNIDADE** — Não utilize a NÊMESIS para autopromoção irregular.",
+        "5 Divulgação e parcerias",
+        "1 Divulgue somente nos canais e formatos autorizados.\n\n2 Não envie anúncios não solicitados por mensagem privada nem insista após uma recusa.\n\n3 Não espalhe convites fraudulentos ou links enganosos.\n\n4 Toda parceria depende de análise e aprovação da autoridade responsável.\n\n5 Não utilize a NÊMESIS para autopromoção irregular.",
     ),
     (
-        "6 - Atendimento e denúncias",
-        ""
-        "**6.1° SOLICITAÇÕES** — Use a categoria correta e trate assuntos pertinentes.\n\n"
-        "**6.2° EVIDÊNCIAS** — Forneça contexto claro e provas originais.\n\n"
-        "**6.3° ABUSO** — Não abra tickets duplicados nem pressione a equipe com cobranças insistentes.\n\n"
-        "**6.4° DENÚNCIAS FALSAS** — Não fabrique, adultere ou manipule provas.\n\n"
-        "**6.5° DISCRIÇÃO** — Evite acusações públicas; denúncia não implica punição automática.",
+        "6 Atendimento e denúncias",
+        "1 Use a categoria correta e trate assuntos pertinentes.\n\n2 Forneça contexto claro e provas originais.\n\n3 Não abra tickets duplicados nem pressione a equipe com cobranças insistentes.\n\n4 Não fabrique, adultere ou manipule provas.\n\n5 Evite acusações públicas; uma denúncia não implica punição automática.",
     ),
     (
-        "7 - Staff, hierarquia e autoridade",
-        ""
-        "**7.1° IMPARCIALIDADE** — A Staff deve agir com respeito, neutralidade e responsabilidade.\n\n"
-        "**7.2° ABUSO DE PODER** — É proibido perseguir, retaliar, favorecer ou obter vantagem pelo cargo.\n\n"
-        "**7.3° CONFIDENCIALIDADE** — Não divulgue informações internas sem autorização.\n\n"
-        "**7.4° RESPONSABILIZAÇÃO** — Condutas da equipe podem ser denunciadas e apuradas.\n\n"
-        "**7.5° ESTRUTURA** — O OCTÓGONO é a instância máxima; Supervisores Staff exercem atribuições administrativas conforme suas permissões.",
+        "7 Staff, hierarquia e autoridade",
+        "1 A Staff deve agir com respeito, neutralidade e responsabilidade.\n\n2 É proibido perseguir, retaliar, favorecer ou obter vantagem pelo cargo.\n\n3 Não divulgue informações internas sem autorização.\n\n4 Condutas da equipe podem ser denunciadas e apuradas.\n\n5 O OCTÓGONO é a instância máxima; Supervisores Staff exercem atribuições administrativas conforme suas permissões.",
     ),
     (
-        "8 - Competições, missões e sistemas",
-        ""
-        "**8.1° NORMAS ESPECÍFICAS** — Cumpra regras de jogos, eventos, competições e missões.\n\n"
-        "**8.2° VANTAGEM INDEVIDA** — São proibidos cheats, exploits e scripts vedados.\n\n"
-        "**8.3° INTEGRIDADE** — Não falsifique provas, participação ou resultados, nem sabote atividades.\n\n"
-        "**8.4° PROGRESSÃO** — Respeite os critérios oficiais de XP e avaliação.\n\n"
-        "**8.5° CONSEQUÊNCIAS** — Infrações também podem gerar medidas na atividade ou competição.",
+        "8 Competições, missões e sistemas",
+        "1 Cumpra as regras específicas de jogos, eventos, competições e missões.\n\n2 São proibidos cheats, exploits e scripts vedados.\n\n3 Não falsifique provas, participação ou resultados, nem sabote atividades.\n\n4 Respeite os critérios oficiais de XP e avaliação.\n\n5 Infrações também podem gerar medidas na atividade ou competição.",
     ),
     (
-        "9 - Reincidência e agravantes",
-        ""
-        "**9.1° REINCIDÊNCIA** — Infrações repetidas no período de análise podem elevar a medida.\n\n"
-        "**9.2° EVASÃO** — Contas alternativas ou tentativa de contornar punições agravam a ocorrência.\n\n"
-        "**9.3° RETALIAÇÃO** — Ameaças contra denunciantes ou testemunhas são agravantes.\n\n"
-        "**9.4° OBSTRUÇÃO** — Ocultar provas ou interferir em apurações pode agravar a medida.\n\n"
-        "**9.5° ANÁLISE** — Gravidade, intenção, dano, contexto, provas e histórico serão considerados; casos críticos podem exigir ação imediata.",
+        "9 Reincidência e agravantes",
+        "1 Infrações repetidas no período de análise podem elevar a medida disciplinar.\n\n2 Contas alternativas ou tentativas de contornar punições agravam a ocorrência.\n\n3 Ameaças contra denunciantes ou testemunhas são agravantes.\n\n4 Ocultar provas ou interferir em apurações pode agravar a medida.\n\n5 Gravidade, intenção, dano, contexto, provas e histórico serão considerados; casos críticos podem exigir ação imediata.",
     ),
     (
-        "10 - Níveis e medidas disciplinares",
-        ""
-        "**10.1° NÍVEL I — NORMAL:** advertência formal.\n\n"
-        "**10.2° NÍVEL II — MÉDIO:** timeout de 10 minutos.\n\n"
-        "**10.3° NÍVEL III — GRAVE:** expulsão do servidor.\n\n"
-        "**10.4° NÍVEL IV — MUITO GRAVE:** banimento temporário de 24 horas.\n\n"
-        "**10.5° NÍVEL V — CRÍTICO:** banimento permanente.\n\n"
-        "**10.6° AJUSTES** — Durações podem ser personalizadas por configuração autorizada. Casos críticos admitem ação imediata.\n\n"
-        "**10.7° REINCIDÊNCIA AUTOMÁTICA** — 2 registros recentes podem elevar um nível; 4 ou mais, dois níveis, limitado ao V.\n\n"
-        "**10.8° REVISÃO** — Solicite revisão nos canais oficiais, com justificativa e informações pertinentes.",
+        "10 Punições",
+        "1 1 Punições Níveis:\n\n2 Nível I: Silenciamento ou advertência formal.\n\n3 Nível II: Remoção de cargo, quando aplicável.\n\n4 Nível III: Suspensão de atividades, missões ou competições.\n\n5 Nível IV: Expulsão do servidor.\n\n6 Nível V: Banimento temporário de 24 horas.\n\n7 Nível VI: Banimento temporário de 7 dias.\n\n8 Nível VII: Banimento permanente.\n\n9 As medidas podem ser ajustadas conforme gravidade, contexto, reincidência e evidências. Casos críticos podem receber ação imediata.\n\n10 Solicitações de revisão devem ser feitas pelos canais oficiais, com justificativa e informações pertinentes.",
     ),
     (
-        "11 - Disposições finais",
-        ""
-        "**11.1° ABRANGÊNCIA** — As regras valem para todos, sem distinção de cargo.\n\n"
-        "**11.2° COMPLEMENTOS** — Normas de sistemas, missões e competições complementam este Código.\n\n"
-        "**11.3° OMISSÕES** — Casos não previstos serão avaliados com proporcionalidade e foco na integridade da organização.\n\n"
-        "**11.4° ATUALIZAÇÕES** — Mudanças serão comunicadas nos canais oficiais.\n\n"
-        "**11.5° RESPONSABILIDADE** — Desconhecer as regras não elimina a responsabilidade por cumpri-las.",
-    ),
+        "11 Disposições finais",
+        "1 As regras valem para todos, sem distinção de cargo.\n\n2 Normas de sistemas, missões e competições complementam este Código.\n\n3 Casos não previstos serão avaliados com proporcionalidade e foco na integridade da organização.\n\n4 Mudanças serão comunicadas nos canais oficiais.\n\n5 Desconhecer as regras não elimina a responsabilidade por cumpri-las.",
+    )
 )
 
 
@@ -123,7 +65,7 @@ def construir_embed_regras() -> discord.Embed:
     """Reúne os 11 artigos em uma única embed, com títulos como campos."""
     embed = criar_embed(
         title="CÓDIGO DE CONDUTA • NÊMESIS",
-        description="Código oficial da NÊMESIS. As regras se aplicam a todos os integrantes, sem distinção de cargo.",
+        description="Código oficial da NÊMESIS. As regras se aplicam a todos os integrantes, sem distinção de cargo.\n\nCada artigo apresenta suas determinações em ordem numérica.",
         color=COR,
     )
     for titulo, texto in SECOES_REGRAS:
