@@ -824,16 +824,17 @@ class FilaCandidaturasView(discord.ui.View):
         return max(1, (len(self.pendentes) + 24) // 25)
 
     def montar_embed(self):
+        instrucao = (
+            "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação."
+            if self.pendentes
+            else "Nenhuma ficha está pendente neste momento. Use **Atualizar fila** para consultar novas candidaturas."
+        )
         return criar_embed(
             "𓂀 FILA RESTRITA · CANDIDATURAS",
             f"**FORMULÁRIO**　{self.central.formulario_id}\n"
             f"**PENDENTES**　{len(self.pendentes)}\n"
             f"**PÁGINA**　{self.pagina + 1}/{self.total_paginas}\n\n"
-            (
-                "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação."
-                if self.pendentes
-                else "Nenhuma ficha está pendente neste momento. Use **Atualizar fila** para consultar novas candidaturas."
-            ),
+            f"{instrucao}",
             cor=0x9F1239,
             rodape="NÊMESIS • ACESSO ADMINISTRATIVO",
         )
