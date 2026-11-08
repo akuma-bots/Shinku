@@ -568,7 +568,7 @@ class Roblox(commands.Cog):
         todos[str(interaction.guild.id)] = atual
         await salvar(ARQUIVO_GRUPO, todos)
         await interaction.response.send_message(
-            f"✅ Grupo Roblox configurado (ID `{grupo_id}`). Agora use `/roblox-mapear-cargo` pra ligar cada rank a um cargo do Discord.",
+            f"✅ Grupo Roblox configurado (ID `{grupo_id}`).",
             ephemeral=True,
         )
 
