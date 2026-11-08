@@ -184,6 +184,10 @@ class TestPlaylistsMusicais(unittest.IsolatedAsyncioTestCase):
         self.assertIn("nemesis:musica:buscar", custom_ids)
         self.assertIn("nemesis:musica:playlists", custom_ids)
         self.assertIn("nemesis:musica:fila", custom_ids)
+        self.assertIn("nemesis:musica:historico", custom_ids)
+        self.assertIn("nemesis:musica:volume", custom_ids)
+        self.assertIn("nemesis:musica:autoplay", custom_ids)
+        self.assertIn("nemesis:musica:limpar_fila", custom_ids)
 
 
 
