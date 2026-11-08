@@ -9,7 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.guild_config import lideranca_only
+from utils.guild_config import lideranca_only, membro_tem_lideranca
 from utils.storage import carregar, salvar
 
 ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {roblox_id, roblox_username} } }
@@ -51,6 +51,173 @@ class ModalVincularRoblox(discord.ui.Modal, title="Vincular conta Roblox"):
 
     async def on_submit(self, interaction: discord.Interaction):
         await self.cog.roblox_vincular(interaction, str(self.usuario.value).strip())
+
+
+class ModalConfigurarGrupoRoblox(discord.ui.Modal, title="Configurar grupo Roblox"):
+    grupo_id = discord.ui.TextInput(
+        label="ID da comunidade Roblox",
+        placeholder="Ex.: 621286796",
+        min_length=1,
+        max_length=20,
+    )
+
+    def __init__(self, cog):
+        super().__init__(timeout=300)
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.roblox_configurar_grupo(interaction, str(self.grupo_id.value).strip())
+
+
+class ModalMapearPatenteRoblox(discord.ui.Modal, title="Mapear patente Roblox"):
+    patente = discord.ui.TextInput(
+        label="Nome exato da patente no Roblox",
+        placeholder="Digite como aparece no grupo Roblox",
+        min_length=1,
+        max_length=100,
+    )
+
+    def __init__(self, cog):
+        super().__init__(timeout=300)
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        patente = str(self.patente.value).strip()
+        if not patente:
+            await interaction.response.send_message("Informe o nome da patente.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            f"Selecione o cargo do Discord que corresponde à patente **{discord.utils.escape_markdown(patente)}**.",
+            view=SeletorCargoRoblox(self.cog, patente),
+            ephemeral=True,
+        )
+
+
+class SeletorCargoRoblox(discord.ui.View):
+    def __init__(self, cog, patente: str):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.patente = patente
+        seletor = discord.ui.RoleSelect(
+            placeholder="Escolha o cargo correspondente",
+            min_values=1,
+            max_values=1,
+            custom_id="nemesis:roblox:mapear_cargo",
+        )
+        seletor.callback = self.selecionar_cargo
+        self.add_item(seletor)
+
+    async def selecionar_cargo(self, interaction: discord.Interaction):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        cargo = interaction.data
+        selecionados = next(
+            (item for item in self.children if isinstance(item, discord.ui.RoleSelect)),
+            None,
+        )
+        if selecionados is None or not selecionados.values:
+            await interaction.response.send_message("Selecione um cargo válido.", ephemeral=True)
+            return
+        cargo = selecionados.values[0]
+        bot_member = interaction.guild.me
+        if cargo.is_default() or cargo.managed:
+            await interaction.response.send_message("Esse cargo não pode ser usado no mapeamento.", ephemeral=True)
+            return
+        if bot_member is None or cargo >= bot_member.top_role:
+            await interaction.response.send_message(
+                "Não consigo atribuir esse cargo. Coloque o cargo do bot acima dele na hierarquia.",
+                ephemeral=True,
+            )
+            return
+        if cargo.id in {
+            1563995880007139425, 1563995880007139424,
+            1563995880007139423, 1563995880007139422,
+        }:
+            await interaction.response.send_message(
+                "Cargos administrativos da NÊMESIS não podem ser concedidos por patente Roblox.",
+                ephemeral=True,
+            )
+            return
+        await self.cog.salvar_mapeamento_roblox(interaction, self.patente, cargo)
+
+
+class SeletorRemoverPatenteRoblox(discord.ui.View):
+    def __init__(self, cog, mapeamentos: dict):
+        super().__init__(timeout=180)
+        self.cog = cog
+        opcoes = [
+            discord.SelectOption(label=str(patente)[:100], value=str(patente)[:100], description="Remover a associação desta patente")
+            for patente in list(mapeamentos.keys())[:25]
+        ]
+        seletor = discord.ui.Select(
+            placeholder="Selecione a patente que deseja remover",
+            min_values=1,
+            max_values=1,
+            options=opcoes,
+        )
+        seletor.callback = self.remover
+        self.add_item(seletor)
+
+    async def remover(self, interaction: discord.Interaction):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        seletor = next((item for item in self.children if isinstance(item, discord.ui.Select)), None)
+        if seletor is None or not seletor.values:
+            await interaction.response.send_message("Selecione uma patente válida.", ephemeral=True)
+            return
+        await self.cog.roblox_remover_mapeamento(interaction, seletor.values[0])
+
+
+class CentralAdministrativaRobloxView(discord.ui.View):
+    def __init__(self, cog):
+        super().__init__(timeout=180)
+        self.cog = cog
+
+    @discord.ui.button(label="Configurar grupo", style=discord.ButtonStyle.primary, emoji="🌐", row=0)
+    async def configurar_grupo(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        await interaction.response.send_modal(ModalConfigurarGrupoRoblox(self.cog))
+
+    @discord.ui.button(label="Mapear patente", style=discord.ButtonStyle.success, emoji="🎖️", row=0)
+    async def mapear_patente(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        await interaction.response.send_modal(ModalMapearPatenteRoblox(self.cog))
+
+    @discord.ui.button(label="Remover mapeamento", style=discord.ButtonStyle.danger, emoji="🗑️", row=0)
+    async def remover_patente(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        config = await _config_grupo(interaction.guild.id)
+        if not config["mapeamentos"]:
+            await interaction.response.send_message("Ainda não existem patentes mapeadas.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "Escolha qual associação deseja remover.",
+            view=SeletorRemoverPatenteRoblox(self.cog, config["mapeamentos"]),
+            ephemeral=True,
+        )
+
+    @discord.ui.button(label="Ver mapeamentos", style=discord.ButtonStyle.secondary, emoji="📋", row=1)
+    async def ver_mapeamentos(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        await self.cog.roblox_mapeamentos(interaction)
+
+    @discord.ui.button(label="Sincronizar membros", style=discord.ButtonStyle.secondary, emoji="🔄", row=1)
+    async def sincronizar_membros(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        await self.cog.roblox_sincronizar(interaction)
+
+    @discord.ui.button(label="Histórico", style=discord.ButtonStyle.secondary, emoji="🕘", row=1)
+    async def historico(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        await self.cog.roblox_historico(interaction)
 
 
 class CentralRobloxView(discord.ui.View):
@@ -112,6 +279,25 @@ class CentralRobloxView(discord.ui.View):
                 "Não foi possível consultar o grupo Roblox agora. Tente novamente em alguns instantes.",
                 ephemeral=True,
             )
+
+    @discord.ui.button(label="Administração", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:admin", emoji="⚙️", row=1)
+    async def administrar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self.cog.exigir_administracao_roblox(interaction):
+            return
+        embed = criar_embed(
+            title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ ADMINISTRAÇÃO ROBLOX",
+            description=(
+                "**Configuração da comunidade**\nDefina o grupo Roblox oficial.\n\n"
+                "**Patentes e cargos**\nAssocie cada patente Roblox ao cargo equivalente do Discord.\n\n"
+                "**Manutenção**\nConsulte associações, remova mapeamentos e sincronize os membros vinculados."
+            ),
+            color=0xB3132B,
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=CentralAdministrativaRobloxView(self.cog),
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="Meu perfil Roblox", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:perfil", emoji="👤")
     async def meu_perfil(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -237,6 +423,10 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
     cargo_id_correto = mapeamentos.get(rank_atual) if rank_atual else None
     ids_gerenciados = set(mapeamentos.values())
 
+    # Uma patente ainda não mapeada não deve retirar cargos válidos do membro.
+    if rank_atual and cargo_id_correto is None:
+        return f"Patente **{rank_atual}** identificada, mas ainda sem cargo correspondente configurado."
+
     cargos_pra_remover = [
         cargo for cargo in membro.roles
         if cargo.id in ids_gerenciados and cargo.id != cargo_id_correto
@@ -244,6 +434,8 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
     cargo_pra_adicionar = None
     if cargo_id_correto and not any(c.id == cargo_id_correto for c in membro.roles):
         cargo_pra_adicionar = guild.get_role(cargo_id_correto)
+        if cargo_pra_adicionar is None:
+            return f"O cargo configurado para **{rank_atual}** não existe mais no Discord. Revise o mapeamento."
 
     try:
         if cargos_pra_remover:
@@ -348,6 +540,43 @@ class Roblox(commands.Cog):
             _LOG.exception("Falha ao publicar/atualizar a Central Roblox.")
         finally:
             self._painel_roblox_sync = False
+
+    async def exigir_administracao_roblox(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild is None or not membro_tem_lideranca(interaction.user):
+            mensagem = "Esta área é restrita à administração da NÊMESIS."
+            if interaction.response.is_done():
+                await interaction.followup.send(mensagem, ephemeral=True)
+            else:
+                await interaction.response.send_message(mensagem, ephemeral=True)
+            return False
+        return True
+
+    async def salvar_mapeamento_roblox(self, interaction: discord.Interaction, patente: str, cargo: discord.Role):
+        todos = await carregar(ARQUIVO_GRUPO, {})
+        if not isinstance(todos, dict):
+            todos = {}
+        atual = todos.get(str(interaction.guild.id), {})
+        if not isinstance(atual, dict):
+            atual = {}
+        grupo_id = atual.get("grupo_id") or ROBLOX_GRUPO_ID
+        mapeamentos = atual.get("mapeamentos", {})
+        if not isinstance(mapeamentos, dict):
+            mapeamentos = {}
+        mapeamentos[patente] = cargo.id
+        atual["grupo_id"] = int(grupo_id)
+        atual["mapeamentos"] = mapeamentos
+        todos[str(interaction.guild.id)] = atual
+        await salvar(ARQUIVO_GRUPO, todos)
+        await _registrar_evento_roblox(
+            interaction.guild,
+            "Mapeamento de patente Roblox atualizado",
+            f"**Patente:** {patente}\n**Cargo Discord:** {cargo.mention}\n**Responsável:** {interaction.user.mention}",
+            interaction.user.id,
+        )
+        await interaction.response.edit_message(
+            content=f"✅ A patente **{discord.utils.escape_markdown(patente)}** agora corresponde ao cargo {cargo.mention}.",
+            view=None,
+        )
 
     # ---------------- Verificação de conta ----------------
 
@@ -559,6 +788,8 @@ class Roblox(commands.Cog):
     # ---------------- Cargo automático por rank do grupo ----------------
 
     async def roblox_configurar_grupo(self, interaction: discord.Interaction, grupo_id: str):
+        if not await self.exigir_administracao_roblox(interaction):
+            return
         if not grupo_id.isdigit():
             await interaction.response.send_message("O ID do grupo precisa ser só números.", ephemeral=True)
             return
@@ -612,6 +843,8 @@ class Roblox(commands.Cog):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def roblox_sincronizar(self, interaction: discord.Interaction, membro: discord.Member = None):
+        if not await self.exigir_administracao_roblox(interaction):
+            return
         await interaction.response.defer(ephemeral=True)
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
         guild_vinculos = vinculos.get(str(interaction.guild.id), {})
@@ -634,6 +867,8 @@ class Roblox(commands.Cog):
         await interaction.followup.send(f"✅ Sincronização concluída pra {atualizados} membro(s) vinculado(s).", ephemeral=True)
 
     async def roblox_historico(self, interaction: discord.Interaction):
+        if not await self.exigir_administracao_roblox(interaction):
+            return
         historico = await carregar(ARQUIVO_HISTORICO_ROBLOX, {})
         eventos = historico.get(str(interaction.guild.id), []) if isinstance(historico, dict) else []
         if not isinstance(eventos, list) or not eventos:
