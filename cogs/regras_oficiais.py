@@ -52,7 +52,7 @@ SECOES_REGRAS = (
     ),
     (
         "10 Punições",
-        "1 1 Punições Níveis:\n\n2 Nível I: Silenciamento ou advertência formal.\n\n3 Nível II: Remoção de cargo, quando aplicável.\n\n4 Nível III: Suspensão de atividades, missões ou competições.\n\n5 Nível IV: Expulsão do servidor.\n\n6 Nível V: Banimento temporário de 24 horas.\n\n7 Nível VI: Banimento temporário de 7 dias.\n\n8 Nível VII: Banimento permanente.\n\n9 As medidas podem ser ajustadas conforme gravidade, contexto, reincidência e evidências. Casos críticos podem receber ação imediata.\n\n10 Solicitações de revisão devem ser feitas pelos canais oficiais, com justificativa e informações pertinentes.",
+        "1 Punições Níveis:\n\nNível I: Silenciamento.\n\nNível II: Remoção de cargo.\n\nNível III: Suspensão de atividades, missões ou competições.\n\nNível IV: Expulsão do servidor.\n\nNível V: Banimento temporário de 24 horas.\n\nNível VI: Banimento temporário de 7 dias.\n\nNível VII: Banimento permanente.\n\nAs medidas podem ser ajustadas conforme gravidade, contexto, reincidência e evidências. Casos críticos podem receber ação imediata.\n\nSolicitações de revisão devem ser feitas pelos canais oficiais, com justificativa e informações pertinentes.",
     ),
     (
         "11 Disposições finais",
