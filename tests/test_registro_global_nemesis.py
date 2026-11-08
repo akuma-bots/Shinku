@@ -12,7 +12,7 @@ class TestRegistroGlobalNemesis(unittest.TestCase):
         esperadas = {
             "mensagens", "atendimento", "moderacao", "historico_membros",
             "administracao", "seguranca", "missoes", "competitivo",
-            "eventos", "parcerias", "integracoes", "sugestoes", "convites",
+            "eventos", "parcerias", "integracoes", "sugestoes",
         }
         self.assertEqual(set(CATEGORIAS), esperadas)
         self.assertNotIn("cargos", CATEGORIAS)
@@ -23,7 +23,7 @@ class TestRegistroGlobalNemesis(unittest.TestCase):
 
     def test_nomes_sao_claros_e_sem_prefixos_de_versao(self):
         nomes = [nome for nome, _descricao in CATEGORIAS.values()]
-        self.assertEqual(len(nomes), 13)
+        self.assertEqual(len(nomes), 12)
         self.assertTrue(all(not nome.startswith("🆕") for nome in nomes))
 
     def test_todas_as_categorias_possuem_descricao(self):
