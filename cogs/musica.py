@@ -102,8 +102,8 @@ def _spotify_itens(consulta: str) -> list[dict]:
     partes = [parte for parte in parsed.path.split("/") if parte]
     if parsed.netloc.lower() not in {"open.spotify.com", "www.open.spotify.com"}:
         raise ValueError("Link Spotify inválido.")
-    if len(partes) < 2 or partes[0] not in {"track", "album", "playlist"}:
-        raise ValueError("Use um link de faixa, álbum ou playlist do Spotify.")
+    if len(partes) < 2 or partes[0] not in {"track", "album", "playlist", "artist"}:
+        raise ValueError("Use um link de faixa, álbum, playlist ou artista do Spotify.")
     tipo, identificador = partes[0], partes[1].split("?")[0]
     token = _spotify_token_acesso()
     itens = []
@@ -116,6 +116,12 @@ def _spotify_itens(consulta: str) -> list[dict]:
         while dados.get("next") and len(itens) < MAX_QUEUE:
             dados = _spotify_json(dados["next"], token)
             itens.extend(dados.get("items", []))
+    elif tipo == "artist":
+        dados = _spotify_json(
+            f"https://api.spotify.com/v1/artists/{identificador}/top-tracks?market=BR",
+            token,
+        )
+        itens = dados.get("tracks", [])
     else:
         url = f"https://api.spotify.com/v1/playlists/{identificador}/tracks?limit=100"
         dados = _spotify_json(url, token)
