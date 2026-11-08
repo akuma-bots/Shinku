@@ -27,10 +27,10 @@ ROBLOX_CANAL_CENTRAL_ID = 1565825670066737202
 ARQUIVO_PAINEL_ROBLOX = "roblox_painel_central.json"
 ARQUIVO_HISTORICO_ROBLOX = "roblox_historico.json"
 
-async def _buscar_dados_grupo() -> dict:
+async def _buscar_dados_grupo(grupo_id: int = ROBLOX_GRUPO_ID) -> dict:
     timeout = aiohttp.ClientTimeout(total=12)
     async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(f"https://groups.roblox.com/v1/groups/{ROBLOX_GRUPO_ID}") as resposta:
+        async with session.get(f"https://groups.roblox.com/v1/groups/{int(grupo_id)}") as resposta:
             resposta.raise_for_status()
             dados = await resposta.json()
     if not isinstance(dados, dict):
@@ -247,7 +247,8 @@ class CentralRobloxView(discord.ui.View):
 
         await interaction.response.defer(ephemeral=True)
         try:
-            grupo_id = ROBLOX_GRUPO_ID
+            config_grupo = await _config_grupo(interaction.guild_id)
+            grupo_id = config_grupo["grupo_id"] or ROBLOX_GRUPO_ID
             rank = await _buscar_rank_no_grupo(int(vinculo["roblox_id"]), grupo_id)
             if rank:
                 embed = criar_embed(
@@ -309,7 +310,9 @@ class CentralRobloxView(discord.ui.View):
         rid = int(vinculo["roblox_id"])
         embed = criar_embed(title="NÊMESIS • PERFIL ROBLOX", description=f"**Usuário:** {vinculo.get('roblox_username', 'Não informado')}\n**Perfil:** https://www.roblox.com/users/{rid}/profile\n**Comunidade:** [Abrir grupo oficial]({ROBLOX_GRUPO_URL})", color=0xB3132B)
         try:
-            rank = await _buscar_rank_no_grupo(rid, ROBLOX_GRUPO_ID)
+            config_grupo = await _config_grupo(interaction.guild_id)
+            grupo_id = config_grupo["grupo_id"] or ROBLOX_GRUPO_ID
+            rank = await _buscar_rank_no_grupo(rid, grupo_id)
             embed.add_field(
                 name="COMUNIDADE NÊMESIS",
                 value=f"Participação confirmada — **{rank}**" if rank else "Não encontrado como membro do grupo",
@@ -438,10 +441,12 @@ async def sincronizar_cargo_membro(guild: discord.Guild, membro: discord.Member,
             return f"O cargo configurado para **{rank_atual}** não existe mais no Discord. Revise o mapeamento."
 
     try:
-        if cargos_pra_remover:
-            await membro.remove_roles(*cargos_pra_remover, reason="Sincronização de rank do Roblox")
+        # Primeiro concede o cargo correto; só depois remove as patentes antigas.
+        # Assim, uma falha ao adicionar não deixa o membro sem patente no Discord.
         if cargo_pra_adicionar:
             await membro.add_roles(cargo_pra_adicionar, reason="Sincronização de rank do Roblox")
+        if cargos_pra_remover:
+            await membro.remove_roles(*cargos_pra_remover, reason="Sincronização de rank do Roblox")
     except discord.Forbidden:
         return "Sem permissão pra ajustar os cargos (verifique a hierarquia de cargos do bot)."
 
@@ -498,13 +503,15 @@ class Roblox(commands.Cog):
             embed = criar_embed(title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CENTRAL ROBLOX", description="Acesse a comunidade oficial da NÊMESIS no Roblox e conecte sua conta ao Discord.\n\n**Comunidade:** [Comunidade Nik](" + ROBLOX_GRUPO_URL + ")\n**ID do grupo:** `" + str(ROBLOX_GRUPO_ID) + "`\n\n**Vinculação segura**\nA confirmação utiliza um código temporário na descrição do perfil Roblox. O bot nunca solicita senha ou cookie.", color=0xB3132B)
             aplicar_identidade_servidor(embed, canal.guild, self.bot)
             try:
-                dados = await _buscar_dados_grupo()
-                nome = str(dados.get("name") or "Comunidade Nik")[:100]
+                config_grupo = await _config_grupo(canal.guild.id)
+                grupo_id_painel = config_grupo["grupo_id"] or ROBLOX_GRUPO_ID
+                dados = await _buscar_dados_grupo(grupo_id_painel)
+                nome = str(dados.get("name") or "Comunidade Roblox")[:100]
                 membros = dados.get("memberCount")
                 valor = "**" + nome + "**"
                 if isinstance(membros, int):
                     valor += "\n**" + format(membros, ",") + "** membros\n"
-                embed.add_field(name="GRUPO OFICIAL", value=valor, inline=True)
+                embed.add_field(name="GRUPO OFICIAL", value=valor + f"\\nID: `{grupo_id_painel}`", inline=True)
                 owner = dados.get("owner") or {}
                 owner_name = owner.get("username") if isinstance(owner, dict) else None
                 if owner_name:
