@@ -19,33 +19,37 @@ class TestRegrasOficiais(unittest.TestCase):
         self.assertLessEqual(len(embed), 6000)
         self.assertTrue(embed.footer.text.startswith(MARCADOR_PUBLICACAO))
 
-    def test_codigos_das_regras_consumidos_pelo_automod_foram_preservados(self):
-        texto = "\n".join(campo.name + "\n" + campo.value for campo in construir_embed_regras().fields)
-        encontrados = re.findall(r"(?m)^(\d+)\s+-\s+([^\n]+)", texto)
-        self.assertEqual([numero for numero, _ in encontrados], [str(i) for i in range(1, 12)])
-        self.assertEqual(len(SECOES_REGRAS), 11)
+    def test_numeracao_simples_dos_artigos_e_itens(self):
+        embed = construir_embed_regras()
+        self.assertEqual(
+            [campo.name for campo in embed.fields],
+            [
+                "1 Conduta", "2 Comunicação e organização",
+                "3 Conteúdo e segurança digital", "4 Privacidade e identidade",
+                "5 Divulgação e parcerias", "6 Atendimento e denúncias",
+                "7 Staff, hierarquia e autoridade",
+                "8 Competições, missões e sistemas",
+                "9 Reincidência e agravantes", "10 Punições",
+                "11 Disposições finais",
+            ],
+        )
+        self.assertTrue(embed.fields[0].value.startswith("1 "))
+        self.assertIn("\\n\\n2 ", embed.fields[0].value)
 
-    def test_niveis_disciplinares_correspondem_a_medidas_padrao_do_automod(self):
+    def test_sete_niveis_de_punicao_na_ordem_solicitada(self):
         texto = construir_embed_regras().fields[9].value
         esperado = (
-            "10.1° NÍVEL I — NORMAL",
-            "advertência formal",
-            "10.2° NÍVEL II — MÉDIO",
-            "timeout de 10 minutos",
-            "10.3° NÍVEL III — GRAVE",
-            "expulsão do servidor",
-            "10.4° NÍVEL IV — MUITO GRAVE",
-            "banimento temporário de 24 horas",
-            "10.5° NÍVEL V — CRÍTICO",
-            "banimento permanente",
+            "1 Punições Níveis:",
+            "Nível I: Silenciamento",
+            "Nível II: Remoção de cargo",
+            "Nível III: Suspensão de atividades",
+            "Nível IV: Expulsão do servidor",
+            "Nível V: Banimento temporário de 24 horas",
+            "Nível VI: Banimento temporário de 7 dias",
+            "Nível VII: Banimento permanente",
         )
         for trecho in esperado:
             self.assertIn(trecho.casefold(), texto.casefold())
-
-    def test_todos_os_artigos_sao_campos_na_ordem_oficial(self):
-        embed = construir_embed_regras()
-        self.assertEqual(embed.fields[0].name, "1 - Conduta e respeito")
-        self.assertEqual(embed.fields[-1].name, "11 - Disposições finais")
 
     def test_regras_nao_dependem_de_comando_slash_para_publicacao(self):
         from cogs.regras_oficiais import RegrasOficiais
