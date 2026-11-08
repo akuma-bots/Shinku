@@ -72,6 +72,23 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resultado["title"], "Busca")
         self.assertEqual(resultado["duration"], 30)
 
+    def test_verifica_e_carrega_biblioteca_opus_do_sistema(self):
+        from cogs.musica import _garantir_opus
+
+        with patch("cogs.musica.discord.opus.is_loaded", side_effect=[False, True]), patch(
+            "cogs.musica.discord.opus.load_opus"
+        ) as carregar_opus:
+            self.assertTrue(_garantir_opus())
+        carregar_opus.assert_called_once_with("libopus.so.0")
+
+    def test_retorna_falso_quando_biblioteca_opus_nao_existe(self):
+        from cogs.musica import _garantir_opus
+
+        with patch("cogs.musica.discord.opus.is_loaded", return_value=False), patch(
+            "cogs.musica.discord.opus.load_opus", side_effect=OSError("missing libopus")
+        ):
+            self.assertFalse(_garantir_opus())
+
 
 class TestPlaylistsMusicais(unittest.IsolatedAsyncioTestCase):
     def test_normalizacao_descarta_urls_nao_permitidas_e_nao_guarda_fluxo_temporario(self):
