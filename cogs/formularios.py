@@ -54,6 +54,48 @@ ARQUIVO_PAINÉIS_AUTOMÁTICOS = "paineis_formularios_automaticos.json"
 
 FORMULARIOS_AUTOMATICOS = [
     {
+        "chave": "staff",
+        "nome": "Inscrição para Staff",
+        "titulo": "NÊMESIS — RECRUTAMENTO STAFF",
+        "descricao": (
+            "CENTRAL DE RECRUTAMENTO • EQUIPE NÊMESIS\\n\\n"
+            "Use este formulário para se candidatar à equipe. Responda com clareza e sinceridade; "
+            "candidaturas incompletas ou com informações falsas poderão ser recusadas.\\n\\n"
+            "REQUISITOS\\n"
+            "— Conhecer e respeitar as regras da NÊMESIS.\\n"
+            "— Ter postura respeitosa, responsabilidade e maturidade.\\n"
+            "— Conseguir agir com imparcialidade em conflitos.\\n"
+            "— Ter disponibilidade para auxiliar a comunidade.\\n\\n"
+            "O envio não garante aprovação. A equipe analisará sua candidatura."
+        ),
+        "canal_id": 1563995880623841338,
+        "paginas": [[
+            "Qual é o seu nome ou apelido e qual é seu usuário do Discord?",
+            "Por que deseja fazer parte da Staff da NÊMESIS?",
+            "Qual é sua disponibilidade semanal para ajudar no servidor?",
+            "Você já teve experiência com moderação ou organização? Explique.",
+            "Como agiria se dois membros começassem uma discussão séria?"
+        ], [
+            "Quais são seus principais pontos fortes para atuar na equipe?",
+            "Em quais áreas da NÊMESIS você acredita que poderia contribuir melhor?",
+            "Como reagiria se um membro desrespeitasse uma regra mesmo após ser alertado?",
+            "O que faria se um amigo próximo cometesse uma infração?",
+            "Como lidaria com uma situação em que não soubesse qual decisão tomar?"
+        ], [
+            "Como você organiza seu tempo para cumprir responsabilidades?",
+            "O que faria ao perceber um problema importante enquanto nenhum líder está online?",
+            "Como receberia uma crítica da liderança sobre seu trabalho?",
+            "Na sua opinião, o que caracteriza uma postura imparcial dentro da Staff?",
+            "Existe algo mais sobre sua experiência ou disponibilidade que queira acrescentar?"
+        ], [
+            "Como você priorizaria tarefas quando várias demandas chegassem ao mesmo tempo?",
+            "O que faria se percebesse que outro membro da equipe está abusando das permissões?",
+            "Como manteria a confidencialidade de informações internas e denúncias?",
+            "Que iniciativa concreta você proporia para melhorar a experiência dos membros?",
+            "Por que a liderança deveria confiar a você responsabilidades dentro da NÊMESIS?"
+        ]],
+    },
+    {
         "chave": "ingresso_nemesis",
         "nome": "Inscrição para NÊMESIS",
         "titulo": "NÊMESIS — PROCESSO DE INGRESSO",
@@ -1694,17 +1736,18 @@ class Formularios(commands.Cog):
             for definicao in FORMULARIOS_AUTOMATICOS:
                 try:
                     lista = await formularios.listar_formularios(guild.id)
-                    nomes_anteriores = {definicao["nome"], "Inscrição para Staff"}
-                    formulario = next((item for item in lista if item.get("nome") == definicao["nome"]), None)
-                    if formulario is None:
-                        formulario = next((item for item in lista if item.get("nome") in nomes_anteriores), None)
+                    # Cada processo seletivo é identificado pelo próprio nome e chave.
+                    # Nunca reutiliza o registro de Staff para criar/atualizar o ingresso geral.
+                    formulario = next(
+                        (item for item in lista if item.get("nome") == definicao["nome"]),
+                        None,
+                    )
                     if formulario is None:
                         formulario = await formularios.criar_formulario(
                             guild.id, definicao["nome"], definicao["titulo"],
                             definicao["descricao"], None, self.bot.user.id if self.bot.user else 0,
                         )
-                    # Migra o formulário antigo sem apagar candidaturas já recebidas.
-                    if int(formulario.get("versao_automatico", 0) or 0) < 2:
+                    if int(formulario.get("versao_automatico", 0) or 0) < 3:
                         formulario = await formularios.atualizar_formulario(
                             guild.id,
                             formulario["id"],
@@ -1712,10 +1755,10 @@ class Formularios(commands.Cog):
                             titulo_painel=definicao["titulo"],
                             descricao_painel=definicao["descricao"],
                             paginas=definicao["paginas"],
-                            versao_automatico=2,
+                            versao_automatico=3,
                         )
                         if formulario is None:
-                            raise RuntimeError(f"Não foi possível migrar o formulário {definicao['nome']}.")
+                            raise RuntimeError(f"Não foi possível configurar o formulário {definicao['nome']}.")
                 except Exception:
                     logging.exception("Erro ao configurar o formulário automático %s.", definicao["nome"])
             try:
