@@ -29,6 +29,7 @@ import yt_dlp
 LOG = logging.getLogger(__name__)
 MAX_QUEUE = 100
 VOLUME_PADRAO = 0.5
+ARQUIVO_ESTADO_MUSICA = "estado_musica.json"
 
 YDL_OPCOES = {
     "format": "bestaudio/best",
@@ -202,6 +203,7 @@ class MusicControlView(discord.ui.View):
         voz = interaction.guild.voice_client
         self.cog.filas[self.guild_id] = []
         self.cog.loop_modes[self.guild_id] = "off"
+        await self.cog._persistir_estado(self.guild_id)
         self.cog.skip_requested.add(self.guild_id)
         if voz:
             if voz.is_playing() or voz.is_paused():
@@ -258,6 +260,7 @@ class MusicControlView(discord.ui.View):
         atual = self.cog.loop_modes.get(self.guild_id, "off")
         novo = modos[(modos.index(atual) + 1) % len(modos)]
         self.cog.loop_modes[self.guild_id] = novo
+        await self.cog._persistir_estado(self.guild_id)
         rotulos = {"off": "desligada", "track": "música atual", "queue": "fila"}
         button.label = f"Repetição: {rotulos[novo]}"
         await interaction.response.send_message(f"🔁 Repetição definida para **{rotulos[novo]}**.", ephemeral=True)
@@ -605,6 +608,7 @@ class ModalVolumeMusica(discord.ui.Modal):
             await interaction.response.send_message("O volume deve ficar entre 1% e 150%.", ephemeral=True)
             return
         self.cog.volumes[self.guild_id] = valor / 100
+        await self.cog._persistir_estado(self.guild_id)
         voz = interaction.guild.voice_client
         if voz and isinstance(voz.source, discord.PCMVolumeTransformer):
             voz.source.volume = valor / 100
@@ -731,6 +735,7 @@ class MusicPanelView(discord.ui.View):
             return
         ativo = not self.cog.autoplay.get(interaction.guild_id, False)
         self.cog.autoplay[interaction.guild_id] = ativo
+        await self.cog._persistir_estado(interaction.guild_id)
         button.label = "Autoplay: ligado" if ativo else "Autoplay: desligado"
         await interaction.response.send_message(
             "♾️ Autoplay ativado: quando a fila terminar, vou procurar uma faixa relacionada."
@@ -769,6 +774,7 @@ class Musica(commands.Cog):
         self.historico: dict[int, list[dict[str, Any]]] = {}
         self._painel_sync = False
         self._painel_view_registrada = False
+        self._estado_lock = asyncio.Lock()
         self.ytdl = yt_dlp.YoutubeDL(YDL_OPCOES)
         self._extrair_lock = asyncio.Lock()
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
@@ -778,6 +784,28 @@ class Musica(commands.Cog):
         LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
         if not opus_ok:
             LOG.error("Áudio desativado: instale o pacote de sistema libopus0.")
+
+    async def _persistir_estado(self, guild_id: int):
+        """Persiste preferências e histórico sem armazenar URLs temporárias de streaming."""
+        async with self._estado_lock:
+            dados = await carregar(ARQUIVO_ESTADO_MUSICA, {})
+            if not isinstance(dados, dict):
+                dados = {}
+            dados[str(guild_id)] = {
+                "autoplay": bool(self.autoplay.get(guild_id, False)),
+                "volume": min(1.5, max(0.01, float(self.volumes.get(guild_id, VOLUME_PADRAO)))),
+                "loop": self.loop_modes.get(guild_id, "off") if self.loop_modes.get(guild_id) in {"off", "track", "queue"} else "off",
+                "historico": [
+                    {
+                        "title": str(item.get("title") or "Música")[:256],
+                        "webpage_url": str(item.get("webpage_url") or "")[:2048],
+                        "duration": max(0, int(item.get("duration") or 0)),
+                    }
+                    for item in self.historico.get(guild_id, [])[-50:]
+                    if isinstance(item, dict)
+                ],
+            }
+            await salvar(ARQUIVO_ESTADO_MUSICA, dados)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -790,6 +818,25 @@ class Musica(commands.Cog):
         if guild is None:
             LOG.warning("Painel musical: servidor NÊMESIS não está disponível.")
             return
+        try:
+            estados = await carregar(ARQUIVO_ESTADO_MUSICA, {})
+            registro_estado = estados.get(str(guild.id), {}) if isinstance(estados, dict) else {}
+            if isinstance(registro_estado, dict):
+                self.autoplay[guild.id] = bool(registro_estado.get("autoplay", False))
+                try:
+                    self.volumes[guild.id] = min(1.5, max(0.01, float(registro_estado.get("volume", VOLUME_PADRAO))))
+                except (TypeError, ValueError):
+                    self.volumes[guild.id] = VOLUME_PADRAO
+                modo = registro_estado.get("loop", "off")
+                self.loop_modes[guild.id] = modo if modo in {"off", "track", "queue"} else "off"
+                historico = registro_estado.get("historico", [])
+                self.historico[guild.id] = [
+                    item for item in historico[-50:]
+                    if isinstance(item, dict) and item.get("webpage_url")
+                ] if isinstance(historico, list) else []
+            LOG.info("Preferências e histórico musical restaurados para o servidor %s.", guild.id)
+        except Exception:
+            LOG.exception("Não foi possível restaurar o estado musical do servidor %s.", guild.id)
         normalizar = lambda valor: "".join(
             caractere for caractere in unicodedata.normalize("NFKD", str(valor).casefold())
             if caractere.isalnum()
@@ -1180,6 +1227,7 @@ class Musica(commands.Cog):
                         "duration": item.get("duration", 0),
                     })
                     del historico[:-50]
+                    await self._persistir_estado(gid)
                     # O modo de repetição só é aplicado quando a faixa termina
                     # naturalmente; /skip e o botão Pular não repetem a faixa.
                     if gid in self.skip_requested:
