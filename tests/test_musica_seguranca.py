@@ -95,9 +95,15 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
         cog.ytdl.extract_info.assert_not_called()
 
     async def test_rejeita_fluxo_local_ou_esquema_nao_http(self):
-        cog = self.criar_cog({"url": "file:///etc/passwd", "title": "inválido"})
+        cog = self.criar_cog({"entries": [{
+            "url": "file:///etc/passwd",
+            "title": "inválido",
+            "webpage_url": "https://www.youtube.com/watch?v=abc",
+        }]})
         with self.assertRaisesRegex(ValueError, "HTTP/HTTPS"):
             await cog._extrair("uma música")
+        with self.assertRaisesRegex(ValueError, "HTTP/HTTPS"):
+            await cog._extrair("file:///etc/passwd")
 
     async def test_normaliza_resultado_valido(self):
         cog = self.criar_cog()
@@ -149,6 +155,15 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
 
 
 class TestPlaylistsMusicais(unittest.IsolatedAsyncioTestCase):
+    def criar_cog(self):
+        cog = object.__new__(Musica)
+        cog._estado_lock = asyncio.Lock()
+        cog.autoplay = {}
+        cog.volumes = {}
+        cog.loop_modes = {}
+        cog.historico = {}
+        return cog
+
     def test_normalizacao_descarta_urls_nao_permitidas_e_nao_guarda_fluxo_temporario(self):
         faixas = _normalizar_faixas_playlist([
             {
