@@ -30,6 +30,32 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
             await cog._extrair("   ")
         cog.ytdl.extract_info.assert_not_called()
 
+
+    async def test_reconhece_link_spotify_sem_tentar_tratar_como_url_generica(self):
+        cog = self.criar_cog()
+        with patch("cogs.musica._spotify_itens", return_value=[{
+            "title": "Faixa Spotify", "artist": "Artista", "duration": 90,
+            "webpage_url": "https://open.spotify.com/track/abc",
+        }]), patch.object(cog.ytdl, "extract_info", return_value={
+            "entries": [{
+                "url": "https://audio.example/stream",
+                "title": "Faixa Spotify",
+                "webpage_url": "https://www.youtube.com/watch?v=abc",
+                "duration": 90,
+            }]
+        }):
+            resultado = await cog._extrair("https://open.spotify.com/track/abc")
+        self.assertEqual(resultado["title"], "Faixa Spotify")
+        self.assertEqual(resultado["duration"], 90)
+
+    def test_link_spotify_exige_credenciais_quando_nao_configurado(self):
+        from cogs.musica import _spotify_itens
+
+        with patch.dict("os.environ", {"SPOTIFY_CLIENT_ID": "", "SPOTIFY_CLIENT_SECRET": ""}):
+            with patch("cogs.musica._SPOTIFY_TOKEN", {"valor": None, "expira_em": 0.0}):
+                with self.assertRaisesRegex(ValueError, "SPOTIFY_CLIENT_ID"):
+                    _spotify_itens("https://open.spotify.com/track/abc")
+
     async def test_rejeita_url_de_provedor_nao_permitido(self):
         cog = self.criar_cog()
         with self.assertRaisesRegex(ValueError, "não permitido"):
