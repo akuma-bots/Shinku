@@ -37,17 +37,35 @@ async def _buscar_dados_grupo() -> dict:
         raise ValueError("A API do grupo Roblox retornou dados inválidos.")
     return dados
 
+class ModalVincularRoblox(discord.ui.Modal, title="Vincular conta Roblox"):
+    usuario = discord.ui.TextInput(
+        label="Nome de usuário Roblox",
+        placeholder="Digite seu usuário Roblox",
+        min_length=3,
+        max_length=20,
+    )
+
+    def __init__(self, cog):
+        super().__init__(timeout=300)
+        self.cog = cog
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.roblox_vincular(interaction, str(self.usuario.value).strip())
+
+
 class CentralRobloxView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, cog):
         super().__init__(timeout=None)
+        self.cog = cog
         self.add_item(discord.ui.Button(label="Acessar comunidade", style=discord.ButtonStyle.link, url=ROBLOX_GRUPO_URL, emoji="🌐"))
 
     @discord.ui.button(label="Vincular minha conta", style=discord.ButtonStyle.primary, custom_id="nemesis:roblox:vincular", emoji="🔗")
     async def vincular_conta(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "**Vinculação da conta Roblox**\n1. Execute `/roblox-vincular` e informe seu nome de usuário.\n2. Coloque o código gerado na descrição do perfil Roblox.\n3. Execute `/roblox-confirmar` para validar.\n\nO bot nunca solicita senha, cookie ou credenciais.",
-            ephemeral=True,
-        )
+        await interaction.response.send_modal(ModalVincularRoblox(self.cog))
+
+    @discord.ui.button(label="Confirmar vínculo", style=discord.ButtonStyle.success, custom_id="nemesis:roblox:confirmar", emoji="✅")
+    async def confirmar_conta(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.cog.roblox_confirmar(interaction)
 
     @discord.ui.button(label="Verificar participação", style=discord.ButtonStyle.secondary, custom_id="nemesis:roblox:participacao", emoji="🛡️")
     async def verificar_participacao(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -317,14 +335,14 @@ class Roblox(commands.Cog):
                     mensagem = await canal.fetch_message(int(registro["message_id"]))
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     mensagem = None
-            view = CentralRobloxView()
+            view = CentralRobloxView(self)
             if mensagem:
                 await mensagem.edit(embed=embed, view=view)
             else:
                 mensagem = await canal.send(embed=embed, view=view)
             estado[str(canal.guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id}
             await salvar(ARQUIVO_PAINEL_ROBLOX, estado)
-            self.bot.add_view(CentralRobloxView())
+            self.bot.add_view(CentralRobloxView(self))
             _LOG.info("Central Roblox atualizada no canal %s (mensagem %s).", canal.id, mensagem.id)
         except Exception:
             _LOG.exception("Falha ao publicar/atualizar a Central Roblox.")
@@ -333,8 +351,6 @@ class Roblox(commands.Cog):
 
     # ---------------- Verificação de conta ----------------
 
-    @app_commands.command(name="roblox-vincular", description="Passo 1: inicia a verificação da sua conta Roblox.")
-    @app_commands.describe(usuario_roblox="Seu nome de usuário no Roblox")
     async def roblox_vincular(self, interaction: discord.Interaction, usuario_roblox: str):
         await interaction.response.defer(ephemeral=True)
 
@@ -362,18 +378,17 @@ class Roblox(commands.Cog):
         await interaction.followup.send(
             f"Quase lá! Vai em **roblox.com → seu perfil → Editar → About/Sobre mim** e cola este código "
             f"em qualquer lugar da descrição:\n\n**`{codigo}`**\n\n"
-            f"Depois de salvar lá, volta aqui e roda `/roblox-confirmar`. Depois de confirmado, pode apagar o código.",
+            "Depois de salvar, volte à Central Roblox e pressione **Confirmar vínculo**. Depois de confirmado, pode apagar o código.",
             ephemeral=True,
         )
 
-    @app_commands.command(name="roblox-confirmar", description="Passo 2: confirma a verificação depois de colocar o código no seu perfil Roblox.")
     async def roblox_confirmar(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
         pendentes = await carregar(ARQUIVO_PENDENTES, {})
         pendente = pendentes.get(str(interaction.guild.id), {}).get(str(interaction.user.id))
         if not pendente:
-            await interaction.followup.send("Você não tem nenhuma verificação pendente. Use `/roblox-vincular` primeiro.", ephemeral=True)
+            await interaction.followup.send("Você não tem nenhuma verificação pendente. Pressione **Vincular minha conta** na Central Roblox primeiro.", ephemeral=True)
             return
 
         try:
@@ -405,7 +420,7 @@ class Roblox(commands.Cog):
             pendente_atual = guild_pendentes.get(str(interaction.user.id))
             if not isinstance(pendente_atual, dict) or str(pendente_atual.get("codigo")) != str(pendente.get("codigo")):
                 await interaction.followup.send(
-                    "Esta verificação já foi processada ou substituída. Use /roblox-vincular para iniciar outra.",
+                    "Esta verificação já foi processada ou substituída. Inicie uma nova vinculação pela Central Roblox.",
                     ephemeral=True,
                 )
                 return
@@ -463,7 +478,6 @@ class Roblox(commands.Cog):
         )
         await interaction.followup.send(mensagem, ephemeral=True)
 
-    @app_commands.command(name="roblox-desvincular", description="Remove o vínculo da sua conta Roblox.")
     async def roblox_desvincular(self, interaction: discord.Interaction):
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
         guild_dados = vinculos.get(str(interaction.guild.id), {})
@@ -480,8 +494,6 @@ class Roblox(commands.Cog):
         )
         await interaction.response.send_message("🔓 Vínculo removido.", ephemeral=True)
 
-    @app_commands.command(name="roblox-perfil", description="Mostra a conta Roblox vinculada de um membro.")
-    @app_commands.describe(membro="De quem ver (padrão: você mesmo)")
     async def roblox_perfil(self, interaction: discord.Interaction, membro: discord.Member = None):
         alvo = membro or interaction.user
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
@@ -507,11 +519,6 @@ class Roblox(commands.Cog):
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={vinculo['roblox_id']}&width=150&height=150&format=png")
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(
-        name="roblox-identificar",
-        description="Encontra o membro da NÊMESIS que vinculou um nome de usuário Roblox.",
-    )
-    @app_commands.describe(usuario_roblox="Nome exato da conta Roblox já verificada")
     async def roblox_identificar(self, interaction: discord.Interaction, usuario_roblox: str):
         if interaction.guild is None:
             await interaction.response.send_message(
@@ -551,9 +558,6 @@ class Roblox(commands.Cog):
 
     # ---------------- Cargo automático por rank do grupo ----------------
 
-    @app_commands.command(name="roblox-configurar-grupo", description="Define qual grupo Roblox da gangue o bot vai usar pra sincronizar cargos.")
-    @app_commands.describe(grupo_id="ID numérico do grupo Roblox (aparece na URL do grupo)")
-    @lideranca_only()
     async def roblox_configurar_grupo(self, interaction: discord.Interaction, grupo_id: str):
         if not grupo_id.isdigit():
             await interaction.response.send_message("O ID do grupo precisa ser só números.", ephemeral=True)
@@ -568,9 +572,6 @@ class Roblox(commands.Cog):
             ephemeral=True,
         )
 
-    @app_commands.command(name="roblox-mapear-cargo", description="Liga um rank do grupo Roblox a um cargo do Discord.")
-    @app_commands.describe(rank_roblox="Nome EXATO do rank no grupo Roblox (ex: 'Oficial')", cargo_discord="Cargo do Discord correspondente")
-    @lideranca_only()
     async def roblox_mapear_cargo(self, interaction: discord.Interaction, rank_roblox: str, cargo_discord: discord.Role):
         if cargo_discord >= interaction.guild.me.top_role:
             await interaction.response.send_message(
@@ -583,16 +584,13 @@ class Roblox(commands.Cog):
         todos = await carregar(ARQUIVO_GRUPO, {})
         atual = todos.get(str(interaction.guild.id), {"grupo_id": None, "mapeamentos": {}})
         if not atual["grupo_id"]:
-            await interaction.response.send_message("Configure o grupo primeiro com `/roblox-configurar-grupo`.", ephemeral=True)
+            await interaction.response.send_message("Configure o grupo primeiro pela área administrativa Roblox.", ephemeral=True)
             return
         atual["mapeamentos"][rank_roblox] = cargo_discord.id
         todos[str(interaction.guild.id)] = atual
         await salvar(ARQUIVO_GRUPO, todos)
         await interaction.response.send_message(f"✅ Rank **{rank_roblox}** agora dá o cargo {cargo_discord.mention} automaticamente.", ephemeral=True)
 
-    @app_commands.command(name="roblox-remover-mapeamento", description="Remove a ligação de um rank do Roblox com cargo do Discord.")
-    @app_commands.describe(rank_roblox="Nome exato do rank, como aparece em /roblox-mapeamentos")
-    @lideranca_only()
     async def roblox_remover_mapeamento(self, interaction: discord.Interaction, rank_roblox: str):
         todos = await carregar(ARQUIVO_GRUPO, {})
         atual = todos.get(str(interaction.guild.id), {"grupo_id": None, "mapeamentos": {}})
@@ -603,7 +601,6 @@ class Roblox(commands.Cog):
         await salvar(ARQUIVO_GRUPO, todos)
         await interaction.response.send_message(f"🗑️ Mapeamento de **{rank_roblox}** removido.", ephemeral=True)
 
-    @app_commands.command(name="roblox-mapeamentos", description="Lista os ranks do Roblox ligados a cargos do Discord neste servidor.")
     async def roblox_mapeamentos(self, interaction: discord.Interaction):
         config = await _config_grupo(interaction.guild.id)
         if not config["grupo_id"]:
@@ -614,9 +611,6 @@ class Roblox(commands.Cog):
         embed = criar_embed(title="🎮 Sincronização de cargos por rank", description=f"Grupo: `{config['grupo_id']}`\n\n{texto}", color=0x00A2FF)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="roblox-sincronizar", description="Força a sincronização de cargo por rank (de um membro ou de todo mundo vinculado).")
-    @app_commands.describe(membro="(Opcional) só esse membro — sem isso, sincroniza todo mundo vinculado")
-    @lideranca_only()
     async def roblox_sincronizar(self, interaction: discord.Interaction, membro: discord.Member = None):
         await interaction.response.defer(ephemeral=True)
         vinculos = await carregar(ARQUIVO_VINCULOS, {})
@@ -639,8 +633,6 @@ class Roblox(commands.Cog):
                 atualizados += 1
         await interaction.followup.send(f"✅ Sincronização concluída pra {atualizados} membro(s) vinculado(s).", ephemeral=True)
 
-    @app_commands.command(name="roblox-historico", description="Consulta as últimas alterações de participação e rank no grupo Roblox.")
-    @lideranca_only()
     async def roblox_historico(self, interaction: discord.Interaction):
         historico = await carregar(ARQUIVO_HISTORICO_ROBLOX, {})
         eventos = historico.get(str(interaction.guild.id), []) if isinstance(historico, dict) else []
