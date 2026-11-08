@@ -511,7 +511,7 @@ class Roblox(commands.Cog):
                 valor = "**" + nome + "**"
                 if isinstance(membros, int):
                     valor += "\n**" + format(membros, ",") + "** membros\n"
-                embed.add_field(name="GRUPO OFICIAL", value=valor + f"\\nID: `{grupo_id_painel}`", inline=True)
+                embed.add_field(name="GRUPO OFICIAL", value=valor + f"\nID: `{grupo_id_painel}`", inline=True)
                 owner = dados.get("owner") or {}
                 owner_name = owner.get("username") if isinstance(owner, dict) else None
                 if owner_name:
