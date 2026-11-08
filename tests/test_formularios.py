@@ -41,16 +41,20 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         self.assertIn((1, 2, "recente"), cog_formularios.SESSOES_FORMULARIOS)
         cog_formularios.SESSOES_FORMULARIOS.clear()
 
-    def test_inscricao_nemesis_tem_15_perguntas_em_tres_etapas(self):
-        formulario = cog_formularios.FORMULARIOS_AUTOMATICOS[0]
-        self.assertEqual(formulario["nome"], "Inscrição para NÊMESIS")
-        self.assertEqual(len(cog_formularios._perguntas_flat(formulario)), 15)
-        self.assertEqual(
-            [len(pagina["perguntas"]) for pagina in cog_formularios._paginas_modal(formulario)],
-            [5, 5, 5],
-        )
+    def test_formularios_staff_e_ingresso_nemesis_coexistem_sem_substituicao(self):
+        por_nome = {item["nome"]: item for item in cog_formularios.FORMULARIOS_AUTOMATICOS}
+        self.assertEqual(set(por_nome), {"Inscrição para Staff", "Inscrição para NÊMESIS"})
+
+        staff = por_nome["Inscrição para Staff"]
+        ingresso = por_nome["Inscrição para NÊMESIS"]
+        self.assertEqual(len(cog_formularios._perguntas_flat(staff)), 20)
+        self.assertEqual(len(cog_formularios._paginas_modal(staff)), 4)
+        self.assertEqual([len(p["perguntas"]) for p in cog_formularios._paginas_modal(staff)], [5, 5, 5, 5])
+
+        self.assertEqual(len(cog_formularios._perguntas_flat(ingresso)), 15)
+        self.assertEqual([len(p["perguntas"]) for p in cog_formularios._paginas_modal(ingresso)], [5, 5, 5])
         escolhas = [
-            pergunta for pergunta in cog_formularios._perguntas_flat(formulario)
+            pergunta for pergunta in cog_formularios._perguntas_flat(ingresso)
             if isinstance(pergunta, dict) and pergunta.get("tipo") == "escolha"
         ]
         self.assertEqual(len(escolhas), 2)
