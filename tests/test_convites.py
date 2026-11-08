@@ -6,7 +6,7 @@ from cogs.convites import (
     _resumo,
     _total_paginas,
 )
-from utils.registro_global import CATEGORIAS, CORES_CATEGORIAS, EMOJIS_CATEGORIAS
+from cogs.convites import CANAL_CONVITES_ID
 
 
 class TestConsultaIndividualConvites(unittest.TestCase):
@@ -19,10 +19,8 @@ class TestConsultaIndividualConvites(unittest.TestCase):
             seletor.children[0].custom_id, "nemesis:convites:membro:selecionar"
         )
 
-    def test_categoria_propria_no_registro_global(self):
-        self.assertIn("convites", CATEGORIAS)
-        self.assertIn("convites", CORES_CATEGORIAS)
-        self.assertEqual(EMOJIS_CATEGORIAS["convites"], "🔗")
+    def test_painel_aponta_para_canal_oficial_de_convites(self):
+        self.assertEqual(CANAL_CONVITES_ID, 1563995880623841332)
 
     def test_resumo_separa_historico_de_convidados_ativos(self):
         servidor = {
