@@ -1212,30 +1212,34 @@ class Musica(commands.Cog):
                     if argumentos_headers:
                         antes = f"{antes} {argumentos_headers}"
                     volume = min(1.5, max(0.01, float(self.volumes.get(gid, VOLUME_PADRAO))))
-                    # Codifica em Opus diretamente no FFmpeg. Isso evita a etapa
-                    # PCM -> libopus do processo Python e aplica o volume antes
-                    # dos pacotes serem enviados ao gateway de voz do Discord.
-                    opcoes_saida = f"{FFMPEG_OPCOES['options']} -af volume={volume:.2f}"
-                    fonte = discord.FFmpegOpusAudio(
+                    # Decodifica para PCM e deixa o VoiceClient codificar em Opus
+                    # usando libopus. Esse caminho evita depender do encoder libopus
+                    # embutido no binário FFmpeg do ambiente de hospedagem.
+                    fonte_pcm = discord.FFmpegPCMAudio(
                         item["url"],
                         executable=self.ffmpeg,
                         before_options=antes,
-                        options=opcoes_saida,
-                        bitrate=128,
+                        options=FFMPEG_OPCOES["options"],
                     )
+                    fonte = discord.PCMVolumeTransformer(fonte_pcm, volume=volume)
                     LOG.info(
-                        "Iniciando transmissão Opus (guild=%s, faixa=%s, volume=%.2f, ffmpeg=%s).",
+                        "Iniciando transmissão PCM->Opus (guild=%s, faixa=%s, volume=%.2f, "
+                        "ffmpeg=%s, opus_carregado=%s, headers=%s).",
                         gid,
                         item.get("title"),
                         volume,
                         self.ffmpeg,
+                        discord.opus.is_loaded(),
+                        bool(cabecalhos),
                     )
                     voz.play(fonte, after=ao_terminar)
                     LOG.info(
-                        "Fonte Opus entregue ao VoiceClient (guild=%s, conectado=%s, tocando=%s).",
+                        "Fonte PCM entregue ao VoiceClient (guild=%s, conectado=%s, "
+                        "tocando=%s, canal_voz=%s).",
                         gid,
                         voz.is_connected(),
                         voz.is_playing(),
+                        getattr(getattr(voz, "channel", None), "id", None),
                     )
                     canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
                     if canal_texto:
