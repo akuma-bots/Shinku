@@ -1367,8 +1367,6 @@ class Musica(commands.Cog):
             return False
         return True
 
-    @app_commands.command(name="play", description="Toca uma música por link ou pesquisa.")
-    @app_commands.describe(consulta="Nome da música ou URL do áudio/vídeo")
     async def play(self, interaction: discord.Interaction, consulta: str):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -1414,7 +1412,6 @@ class Musica(commands.Cog):
             ))
         await self._garantir_reprodutor(interaction.guild)
 
-    @app_commands.command(name="skip", description="Pula a música atual.")
     async def skip(self, interaction: discord.Interaction):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1426,7 +1423,6 @@ class Musica(commands.Cog):
         voz.stop()
         await interaction.response.send_message("⏭ Música pulada.")
 
-    @app_commands.command(name="pause", description="Pausa a música atual.")
     async def pause(self, interaction: discord.Interaction):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1437,7 +1433,6 @@ class Musica(commands.Cog):
         voz.pause()
         await interaction.response.send_message("⏸ Reprodução pausada.")
 
-    @app_commands.command(name="resume", description="Retoma a música pausada.")
     async def resume(self, interaction: discord.Interaction):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1448,7 +1443,6 @@ class Musica(commands.Cog):
         voz.resume()
         await interaction.response.send_message("▶ Reprodução retomada.")
 
-    @app_commands.command(name="queue", description="Mostra a fila de músicas.")
     async def queue(self, interaction: discord.Interaction):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -1469,7 +1463,6 @@ class Musica(commands.Cog):
             f"♫ Fila de reprodução ({len(fila)})", "\n".join(linhas)
         ))
 
-    @app_commands.command(name="nowplaying", description="Mostra o estado da reprodução atual.")
     async def nowplaying(self, interaction: discord.Interaction):
         voz = interaction.guild.voice_client if interaction.guild else None
         if not voz or not (voz.is_playing() or voz.is_paused()):
@@ -1485,8 +1478,6 @@ class Musica(commands.Cog):
             f"Fila restante: **{len(self.filas.get(interaction.guild.id, []))}**"
         ))
 
-    @app_commands.command(name="volume", description="Ajusta o volume da música (1–100%).")
-    @app_commands.describe(percentual="Volume de 1 a 100")
     async def volume(self, interaction: discord.Interaction, percentual: app_commands.Range[int, 1, 100]):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
@@ -1500,7 +1491,6 @@ class Musica(commands.Cog):
             voz.source.volume = percentual / 100
         await interaction.response.send_message(f"🔊 Volume definido para **{percentual}%**.")
 
-    @app_commands.command(name="shuffle", description="Embaralha as músicas que aguardam na fila.")
     async def shuffle(self, interaction: discord.Interaction):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1511,13 +1501,6 @@ class Musica(commands.Cog):
         random.shuffle(fila)
         await interaction.response.send_message(f"🔀 Fila embaralhada: **{len(fila)}** músicas.")
 
-    @app_commands.command(name="loop", description="Define repetição desligada, da música atual ou da fila.")
-    @app_commands.describe(modo="O que deve ser repetido")
-    @app_commands.choices(modo=[
-        app_commands.Choice(name="Desligado", value="off"),
-        app_commands.Choice(name="Música atual", value="track"),
-        app_commands.Choice(name="Fila inteira", value="queue"),
-    ])
     async def loop(self, interaction: discord.Interaction, modo: app_commands.Choice[str]):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1525,8 +1508,6 @@ class Musica(commands.Cog):
         rotulos = {"off": "desligada", "track": "música atual", "queue": "fila inteira"}
         await interaction.response.send_message(f"🔁 Repetição definida para **{rotulos[modo.value]}**.")
 
-    @app_commands.command(name="remove", description="Remove uma música da fila pela posição.")
-    @app_commands.describe(posicao="Posição da música na fila, começando em 1")
     async def remove(self, interaction: discord.Interaction, posicao: app_commands.Range[int, 1, 100]):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1538,7 +1519,6 @@ class Musica(commands.Cog):
         titulo = discord.utils.escape_markdown(item.get("title", "Música sem título"))
         await interaction.response.send_message(f"🗑️ Removida da fila: **{titulo}**.")
 
-    @app_commands.command(name="clearqueue", description="Limpa a fila sem interromper a música atual.")
     async def clearqueue(self, interaction: discord.Interaction):
         if not await self._exigir_mesmo_canal(interaction):
             return
@@ -1547,7 +1527,6 @@ class Musica(commands.Cog):
         fila.clear()
         await interaction.response.send_message(f"🧹 Fila limpa. A música atual continua tocando; **{total}** item(ns) removido(s).")
 
-    @app_commands.command(name="stop", description="Para a música, limpa a fila e sai do canal de voz.")
     async def stop(self, interaction: discord.Interaction):
         if not interaction.guild:
             await interaction.response.send_message("Use este comando no servidor.", ephemeral=True)
