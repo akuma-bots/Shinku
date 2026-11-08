@@ -209,6 +209,35 @@ class TestPlaylistsMusicais(unittest.IsolatedAsyncioTestCase):
                     [{"title": "Nova", "webpage_url": "https://youtu.be/xyz", "duration": 30}],
                 )
 
+    async def test_persiste_historico_e_preferencias_sem_fluxo_temporario(self):
+        cog = self.criar_cog()
+        cog._estado_lock = asyncio.Lock()
+        cog.autoplay = {123: True}
+        cog.volumes = {123: 0.8}
+        cog.loop_modes = {123: "queue"}
+        cog.historico = {123: [{
+            "title": "Faixa",
+            "webpage_url": "https://youtu.be/abc",
+            "duration": 90,
+            "url": "https://stream-temporario.example/audio",
+        }]}
+        armazenado = {}
+
+        async def salvar_estado(_arquivo, dados):
+            armazenado.update(dados)
+
+        with patch("cogs.musica.carregar", new=AsyncMock(return_value={})), patch(
+            "cogs.musica.salvar", new=AsyncMock(side_effect=salvar_estado)
+        ):
+            await cog._persistir_estado(123)
+
+        registro = armazenado["123"]
+        self.assertTrue(registro["autoplay"])
+        self.assertEqual(registro["volume"], 0.8)
+        self.assertEqual(registro["loop"], "queue")
+        self.assertEqual(registro["historico"][0]["title"], "Faixa")
+        self.assertNotIn("url", registro["historico"][0])
+
     def test_painel_musical_tem_componentes_persistentes(self):
         view = MusicPanelView(object())
         self.assertIsNone(view.timeout)
