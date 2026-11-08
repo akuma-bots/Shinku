@@ -210,7 +210,7 @@ class RegrasOficiais(commands.Cog):
         if existentes:
             principal = existentes[0]
             try:
-                await principal.edit(content=None, embed=embed, embeds=[], allowed_mentions=discord.AllowedMentions.none())
+                await principal.edit(content=None, embeds=[embed], allowed_mentions=discord.AllowedMentions.none())
             except discord.HTTPException:
                 logging.exception("Código de Conduta: falha ao atualizar a embed única.")
                 return False
