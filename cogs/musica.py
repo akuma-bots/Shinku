@@ -1040,6 +1040,8 @@ class Musica(commands.Cog):
             "music.apple.com", "www.music.apple.com", "tidal.com", "www.tidal.com",
             "open.spotify.com", "www.open.spotify.com",
         )
+        if "://" in consulta and not consulta.startswith(("http://", "https://")):
+            raise ValueError("O link precisa usar HTTP/HTTPS.")
         if consulta.startswith(("http://", "https://")):
             parsed = urlparse(consulta)
             host = (parsed.hostname or "").lower()
