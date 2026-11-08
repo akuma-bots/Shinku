@@ -562,6 +562,7 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
 
 
 GUILD_NEMESIS_ID = 1563995879981981817
+CANAL_MUSICA_ID = 1563995881508831335
 MARCADOR_PAINEL_MUSICA = "NÊMESIS • Painel de música"
 ARQUIVO_PAINEL_MUSICA = "painel_musica.json"
 
@@ -837,18 +838,22 @@ class Musica(commands.Cog):
             LOG.info("Preferências e histórico musical restaurados para o servidor %s.", guild.id)
         except Exception:
             LOG.exception("Não foi possível restaurar o estado musical do servidor %s.", guild.id)
-        normalizar = lambda valor: "".join(
-            caractere for caractere in unicodedata.normalize("NFKD", str(valor).casefold())
-            if caractere.isalnum()
-        )
-        canais = [
-            canal for canal in guild.text_channels
-            if "musica" in normalizar(canal.name) or "music" in normalizar(canal.name)
-        ]
-        if not canais:
-            LOG.warning("Painel musical não publicado: crie ou renomeie um canal de texto para Música.")
+        canal = guild.get_channel(CANAL_MUSICA_ID)
+        if canal is None:
+            try:
+                canal = await guild.fetch_channel(CANAL_MUSICA_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                LOG.exception(
+                    "Painel musical: não foi possível acessar o canal configurado %s.",
+                    CANAL_MUSICA_ID,
+                )
+                return
+        if not isinstance(canal, discord.TextChannel):
+            LOG.error(
+                "Painel musical não publicado: o destino %s não é um canal de texto.",
+                CANAL_MUSICA_ID,
+            )
             return
-        canal = next((item for item in canais if normalizar(item.name) in {"musica", "music"}), canais[0])
         permissoes = canal.permissions_for(guild.me) if guild.me else None
         if not permissoes or not (permissoes.view_channel and permissoes.send_messages and permissoes.embed_links):
             LOG.error("Painel musical sem permissões para publicar no canal %s.", canal.id)
@@ -1179,6 +1184,12 @@ class Musica(commands.Cog):
                                 ),
                                 loop,
                             )
+                    if erro is None:
+                        LOG.info(
+                            "Processo de áudio finalizado sem erro (guild=%s, faixa=%s).",
+                            gid,
+                            item.get("title"),
+                        )
                     loop.call_soon_threadsafe(terminou.set)
 
                 try:
@@ -1200,19 +1211,32 @@ class Musica(commands.Cog):
                     antes = FFMPEG_OPCOES["before_options"]
                     if argumentos_headers:
                         antes = f"{antes} {argumentos_headers}"
-                    if not _garantir_opus():
-                        raise RuntimeError(
-                            "Biblioteca libopus não encontrada. Instale o pacote de sistema libopus0 e reinicie o bot."
-                        )
-                    fonte = discord.FFmpegPCMAudio(
+                    volume = min(1.5, max(0.01, float(self.volumes.get(gid, VOLUME_PADRAO))))
+                    # Codifica em Opus diretamente no FFmpeg. Isso evita a etapa
+                    # PCM -> libopus do processo Python e aplica o volume antes
+                    # dos pacotes serem enviados ao gateway de voz do Discord.
+                    opcoes_saida = f"{FFMPEG_OPCOES['options']} -af volume={volume:.2f}"
+                    fonte = discord.FFmpegOpusAudio(
                         item["url"],
                         executable=self.ffmpeg,
                         before_options=antes,
-                        options=FFMPEG_OPCOES["options"],
+                        options=opcoes_saida,
+                        bitrate=128,
                     )
-                    volume = self.volumes.get(gid, VOLUME_PADRAO)
-                    LOG.info("Iniciando transmissão de áudio (guild=%s, faixa=%s, ffmpeg=%s).", gid, item.get("title"), self.ffmpeg)
-                    voz.play(discord.PCMVolumeTransformer(fonte, volume=volume), after=ao_terminar)
+                    LOG.info(
+                        "Iniciando transmissão Opus (guild=%s, faixa=%s, volume=%.2f, ffmpeg=%s).",
+                        gid,
+                        item.get("title"),
+                        volume,
+                        self.ffmpeg,
+                    )
+                    voz.play(fonte, after=ao_terminar)
+                    LOG.info(
+                        "Fonte Opus entregue ao VoiceClient (guild=%s, conectado=%s, tocando=%s).",
+                        gid,
+                        voz.is_connected(),
+                        voz.is_playing(),
+                    )
                     canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
                     if canal_texto:
                         await canal_texto.send(embed=self._embed_musica(
