@@ -6,6 +6,10 @@ Aceita links e buscas; a reprodução depende da disponibilidade do provedor de 
 from utils.apresentacao import criar_embed
 from utils.storage import atualizar_json, carregar, salvar
 import asyncio
+import base64
+import json
+import os
+import time
 import logging
 import random
 import shlex
@@ -13,7 +17,8 @@ import shutil
 import uuid
 import unicodedata
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
+from urllib.request import Request, urlopen
 
 import discord
 from discord import app_commands
@@ -52,6 +57,94 @@ def _garantir_opus() -> bool:
     except Exception:
         LOG.exception("Biblioteca libopus indisponível; a reprodução de voz não funcionará.")
         return False
+
+
+_SPOTIFY_TOKEN = {"valor": None, "expira_em": 0.0}
+
+
+def _spotify_json(url: str, token: str | None = None, dados: bytes | None = None,
+                  cabecalho: dict | None = None) -> dict:
+    headers = dict(cabecalho or {})
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if dados is not None:
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+    requisicao = Request(url, data=dados, headers=headers)
+    with urlopen(requisicao, timeout=15) as resposta:
+        return json.loads(resposta.read().decode("utf-8"))
+
+
+def _spotify_token_acesso() -> str:
+    agora = time.time()
+    if _SPOTIFY_TOKEN["valor"] and _SPOTIFY_TOKEN["expira_em"] > agora + 60:
+        return _SPOTIFY_TOKEN["valor"]
+    client_id = os.getenv("SPOTIFY_CLIENT_ID", "").strip()
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()
+    if not client_id or not client_secret:
+        raise ValueError(
+            "Links do Spotify precisam da integração oficial. Configure SPOTIFY_CLIENT_ID "
+            "e SPOTIFY_CLIENT_SECRET nas variáveis privadas do Render."
+        )
+    credenciais = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    token_data = _spotify_json(
+        "https://accounts.spotify.com/api/token",
+        dados=b"grant_type=client_credentials",
+        cabecalho={"Authorization": f"Basic {credenciais}"},
+    )
+    _SPOTIFY_TOKEN["valor"] = token_data["access_token"]
+    _SPOTIFY_TOKEN["expira_em"] = agora + int(token_data.get("expires_in", 3600))
+    return _SPOTIFY_TOKEN["valor"]
+
+
+def _spotify_itens(consulta: str) -> list[dict]:
+    """Obtém metadados públicos de faixas Spotify; o áudio será resolvido em fonte reproduzível."""
+    parsed = urlparse(consulta)
+    partes = [parte for parte in parsed.path.split("/") if parte]
+    if parsed.netloc.lower() not in {"open.spotify.com", "www.open.spotify.com"}:
+        raise ValueError("Link Spotify inválido.")
+    if len(partes) < 2 or partes[0] not in {"track", "album", "playlist"}:
+        raise ValueError("Use um link de faixa, álbum ou playlist do Spotify.")
+    tipo, identificador = partes[0], partes[1].split("?")[0]
+    token = _spotify_token_acesso()
+    itens = []
+    if tipo == "track":
+        dados = _spotify_json(f"https://api.spotify.com/v1/tracks/{identificador}", token)
+        itens = [dados]
+    elif tipo == "album":
+        dados = _spotify_json(f"https://api.spotify.com/v1/albums/{identificador}/tracks?limit=50", token)
+        itens = dados.get("items", [])
+        while dados.get("next") and len(itens) < MAX_QUEUE:
+            dados = _spotify_json(dados["next"], token)
+            itens.extend(dados.get("items", []))
+    else:
+        url = f"https://api.spotify.com/v1/playlists/{identificador}/tracks?limit=100"
+        dados = _spotify_json(url, token)
+        itens = [registro.get("track") for registro in dados.get("items", [])]
+        while dados.get("next") and len(itens) < MAX_QUEUE:
+            dados = _spotify_json(dados["next"], token)
+            itens.extend(registro.get("track") for registro in dados.get("items", []))
+    resultado = []
+    for faixa in itens[:MAX_QUEUE]:
+        if not isinstance(faixa, dict) or not faixa.get("name"):
+            continue
+        artistas = ", ".join(
+            str(artista.get("name", "")).strip()
+            for artista in faixa.get("artists", []) if isinstance(artista, dict)
+        )
+        titulo = str(faixa["name"]).strip()
+        duracao = max(0, int(faixa.get("duration_ms") or 0) // 1000)
+        resultado.append({
+            "title": titulo,
+            "artist": artistas,
+            "duration": duracao,
+            "webpage_url": (
+                faixa.get("external_urls", {}).get("spotify")
+                or f"https://open.spotify.com/track/{faixa.get('id')}"
+            ),
+        })
+    if not resultado:
+        raise ValueError("O Spotify não retornou faixas disponíveis para esse link.")
+    return resultado
 
 
 class MusicControlView(discord.ui.View):
@@ -174,8 +267,15 @@ def _normalizar_faixas_playlist(faixas: list[dict]) -> list[dict]:
     resultado = []
     if not isinstance(faixas, list):
         return resultado
-    permitidos = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
-                  "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com"}
+    permitidos = {
+        "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be",
+        "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com",
+        "vimeo.com", "www.vimeo.com", "bandcamp.com", "www.bandcamp.com",
+        "twitch.tv", "www.twitch.tv", "mixcloud.com", "www.mixcloud.com",
+        "dailymotion.com", "www.dailymotion.com", "deezer.com", "www.deezer.com",
+        "music.apple.com", "www.music.apple.com", "tidal.com", "www.tidal.com",
+        "open.spotify.com", "www.open.spotify.com",
+    }
     for item in faixas[:MAX_FAIXAS_PLAYLIST]:
         if not isinstance(item, dict):
             continue
@@ -670,31 +770,103 @@ class Musica(commands.Cog):
         if voz is None:
             return
         try:
-            item = await self._extrair(consulta)
+            itens = await self._extrair_varios(consulta)
         except Exception as erro:
             LOG.info("Não foi possível pesquisar áudio: %s", erro)
             await interaction.followup.send(
-                "Não encontrei essa música ou o provedor bloqueou a consulta. Tente outro nome ou link.",
+                f"Não consegui carregar essa fonte musical: {str(erro)[:220]}",
                 ephemeral=True,
             )
             return
-        item["text_channel_id"] = interaction.channel_id
         fila = self.filas.setdefault(gid, [])
-        if len(fila) >= MAX_QUEUE:
+        disponivel = MAX_QUEUE - len(fila)
+        if disponivel <= 0:
             await interaction.followup.send(f"A fila atingiu o limite de {MAX_QUEUE} músicas.", ephemeral=True)
             return
-        fila.append(item)
-        posicao = len(fila)
+        itens = itens[:disponivel]
+        for item in itens:
+            item["text_channel_id"] = interaction.channel_id
+        fila.extend(itens)
+        primeira = itens[0]
+        posicao = len(fila) - len(itens) + 1
         estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
+        quantidade = f" • {len(itens)} faixa(s)" if len(itens) > 1 else ""
         await interaction.followup.send(
             embed=self._embed_musica(
                 f"♫ {estado}",
-                f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
-                f"Duração: {self._tempo(item['duration'])} • Posição na fila: {posicao}",
+                f"**[{discord.utils.escape_markdown(primeira['title'])}]({primeira['webpage_url']})**{quantidade}\n"
+                f"Duração: {self._tempo(primeira['duration'])} • Posição inicial: {posicao}",
             ),
             ephemeral=True,
         )
         await self._garantir_reprodutor(interaction.guild)
+
+
+    async def _extrair_varios(self, consulta: str) -> list[dict[str, Any]]:
+        """Resolve faixas individuais ou playlists de provedores compatíveis."""
+        consulta = str(consulta or "").strip()
+        if "open.spotify.com/" in consulta.lower():
+            async with self._extrair_lock:
+                metadados = await asyncio.to_thread(_spotify_itens, consulta)
+                def resolver_spotify():
+                    resultado = []
+                    for faixa in metadados[:MAX_QUEUE]:
+                        busca = f"{faixa['title']} {faixa.get('artist', '')}".strip()
+                        dados = self.ytdl.extract_info(f"ytsearch1:{busca}", download=False)
+                        entradas = dados.get("entries") if isinstance(dados, dict) else None
+                        entrada = next((item for item in entradas or [] if isinstance(item, dict)), None)
+                        if not entrada:
+                            continue
+                        url = str(entrada.get("url") or "").strip()
+                        pagina = str(entrada.get("webpage_url") or "").strip()
+                        if not url or not pagina:
+                            continue
+                        resultado.append({
+                            "url": url,
+                            "title": faixa["title"],
+                            "webpage_url": pagina,
+                            "duration": faixa["duration"] or int(entrada.get("duration") or 0),
+                            "http_headers": entrada.get("http_headers") or {},
+                            "source": "Spotify",
+                        })
+                    return resultado
+                itens = await asyncio.to_thread(resolver_spotify)
+            if not itens:
+                raise ValueError("Não consegui encontrar versões reproduzíveis das faixas desse link Spotify.")
+            return itens
+
+        if consulta.startswith(("http://", "https://")):
+            def extrair_playlist():
+                opcoes = dict(YDL_OPCOES)
+                opcoes["noplaylist"] = False
+                coletor = yt_dlp.YoutubeDL(opcoes)
+                dados = coletor.extract_info(consulta, download=False)
+                entradas = dados.get("entries") if isinstance(dados, dict) else None
+                if entradas is None:
+                    return None
+                resultado = []
+                for entrada in entradas:
+                    if not isinstance(entrada, dict):
+                        continue
+                    pagina = str(entrada.get("webpage_url") or entrada.get("url") or "").strip()
+                    if pagina.startswith(("http://", "https://")):
+                        resultado.append(pagina)
+                    if len(resultado) >= MAX_QUEUE:
+                        break
+                return resultado
+            async with self._extrair_lock:
+                paginas = await asyncio.to_thread(extrair_playlist)
+            if paginas is not None:
+                itens = []
+                for pagina in paginas:
+                    try:
+                        itens.append(await self._extrair(pagina))
+                    except Exception:
+                        LOG.warning("Faixa de playlist indisponível: %s", pagina)
+                if not itens:
+                    raise ValueError("A playlist não possui faixas reproduzíveis.")
+                return itens
+        return [await self._extrair(consulta)]
 
     async def abrir_playlists(self, interaction: discord.Interaction):
         if interaction.guild is None:
@@ -720,22 +892,36 @@ class Musica(commands.Cog):
             raise ValueError("A pesquisa musical deve ter no máximo 300 caracteres.")
 
         permitidos = (
-            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
-            "www.youtu.be", "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com",
+            "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be",
+            "soundcloud.com", "www.soundcloud.com", "m.soundcloud.com",
+            "vimeo.com", "www.vimeo.com", "bandcamp.com", "www.bandcamp.com",
+            "twitch.tv", "www.twitch.tv", "mixcloud.com", "www.mixcloud.com",
+            "dailymotion.com", "www.dailymotion.com", "deezer.com", "www.deezer.com",
+            "music.apple.com", "www.music.apple.com", "tidal.com", "www.tidal.com",
+            "open.spotify.com", "www.open.spotify.com",
         )
         if consulta.startswith(("http://", "https://")):
-            host = (urlparse(consulta).hostname or "").lower()
-            if not any(host == dominio or host.endswith("." + dominio) for dominio in permitidos):
-                raise ValueError("Provedor de música não permitido.")
+            parsed = urlparse(consulta)
+            host = (parsed.hostname or "").lower()
+            extensoes_audio = (".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".flac", ".m3u", ".pls")
+            host_conhecido = any(host == dominio or host.endswith("." + dominio) for dominio in permitidos)
+            url_direta = parsed.path.lower().endswith(extensoes_audio)
+            if parsed.scheme.lower() not in {"http", "https"} or not (host_conhecido or url_direta):
+                raise ValueError("Este link ainda não é de uma fonte musical compatível.")
 
         def extrair():
-            try:
-                dados = self.ytdl.extract_info(consulta, download=False)
-            except Exception:
-                if consulta.startswith(("http://", "https://")):
-                    raise
-                LOG.info("Pesquisa no provedor principal falhou; tentando SoundCloud.")
-                dados = self.ytdl.extract_info(f"scsearch1:{consulta}", download=False)
+            if "open.spotify.com/" in consulta.lower():
+                metadados = _spotify_itens(consulta)[0]
+                busca = f"{metadados['title']} {metadados.get('artist', '')}".strip()
+                dados = self.ytdl.extract_info(f"ytsearch1:{busca}", download=False)
+            else:
+                try:
+                    dados = self.ytdl.extract_info(consulta, download=False)
+                except Exception:
+                    if consulta.startswith(("http://", "https://")):
+                        raise
+                    LOG.info("Pesquisa no provedor principal falhou; tentando SoundCloud.")
+                    dados = self.ytdl.extract_info(f"scsearch1:{consulta}", download=False)
 
             if not isinstance(dados, dict):
                 raise ValueError("O provedor retornou uma resposta inválida.")
@@ -754,6 +940,8 @@ class Musica(commands.Cog):
 
             titulo = str(dados.get("title") or "Áudio sem título").strip()[:256]
             webpage = str(dados.get("webpage_url") or consulta).strip()[:2048]
+            # Para Spotify, mantém o link original apenas como referência de origem;
+            # a URL temporária reproduzível continua sendo a retornada pelo YouTube.
             try:
                 duracao = max(0, int(dados.get("duration") or 0))
             except (TypeError, ValueError, OverflowError):
