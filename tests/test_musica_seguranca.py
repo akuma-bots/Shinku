@@ -56,6 +56,38 @@ class TestSegurancaExtracaoMusical(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaisesRegex(ValueError, "SPOTIFY_CLIENT_ID"):
                     _spotify_itens("https://open.spotify.com/track/abc")
 
+    async def test_busca_tenta_soundcloud_quando_youtube_falha(self):
+        cog = self.criar_cog()
+        resultado_soundcloud = {
+            "entries": [{
+                "url": "https://audio.example/soundcloud-stream",
+                "title": "Faixa SoundCloud",
+                "webpage_url": "https://soundcloud.com/artista/faixa",
+                "duration": 75,
+            }]
+        }
+        cog.ytdl.extract_info.side_effect = [RuntimeError("YouTube bloqueado"), resultado_soundcloud]
+        resultado = await cog._extrair("faixa de teste")
+        self.assertEqual(resultado["title"], "Faixa SoundCloud")
+        self.assertEqual(cog.ytdl.extract_info.call_count, 2)
+        self.assertEqual(cog.ytdl.extract_info.call_args_list[0].args[0], "ytsearch1:faixa de teste")
+        self.assertEqual(cog.ytdl.extract_info.call_args_list[1].args[0], "scsearch1:faixa de teste")
+
+    async def test_busca_tenta_soundcloud_quando_youtube_nao_retorna_resultados(self):
+        cog = self.criar_cog()
+        cog.ytdl.extract_info.side_effect = [
+            {"entries": []},
+            {"entries": [{
+                "url": "https://audio.example/soundcloud-stream",
+                "title": "Faixa alternativa",
+                "webpage_url": "https://soundcloud.com/artista/faixa",
+                "duration": 60,
+            }]},
+        ]
+        resultado = await cog._extrair("faixa alternativa")
+        self.assertEqual(resultado["title"], "Faixa alternativa")
+        self.assertEqual(cog.ytdl.extract_info.call_count, 2)
+
     async def test_rejeita_url_de_provedor_nao_permitido(self):
         cog = self.criar_cog()
         with self.assertRaisesRegex(ValueError, "não permitido"):
