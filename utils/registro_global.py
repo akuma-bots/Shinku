@@ -32,7 +32,6 @@ CARGOS_ACESSO_IDS = {
 CATEGORIAS = {
     "administracao": ("👑・Central de Administração", "Decisões administrativas, permissões, configurações e diretrizes oficiais da NÊMESIS."),
     "historico_membros": ("👥・Arquivo de Membros", "Entradas, saídas e ocorrências individuais essenciais. Não recebe mensagens, cargos ou conquistas."),
-    "convites": ("🔗・Central de Convites", "Consulta individual de convites atribuídos, links utilizados, convidados presentes e saídas."),
     "moderacao": ("⚖️・Tribunal de Moderação", "Advertências, timeouts, expulsões, banimentos e decisões da equipe."),
     "seguranca": ("🛡️・Muralha de Segurança", "AutoMod, Anti-Raid, filtros, incidentes, bloqueios e falhas de proteção."),
     "missoes": ("🎯・Operações e Missões", "Missões, operações, formulários, relatórios, atribuições, provas, validações, conclusões e recompensas."),
@@ -50,7 +49,6 @@ CATEGORIAS = {
 CORES_CATEGORIAS = {
     "administracao": 0xB3263E,
     "historico_membros": 0x991B33,
-    "convites": 0x8B1E2D,
     "moderacao": 0x741629,
     "seguranca": 0x681323,
     "missoes": 0x8F172C,
@@ -64,7 +62,7 @@ CORES_CATEGORIAS = {
 }
 
 EMOJIS_CATEGORIAS = {
-    "administracao": "👑", "historico_membros": "👥", "convites": "🔗", "moderacao": "⚖️",
+    "administracao": "👑", "historico_membros": "👥", "moderacao": "⚖️",
     "seguranca": "🛡️", "missoes": "🎯", "competitivo": "🏆",
     "eventos": "🎉", "atendimento": "🎫", "mensagens": "💬",
     "parcerias": "🤝", "integracoes": "⚙️", "sugestoes": "📋",
