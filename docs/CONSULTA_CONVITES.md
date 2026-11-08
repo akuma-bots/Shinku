@@ -1,7 +1,7 @@
 # Central de Convites — NÊMESIS
 
 ## Consulta individual
-A consulta é aberta pelo botão **Consultar convites de membro** no tópico **🔗・Central de Convites**, dentro do Registro Global. A liderança pesquisa e seleciona uma pessoa pelo seletor nativo do Discord. O resultado é privado e não apresenta ranking.
+A consulta é aberta pelo botão **Consultar convites de membro** no canal **Convites** (`1563995880623841332`), pelo painel fixo **🔗 CENTRAL DE CONVITES**. A liderança pesquisa e seleciona uma pessoa pelo seletor nativo do Discord. O painel fica diretamente no canal de Convites, não no Registro Global. O resultado é privado e não apresenta ranking.
 
 A ficha mostra:
 - quantidade de convidados atribuídos ao membro;
