@@ -9,7 +9,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.guild_config import (\n    lideranca_only, membro_tem_lideranca,\n    CARGOS_AUTORIZADOS_HIERARQUIA_IDS, CARGOS_LIDERANCA_IDS,\n)
+from utils.guild_config import (
+    lideranca_only, membro_tem_lideranca,
+    CARGOS_AUTORIZADOS_HIERARQUIA_IDS, CARGOS_LIDERANCA_IDS,
+)
 from utils.storage import carregar, salvar
 
 ARQUIVO_VINCULOS = "roblox_vinculos.json"       # { guild_id: { discord_id: {roblox_id, roblox_username} } }
