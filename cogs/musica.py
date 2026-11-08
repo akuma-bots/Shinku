@@ -43,6 +43,17 @@ FFMPEG_OPCOES = {
 }
 
 
+def _garantir_opus() -> bool:
+    """Carrega a biblioteca Opus do sistema necessária para enviar áudio ao Discord."""
+    try:
+        if not discord.opus.is_loaded():
+            discord.opus.load_opus("libopus.so.0")
+        return discord.opus.is_loaded()
+    except (OSError, discord.OpusNotLoaded):
+        LOG.exception("Biblioteca libopus indisponível; a reprodução de voz não funcionará.")
+        return False
+
+
 class MusicControlView(discord.ui.View):
     """Painel interativo de reprodução, inspirado em bots de música populares."""
 
@@ -570,7 +581,10 @@ class Musica(commands.Cog):
         # Prefere FFmpeg do sistema (Render instala via apt.txt); o binário
         # empacotado pelo imageio-ffmpeg fica como fallback.
         self.ffmpeg = shutil.which("ffmpeg") or imageio_ffmpeg.get_ffmpeg_exe()
+        opus_ok = _garantir_opus()
         LOG.info("Reprodução de música usando FFmpeg: %s", self.ffmpeg)
+        if not opus_ok:
+            LOG.error("Áudio desativado: instale o pacote de sistema libopus0.")
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -832,6 +846,10 @@ class Musica(commands.Cog):
                     antes = FFMPEG_OPCOES["before_options"]
                     if argumentos_headers:
                         antes = f"{antes} {argumentos_headers}"
+                    if not _garantir_opus():
+                        raise RuntimeError(
+                            "Biblioteca libopus não encontrada. Instale o pacote de sistema libopus0 e reinicie o bot."
+                        )
                     fonte = discord.FFmpegPCMAudio(
                         item["url"],
                         executable=self.ffmpeg,
