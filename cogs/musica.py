@@ -40,7 +40,7 @@ YDL_OPCOES = {
     "extractor_retries": 2,
     "socket_timeout": 15,
     # Tenta clientes públicos alternativos quando o cliente web padrão é bloqueado.
-    "extractor_args": {"youtube": {"player_client": ["android", "web_safari"]}},
+    "extractor_args": {"youtube": {"player_client": ["android", "ios", "web_safari"]}},
 }
 FFMPEG_OPCOES = {
     "before_options": "-nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
@@ -1003,18 +1003,42 @@ class Musica(commands.Cog):
                 raise ValueError("Provedor não permitido: este link ainda não é de uma fonte musical compatível.")
 
         def extrair():
-            if "open.spotify.com/" in consulta.lower():
+            spotify = "open.spotify.com/" in consulta.lower()
+            if spotify:
                 metadados = _spotify_itens(consulta)[0]
                 busca = f"{metadados['title']} {metadados.get('artist', '')}".strip()
-                dados = self.ytdl.extract_info(f"ytsearch1:{busca}", download=False)
+            elif consulta.startswith(("http://", "https://")):
+                busca = None
+                dados = self.ytdl.extract_info(consulta, download=False)
             else:
-                try:
-                    dados = self.ytdl.extract_info(consulta, download=False)
-                except Exception:
-                    if consulta.startswith(("http://", "https://")):
-                        raise
-                    LOG.info("Pesquisa no provedor principal falhou; tentando SoundCloud.")
-                    dados = self.ytdl.extract_info(f"scsearch1:{consulta}", download=False)
+                busca = consulta
+
+            if busca is not None:
+                dados = None
+                falhas = []
+                # A busca tenta YouTube e SoundCloud; falhas de bloqueio, resposta
+                # vazia ou ausência de fluxo não encerram a resolução prematuramente.
+                for prefixo, provedor in (("ytsearch1:", "YouTube"), ("scsearch1:", "SoundCloud")):
+                    try:
+                        tentativa = self.ytdl.extract_info(f"{prefixo}{busca}", download=False)
+                        entradas = tentativa.get("entries") if isinstance(tentativa, dict) else None
+                        candidato = next(
+                            (item for item in entradas or [] if isinstance(item, dict) and item.get("url")),
+                            None,
+                        )
+                        if candidato:
+                            dados = candidato
+                            LOG.info("Faixa resolvida pelo provedor %s.", provedor)
+                            break
+                        falhas.append(f"{provedor}: nenhum fluxo retornado")
+                    except Exception as erro:
+                        falhas.append(f"{provedor}: {type(erro).__name__}")
+                        LOG.warning("Busca musical falhou no provedor %s: %s", provedor, erro)
+                if dados is None:
+                    raise ValueError(
+                        "Não encontrei um fluxo reproduzível no YouTube nem no SoundCloud. "
+                        "Tente outra versão ou um link direto compatível."
+                    )
 
             if not isinstance(dados, dict):
                 raise ValueError("O provedor retornou uma resposta inválida.")
@@ -1138,6 +1162,7 @@ class Musica(commands.Cog):
                         options=FFMPEG_OPCOES["options"],
                     )
                     volume = self.volumes.get(gid, VOLUME_PADRAO)
+                    LOG.info("Iniciando transmissão de áudio (guild=%s, faixa=%s, ffmpeg=%s).", gid, item.get("title"), self.ffmpeg)
                     voz.play(discord.PCMVolumeTransformer(fonte, volume=volume), after=ao_terminar)
                     canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
                     if canal_texto:
