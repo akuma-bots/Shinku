@@ -824,13 +824,16 @@ class FilaCandidaturasView(discord.ui.View):
         return max(1, (len(self.pendentes) + 24) // 25)
 
     def montar_embed(self):
-        inicio = self.pagina * 25
         return criar_embed(
             "𓂀 FILA RESTRITA · CANDIDATURAS",
             f"**FORMULÁRIO**　{self.central.formulario_id}\n"
             f"**PENDENTES**　{len(self.pendentes)}\n"
             f"**PÁGINA**　{self.pagina + 1}/{self.total_paginas}\n\n"
-            "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação.",
+            (
+                "Selecione uma ficha para abrir o dossiê, consultar as respostas e continuar a avaliação."
+                if self.pendentes
+                else "Nenhuma ficha está pendente neste momento. Use **Atualizar fila** para consultar novas candidaturas."
+            ),
             cor=0x9F1239,
             rodape="NÊMESIS • ACESSO ADMINISTRATIVO",
         )
@@ -838,9 +841,14 @@ class FilaCandidaturasView(discord.ui.View):
     def _montar(self):
         self.clear_items()
         inicio = self.pagina * 25
-        self.add_item(SeletorFichaPendente(self.central, self.pendentes[inicio:inicio + 25]))
-        self.anterior.disabled = self.pagina <= 0
-        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+        fichas_da_pagina = self.pendentes[inicio:inicio + 25]
+        # O Discord não aceita um Select sem opções. Quando a fila zera após
+        # uma decisão, mantém somente os controles de navegação desativados e
+        # a atualização, evitando que a interação falhe ao redesenhar a view.
+        if fichas_da_pagina:
+            self.add_item(SeletorFichaPendente(self.central, fichas_da_pagina))
+        self.anterior.disabled = not self.pendentes or self.pagina <= 0
+        self.proxima.disabled = not self.pendentes or self.pagina >= self.total_paginas - 1
         self.add_item(self.anterior)
         self.add_item(self.proxima)
         self.add_item(self.atualizar_fila)
