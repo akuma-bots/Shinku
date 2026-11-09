@@ -15,6 +15,7 @@ COR_NEUTRA = 0x111014
 MARCA = "NÊMESIS"
 AUTOR_PADRAO = "NÊMESIS • CENTRAL DE SISTEMAS"
 RODAPE_PADRAO = "NÊMESIS • SISTEMAS INTEGRADOS"
+ASSINATURA_SISTEMA = "Nêmesis Systeam"
 
 
 def criar_embed(
@@ -51,8 +52,13 @@ def criar_embed(
     if not embed.author.name:
         embed.set_author(name=AUTOR_PADRAO)
 
-    if rodape and not embed.footer.text:
-        embed.set_footer(text=rodape[:2048])
+    # Assinatura discreta e consistente em todos os painéis e respostas
+    # que utilizam esta camada compartilhada de apresentação.
+    if rodape:
+        texto_rodape = str(rodape).strip()
+        if ASSINATURA_SISTEMA.casefold() not in texto_rodape.casefold():
+            texto_rodape = f"{texto_rodape} • {ASSINATURA_SISTEMA}"
+        embed.set_footer(text=texto_rodape[:2048])
 
     return embed
 
