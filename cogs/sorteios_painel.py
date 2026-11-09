@@ -16,12 +16,15 @@ MARCADOR_PAINEL = "NEMESIS-PAINEL-SORTEIOS"
 
 
 def _canal_oficial_sorteios(guild):
-    canais = []
+    exatos = []
+    candidatos = []
     for canal in guild.text_channels:
         tokens = re.findall(r"[a-z0-9]+", canal.name.casefold())
-        if "sorteios" in tokens:
-            canais.append(canal)
-    return canais
+        if tokens in (["sorteios"], ["sorteio"]):
+            exatos.append(canal)
+        elif any(token.startswith("sorteio") for token in tokens):
+            candidatos.append(canal)
+    return exatos if exatos else candidatos
 
 
 async def _carregar_todos():
@@ -530,7 +533,7 @@ class SorteiosPainel(commands.Cog):
                 return
             canais = _canal_oficial_sorteios(guild)
             if len(canais) != 1:
-                logger.warning("Painel administrativo de sorteios não sincronizado: canal #Sorteios ausente ou ambíguo.")
+                logger.warning("Painel administrativo de sorteios não sincronizado: canal oficial ausente ou ambíguo (candidatos=%s).", [c.name for c in guild.text_channels if "sorteio" in c.name.casefold()])
                 return
             canal = canais[0]
             painel = None
