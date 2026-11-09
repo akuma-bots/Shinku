@@ -323,6 +323,72 @@ class PainelAdministrativoView(discord.ui.View):
             return
         await interaction.response.send_modal(ModalCriarSorteio(interaction.client.get_cog("SorteiosPainel")))
 
+    @discord.ui.button(label="Sorteios ativos", style=discord.ButtonStyle.secondary, emoji="📋", custom_id="nemesis_sorteios:ativos")
+    async def ativos(self, interaction, button):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        cog = interaction.client.get_cog("SorteiosPainel")
+        await cog.mostrar_ativos(interaction)
+
+
+class SeletorSorteioAtivo(discord.ui.Select):
+    def __init__(self, cog, sorteios):
+        opcoes = [
+            discord.SelectOption(
+                label=str(item.get("titulo") or item.get("premio") or "Sorteio")[:100],
+                value=str(item["id"]),
+                description=(str(len(item.get("participantes", []))) + " participantes · " + timestamp_discord(float(item.get("fim") or 0), "R"))[:100],
+            )
+            for item in sorteios[:25]
+        ]
+        super().__init__(placeholder="Selecione um sorteio", min_values=1, max_values=1, options=opcoes)
+        self.cog = cog
+
+    async def callback(self, interaction):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        await interaction.response.send_message(
+            "Confirma o encerramento antecipado deste sorteio?",
+            view=ConfirmarEncerramentoSorteioView(self.cog, self.values[0]),
+            ephemeral=True,
+        )
+
+
+class SeletorSorteioAtivoView(discord.ui.View):
+    def __init__(self, cog, sorteios):
+        super().__init__(timeout=180)
+        self.add_item(SeletorSorteioAtivo(cog, sorteios))
+
+
+class ConfirmarEncerramentoSorteioView(discord.ui.View):
+    def __init__(self, cog, sorteio_id):
+        super().__init__(timeout=90)
+        self.cog = cog
+        self.sorteio_id = sorteio_id
+
+    @discord.ui.button(label="Confirmar encerramento", style=discord.ButtonStyle.danger, emoji="⏹️")
+    async def confirmar(self, interaction, button):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        sorteio = await self.cog.obter(self.sorteio_id)
+        if not sorteio or sorteio.get("encerrado") or sorteio.get("rascunho"):
+            await interaction.response.send_message("Este sorteio não está mais ativo.", ephemeral=True)
+            return
+        if str(sorteio.get("guild_id")) != str(interaction.guild.id):
+            await interaction.response.send_message("Este sorteio pertence a outro servidor.", ephemeral=True)
+            return
+        cog_sorteios = interaction.client.get_cog("Sorteios")
+        if cog_sorteios is None:
+            await interaction.response.send_message("O mecanismo de encerramento está indisponível.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await cog_sorteios.sortear_vencedores(sorteio)
+        await interaction.followup.send("Encerramento solicitado. Confira o canal oficial para confirmar a publicação do resultado.", ephemeral=True)
+        self.stop()
+
 
 class SorteiosPainel(commands.Cog):
     def __init__(self, bot):
@@ -404,6 +470,22 @@ class SorteiosPainel(commands.Cog):
             await interaction.followup.send(f"Você ainda não entrou. Se participar agora, terá **{atuais}** chance(s).", ephemeral=True)
             return
         await interaction.followup.send(f"Você está inscrito neste sorteio com **{int(total)}** chance(s).", ephemeral=True)
+
+    async def mostrar_ativos(self, interaction):
+        todos = await _carregar_todos()
+        ativos = [
+            item for item in todos.values()
+            if isinstance(item, dict)
+            and str(item.get("guild_id")) == str(interaction.guild.id)
+            and not item.get("encerrado")
+            and not item.get("rascunho")
+        ]
+        ativos.sort(key=lambda item: float(item.get("fim") or 0))
+        if not ativos:
+            await interaction.response.send_message("Não há sorteios ativos no momento.", ephemeral=True)
+            return
+        embed = criar_embed(title="📋 SORTEIOS EM ANDAMENTO", description="Selecione um sorteio para encerrar antecipadamente. A ação exige confirmação.", color=COR_PRIMARIA)
+        await interaction.response.send_message(embed=embed, view=SeletorSorteioAtivoView(self, ativos), ephemeral=True)
 
     async def _por_mensagem(self, mensagem_id):
         todos = await _carregar_todos()
