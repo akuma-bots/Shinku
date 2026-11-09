@@ -209,75 +209,73 @@ def _emoji_personalizado(guild: discord.Guild | None, tipo: dict):
     return None
 
 
-async def _montar_select(guild_id: int, guild: discord.Guild | None = None) -> discord.ui.View:
-    tipos = await tickets.get_tipos(guild_id)
-    if not tipos:
-        # O Discord não aceita um select vazio; recupera as categorias padrão.
-        tipos = list(tickets.TIPOS_PADRAO)
-
+async def _montar_select(guild_id: int, guild: discord.Guild | None = None) -> discord.ui.LayoutView:
+    """Painel de atendimento em Components V2, com seletor dentro do cartão."""
+    config = await get_config(guild_id)
+    tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
     options = []
     for tipo in tipos[:25]:
         emoji = _emoji_personalizado(guild, tipo) or tipo.get("emoji") or "◈"
-        options.append(
-            discord.SelectOption(
-                label=str(tipo.get("label") or "Atendimento")[:100],
-                value=str(tipo.get("valor") or "outro")[:100],
-                description=str(tipo.get("descricao") or "Solicitação de atendimento.")[:100],
-                emoji=emoji,
-            )
-        )
-
-    select = discord.ui.Select(
-        placeholder="◈  Escolha uma categoria para abrir seu ticket",
+        options.append(discord.SelectOption(
+            label=str(tipo.get("label") or "Atendimento")[:100],
+            value=str(tipo.get("valor") or "outro")[:100],
+            description=str(tipo.get("descricao") or "Solicitação de atendimento.")[:100],
+            emoji=emoji,
+        ))
+    seletor = discord.ui.Select(
+        placeholder="Escolha o assunto do atendimento",
         options=options,
         custom_id=CUSTOM_ID_SELECT,
     )
 
-    view = discord.ui.View(timeout=None)
-    view.add_item(select)
+    avatar = guild.me.display_avatar.url if guild and guild.me else None
+    itens = []
+    banner = config.get("ticket_painel_banner_url")
+    if banner:
+        itens.append(discord.ui.MediaGallery(
+            discord.MediaGalleryItem(url=banner, description="Nêmesis • Atendimento")
+        ))
 
-    return view
-
-
-async def _montar_embed_painel(guild_id: int, guild: discord.Guild | None = None) -> discord.Embed:
-    config = await get_config(guild_id)
-    tipos = await tickets.get_tipos(guild_id) or list(tickets.TIPOS_PADRAO)
-    embed = criar_embed(
-        config.get("ticket_painel_titulo") or TITULO_PADRAO,
-        "**CENTRAL DE ATENDIMENTO  /  NÊMESIS**\n"
-        + (config.get("ticket_painel_descricao") or DESCRICAO_PADRAO)
-        + "\n\nSelecione uma área para abrir um canal reservado e encaminhar sua solicitação à equipe responsável.",
-        cor=COR_TICKET,
-        rodape="NÊMESIS  •  CENTRAL DE OPERAÇÕES  •  ATENDIMENTO PRIVADO",
-        timestamp=True,
+    titulo = str(config.get("ticket_painel_titulo") or TITULO_PADRAO)
+    descricao = str(config.get("ticket_painel_descricao") or DESCRICAO_PADRAO)
+    texto = (
+        f"## 🎟️ {titulo}\n"
+        "**NÊMESIS  /  CENTRAL DE ATENDIMENTO**\n"
+        f"{descricao}\n\n"
+        "Escolha uma categoria para abrir seu canal privado."
     )
-    avatar_url = None
-    if guild is not None and guild.me is not None:
-        avatar_url = guild.me.display_avatar.url
-    embed.set_author(name="NÊMESIS  /  CENTRAL DE ATENDIMENTO", icon_url=avatar_url)
-    embed.add_field(name="━━━━━━━━━━━━━━━━━━━━", value="**ATENDIMENTO PRIVADO  •  NÊMESIS SYSTEAM**", inline=False)
-    embed.add_field(name="◈  CATÁLOGO DE ATENDIMENTO", value="Escolha o assunto mais próximo da sua necessidade:", inline=False)
-    for indice, tipo in enumerate(tipos[:8], start=1):
-        emoji_personalizado = _emoji_personalizado(guild, tipo)
-        emoji = str(emoji_personalizado or tipo.get("emoji") or "◈")
-        nome = str(tipo.get("label") or "Atendimento")[:80]
-        detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe responsável.")[:180]
-        fluxo = "AUTOATENDIMENTO + EQUIPE" if tipo.get("usa_ia") else "EQUIPE ESPECIALIZADA"
-        embed.add_field(name=f"{emoji}  {indice:02d}  /  {nome}", value=f"{detalhe} — {fluxo}", inline=True)
-    embed.add_field(name="▰  COMO FUNCIONA", value="**01**  Selecione uma categoria no menu.\n**02**  Um canal privado será criado para você.\n**03**  Descreva a solicitação e envie evidências, se necessário.\n**04**  Acompanhe o atendimento e encerre quando estiver resolvido.", inline=False)
-    embed.add_field(name="♜  PRIVACIDADE E SEGURANÇA", value="O canal é restrito ao solicitante e à equipe autorizada. A NÊMESIS nunca solicita senhas, tokens ou códigos de autenticação.", inline=False)
-    embed.add_field(name="⏱️  ATENDIMENTO", value="A equipe responderá assim que houver um responsável disponível. Evite abrir solicitações duplicadas.", inline=False)
-    if config.get("ticket_painel_banner_url"):
-        embed.set_image(url=config["ticket_painel_banner_url"])
-    if config.get("ticket_painel_thumbnail_url"):
-        embed.set_thumbnail(url=config["ticket_painel_thumbnail_url"])
-    elif avatar_url:
-        embed.set_thumbnail(url=avatar_url)
-    if avatar_url:
-        embed.set_footer(text="Nêmesis Systeam", icon_url=avatar_url)
+    if avatar:
+        itens.append(discord.ui.Section(
+            discord.ui.TextDisplay(texto),
+            accessory=discord.ui.Thumbnail(avatar, description="Ícone do bot Nêmesis"),
+        ))
     else:
-        embed.set_footer(text="Nêmesis Systeam")
-    return embed
+        itens.append(discord.ui.TextDisplay(texto))
+
+    itens.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("### ◈  ASSUNTOS DO ATENDIMENTO"),
+    ])
+    for tipo in tipos[:8]:
+        emoji = str(_emoji_personalizado(guild, tipo) or tipo.get("emoji") or "◈")
+        nome = str(tipo.get("label") or "Atendimento")[:80]
+        detalhe = str(tipo.get("descricao") or "Solicitação direcionada à equipe.")[:180]
+        itens.append(discord.ui.TextDisplay(f"{emoji} **{nome}**\n{detalhe}"))
+
+    itens.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay(
+            "**Privado • Seguro • Direcionado**\n"
+            "O canal será visível somente para você e a equipe autorizada. "
+            "Nunca compartilhe senhas, tokens ou códigos de autenticação."
+        ),
+        discord.ui.ActionRow(seletor),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam"),
+    ])
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(discord.ui.Container(*itens, accent_colour=COR_TICKET))
+    return view
 
 
 CANAL_AVALIACOES_TICKET_ID = 1563995881806758056
@@ -910,7 +908,6 @@ async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
     if not isinstance(canal, discord.TextChannel):
         raise RuntimeError("O canal configurado para o painel de tickets não é um canal de texto.")
 
-    embed = await _montar_embed_painel(guild.id, guild)
     view = await _montar_select(guild.id, guild)
     mensagem = None
     mensagem_id = config.get("ticket_painel_mensagem_id")
@@ -921,9 +918,9 @@ async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
             mensagem = None
 
     if mensagem is not None:
-        await mensagem.edit(embed=embed, view=view)
+        await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
     else:
-        mensagem = await canal.send(embed=embed, view=view)
+        mensagem = await canal.send(view=view)
         try:
             await mensagem.pin(reason="Central permanente de atendimento NÊMESIS")
         except (discord.Forbidden, discord.HTTPException):
@@ -1816,31 +1813,24 @@ class Tickets(commands.Cog):
                 if not isinstance(canal, discord.TextChannel):
                     continue
 
-                embed = await _montar_embed_painel(guild.id, guild)
                 view = await _montar_select(guild.id, guild)
 
                 if mensagem_id:
                     try:
                         mensagem_existente = await canal.fetch_message(int(mensagem_id))
-                        # Atualiza apenas quando o conteúdo visual mudou; evita
-                        # editar o painel a cada ciclo e consumir limites do Discord.
-                        embed_atual = (
-                            mensagem_existente.embeds[0].to_dict()
-                            if mensagem_existente.embeds
-                            else None
-                        )
-                        if embed_atual != embed.to_dict():
-                            await mensagem_existente.edit(embed=embed, view=view)
+                        if mensagem_existente.embeds or not mensagem_existente.components:
+                            await mensagem_existente.edit(
+                                content=None, embed=None, embeds=[], attachments=[], view=view
+                            )
+                            log.info("Painel de atendimento migrado para Components V2 no canal %s.", canal.id)
                         continue
                     except discord.NotFound:
                         pass
                     except (discord.Forbidden, discord.HTTPException):
+                        log.exception("Falha ao migrar painel de atendimento no canal %s.", canal.id)
                         continue
 
-                mensagem = await canal.send(
-                    embed=embed,
-                    view=view,
-                )
+                mensagem = await canal.send(view=view)
                 try:
                     await mensagem.pin(
                         reason="Restaurando o painel permanente de tickets NÊMESIS"
