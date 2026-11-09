@@ -66,7 +66,7 @@ def _embed_sorteio(sorteio, quantidade=0):
             for role_id, chances in bonus.items()
         ]
         descricao += "\n\n**Chances adicionais**\n" + "\n".join(linhas)
-    embed = criar_embed(title="🎉 SORTEIO NÊMESIS", description=descricao, color=COR_PRIMARIA)
+    embed = criar_embed(title="🎉 " + str(sorteio.get("titulo") or "SORTEIO NÊMESIS"), description=descricao, color=COR_PRIMARIA)
     if sorteio.get("banner"):
         embed.set_image(url=sorteio["banner"])
     embed.set_footer(text=f"NÊMESIS • Sorteios • ID:{sorteio['id']}")
@@ -91,6 +91,7 @@ def _calcular_chances(membro, sorteio):
 
 
 class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
+    titulo = discord.ui.TextInput(label="Nome do sorteio", placeholder="Ex.: Sorteio Diário", default="Sorteio NÊMESIS", max_length=100)
     premio = discord.ui.TextInput(label="Prêmio", placeholder="Ex.: recompensa, item ou benefício", max_length=300)
     descricao = discord.ui.TextInput(label="Descrição", placeholder="Informações e instruções para participar", style=discord.TextStyle.paragraph, required=False, max_length=900)
     duracao = discord.ui.TextInput(label="Duração em minutos", placeholder="Ex.: 1440 para 24 horas", max_length=6)
@@ -125,6 +126,7 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
             "guild_id": interaction.guild.id,
             "canal_id": None,
             "mensagem_id": None,
+            "titulo": str(self.titulo.value or "Sorteio NÊMESIS").strip(),
             "premio": premio,
             "descricao": str(self.descricao.value or "").strip(),
             "banner": banner or None,
