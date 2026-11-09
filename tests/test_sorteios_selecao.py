@@ -57,6 +57,29 @@ class TestSelecaoVencedoresSorteio(unittest.TestCase):
         )
         self.assertEqual(resultado, [])
 
+    def test_chances_ponderadas_sao_usadas_sem_repetir_vencedor(self):
+        with patch("cogs.sorteios.random.choices", side_effect=[[20], [10]]) as choices:
+            resultado = _selecionar_vencedores(
+                participantes=[10, 20, 30],
+                quantidade_solicitada=2,
+                chances_por_usuario={"10": 1, "20": 5, "30": 2},
+            )
+        self.assertEqual(resultado, [20, 10])
+        self.assertEqual(choices.call_count, 2)
+        choices.assert_any_call([10, 20, 30], weights=[1, 5, 2], k=1)
+        choices.assert_any_call([10, 30], weights=[1, 2], k=1)
+
+    def test_chance_invalida_volta_para_uma_chance(self):
+        with patch("cogs.sorteios.random.choices", return_value=[10]) as choices:
+            resultado = _selecionar_vencedores(
+                participantes=[10, 20],
+                quantidade_solicitada=1,
+                chances_por_usuario={"10": "invalida", "20": 3},
+            )
+        self.assertEqual(resultado, [10])
+        choices.assert_called_once_with([10, 20], weights=[1, 3], k=1)
+
+
 
 if __name__ == "__main__":
     unittest.main()
