@@ -12,7 +12,7 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("CENTRAL DE ATENDIMENTO", embed.title)
         self.assertIn("Selecione abaixo a categoria", embed.description)
         nomes = [field.name for field in embed.fields]
-        self.assertEqual(len(nomes), 12)
+        self.assertEqual(len(nomes), 13)
         self.assertIn("✦  01  /  Recrutamento e Admissão", nomes)
         self.assertIn("♟️  02  /  Estrutura e Hierarquia", nomes)
         self.assertIn("♜  PRIVACIDADE E SEGURANÇA", nomes)
@@ -20,6 +20,7 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertIn("⏱️  ATENDIMENTO", nomes)
         self.assertIn("▰  COMO FUNCIONA", nomes)
         self.assertEqual(embed.color.value, 0x9F1239)
+        self.assertEqual(embed.footer.text, 'Nêmesis Systeam')
 
 
     def test_controles_persistentes_incluem_acoes_de_atendimento(self):
