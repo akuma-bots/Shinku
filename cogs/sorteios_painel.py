@@ -375,11 +375,12 @@ class SorteiosPainel(commands.Cog):
         registradas = sorteio.get("chances_por_usuario") or {}
         total = registradas.get(str(interaction.user.id))
         if total is None:
-            atuais = _calcular_chances(interaction.user, sorteio)
-            if atuais is None:
-                await interaction.followup.send("Você ainda não atende ao requisito mínimo deste sorteio.", ephemeral=True)
-                return
-            await interaction.followup.send(f"Você ainda não entrou. Se participar agora, terá **{atuais}** chance(s).", ephemeral=True)
+            # A participação é aberta: cargos e requisitos não alteram as chances.
+            atuais = 1
+            await interaction.followup.send(
+                f"Você ainda não entrou. Se participar agora, terá **{atuais}** chance.",
+                ephemeral=True,
+            )
             return
         await interaction.followup.send(f"Você está inscrito neste sorteio com **{int(total)}** chance(s).", ephemeral=True)
 
