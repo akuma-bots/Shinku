@@ -276,8 +276,12 @@ class ConfigurarSorteioView(discord.ui.View):
 
 
 class ViewSorteioPublico(discord.ui.View):
-    def __init__(self):
+    def __init__(self, encerrado=False):
         super().__init__(timeout=None)
+        if encerrado:
+            for item in self.children:
+                if isinstance(item, discord.ui.Button):
+                    item.disabled = True
 
     @discord.ui.button(label="🎉 Participar", style=discord.ButtonStyle.success, custom_id="nemesis_sorteio:participar")
     async def participar(self, interaction: discord.Interaction, button):
