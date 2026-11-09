@@ -1506,9 +1506,6 @@ class SeletorHistoricoCandidaturas(discord.ui.Select):
         respostas = await formularios.listar_respostas(interaction.guild.id, formulario_id=central.formulario_id)
         encerradas = [item for item in respostas if item.get("status") in {"aprovada", "recusada"}]
         encerradas.sort(key=lambda item: float(item.get("atualizado_em", item.get("criado_em", 0)) or 0), reverse=True)
-        if not encerradas:
-            await interaction.response.send_message("Ainda não existem candidaturas encerradas para este formulário.", ephemeral=True)
-            return
         view = FilaHistoricoView(central, encerradas)
         await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
 
@@ -1526,13 +1523,18 @@ class FilaHistoricoView(discord.ui.View):
     def montar_embed(self):
         aprovadas = sum(item.get("status") == "aprovada" for item in self.respostas)
         recusadas = sum(item.get("status") == "recusada" for item in self.respostas)
+        instrucao = (
+            "Selecione uma ficha para consultar o dossiê e a trilha de auditoria."
+            if self.respostas
+            else "Ainda não existem candidaturas encerradas. Use **Atualizar histórico** para consultar novos resultados."
+        )
         return criar_embed(
             "𓂀 HISTÓRICO · CANDIDATURAS ENCERRADAS",
             f"**FORMULÁRIO**　{self.central.formulario_id}\n"
             f"**TOTAL**　{len(self.respostas)}\n"
             f"**APROVADAS**　{aprovadas}　 **RECUSADAS**　{recusadas}\n"
             f"**PÁGINA**　{self.pagina + 1}/{self.total_paginas}\n\n"
-            "Selecione uma ficha para consultar o dossiê e a trilha de auditoria.",
+            f"{instrucao}",
             cor=0x9F1239,
             rodape="NÊMESIS • HISTÓRICO RESTRITO",
         )
@@ -1540,17 +1542,40 @@ class FilaHistoricoView(discord.ui.View):
     def _montar(self):
         self.clear_items()
         inicio = self.pagina * 25
-        self.add_item(SeletorFichaHistorica(self.central, self.respostas[inicio:inicio + 25]))
-        self.anterior.disabled = self.pagina <= 0
-        self.proxima.disabled = self.pagina >= self.total_paginas - 1
+        fichas_da_pagina = self.respostas[inicio:inicio + 25]
+        if fichas_da_pagina:
+            self.add_item(SeletorFichaHistorica(self.central, fichas_da_pagina))
+        self.anterior.disabled = not self.respostas or self.pagina <= 0
+        self.proxima.disabled = not self.respostas or self.pagina >= self.total_paginas - 1
         self.add_item(self.anterior)
         self.add_item(self.proxima)
+        self.add_item(self.atualizar_historico)
 
     async def _validar(self, interaction: discord.Interaction):
         if interaction.user.id != self.central.usuario_id or interaction.guild is None or not membro_tem_lideranca(interaction.user):
             await interaction.response.send_message("O histórico é restrito à administração que abriu a central.", ephemeral=True)
             return False
         return True
+
+    @discord.ui.button(label="Atualizar histórico", style=discord.ButtonStyle.primary, emoji="🔄")
+    async def atualizar_historico(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await self._validar(interaction):
+            return
+        respostas = await formularios.listar_respostas(
+            interaction.guild.id,
+            formulario_id=self.central.formulario_id,
+        )
+        self.respostas = [
+            item for item in respostas
+            if item.get("status") in {"aprovada", "recusada"}
+        ]
+        self.respostas.sort(
+            key=lambda item: float(item.get("atualizado_em", item.get("criado_em", 0)) or 0),
+            reverse=True,
+        )
+        self.pagina = min(self.pagina, self.total_paginas - 1)
+        self._montar()
+        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
 
     @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️")
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
