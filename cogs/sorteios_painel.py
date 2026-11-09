@@ -79,20 +79,8 @@ def _embed_sorteio(sorteio, quantidade=0):
 
 
 def _calcular_chances(membro, sorteio):
-    cargos = {cargo.id for cargo in membro.roles}
-    minimo = sorteio.get("cargo_minimo_id")
-    if minimo and int(minimo) not in cargos:
-        return None
-    total = 1
-    bonus = sorteio.get("bonus_cargos") or {}
-    if isinstance(bonus, dict):
-        for role_id, quantidade in bonus.items():
-            try:
-                if int(role_id) in cargos:
-                    total += max(0, min(100, int(quantidade)))
-            except (TypeError, ValueError):
-                continue
-    return max(1, min(1000, total))
+    """Todos os participantes têm a mesma chance; cargos não alteram elegibilidade."""
+    return 1
 
 
 class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
@@ -146,7 +134,7 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
         }
         await _salvar_item(sorteio)
         await interaction.response.send_message(
-            f"Rascunho **{sorteio['id']}** criado. Configure o requisito e as chances extras antes de publicar.",
+            f"Rascunho **{sorteio['id']}** criado. Personalize a apresentação e publique quando estiver pronto.",
             view=ConfigurarSorteioView(self.cog, sorteio["id"]),
             ephemeral=True,
         )
@@ -256,20 +244,6 @@ class ConfigurarSorteioView(discord.ui.View):
         super().__init__(timeout=900)
         self.cog = cog
         self.sorteio_id = sorteio_id
-
-    @discord.ui.button(label="Definir requisito mínimo", style=discord.ButtonStyle.secondary, emoji="🔒")
-    async def requisito(self, interaction, button):
-        if not _eh_lideranca(interaction):
-            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
-            return
-        await interaction.response.send_message("Escolha o cargo obrigatório:", view=EscolherCargoMinimoView(self.cog, self.sorteio_id), ephemeral=True)
-
-    @discord.ui.button(label="Adicionar cargo com bônus", style=discord.ButtonStyle.secondary, emoji="✨")
-    async def bonus(self, interaction, button):
-        if not _eh_lideranca(interaction):
-            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
-            return
-        await interaction.response.send_message("Escolha o cargo que receberá chances extras:", view=EscolherCargoBonusView(self.cog, self.sorteio_id), ephemeral=True)
 
     @discord.ui.button(label="Definir imagem", style=discord.ButtonStyle.secondary, emoji="🖼️")
     async def imagem(self, interaction, button):
