@@ -61,16 +61,6 @@ def _embed_sorteio(sorteio, quantidade=0):
         f"**Encerra:** {timestamp_discord(fim, 'F')} ({timestamp_discord(fim, 'R')})\n"
         f"**Participantes:** {quantidade}"
     )
-    minimo = sorteio.get("cargo_minimo_id")
-    if minimo:
-        descricao += f"\n**Requisito mínimo:** <@&{int(minimo)}>"
-    bonus = sorteio.get("bonus_cargos") or {}
-    if bonus:
-        linhas = [
-            f"<@&{int(role_id)}> — +{max(1, int(chances))} chance(s)"
-            for role_id, chances in bonus.items()
-        ]
-        descricao += "\n\n**Chances adicionais**\n" + "\n".join(linhas)
     embed = criar_embed(title="🎉 " + str(sorteio.get("titulo") or "SORTEIO NÊMESIS"), description=descricao, color=COR_PRIMARIA)
     if sorteio.get("banner"):
         embed.set_image(url=sorteio["banner"])
@@ -425,12 +415,7 @@ class SorteiosPainel(commands.Cog):
             await interaction.followup.send("O período de participação deste sorteio terminou.", ephemeral=True)
             return
         membro = interaction.user
-        chances = _calcular_chances(membro, sorteio)
-        if chances is None:
-            role_id = sorteio.get("cargo_minimo_id")
-            cargo = interaction.guild.get_role(int(role_id)) if role_id else None
-            await interaction.followup.send(f"Você ainda não pode participar. É necessário possuir {cargo.mention if cargo else 'o cargo mínimo configurado'}.", ephemeral=True)
-            return
+        chances = 1
         async with _SORTEIOS_LOCK:
             todos = await _carregar_todos()
             atual = todos.get(str(sorteio["id"]))
