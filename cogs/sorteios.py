@@ -1567,7 +1567,7 @@ class Sorteios(commands.Cog):
                 f"{resultado}\n\n"
                 f"👥 **Participantes:** "
                 f"**{len(participantes)}**\n\n"
-                "🎫 **Resgate:** abra um atendimento na Central de Atendimento e solicite o resgate do prêmio."
+                "🎫 **Resgate:** abra um ticket em <#1563995881655509059> e selecione **Premiações e Reconhecimentos**."
             ),
             color=COR_SUCESSO,
         )
