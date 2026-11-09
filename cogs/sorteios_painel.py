@@ -96,7 +96,6 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
     descricao = discord.ui.TextInput(label="Descrição", placeholder="Informações e instruções para participar", style=discord.TextStyle.paragraph, required=False, max_length=900)
     duracao = discord.ui.TextInput(label="Duração em minutos", placeholder="Ex.: 1440 para 24 horas", max_length=6)
     vencedores = discord.ui.TextInput(label="Quantidade de vencedores", default="1", max_length=2)
-    banner = discord.ui.TextInput(label="Imagem (URL opcional)", required=False, max_length=400)
 
     def __init__(self, cog):
         super().__init__()
@@ -113,12 +112,8 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
         except (TypeError, ValueError):
             await interaction.response.send_message("Informe duração e quantidade de vencedores usando números inteiros.", ephemeral=True)
             return
-        banner = str(self.banner.value or "").strip()
         if not premio or minutos < 1 or minutos > 43200 or vencedores < 1 or vencedores > 100:
             await interaction.response.send_message("Prêmio obrigatório; duração de 1 a 43.200 minutos; vencedores de 1 a 100.", ephemeral=True)
-            return
-        if banner and not banner.startswith(("https://", "http://")):
-            await interaction.response.send_message("A imagem precisa usar um endereço http:// ou https://.", ephemeral=True)
             return
         agora = time.time()
         sorteio = {
@@ -129,7 +124,7 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
             "titulo": str(self.titulo.value or "Sorteio NÊMESIS").strip(),
             "premio": premio,
             "descricao": str(self.descricao.value or "").strip(),
-            "banner": banner or None,
+            "banner": None,
             "fim": agora + minutos * 60,
             "vencedores": vencedores,
             "participantes": [],
@@ -151,6 +146,30 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
             ephemeral=True,
         )
 
+
+class ModalBannerSorteio(discord.ui.Modal, title="Imagem do sorteio"):
+    url = discord.ui.TextInput(label="URL da imagem", placeholder="https://...", max_length=400)
+
+    def __init__(self, cog, sorteio_id):
+        super().__init__()
+        self.cog = cog
+        self.sorteio_id = sorteio_id
+
+    async def on_submit(self, interaction):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        endereco = str(self.url.value or "").strip()
+        if not endereco.startswith(("https://", "http://")):
+            await interaction.response.send_message("Informe uma URL http:// ou https:// válida.", ephemeral=True)
+            return
+        sorteio = await self.cog.obter(self.sorteio_id)
+        if not sorteio or not sorteio.get("rascunho"):
+            await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
+            return
+        sorteio["banner"] = endereco
+        await _salvar_item(sorteio)
+        await interaction.response.send_message("Imagem do sorteio configurada.", ephemeral=True)
 
 class SeletorCargoMinimo(discord.ui.RoleSelect):
     def __init__(self, cog, sorteio_id):
@@ -247,6 +266,12 @@ class ConfigurarSorteioView(discord.ui.View):
             return
         await interaction.response.send_message("Escolha o cargo que receberá chances extras:", view=EscolherCargoBonusView(self.cog, self.sorteio_id), ephemeral=True)
 
+    @discord.ui.button(label="Definir imagem", style=discord.ButtonStyle.secondary, emoji="🖼️")
+    async def imagem(self, interaction, button):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        await interaction.response.send_modal(ModalBannerSorteio(self.cog, self.sorteio_id))
     @discord.ui.button(label="Publicar sorteio", style=discord.ButtonStyle.success, emoji="🎉")
     async def publicar(self, interaction, button):
         if not _eh_lideranca(interaction):
