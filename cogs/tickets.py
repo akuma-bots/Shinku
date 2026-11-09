@@ -918,7 +918,7 @@ async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
             mensagem = None
 
     if mensagem is not None:
-        await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+        await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
     else:
         mensagem = await canal.send(view=view)
         try:
