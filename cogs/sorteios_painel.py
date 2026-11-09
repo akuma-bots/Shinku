@@ -2,6 +2,7 @@ import time
 import uuid
 import logging
 import re
+import unicodedata
 
 import discord
 from discord.ext import commands
@@ -19,7 +20,8 @@ def _canal_oficial_sorteios(guild):
     exatos = []
     candidatos = []
     for canal in guild.text_channels:
-        tokens = re.findall(r"[a-z0-9]+", canal.name.casefold())
+        nome_normalizado = unicodedata.normalize("NFKC", canal.name).casefold()
+        tokens = re.findall(r"[a-z0-9]+", nome_normalizado)
         if tokens in (["sorteios"], ["sorteio"]):
             exatos.append(canal)
         elif any(token.startswith("sorteio") for token in tokens):
@@ -533,7 +535,7 @@ class SorteiosPainel(commands.Cog):
                 return
             canais = _canal_oficial_sorteios(guild)
             if len(canais) != 1:
-                logger.warning("Painel administrativo de sorteios não sincronizado: canal oficial ausente ou ambíguo (candidatos=%s).", [c.name for c in guild.text_channels if "sorteio" in c.name.casefold()])
+                logger.warning("Painel administrativo de sorteios não sincronizado: canal oficial ausente ou ambíguo (candidatos=%s).", [c.name for c in guild.text_channels if "sorteio" in unicodedata.normalize("NFKC", c.name).casefold()])
                 return
             canal = canais[0]
             painel = None
