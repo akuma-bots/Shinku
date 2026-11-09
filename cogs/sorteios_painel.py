@@ -1,6 +1,7 @@
 import time
 import uuid
 import logging
+import re
 
 import discord
 from discord.ext import commands
@@ -12,6 +13,15 @@ from utils.storage import carregar, salvar
 
 logger = logging.getLogger(__name__)
 MARCADOR_PAINEL = "NEMESIS-PAINEL-SORTEIOS"
+
+
+def _canal_oficial_sorteios(guild):
+    canais = []
+    for canal in guild.text_channels:
+        tokens = re.findall(r"[a-z0-9]+", canal.name.casefold())
+        if "sorteios" in tokens:
+            canais.append(canal)
+    return canais
 
 
 async def _carregar_todos():
@@ -244,7 +254,7 @@ class ConfigurarSorteioView(discord.ui.View):
         if not sorteio or not sorteio.get("rascunho"):
             await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
             return
-        canais = [c for c in interaction.guild.text_channels if c.name.casefold() == "sorteios"]
+        canais = _canal_oficial_sorteios(interaction.guild)
         if len(canais) != 1:
             await interaction.response.send_message("Não encontrei um único canal oficial chamado #Sorteios.", ephemeral=True)
             return
@@ -409,7 +419,7 @@ class SorteiosPainel(commands.Cog):
             guild = self.bot.get_guild(GUILD_NEMESIS_ID)
             if guild is None:
                 return
-            canais = [c for c in guild.text_channels if c.name.casefold() == "sorteios"]
+            canais = _canal_oficial_sorteios(guild)
             if len(canais) != 1:
                 logger.warning("Painel administrativo de sorteios não sincronizado: canal #Sorteios ausente ou ambíguo.")
                 return
