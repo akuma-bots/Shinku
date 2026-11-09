@@ -199,6 +199,44 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         view._montar()
         self.assertEqual(len(view.children[0].options), 1)
 
+    def test_historico_vazio_mantem_controles_para_atualizacao(self):
+        central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
+        view = cog_formularios.FilaHistoricoView(central, [])
+
+        self.assertFalse(any(isinstance(item, discord.ui.Select) for item in view.children))
+        self.assertTrue(view.anterior.disabled)
+        self.assertTrue(view.proxima.disabled)
+        self.assertTrue(any(
+            isinstance(item, discord.ui.Button) and item.label == "Atualizar histórico"
+            for item in view.children
+        ))
+        self.assertIn("Ainda não existem candidaturas encerradas", view.montar_embed().description)
+
+    async def test_historico_atualiza_sem_reabrir_a_central(self):
+        central = SimpleNamespace(usuario_id=456, formulario_id="form-1")
+        view = cog_formularios.FilaHistoricoView(central, [])
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=456),
+            guild=SimpleNamespace(id=123),
+            response=SimpleNamespace(edit_message=AsyncMock()),
+        )
+        atualizadas = [
+            {"id": "resp-1", "nome": "Candidato", "status": "aprovada", "atualizado_em": 100}
+        ]
+        botao = next(
+            item for item in view.children
+            if isinstance(item, discord.ui.Button) and item.label == "Atualizar histórico"
+        )
+        with patch.object(cog_formularios, "membro_tem_lideranca", return_value=True), patch.object(
+            cog_formularios.formularios, "listar_respostas", new=AsyncMock(return_value=atualizadas)
+        ) as listar:
+            await botao.callback(interaction)
+
+        listar.assert_awaited_once_with(123, formulario_id="form-1")
+        self.assertEqual([item["id"] for item in view.respostas], ["resp-1"])
+        self.assertTrue(any(isinstance(item, discord.ui.Select) for item in view.children))
+        interaction.response.edit_message.assert_awaited_once()
+
     def test_seletor_de_edicao_de_perguntas_e_paginado_em_blocos_de_25(self):
         cog = object.__new__(cog_formularios.Formularios)
         formulario = {"id": "f1", "paginas": [[f"Pergunta {i}" for i in range(26)]]}
