@@ -26,12 +26,12 @@ def _selecionar_vencedores(
     quantidade_solicitada: int,
     vencedores_salvos=None,
     resultado_ja_sorteado: bool = False,
+    chances_por_usuario: dict | None = None,
 ) -> list[int]:
-    """Seleciona vencedores únicos e mantém o resultado estável durante retries."""
+    """Seleciona vencedores únicos; aceita chances ponderadas e mantém retries estáveis."""
     if not isinstance(participantes, (list, tuple, set)):
         participantes = []
 
-    # Dados antigos/corrompidos não podem fazer o mesmo usuário ocupar várias vagas.
     participantes_ids = list(dict.fromkeys(
         int(uid) for uid in participantes if str(uid).isdigit()
     ))
@@ -53,7 +53,34 @@ def _selecionar_vencedores(
     except (TypeError, ValueError, OverflowError):
         solicitada = 0
     quantidade = max(0, min(len(participantes_ids), solicitada))
-    return random.sample(participantes_ids, quantidade) if quantidade else []
+    if not quantidade:
+        return []
+
+    pesos = {}
+    if isinstance(chances_por_usuario, dict):
+        for uid in participantes_ids:
+            try:
+                peso = max(1, min(1000, int(chances_por_usuario.get(str(uid), 1))))
+            except (TypeError, ValueError, OverflowError):
+                peso = 1
+            pesos[uid] = peso
+
+    if not pesos or all(peso == 1 for peso in pesos.values()):
+        return random.sample(participantes_ids, quantidade)
+
+    # Sorteio ponderado sem reposição: cada vencedor é único e as chances
+    # restantes são recalculadas após cada seleção.
+    restantes = list(participantes_ids)
+    resultado = []
+    for _ in range(quantidade):
+        escolhido = random.choices(
+            restantes,
+            weights=[pesos[uid] for uid in restantes],
+            k=1,
+        )[0]
+        resultado.append(escolhido)
+        restantes.remove(escolhido)
+    return resultado
 
 
 def timestamp_discord(
@@ -1463,6 +1490,7 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
                 quantidade_solicitada,
                 vencedores_salvos=atual.get("vencedores_ids"),
                 resultado_ja_sorteado=atual.get("resultado_sorteado") is True,
+                chances_por_usuario=atual.get("chances_por_usuario"),
             )
             agora = time.time()
 
