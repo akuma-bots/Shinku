@@ -10,7 +10,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.guild_config import lideranca_only
 
 from utils.storage import carregar, salvar
 
@@ -358,7 +357,7 @@ class BotaoParticipar(discord.ui.View):
         )
 
 
-class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gerenciamento dos sorteios da NÊMESIS."):
+class Sorteios(commands.Cog):
 
     def __init__(
         self,
@@ -773,30 +772,6 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
     # COMANDO: CRIAR
     # =========================================================
 
-    @app_commands.command(
-        name="sorteio-criar",
-        description="Cria um sorteio da NÊMESIS.",
-    )
-    @app_commands.describe(
-        texto="Texto apresentado no sorteio.",
-        requisitos="Requisitos mínimos para participar.",
-        premio="Prêmio que será sorteado.",
-        vencedores="Quantidade de vencedores.",
-        duracao_minutos="Tempo até o encerramento do sorteio.",
-        banner="URL da imagem/banner do sorteio.",
-        canal="Canal onde o sorteio será publicado.",
-        tipo_recompensa="Recompensa automática entregue a cada vencedor.",
-        xp_recompensa="Quantidade de XP concedida a cada vencedor.",
-        cargo_recompensa="Cargo concedido a cada vencedor.",
-    )
-    @app_commands.choices(tipo_recompensa=[
-        app_commands.Choice(name="Nenhuma recompensa automática", value="nenhuma"),
-        app_commands.Choice(name="XP do perfil", value="xp_perfil"),
-        app_commands.Choice(name="XP da gangue", value="xp_gangue"),
-        app_commands.Choice(name="Cargo Discord", value="cargo"),
-        app_commands.Choice(name="Manual (descrito no prêmio)", value="manual"),
-    ])
-    @lideranca_only()
     async def sorteio_criar(
         self,
         interaction: discord.Interaction,
@@ -1099,21 +1074,15 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         #
         # Sorteios criados pelo comando
         # continuam utilizando a view tradicional.
-        if (
-            sorteio.get("criado_por_id")
-            is None
-        ):
-            view = self.criar_view_legada(
-                sorteio
-            )
-
+        if sorteio.get("painel_avancado"):
+            from cogs.sorteios_painel import ViewSorteioPublico
+            view = ViewSorteioPublico()
+        elif sorteio.get("criado_por_id") is None:
+            view = self.criar_view_legada(sorteio)
         else:
             view = self.criar_view(
                 quantidade=quantidade,
-                encerrado=sorteio.get(
-                    "encerrado",
-                    False,
-                ),
+                encerrado=sorteio.get("encerrado", False),
             )
 
         try:
@@ -1128,14 +1097,6 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
     # COMANDO: ENCERRAR
     # =========================================================
 
-    @app_commands.command(
-        name="sorteio-encerrar",
-        description="Encerra um sorteio e seleciona os vencedores.",
-    )
-    @app_commands.describe(
-        id="ID do sorteio.",
-    )
-    @lideranca_only()
     async def sorteio_encerrar(
         self,
         interaction: discord.Interaction,
@@ -1180,10 +1141,6 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
     # COMANDO: LISTAR
     # =========================================================
 
-    @app_commands.command(
-        name="sorteio-listar",
-        description="Lista os sorteios ativos da NÊMESIS.",
-    )
     async def sorteio_listar(
         self,
         interaction: discord.Interaction,
@@ -1672,6 +1629,8 @@ class Sorteios(commands.GroupCog, group_name="sorteios", group_description="Gere
         agora = time.time()
         for sorteio in list(todos.values()):
             if not isinstance(sorteio, dict):
+                continue
+            if sorteio.get("rascunho"):
                 continue
             if sorteio.get("encerrado") and sorteio.get("anuncio_enviado") is not False:
                 continue
