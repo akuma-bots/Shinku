@@ -112,9 +112,7 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
             "vencedores": vencedores,
             "participantes": [],
             "chances_por_usuario": {},
-            "cargo_minimo_id": None,
             "painel_avancado": True,
-            "bonus_cargos": {},
             "vencedores_ids": [],
             "encerrado": False,
             "rascunho": True,
@@ -153,81 +151,6 @@ class ModalBannerSorteio(discord.ui.Modal, title="Imagem do sorteio"):
         sorteio["banner"] = endereco
         await _salvar_item(sorteio)
         await interaction.response.send_message("Imagem do sorteio configurada.", ephemeral=True)
-
-class SeletorCargoMinimo(discord.ui.RoleSelect):
-    def __init__(self, cog, sorteio_id):
-        super().__init__(placeholder="Selecione o cargo obrigatório", min_values=1, max_values=1)
-        self.cog = cog
-        self.sorteio_id = sorteio_id
-
-    async def callback(self, interaction: discord.Interaction):
-        if not _eh_lideranca(interaction):
-            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
-            return
-        sorteio = await self.cog.obter(self.sorteio_id)
-        if not sorteio or not sorteio.get("rascunho"):
-            await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
-            return
-        sorteio["cargo_minimo_id"] = self.values[0].id
-        await _salvar_item(sorteio)
-        await interaction.response.send_message(f"Requisito mínimo definido: {self.values[0].mention}.", ephemeral=True)
-
-
-class SeletorCargoBonus(discord.ui.RoleSelect):
-    def __init__(self, cog, sorteio_id):
-        super().__init__(placeholder="Selecione o cargo que dará chances extras", min_values=1, max_values=1)
-        self.cog = cog
-        self.sorteio_id = sorteio_id
-
-    async def callback(self, interaction: discord.Interaction):
-        if not _eh_lideranca(interaction):
-            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
-            return
-        await interaction.response.send_modal(ModalDefinirBonus(self.cog, self.sorteio_id, self.values[0].id, self.values[0].name))
-
-
-class ModalDefinirBonus(discord.ui.Modal, title="Configurar chances extras"):
-    quantidade = discord.ui.TextInput(label="Chances adicionais", placeholder="Ex.: 1", default="1", max_length=3)
-
-    def __init__(self, cog, sorteio_id, role_id, role_name):
-        super().__init__()
-        self.cog = cog
-        self.sorteio_id = sorteio_id
-        self.role_id = role_id
-        self.role_name = role_name
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if not _eh_lideranca(interaction):
-            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
-            return
-        try:
-            quantidade = int(self.quantidade.value)
-        except (TypeError, ValueError):
-            quantidade = 0
-        if quantidade < 1 or quantidade > 100:
-            await interaction.response.send_message("Informe entre 1 e 100 chances adicionais.", ephemeral=True)
-            return
-        sorteio = await self.cog.obter(self.sorteio_id)
-        if not sorteio or not sorteio.get("rascunho"):
-            await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
-            return
-        bonus = sorteio.setdefault("bonus_cargos", {})
-        bonus[str(self.role_id)] = quantidade
-        await _salvar_item(sorteio)
-        await interaction.response.send_message(f"Cargo **{self.role_name}** configurado com **+{quantidade}** chance(s).", ephemeral=True)
-
-
-class EscolherCargoMinimoView(discord.ui.View):
-    def __init__(self, cog, sorteio_id):
-        super().__init__(timeout=180)
-        self.add_item(SeletorCargoMinimo(cog, sorteio_id))
-
-
-class EscolherCargoBonusView(discord.ui.View):
-    def __init__(self, cog, sorteio_id):
-        super().__init__(timeout=180)
-        self.add_item(SeletorCargoBonus(cog, sorteio_id))
-
 
 class ConfigurarSorteioView(discord.ui.View):
     def __init__(self, cog, sorteio_id):
