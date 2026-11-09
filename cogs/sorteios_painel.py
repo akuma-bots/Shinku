@@ -123,6 +123,7 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
             "participantes": [],
             "chances_por_usuario": {},
             "cargo_minimo_id": None,
+            "painel_avancado": True,
             "bonus_cargos": {},
             "vencedores_ids": [],
             "encerrado": False,
@@ -372,20 +373,21 @@ class SorteiosPainel(commands.Cog):
         if not interaction.guild or interaction.guild.id != GUILD_NEMESIS_ID:
             await interaction.response.send_message("Este sorteio pertence à NÊMESIS.", ephemeral=True)
             return
+        await interaction.response.defer(ephemeral=True, thinking=True)
         sorteio = await self._por_mensagem(interaction.message.id)
         if not sorteio:
-            await interaction.response.send_message("Não encontrei este sorteio.", ephemeral=True)
+            await interaction.followup.send("Não encontrei este sorteio.", ephemeral=True)
             return
         registradas = sorteio.get("chances_por_usuario") or {}
         total = registradas.get(str(interaction.user.id))
         if total is None:
             atuais = _calcular_chances(interaction.user, sorteio)
             if atuais is None:
-                await interaction.response.send_message("Você ainda não atende ao requisito mínimo deste sorteio.", ephemeral=True)
+                await interaction.followup.send("Você ainda não atende ao requisito mínimo deste sorteio.", ephemeral=True)
                 return
-            await interaction.response.send_message(f"Você ainda não entrou. Se participar agora, terá **{atuais}** chance(s).", ephemeral=True)
+            await interaction.followup.send(f"Você ainda não entrou. Se participar agora, terá **{atuais}** chance(s).", ephemeral=True)
             return
-        await interaction.response.send_message(f"Você está inscrito neste sorteio com **{int(total)}** chance(s).", ephemeral=True)
+        await interaction.followup.send(f"Você está inscrito neste sorteio com **{int(total)}** chance(s).", ephemeral=True)
 
     async def _por_mensagem(self, mensagem_id):
         todos = await _carregar_todos()
