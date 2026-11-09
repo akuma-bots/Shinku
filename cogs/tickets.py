@@ -1784,6 +1784,24 @@ class Tickets(commands.Cog):
             ephemeral=True,
         )
 
+    @commands.Cog.listener()
+    async def on_ready(self):
+        """Aplica a versão atual do painel assim que o bot fica pronto."""
+        for guild in self.bot.guilds:
+            try:
+                mensagem = await sincronizar_painel_ticket(guild)
+                log.info(
+                    "Central de atendimento sincronizada no Discord (guild=%s, canal=%s, mensagem=%s, components_v2=True).",
+                    guild.id,
+                    mensagem.channel.id,
+                    mensagem.id,
+                )
+            except Exception:
+                log.exception(
+                    "Falha ao sincronizar a Central de Atendimento no on_ready (guild=%s).",
+                    guild.id,
+                )
+
     @tasks.loop(seconds=300)
     async def verificar_painel_permanente(self):
         for guild in self.bot.guilds:
