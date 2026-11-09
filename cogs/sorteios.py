@@ -1566,7 +1566,8 @@ class Sorteios(commands.Cog):
                 f"🏆 **Vencedor(es):**\n"
                 f"{resultado}\n\n"
                 f"👥 **Participantes:** "
-                f"**{len(participantes)}**"
+                f"**{len(participantes)}**\n\n"
+                "🎫 **Resgate:** abra um atendimento na Central de Atendimento e solicite o resgate do prêmio."
             ),
             color=COR_SUCESSO,
         )
