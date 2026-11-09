@@ -251,7 +251,11 @@ async def _montar_embed_painel(guild_id: int, guild: discord.Guild | None = None
         rodape="NÊMESIS  •  CENTRAL DE OPERAÇÕES  •  ATENDIMENTO PRIVADO",
         timestamp=True,
     )
-    embed.set_author(name="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  CUSTOMER OPERATIONS")
+    avatar_url = None
+    if guild is not None and guild.me is not None:
+        avatar_url = guild.me.display_avatar.url
+    embed.set_author(name="NÊMESIS  /  CENTRAL DE ATENDIMENTO", icon_url=avatar_url)
+    embed.add_field(name="━━━━━━━━━━━━━━━━━━━━", value="**ATENDIMENTO PRIVADO  •  NÊMESIS SYSTEAM**", inline=False)
     embed.add_field(name="◈  CATÁLOGO DE ATENDIMENTO", value="Escolha o assunto mais próximo da sua necessidade:", inline=False)
     for indice, tipo in enumerate(tipos[:8], start=1):
         emoji_personalizado = _emoji_personalizado(guild, tipo)
@@ -267,6 +271,12 @@ async def _montar_embed_painel(guild_id: int, guild: discord.Guild | None = None
         embed.set_image(url=config["ticket_painel_banner_url"])
     if config.get("ticket_painel_thumbnail_url"):
         embed.set_thumbnail(url=config["ticket_painel_thumbnail_url"])
+    elif avatar_url:
+        embed.set_thumbnail(url=avatar_url)
+    if avatar_url:
+        embed.set_footer(text="Nêmesis Systeam", icon_url=avatar_url)
+    else:
+        embed.set_footer(text="Nêmesis Systeam")
     return embed
 
 
