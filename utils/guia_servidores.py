@@ -308,8 +308,9 @@ async def publicar_guia_servidor(bot) -> bool:
             if mensagem.author.id != bot.user.id:
                 continue
             if _mensagem_contem_guia(mensagem):
+                if not _mensagem_contem_guia(mensagem):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
                 await mensagem.edit(
-                    content=None, embeds=[], attachments=[],
                     view=GuiaServidoresView(),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
