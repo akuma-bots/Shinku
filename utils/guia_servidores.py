@@ -170,7 +170,7 @@ class GuiaCanaisSelect(discord.ui.Select):
         if selecionado is None:
             await interaction.response.send_message(
                 "Esta área não está disponível no guia.",
-                ephemeral=True,
+                ephemeral=interaction.guild is not None,
             )
             return
 
@@ -178,14 +178,14 @@ class GuiaCanaisSelect(discord.ui.Select):
         canal = guild.get_channel(canal_id)
         if canal is None:
             try:
-                canal = await interaction.guild.fetch_channel(canal_id)
+                canal = await guild.fetch_channel(canal_id)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 canal = None
 
         if canal is None:
             await interaction.response.send_message(
                 "Não foi possível localizar esse canal. Avise a equipe pelo Atendimento.",
-                ephemeral=True,
+                ephemeral=interaction.guild is not None,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return
@@ -194,7 +194,7 @@ class GuiaCanaisSelect(discord.ui.Select):
         if not permissoes.view_channel:
             await interaction.response.send_message(
                 "Este espaço não está disponível para sua conta. O guia não revela canais internos ou acessos restritos.",
-                ephemeral=True,
+                ephemeral=interaction.guild is not None,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return
