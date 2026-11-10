@@ -446,6 +446,17 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
     return layout
 
 
+
+def _mensagem_tem_cartao_inscricoes(mensagem: discord.Message) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if "central de recrutamento" in str(getattr(item, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
 def _view_central_inscricoes(lista: list, embed: discord.Embed) -> discord.ui.LayoutView:
     view = discord.ui.LayoutView(timeout=None)
     seletor = SeletorInscricaoPublico(lista)
@@ -1998,7 +2009,9 @@ class Formularios(commands.Cog):
         embed = _embed_central_inscricoes(lista, guild, self.bot)
         view = _view_central_inscricoes(lista, embed)
         if mensagem_existente is not None:
-            mensagem = await mensagem_existente.edit(content=None, embeds=[], attachments=[], view=view)
+            if not _mensagem_tem_cartao_inscricoes(mensagem_existente):
+                await mensagem_existente.edit(content=None, embeds=[], attachments=[])
+            mensagem = await mensagem_existente.edit(view=view)
             acao = "atualizada"
         else:
             mensagem = await canal.send(view=view)
