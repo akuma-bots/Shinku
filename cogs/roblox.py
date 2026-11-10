@@ -323,6 +323,46 @@ class CentralRobloxView(discord.ui.View):
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rid}&width=150&height=150&format=png")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
+class CentralRobloxLayoutView(discord.ui.LayoutView):
+    """Central pública Roblox em Components V2; todos os controles ficam no cartão."""
+
+    def __init__(self, cog, embed: discord.Embed):
+        super().__init__(timeout=None)
+        legado = CentralRobloxView(cog)
+        botoes = []
+        for original in legado.children:
+            kwargs = {
+                "label": original.label,
+                "style": original.style,
+                "emoji": original.emoji,
+                "disabled": original.disabled,
+                "custom_id": original.custom_id,
+                "url": original.url,
+            }
+            botao = discord.ui.Button(**kwargs)
+            if original.style != discord.ButtonStyle.link:
+                botao.callback = original.callback
+            botoes.append(botao)
+
+        partes = []
+        if embed.title:
+            partes.append(f"## {embed.title}")
+        if embed.description:
+            partes.append(embed.description)
+        for campo in embed.fields:
+            partes.append(f"### {campo.name}\n{campo.value}")
+        partes.append("### ◈ ACESSO À CENTRAL\nVincule sua conta, confirme sua participação na comunidade ou consulte seu perfil Roblox.")
+        partes.append("-# Nêmesis Systeam")
+
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(partes)),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(*botoes[:4]),
+            discord.ui.ActionRow(*botoes[4:]),
+            accent_colour=0x9F1239,
+        ))
+
 async def _buscar_usuario_roblox(nome_usuario: str):
     timeout = aiohttp.ClientTimeout(total=15)
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -534,14 +574,14 @@ class Roblox(commands.Cog):
                     mensagem = await canal.fetch_message(int(registro["message_id"]))
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     mensagem = None
-            view = CentralRobloxView(self)
+            view = CentralRobloxLayoutView(self, embed)
             if mensagem:
-                await mensagem.edit(embed=embed, view=view)
+                await mensagem.edit(content=None, embeds=[], attachments=[], view=view, allowed_mentions=discord.AllowedMentions.none())
             else:
-                mensagem = await canal.send(embed=embed, view=view)
+                mensagem = await canal.send(view=view, allowed_mentions=discord.AllowedMentions.none())
             estado[str(canal.guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id}
             await salvar(ARQUIVO_PAINEL_ROBLOX, estado)
-            self.bot.add_view(CentralRobloxView(self))
+            self.bot.add_view(CentralRobloxLayoutView(self, embed))
             _LOG.info("Central Roblox atualizada no canal %s (mensagem %s).", canal.id, mensagem.id)
         except Exception:
             _LOG.exception("Falha ao publicar/atualizar a Central Roblox.")
