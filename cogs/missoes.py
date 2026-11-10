@@ -180,8 +180,7 @@ class CategoriaMissoesSelect(discord.ui.Select):
         match = re.search(r"PAGINA:(\d+)/(\d+)", embed.footer.text or "")
         total = int(match.group(2)) if match else 1
         await interaction.response.edit_message(
-            embed=embed,
-            view=NavegacaoMissoesView(self.cog, categoria=categoria, pagina=0, total_paginas=total),
+            view=NavegacaoMissoesView(self.cog, categoria=categoria, pagina=0, total_paginas=total, embed=embed),
         )
 
 
@@ -222,8 +221,7 @@ class PaginaMissoesSelect(discord.ui.Select):
         match = re.search(r"PAGINA:(\d+)/(\d+)", footer)
         total = int(match.group(2)) if match else 1
         await interaction.response.edit_message(
-            embed=embed,
-            view=NavegacaoMissoesView(self.cog, categoria=self.categoria, pagina=pagina, total_paginas=total),
+            view=NavegacaoMissoesView(self.cog, categoria=self.categoria, pagina=pagina, total_paginas=total, embed=embed),
         )
 
 
@@ -505,69 +503,76 @@ def _calcular_inteligencia_participantes(
     }
 
 
-class NavegacaoMissoesView(discord.ui.View):
-    """Navegação por seletores; mantém apenas a ação de envio de evidência como botão."""
-    def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1):
+def _texto_embed_missoes(embed: discord.Embed | None) -> str:
+    if embed is None:
+        return "## 🎯 NÊMESIS • CENTRAL DE MISSÕES\\nSelecione uma categoria ou página para consultar as atividades."
+    partes = []
+    if embed.author and embed.author.name:
+        partes.append(f"-# {embed.author.name}")
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"### {campo.name}\\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    return "\\n\\n".join(partes)
+
+
+class NavegacaoMissoesView(discord.ui.LayoutView):
+    """Painel de missões em Components V2; todos os controles ficam no cartão."""
+    def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1, embed=None):
         super().__init__(timeout=None)
         self.cog = cog
         self.categoria = categoria if categoria in TIPOS else "missao"
-        self.add_item(CategoriaMissoesSelect(cog, self.categoria))
-        self.add_item(PaginaMissoesSelect(cog, categoria, pagina, total_paginas))
+        self.pagina = max(0, int(pagina))
+        self.total_paginas = max(1, int(total_paginas))
 
-    @discord.ui.button(
-        label="Enviar evidência",
-        emoji="📨",
-        style=discord.ButtonStyle.success,
-        custom_id="nemesis:missoes:provas",
-        row=2,
-    )
-    async def enviar_provas(self, interaction: discord.Interaction, button: discord.ui.Button):
-        categoria = "missao"
-        if interaction.message and interaction.message.embeds:
-            rodape = interaction.message.embeds[0].footer.text or ""
-            match = re.search(r"CATEGORIA:([a-z_]+)", rodape)
-            if match and match.group(1) in TIPOS:
-                categoria = match.group(1)
-        await self.cog.abrir_seletor_prova(interaction, categoria)
+        seletor_categoria = CategoriaMissoesSelect(cog, self.categoria)
+        seletor_pagina = PaginaMissoesSelect(cog, self.categoria, self.pagina, self.total_paginas)
+        botoes = []
 
-    @discord.ui.button(
-        label="Temporada atual",
-        emoji="🏆",
-        style=discord.ButtonStyle.secondary,
-        custom_id="nemesis:missoes:temporada",
-        row=2,
-    )
-    async def temporada_atual(self, interaction: discord.Interaction, button: discord.ui.Button):
+        def botao(label, emoji, custom_id, callback, style=discord.ButtonStyle.secondary):
+            item = discord.ui.Button(label=label, emoji=emoji, custom_id=custom_id, style=style)
+            item.callback = callback
+            botoes.append(item)
+
+        botao("Enviar evidência", "📨", "nemesis:missoes:provas", self._enviar_provas, discord.ButtonStyle.success)
+        botao("Temporada atual", "🏆", "nemesis:missoes:temporada", self._temporada_atual)
+        botao("Meu desempenho", "📊", "nemesis:missoes:desempenho", self._meu_desempenho)
+        botao("Central OCTÓGONO", "📈", "nemesis:missoes:inteligencia", self._central_inteligencia)
+
+        itens = [
+            discord.ui.TextDisplay(_texto_embed_missoes(embed)),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("### ◈ NAVEGAÇÃO DO CATÁLOGO"),
+            discord.ui.ActionRow(seletor_categoria),
+            discord.ui.ActionRow(seletor_pagina),
+        ]
+        for inicio in range(0, len(botoes), 2):
+            itens.append(discord.ui.ActionRow(*botoes[inicio:inicio + 2]))
+        itens.extend([
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+        ])
+        self.add_item(discord.ui.Container(*itens, accent_colour=0x9F1239))
+
+    async def _enviar_provas(self, interaction: discord.Interaction):
+        await self.cog.abrir_seletor_prova(interaction, self.categoria)
+
+    async def _temporada_atual(self, interaction: discord.Interaction):
         central = self.cog.bot.get_cog("TemporadasMissoes")
         if central is None:
-            await interaction.response.send_message(
-                "O módulo de temporadas está temporariamente indisponível.",
-                ephemeral=True,
-            )
+            await interaction.response.send_message("O módulo de temporadas está temporariamente indisponível.", ephemeral=True)
             return
         await central.abrir_status_publico(interaction)
 
-    @discord.ui.button(
-        label="Meu desempenho",
-        emoji="📊",
-        style=discord.ButtonStyle.secondary,
-        custom_id="nemesis:missoes:desempenho",
-        row=2,
-    )
-    async def meu_desempenho(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def _meu_desempenho(self, interaction: discord.Interaction):
         await self.cog.enviar_painel_desempenho(interaction)
 
-    @discord.ui.button(
-        label="Central OCTÓGONO",
-        emoji="📈",
-        style=discord.ButtonStyle.secondary,
-        custom_id="nemesis:missoes:inteligencia",
-        row=2,
-    )
-    async def central_inteligencia(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def _central_inteligencia(self, interaction: discord.Interaction):
         await self.cog.enviar_painel_inteligencia(interaction)
-
-
 
 
 class InteligenciaMissoesView(discord.ui.View):
@@ -1490,17 +1495,17 @@ class Missoes(commands.Cog):
         embed = await self._montar_painel_missoes(guild, "todos", "missao")
         match = re.search(r"PAGINA:(\d+)/(\d+)", embed.footer.text or "")
         total_paginas = int(match.group(2)) if match else 1
-        view = NavegacaoMissoesView(self, categoria="missao", pagina=0, total_paginas=total_paginas)
+        view = NavegacaoMissoesView(self, categoria="missao", pagina=0, total_paginas=total_paginas, embed=embed)
         try:
             if mensagem is None:
-                mensagem = await canal.send(embed=embed, view=view)
+                mensagem = await canal.send(view=view)
                 await ranking_missoes_jogos.salvar_painel(guild.id, "missoes", mensagem.id)
                 try:
                     await mensagem.pin(reason="Painel de navegação de missões NÊMESIS")
                 except discord.HTTPException:
                     pass
             else:
-                await mensagem.edit(embed=embed, view=view)
+                await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Não foi possível atualizar o painel de missões.")
             raise
