@@ -226,9 +226,12 @@ class EditarMissaoModal(discord.ui.Modal, title="Editar atividade"):
             )
             nova.add_item(SeletorAtividade(nova, atividades, self.atividade_id))
             try:
+                await self.mensagem_original.edit(content=None, embeds=[], attachments=[])
                 await self.mensagem_original.edit(
-                    embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
-                    view=nova,
+                    view=_card_gestao_missoes(
+                        nova,
+                        _embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
+                    ),
                 )
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 log.exception("Não foi possível atualizar automaticamente o painel após editar atividade.")
@@ -247,6 +250,61 @@ def _ordenar_atividades(atividades: list) -> list:
             str(item.get("id", "")),
         ),
     )
+
+
+
+def _card_gestao_missoes(origem: discord.ui.View, embed: discord.Embed | None = None,
+                         titulo: str = "GESTÃO DE MISSÕES", descricao: str = "") -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    seletores, botoes = [], []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • OCTÓGONO • Gestão de Missões"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
 
 
 class SeletorAtividade(discord.ui.Select):
@@ -333,8 +391,9 @@ class CentralMissoesView(discord.ui.View):
         if atividades:
             nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
-            embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
-            view=nova,
+            view=_card_gestao_missoes(
+                nova, _embed_central(atividades, selecionada, stats, interaction.guild, interaction.client)
+            ),
         )
 
     async def mudar_pagina(self, interaction: discord.Interaction, delta: int):
@@ -363,8 +422,9 @@ class CentralMissoesView(discord.ui.View):
         if atividades:
             nova.add_item(SeletorAtividade(nova, atividades, self.selecionada_id))
         await interaction.response.edit_message(
-            embed=_embed_central(atividades, selecionada, stats, interaction.guild, interaction.client),
-            view=nova,
+            view=_card_gestao_missoes(
+                nova, _embed_central(atividades, selecionada, stats, interaction.guild, interaction.client)
+            ),
         )
 
     @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, emoji="◀️", row=1)
@@ -474,8 +534,9 @@ class GestaoMissoes(commands.Cog):
         if lista:
             view.add_item(SeletorAtividade(view, lista))
         await interaction.response.send_message(
-            embed=_embed_central(lista, guild=interaction.guild, bot=self.bot),
-            view=view,
+            view=_card_gestao_missoes(
+                view, _embed_central(lista, guild=interaction.guild, bot=self.bot)
+            ),
             ephemeral=True,
         )
 
