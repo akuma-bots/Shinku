@@ -17,7 +17,7 @@ from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 GUILD_NEMESIS_ID = int(os.getenv("NEMESIS_GUILD_ID", "1563995879981981817"))
-CONVITE_NEMESIS = "https://discord.gg/WsfjRQPhAg"
+CONVITE_NEMESIS = "https://discord.gg/BJUNuajfrv"
 TAG_GANGUE = TAG_ORG_NEMESIS
 CAMINHO_CODIGOS = Path(__file__).resolve().parent.parent / "config" / "codigos_jogos.json"
 
@@ -53,7 +53,7 @@ def _embed_inicio(membro: discord.abc.User) -> discord.Embed:
         "02. Ao entrar, você recebe automaticamente o cargo Visitantes.\n"
         "03. Explore os canais pelo seletor de navegação abaixo.\n"
         "04. Abra #Sistemas e consulte o guia Começando na NÊMESIS.\n"
-        "05. Use /help para localizar os comandos liberados ao seu cargo."
+        "05. Consulte os painéis oficiais para acessar os sistemas liberados ao seu cargo."
     ), inline=False)
     embed.add_field(name="◈ GUIA DE NAVEGAÇÃO", value="O seletor abaixo reúne as áreas essenciais em um único menu. Comece por Regras, Como funciona, Divisões e Sistemas; depois explore missões, progressão e atividades.", inline=False)
     embed.add_field(name="CONVITE DO SERVIDOR", value=f"[Entrar na NÊMESIS]({CONVITE_NEMESIS})", inline=False)
@@ -117,9 +117,9 @@ class SeletorBoasVindas(discord.ui.Select):
             await interaction.response.send_message("Esta mensagem de boas-vindas foi enviada para outra pessoa.", ephemeral=True)
             return
         chave = self.values[0]
-        view = BoasVindasView(self.autor_id, chave)
-        embed = _embed_inicio(interaction.user) if chave == "inicio" else _embed_codigos(chave)
-        await interaction.response.edit_message(embed=embed, view=view)
+        await interaction.response.edit_message(
+            view=BoasVindasLayoutView(interaction.user, self.autor_id, chave)
+        )
 
 
 class AlternarAvisosButton(discord.ui.Button):
@@ -169,34 +169,45 @@ class BoasVindasView(discord.ui.View):
         self.add_item(AlternarAvisosButton())
 
 
+
+class BoasVindasLayoutView(discord.ui.LayoutView):
+    """Cartão de integração com navegação e preferências dentro do próprio painel."""
+
+    def __init__(self, membro: discord.abc.User, autor_id: int, selecionado: str = "inicio"):
+        super().__init__(timeout=900)
+        embed = _embed_inicio(membro) if selecionado == "inicio" else _embed_codigos(selecionado)
+        linhas = [f"## {embed.title or 'INTEGRAÇÃO NÊMESIS'}"]
+        if embed.description:
+            linhas.append(embed.description)
+        for campo in embed.fields:
+            linhas.append(f"**{campo.name}**\n{campo.value}")
+        guia = adicionar_seletor_guia(discord.ui.View(timeout=900)).children[0]
+        seletor = SeletorBoasVindas(autor_id, selecionado)
+        avisos = AlternarAvisosButton()
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(linhas)[:3900]),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("### ◈ NAVEGAÇÃO DA ORGANIZAÇÃO"),
+            discord.ui.ActionRow(guia),
+            discord.ui.ActionRow(seletor),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(avisos),
+            discord.ui.TextDisplay("-# NÊMESIS • INTEGRAÇÃO OFICIAL • NΞM"),
+            accent_colour=0x9F1239,
+        ))
+
+
 class BoasVindasDM(commands.Cog):
     """Envia boas-vindas por DM quando uma pessoa entra no servidor da NÊMESIS."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
-    @app_commands.command(name="codigos", description="Consultar códigos de Shigaku, Gakuran e Fistborn.")
-    @app_commands.guild_only()
-    async def consultar_codigos(self, interaction: discord.Interaction):
-        """Abre a central interativa de códigos para consulta a qualquer momento."""
-        if interaction.guild_id != GUILD_NEMESIS_ID:
-            await interaction.response.send_message(
-                "Este sistema está disponível apenas no servidor da NÊMESIS.",
-                ephemeral=True,
-            )
-            return
-
-        await interaction.response.send_message(
-            embed=_embed_codigos("shigaku"),
-            view=BoasVindasView(interaction.user.id, "shigaku"),
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
 
     @commands.Cog.listener()
     async def on_member_join(self, membro: discord.Member):
         if membro.bot or membro.guild.id != GUILD_NEMESIS_ID:
             return
         try:
-            await membro.send(embed=_embed_inicio(membro), view=BoasVindasView(membro.id), allowed_mentions=discord.AllowedMentions.none())
+            await membro.send(view=BoasVindasLayoutView(membro, membro.id), allowed_mentions=discord.AllowedMentions.none())
             logger.info("DM de boas-vindas enviada (guild=%s, user=%s).", membro.guild.id, membro.id)
         except discord.Forbidden:
             logger.info("DM de boas-vindas bloqueada pelo usuário (guild=%s, user=%s).", membro.guild.id, membro.id)
