@@ -481,8 +481,11 @@ class SeletorPlaylist(discord.ui.Select):
         self.library.carregar.disabled = playlist is None
         self.library.excluir.disabled = playlist is None
         await interaction.response.edit_message(
-            content=f"Playlist selecionada: **{discord.utils.escape_markdown(nome)}**.",
-            view=self.library,
+            view=_card_music_view(
+                self.library,
+                "🎼 SUA BIBLIOTECA MUSICAL",
+                f"Playlist selecionada: **{discord.utils.escape_markdown(nome)}**. Use os controles abaixo para carregar ou excluir.",
+            ),
         )
 
 
@@ -578,8 +581,11 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
             return
         ok = await _excluir_playlist(self.biblioteca.guild_id, self.biblioteca.user_id, self.playlist_id)
         await interaction.response.edit_message(
-            content="Playlist excluída da sua biblioteca." if ok else "A playlist não existe mais.",
-            view=None,
+            view=_card_music_view(
+                discord.ui.View(timeout=90),
+                "PLAYLIST EXCLUÍDA" if ok else "PLAYLIST NÃO ENCONTRADA",
+                "A playlist foi removida da sua biblioteca." if ok else "A playlist não existe mais.",
+            ),
         )
 
     @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary)
@@ -587,7 +593,12 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
         if interaction.guild_id != self.biblioteca.guild_id or interaction.user.id != self.biblioteca.user_id:
             await interaction.response.send_message("Esta confirmação pertence a outra pessoa.", ephemeral=True)
             return
-        await interaction.response.edit_message(content="Exclusão cancelada.", view=None)
+        await interaction.response.edit_message(
+            view=_card_music_view(
+                discord.ui.View(timeout=90), "EXCLUSÃO CANCELADA",
+                "A playlist foi mantida na sua biblioteca.",
+            ),
+        )
 
 
 
