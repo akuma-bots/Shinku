@@ -90,6 +90,21 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         ids = {controle.custom_id for controle, _ in controles}
         self.assertEqual(ids, {"ticket:atualizar", "ticket:categoria"})
 
+        botao_clonado = next(
+            controle for controle, _ in controles
+            if controle.custom_id == "ticket:atualizar"
+        )
+        seletor_clonado = next(
+            controle for controle, _ in controles
+            if controle.custom_id == "ticket:categoria"
+        )
+        self.assertIs(botao_clonado.callback, botao.callback)
+        seletor_clonado._values = ["suporte"]
+        interaction = SimpleNamespace()
+        await seletor_clonado.callback(interaction)
+        self.assertEqual(seletor._values, ["suporte"])
+        seletor.callback.assert_awaited_once_with(interaction)
+
     def test_controles_persistentes_incluem_acoes_de_atendimento(self):
         view = FecharTicketView()
         ids = {item.custom_id for item in view.children}
