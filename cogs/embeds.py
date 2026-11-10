@@ -144,10 +144,10 @@ class EmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CRIAR
                     if self.rodape_embed:
                         embed.set_footer(text=self.rodape_embed)
 
-                await self.canal.send(
-                    view=_layout_embed_publicado(embed, view) if indice == 0 else None,
-                    embed=embed if indice > 0 else None,
-                )
+                if indice == 0:
+                    await self.canal.send(view=_layout_embed_publicado(embed, view))
+                else:
+                    await self.canal.send(embed=embed)
                 enviados += 1
         except discord.HTTPException as erro:
             await interaction.followup.send(
