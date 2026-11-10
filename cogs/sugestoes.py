@@ -1249,28 +1249,11 @@ class Sugestoes(commands.Cog):
                         mensagem = await canal.fetch_message(mensagem_id)
                     else:
                         raise
-                ids_componentes = {
-                    getattr(componente, "custom_id", None)
-                    for linha in mensagem.components
-                    for componente in getattr(linha, "children", [])
-                }
-                obrigatorios = {
-                    "nemesis:sugestoes:votar:apoia",
-                    "nemesis:sugestoes:votar:nao_apoia",
-                    "nemesis:sugestoes:comentar",
-                    "nemesis:sugestoes:acompanhar",
-                    "nemesis:sugestoes:editar",
-                    "nemesis:sugestoes:gerenciar",
-                }
-                if obrigatorios.issubset(ids_componentes):
+                if _mensagem_tem_cartao_sugestoes(
+                    mensagem, "NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2"
+                ):
                     continue
-                await mensagem.edit(
-                    embed=_embed_sugestao(registro),
-                    view=PublicacaoSugestaoView(
-                        votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
-                        edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
-                    ),
-                )
+                await _atualizar_cartao_sugestao(mensagem, registro)
                 atualizadas += 1
             except discord.NotFound:
                 ignoradas += 1
@@ -1347,23 +1330,36 @@ class Sugestoes(commands.Cog):
                     break
 
         if mensagem is None and isinstance(canal, discord.ForumChannel):
+            embed_painel = _embed_painel()
             destino, mensagem = await canal.create_thread(
                 name="💡・Central de Sugestões",
-                embed=_embed_painel(),
-                view=PainelSugestoesView(),
+                view=_card_sugestoes_view(
+                    PainelSugestoesView(), embed_painel,
+                    marcador="NÊMESIS • CENTRAL DE SUGESTÕES • V2",
+                ),
                 reason="Publicar painel oficial da Central de Sugestões",
             )
         elif mensagem is None:
+            embed_painel = _embed_painel()
             mensagem = await canal.send(
-                embed=_embed_painel(),
-                view=PainelSugestoesView(),
+                view=_card_sugestoes_view(
+                    PainelSugestoesView(), embed_painel,
+                    marcador="NÊMESIS • CENTRAL DE SUGESTÕES • V2",
+                ),
                 allowed_mentions=discord.AllowedMentions.none(),
             )
         else:
+            embed_painel = _embed_painel()
+            view_painel = _card_sugestoes_view(
+                PainelSugestoesView(), embed_painel,
+                marcador="NÊMESIS • CENTRAL DE SUGESTÕES • V2",
+            )
+            if not _mensagem_tem_cartao_sugestoes(
+                mensagem, "NÊMESIS • CENTRAL DE SUGESTÕES • V2"
+            ):
+                await mensagem.edit(content=None, embeds=[], attachments=[])
             await mensagem.edit(
-                content=None,
-                embed=_embed_painel(),
-                view=PainelSugestoesView(),
+                view=view_painel,
                 allowed_mentions=discord.AllowedMentions.none(),
             )
         if isinstance(canal, discord.ForumChannel) and not mensagem.pinned:
@@ -1392,5 +1388,14 @@ class Sugestoes(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    bot.add_view(_card_sugestoes_view(
+        PublicacaoSugestaoView(), None, "PUBLICAÇÃO DE SUGESTÃO",
+        "Painel oficial de votação da NÊMESIS.",
+        marcador="NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
+    ))
+    bot.add_view(_card_sugestoes_view(
+        PainelSugestoesView(), _embed_painel(),
+        marcador="NÊMESIS • CENTRAL DE SUGESTÕES • V2",
+    ))
     await bot.add_cog(Sugestoes(bot))
 
