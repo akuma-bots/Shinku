@@ -341,6 +341,108 @@ def _texto_embed_inscricoes(embed: discord.Embed) -> str:
     return "\n\n".join(partes)
 
 
+
+def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+                    titulo: str = "CENTRAL DE INSCRIÇÕES", descricao: str = "") -> discord.ui.LayoutView:
+    """Mantém seletores, botões e callbacks dos fluxos de formulário dentro do cartão."""
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    if embed:
+        texto = _texto_embed_inscricoes(embed)
+    else:
+        texto = f"## {titulo}\n{descricao}".strip()
+    componentes = [
+        discord.ui.TextDisplay(texto[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    seletores, botoes = [], []
+    for item in origem.children:
+        if isinstance(item, discord.ui.UserSelect):
+            novo = discord.ui.UserSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.RoleSelect):
+            novo = discord.ui.RoleSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.ChannelSelect):
+            novo = discord.ui.ChannelSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.MentionableSelect):
+            novo = discord.ui.MentionableSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Gestão de Inscrições"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 def _view_central_inscricoes(lista: list, embed: discord.Embed) -> discord.ui.LayoutView:
     view = discord.ui.LayoutView(timeout=None)
     seletor = SeletorInscricaoPublico(lista)
@@ -827,9 +929,7 @@ class SeletorFilaCandidaturas(discord.ui.Select):
 
         view = FilaCandidaturasView(central, pendentes)
         await interaction.response.send_message(
-            embed=view.montar_embed(),
-            view=view,
-            ephemeral=True,
+            view=_card_form_view(view, view.montar_embed()), ephemeral=True,
         )
 
 
@@ -893,7 +993,9 @@ class FilaCandidaturasView(discord.ui.View):
             return
         self.pagina = max(0, self.pagina - 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
     @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1453,7 +1555,7 @@ class SeletorAcaoFormulario(discord.ui.Select):
             view = discord.ui.View(timeout=120)
             view.add_item(SeletorPaginaEditar(central.cog, interaction.guild.id, interaction.user.id, formulario))
             await interaction.response.send_message(
-                "Escolha a etapa cujo título deseja alterar.", view=view, ephemeral=True,
+                view=_card_form_view(view, None, "EDITAR ETAPA", "Escolha a etapa cujo título deseja alterar."), ephemeral=True,
             )
             return
         if acao == "editar_pergunta":
@@ -1463,8 +1565,10 @@ class SeletorAcaoFormulario(discord.ui.Select):
                 return
             view = EditarPerguntasView(central.cog, interaction.guild.id, interaction.user.id, formulario)
             await interaction.response.send_message(
-                f"Selecione a pergunta que deseja editar. Total: **{len(perguntas)}** · página **1/{view.total_paginas}**.",
-                view=view, ephemeral=True,
+                view=_card_form_view(
+                    view, None, "EDITAR PERGUNTAS",
+                    f"Selecione a pergunta que deseja editar. Total: **{len(perguntas)}** · página **1/{view.total_paginas}**.",
+                ), ephemeral=True,
             )
             return
         if acao == "remover_etapa":
@@ -1474,13 +1578,17 @@ class SeletorAcaoFormulario(discord.ui.Select):
                 return
             view = discord.ui.View(timeout=120)
             view.add_item(SeletorPaginaRemover(central.cog, interaction.guild.id, interaction.user.id, formulario))
-            await interaction.response.send_message("Escolha a etapa que deseja remover. A remoção exige confirmação.", view=view, ephemeral=True)
+            await interaction.response.send_message(
+                view=_card_form_view(view, None, "REMOVER ETAPA", "Escolha a etapa que deseja remover. A remoção exige confirmação."), ephemeral=True
+            )
             return
         if acao == "cargos":
             view = GerenciarCargosView(central.cog, interaction.guild, interaction.user.id, formulario)
             await interaction.response.send_message(
-                f"**Comissão de análise · {formulario.get('nome', 'Formulário')}**\nSelecione a lista completa de cargos que deve receber as fichas. O cargo de instrutor padrão continua sendo notificado automaticamente.",
-                view=view, ephemeral=True,
+                view=_card_form_view(
+                    view, None, "COMISSÃO DE ANÁLISE",
+                    f"Formulário: **{formulario.get('nome', 'Formulário')}**\nSelecione os cargos que receberão as fichas. O instrutor padrão continua sendo notificado automaticamente.",
+                ), ephemeral=True,
             )
             return
         if acao == "publicar":
