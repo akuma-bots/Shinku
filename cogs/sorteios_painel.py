@@ -135,6 +135,18 @@ def _card_com_view(origem: discord.ui.View, titulo: str, descricao: str,
     return layout
 
 
+
+def _mensagem_tem_cartao_sorteio(mensagem: discord.Message, sorteio_id: str) -> bool:
+    marcador = f"ID:{sorteio_id}".casefold()
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if marcador in str(getattr(item, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
 def _card_sorteio(sorteio: dict, quantidade: int, view: discord.ui.View):
     return _card_com_view(
         view,
@@ -424,6 +436,8 @@ class SorteiosPainel(commands.Cog):
             canal = guild.get_channel(int(sorteio.get("canal_id") or 0)) if guild else None
             if canal is not None:
                 mensagem = await canal.fetch_message(mensagem_id)
+                if not _mensagem_tem_cartao_sorteio(mensagem, sorteio.get("id", "")):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
                 await mensagem.edit(view=view)
         except (KeyError, TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível sincronizar o cartão persistente do sorteio %s.", sorteio.get("id"))
