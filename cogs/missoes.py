@@ -505,7 +505,7 @@ def _calcular_inteligencia_participantes(
 
 def _texto_embed_missoes(embed: discord.Embed | None) -> str:
     if embed is None:
-        return "## 🎯 NÊMESIS • CENTRAL DE MISSÕES\\nSelecione uma categoria ou página para consultar as atividades."
+        return "## 🎯 NÊMESIS • CENTRAL DE MISSÕES\nSelecione uma categoria ou página para consultar as atividades."
     partes = []
     if embed.author and embed.author.name:
         partes.append(f"-# {embed.author.name}")
@@ -514,10 +514,10 @@ def _texto_embed_missoes(embed: discord.Embed | None) -> str:
     if embed.description:
         partes.append(embed.description)
     for campo in embed.fields:
-        partes.append(f"### {campo.name}\\n{campo.value}")
+        partes.append(f"### {campo.name}\n{campo.value}")
     if embed.footer and embed.footer.text:
         partes.append(f"-# {embed.footer.text}")
-    return "\\n\\n".join(partes)
+    return "\n\n".join(partes)
 
 
 class NavegacaoMissoesView(discord.ui.LayoutView):
