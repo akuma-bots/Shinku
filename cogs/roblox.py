@@ -328,6 +328,21 @@ class CentralRobloxView(discord.ui.View):
 
 
 
+
+
+
+MARCADOR_CENTRAL_ROBLOX = "NÊMESIS • CENTRAL ROBLOX • V2"
+
+
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador.casefold() in str(getattr(componente, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
 def _card_roblox(origem: discord.ui.View, embed: discord.Embed | None = None,
                  titulo: str = "ADMINISTRAÇÃO ROBLOX", descricao: str = ""):
     layout = discord.ui.LayoutView(timeout=origem.timeout)
@@ -404,7 +419,7 @@ class CentralRobloxLayoutView(discord.ui.LayoutView):
         for campo in embed.fields:
             partes.append(f"### {campo.name}\n{campo.value}")
         partes.append("### ◈ ACESSO À CENTRAL\nVincule sua conta, confirme sua participação na comunidade ou consulte seu perfil Roblox.")
-        partes.append("-# Nêmesis Systeam")
+        partes.append(f"-# Nêmesis Systeam • {MARCADOR_CENTRAL_ROBLOX}")
 
         self.add_item(discord.ui.Container(
             discord.ui.TextDisplay("\n\n".join(partes)),
@@ -627,7 +642,9 @@ class Roblox(commands.Cog):
                     mensagem = None
             view = CentralRobloxLayoutView(self, embed)
             if mensagem:
-                await mensagem.edit(content=None, embeds=[], attachments=[], view=view, allowed_mentions=discord.AllowedMentions.none())
+                if not _componentes_contem_marcador(mensagem.components, MARCADOR_CENTRAL_ROBLOX):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
+                    await mensagem.edit(view=view, allowed_mentions=discord.AllowedMentions.none())
             else:
                 mensagem = await canal.send(view=view, allowed_mentions=discord.AllowedMentions.none())
             estado[str(canal.guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id}
