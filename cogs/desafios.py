@@ -45,12 +45,74 @@ async def _resolver_canal(
         return fallback
     return None
 
-def _view_desafio(desafio_id: str) -> discord.ui.View:
-    view = discord.ui.View(timeout=None)
-    view.add_item(discord.ui.Button(label="Aceitar", style=discord.ButtonStyle.success,
-                                     emoji="⚔️", custom_id=f"desafio:aceitar:{desafio_id}"))
-    view.add_item(discord.ui.Button(label="Recusar", style=discord.ButtonStyle.danger,
-                                     emoji="🚫", custom_id=f"desafio:recusar:{desafio_id}"))
+def _embed_desafio(desafio: dict, estado: str = "🟡 Aguardando resposta do oponente",
+                    detalhe: str | None = None) -> discord.Embed:
+    embed = criar_embed(
+        "⚔️ CONVOCAÇÃO DE COMBATE · PvP",
+        "**UM NOVO CONFRONTO FOI PROPOSTO**\n"
+        "O desafio só passa para a fase de luta depois que o oponente aceitar. "
+        "Após o combate, o resultado deverá ser enviado para revisão da equipe.",
+        cor=COR_ERRO if estado.startswith("🟡") else COR_SUCESSO if estado.startswith("✅") else COR_NEUTRA,
+        rodape=None,
+    )
+    embed.set_author(name="NÊMESIS  /  ARENA COMPETITIVA")
+    embed.add_field(name="DESAFIANTE", value=f"<@{desafio['desafiante_id']}>", inline=True)
+    embed.add_field(name="OPONENTE", value=f"<@{desafio['desafiado_id']}>", inline=True)
+    embed.add_field(name="FASE ATUAL", value=estado, inline=False)
+    aposta = int(desafio.get("aposta_xp", 0) or 0)
+    if aposta > 0:
+        embed.add_field(
+            name="💠 XP EM DISPUTA",
+            value=f"Cada participante arrisca **{aposta} XP**.\nO vencedor recebe **{aposta * 2} XP** da aposta, além da recompensa de vitória prevista pelo sistema.",
+            inline=False,
+        )
+    else:
+        embed.add_field(name="💠 MODALIDADE", value="Duelo sem aposta de XP.", inline=False)
+    if detalhe:
+        embed.add_field(name="◈ RESULTADO", value=detalhe[:1000], inline=False)
+    embed.add_field(
+        name="PRÓXIMO PASSO",
+        value="O oponente deve escolher **Aceitar** ou **Recusar**. Se aceitar, a luta será publicada no canal competitivo."
+        if estado.startswith("🟡") else "A convocação foi encerrada. Consulte o canal competitivo para acompanhar os próximos passos.",
+        inline=False,
+    )
+    embed.set_footer(text=f"REGISTRO {desafio['id']}  •  NÊMESIS PvP")
+    return embed
+
+
+def _layout_desafio(embed: discord.Embed, desafio_id: str,
+                    mencao: str | None = None, botoes: bool = True) -> discord.ui.LayoutView:
+    view = discord.ui.LayoutView(timeout=None)
+    partes = []
+    if mencao:
+        partes.append(mencao)
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"**{campo.name}**\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    if botoes:
+        aceitar = discord.ui.Button(
+            label="Aceitar", style=discord.ButtonStyle.success, emoji="⚔️",
+            custom_id=f"desafio:aceitar:{desafio_id}",
+        )
+        recusar = discord.ui.Button(
+            label="Recusar", style=discord.ButtonStyle.danger, emoji="🚫",
+            custom_id=f"desafio:recusar:{desafio_id}",
+        )
+        componentes.append(discord.ui.ActionRow(aceitar, recusar))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Arena Competitiva"),
+    ])
+    view.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     return view
 
 
@@ -325,33 +387,11 @@ class Desafios(commands.Cog):
             )
             return
 
-        embed = criar_embed(
-            "⚔️ CONVOCAÇÃO DE COMBATE · PvP",
-            "**UM NOVO CONFRONTO FOI PROPOSTO**\n"
-            "O desafio só passa para a fase de luta depois que o oponente aceitar. "
-            "Após o combate, o resultado deverá ser enviado para revisão da equipe.",
-            cor=COR_ERRO,
-            rodape=None,
-        )
-        embed.set_author(name="NÊMESIS  /  ARENA COMPETITIVA")
-        embed.add_field(name="DESAFIANTE", value=f"{interaction.user.mention}\n`{interaction.user.display_name[:80]}`", inline=True)
-        embed.add_field(name="OPONENTE", value=f"{membro.mention}\n`{membro.display_name[:80]}`", inline=True)
-        embed.add_field(name="FASE ATUAL", value="🟡 Aguardando resposta do oponente", inline=False)
-        if aposta_xp > 0:
-            embed.add_field(
-                name="💠 XP EM DISPUTA",
-                value=f"Cada participante arrisca **{aposta_xp} XP**.\nO vencedor recebe **{aposta_xp * 2} XP** da aposta, além da recompensa de vitória prevista pelo sistema.",
-                inline=False,
-            )
-        else:
-            embed.add_field(name="💠 MODALIDADE", value="Duelo sem aposta de XP.", inline=False)
-        embed.add_field(name="PRÓXIMO PASSO", value="O oponente deve escolher **Aceitar** ou **Recusar**. Se aceitar, a luta será publicada no canal competitivo.", inline=False)
-        embed.set_footer(text=f"REGISTRO {desafio['id']}  •  NÊMESIS PvP")
+        embed = _embed_desafio(desafio)
         try:
             msg = await canal.send(
-                content=membro.mention,
-                embed=embed,
-                view=_view_desafio(desafio["id"]),
+                view=_layout_desafio(embed, desafio["id"], membro.mention),
+                allowed_mentions=discord.AllowedMentions(users=[membro]),
             )
         except (discord.Forbidden, discord.HTTPException) as erro:
             if aposta_xp > 0:
@@ -436,10 +476,13 @@ class Desafios(commands.Cog):
                 if not ok:
                     await desafios.transicionar_status(interaction.guild.id, desafio_id, "processando_aceite", "recusado")
                     await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
-                    embed = interaction.message.embeds[0]
-                    embed.color = COR_NEUTRA
-                    embed.add_field(name="🚫 Cancelado", value=f"{interaction.user.mention} não tem XP suficiente pra cobrir a aposta.", inline=False)
-                    await interaction.message.edit(embed=embed, view=None)
+                    embed = _embed_desafio(
+                        desafio, "🚫 Cancelado",
+                        f"{interaction.user.mention} não tem XP suficiente para cobrir a aposta.",
+                    )
+                    await interaction.message.edit(
+                        view=_layout_desafio(embed, desafio_id, botoes=False)
+                    )
                     await interaction.followup.send(
                         "A aposta foi cancelada porque você não tem XP suficiente. O XP reservado ao desafiante foi devolvido.",
                         ephemeral=True,
@@ -454,10 +497,10 @@ class Desafios(commands.Cog):
                     await _devolver_xp(interaction.guild.id, interaction.user.id, desafio["aposta_xp"])
                 await interaction.followup.send("Não foi possível confirmar o aceite; a aposta foi devolvida se havia sido debitada.", ephemeral=True)
                 return
-            embed = interaction.message.embeds[0]
-            embed.color = COR_SUCESSO
-            embed.add_field(name="✅ Aceito!", value="A luta pode acontecer agora.", inline=False)
-            await interaction.message.edit(embed=embed, view=None)
+            embed = _embed_desafio(desafio, "✅ Aceito!", "A luta pode acontecer agora.")
+            await interaction.message.edit(
+                view=_layout_desafio(embed, desafio_id, botoes=False)
+            )
             await interaction.followup.send(
                 "Desafio aceito. A luta pode acontecer agora.",
                 ephemeral=True,
@@ -490,10 +533,10 @@ class Desafios(commands.Cog):
                 return
             if desafio["aposta_xp"] > 0:
                 await _devolver_xp(interaction.guild.id, desafio["desafiante_id"], desafio["aposta_xp"])
-            embed = interaction.message.embeds[0]
-            embed.color = COR_NEUTRA
-            embed.add_field(name="🚫 Recusado", value="O desafio foi recusado.", inline=False)
-            await interaction.message.edit(embed=embed, view=None)
+            embed = _embed_desafio(desafio, "🚫 Recusado", "O desafio foi recusado.")
+            await interaction.message.edit(
+                view=_layout_desafio(embed, desafio_id, botoes=False)
+            )
             await interaction.followup.send(
                 "Desafio recusado. A aposta do desafiante foi devolvida, se havia uma.",
                 ephemeral=True,
