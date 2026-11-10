@@ -124,40 +124,118 @@ class SeletorBoasVindas(discord.ui.Select):
 
 
 def _reconstruir_cartao_preferencias(mensagem: discord.Message, botao: discord.ui.Button) -> discord.ui.LayoutView:
-    """Atualiza somente os controles, preservando o texto original da DM."""
+    """Preserva texto, seletores e atalhos ao atualizar a preferência por DM."""
     texto = ""
-    links = []
     pendentes = list(getattr(mensagem, "components", []) or [])
     while pendentes:
         item = pendentes.pop(0)
         conteudo = str(getattr(item, "content", "") or "").strip()
         if conteudo and not texto:
             texto = conteudo
-        url = getattr(item, "url", None)
-        if url:
-            links.append(discord.ui.Button(
-                label=getattr(item, "label", None),
-                style=discord.ButtonStyle.link,
-                url=url,
-                emoji=getattr(item, "emoji", None),
-            ))
         pendentes.extend(list(getattr(item, "children", []) or []))
-    if not texto:
-        texto = "## NÊMESIS • NOTAS DE ATUALIZAÇÃO\nConfigure aqui o recebimento de comunicados automáticos."
-    preferencia = discord.ui.Button(
-        label=botao.label,
-        style=botao.style,
-        emoji=botao.emoji,
-        custom_id=botao.custom_id,
-    )
-    preferencia.callback = botao.callback
+
+    origem = getattr(botao, "view", None)
+    itens = []
+    pendentes = list(getattr(origem, "children", []) or [])
+    while pendentes:
+        item = pendentes.pop(0)
+        if isinstance(item, (discord.ui.Button, discord.ui.Select)):
+            itens.append(item)
+        else:
+            pendentes.extend(list(getattr(item, "children", []) or []))
+
     componentes = [
-        discord.ui.TextDisplay(texto[:3900]),
+        discord.ui.TextDisplay(
+            (texto or "## NÊMESIS • NOTAS DE ATUALIZAÇÃO\nConfigure o recebimento de comunicados automáticos.")[:3900]
+        ),
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
     ]
-    if links:
-        componentes.append(discord.ui.ActionRow(*links[:5]))
-    componentes.append(discord.ui.ActionRow(preferencia))
+    seletores = []
+    botoes_link = []
+    botoes_acao = []
+    for original in itens:
+        if isinstance(original, discord.ui.UserSelect):
+            novo = discord.ui.UserSelect(
+                placeholder=original.placeholder, min_values=original.min_values,
+                max_values=original.max_values, custom_id=original.custom_id,
+                disabled=original.disabled,
+            )
+            async def callback(interaction, item=original, clone=novo):
+                item._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    item._resolved = clone._resolved
+                await item.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(original, discord.ui.RoleSelect):
+            novo = discord.ui.RoleSelect(
+                placeholder=original.placeholder, min_values=original.min_values,
+                max_values=original.max_values, custom_id=original.custom_id,
+                disabled=original.disabled,
+            )
+            async def callback(interaction, item=original, clone=novo):
+                item._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    item._resolved = clone._resolved
+                await item.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(original, discord.ui.ChannelSelect):
+            novo = discord.ui.ChannelSelect(
+                placeholder=original.placeholder, min_values=original.min_values,
+                max_values=original.max_values, channel_types=list(original.channel_types),
+                custom_id=original.custom_id, disabled=original.disabled,
+            )
+            async def callback(interaction, item=original, clone=novo):
+                item._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    item._resolved = clone._resolved
+                await item.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(original, discord.ui.MentionableSelect):
+            novo = discord.ui.MentionableSelect(
+                placeholder=original.placeholder, min_values=original.min_values,
+                max_values=original.max_values, custom_id=original.custom_id,
+                disabled=original.disabled,
+            )
+            async def callback(interaction, item=original, clone=novo):
+                item._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    item._resolved = clone._resolved
+                await item.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(original, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=original.placeholder, min_values=original.min_values,
+                max_values=original.max_values, options=list(original.options),
+                custom_id=original.custom_id, disabled=original.disabled,
+            )
+            async def callback(interaction, item=original, clone=novo):
+                item._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    item._resolved = clone._resolved
+                await item.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(original, discord.ui.Button):
+            fonte = botao if original.custom_id == botao.custom_id else original
+            novo = discord.ui.Button(
+                label=fonte.label, style=fonte.style, disabled=fonte.disabled,
+                custom_id=fonte.custom_id, url=fonte.url, emoji=fonte.emoji,
+            )
+            callback = getattr(fonte, "callback", None)
+            if callback is not None and not fonte.url:
+                novo.callback = callback
+            (botoes_link if fonte.url else botoes_acao).append(novo)
+
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    if botoes_link:
+        componentes.append(discord.ui.ActionRow(*botoes_link[:5]))
+    for inicio in range(0, len(botoes_acao), 5):
+        componentes.append(discord.ui.ActionRow(*botoes_acao[inicio:inicio + 5]))
     componentes.extend([
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# Nêmesis Systeam"),
@@ -165,7 +243,6 @@ def _reconstruir_cartao_preferencias(mensagem: discord.Message, botao: discord.u
     layout = discord.ui.LayoutView(timeout=None)
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     return layout
-
 
 class AlternarAvisosButton(discord.ui.Button):
     """Alterna o recebimento das notas automáticas diretamente pela mensagem."""
