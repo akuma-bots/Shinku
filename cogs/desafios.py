@@ -183,6 +183,25 @@ async def _devolver_xp(guild_id: int, user_id: int, quantidade: int):
         lambda perfil: {**perfil, "xp": perfil["xp"] + quantidade},
     )
 
+
+def _mensagem_tem_cartao_desafio(mensagem: discord.Message) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if "NÊMESIS • Arena Competitiva" in str(getattr(item, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
+async def _atualizar_cartao_desafio(mensagem: discord.Message, embed: discord.Embed,
+                                    desafio_id: str) -> None:
+    view = _layout_desafio(embed, desafio_id, botoes=False)
+    if not _mensagem_tem_cartao_desafio(mensagem):
+        await mensagem.edit(content=None, embeds=[], attachments=[])
+    await mensagem.edit(view=view)
+
+
 class Desafios(commands.Cog):
     """Duelo PvP casual: /desafiar posta em Desafios com botões Aceitar/
     Recusar; se aceito, anuncia em Lutas; o resultado passa pela revisão
@@ -480,9 +499,7 @@ class Desafios(commands.Cog):
                         desafio, "🚫 Cancelado",
                         f"{interaction.user.mention} não tem XP suficiente para cobrir a aposta.",
                     )
-                    await interaction.message.edit(
-                        view=_layout_desafio(embed, desafio_id, botoes=False)
-                    )
+                    await _atualizar_cartao_desafio(interaction.message, embed, desafio_id)
                     await interaction.followup.send(
                         "A aposta foi cancelada porque você não tem XP suficiente. O XP reservado ao desafiante foi devolvido.",
                         ephemeral=True,
@@ -498,9 +515,7 @@ class Desafios(commands.Cog):
                 await interaction.followup.send("Não foi possível confirmar o aceite; a aposta foi devolvida se havia sido debitada.", ephemeral=True)
                 return
             embed = _embed_desafio(desafio, "✅ Aceito!", "A luta pode acontecer agora.")
-            await interaction.message.edit(
-                view=_layout_desafio(embed, desafio_id, botoes=False)
-            )
+            await _atualizar_cartao_desafio(interaction.message, embed, desafio_id)
             await interaction.followup.send(
                 "Desafio aceito. A luta pode acontecer agora.",
                 ephemeral=True,
