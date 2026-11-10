@@ -981,6 +981,10 @@ class Musica(commands.Cog):
             await mensagem.edit(content=None, embed=embed, view=view)
         else:
             mensagem = await canal.send(embed=embed, view=view)
+        try:
+            await mensagem.pin(reason="Painel oficial de música da NÊMESIS")
+        except (discord.Forbidden, discord.HTTPException):
+            LOG.exception("Não foi possível fixar o painel musical no canal %s.", canal.id)
         estado[str(guild.id)] = {"canal_id": canal.id, "mensagem_id": mensagem.id}
         await salvar(ARQUIVO_PAINEL_MUSICA, estado)
         self._painel_sync = True
@@ -1016,7 +1020,12 @@ class Musica(commands.Cog):
         itens = itens[:disponivel]
         for item in itens:
             item["text_channel_id"] = interaction.channel_id
+            item["requested_by"] = interaction.user.id
         fila.extend(itens)
+        canal_musica = interaction.guild.get_channel(CANAL_MUSICA_ID)
+        if isinstance(canal_musica, discord.TextChannel):
+            for faixa in itens:
+                await self._publicar_topico_faixa(canal_musica, faixa)
         primeira = itens[0]
         posicao = len(fila) - len(itens) + 1
         estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
@@ -1228,6 +1237,25 @@ class Musica(commands.Cog):
         embed = criar_embed(title=titulo, description=descricao, color=cor)
         embed.set_footer(text="NÊMESIS • Sistema de música")
         return embed
+
+    async def _publicar_topico_faixa(self, canal: discord.TextChannel, faixa: dict[str, Any]) -> None:
+        """Publica cada faixa adicionada como tópico próprio no canal musical."""
+        titulo = " ".join(str(faixa.get("title") or "Música").split())[:90]
+        url = str(faixa.get("webpage_url") or "").strip()
+        if not url.startswith(("https://", "http://")):
+            return
+        artista = str(faixa.get("artist") or "").strip()
+        descricao = (
+            f"**Faixa:** [{discord.utils.escape_markdown(titulo)}]({url})\\n"
+            + (f"**Artista:** {discord.utils.escape_markdown(artista)}\\n" if artista else "")
+            + f"**Duração:** {self._tempo(int(faixa.get('duration') or 0))}\\n"
+            + f"**Solicitada por:** <@{int(faixa.get('requested_by') or 0)}>"
+        )
+        try:
+            inicial = await canal.send(embed=self._embed_musica("♫ " + titulo, descricao))
+            await inicial.create_thread(name=("♫ " + titulo)[:100], auto_archive_duration=10080)
+        except (discord.Forbidden, discord.HTTPException):
+            LOG.exception("Não foi possível publicar tópico para a faixa %s no canal %s.", titulo, canal.id)
 
     async def _tocar_fila(self, guild: discord.Guild):
         gid = guild.id
@@ -1554,6 +1582,7 @@ class Musica(commands.Cog):
             )
             return
         item["text_channel_id"] = interaction.channel_id
+        item["requested_by"] = interaction.user.id
         fila = self.filas.setdefault(interaction.guild.id, [])
         if len(fila) >= MAX_QUEUE:
             await interaction.followup.send(
@@ -1561,6 +1590,9 @@ class Musica(commands.Cog):
             )
             return
         fila.append(item)
+        canal_musica = interaction.guild.get_channel(CANAL_MUSICA_ID)
+        if isinstance(canal_musica, discord.TextChannel):
+            await self._publicar_topico_faixa(canal_musica, item)
         posicao = len(fila)
         if voz.is_playing() or voz.is_paused() or self.tarefas.get(interaction.guild.id, None):
             await interaction.followup.send(embed=self._embed_musica(
