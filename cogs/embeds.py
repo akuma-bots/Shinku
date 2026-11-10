@@ -29,7 +29,8 @@ def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
 
 
 
-def _layout_embed_publicado(embed: discord.Embed, origem: discord.ui.View) -> discord.ui.LayoutView:
+def _layout_embed_publicado(embed: discord.Embed, origem: discord.ui.View | None) -> discord.ui.LayoutView:
+    origem = origem or discord.ui.View(timeout=None)
     partes = []
     if embed.title:
         partes.append(f"## {embed.title}")
