@@ -443,16 +443,18 @@ class ConvitesNemesis(commands.Cog):
                         painel = None
 
                 encontrados = []
-                # Uma única varredura de recuperação limpa duplicatas antigas.
+                # A varredura curta também remove duplicatas criadas antes da
+                # persistência do ID, sem depender apenas do título do painel.
+                async for mensagem in canal.history(limit=200, oldest_first=True):
+                    if mensagem.author.id == self.bot.user.id and _mensagem_eh_painel_convites(mensagem):
+                        encontrados.append(mensagem)
                 if painel is None:
-                    async for mensagem in canal.history(limit=None, oldest_first=True):
-                        if mensagem.author.id == self.bot.user.id and _mensagem_eh_painel_convites(mensagem):
-                            encontrados.append(mensagem)
-                    painel = encontrados[0] if encontrados else None
-                else:
-                    # O ID persistido é a fonte primária; não republique por
-                    # simples reconexão do gateway.
-                    encontrados = [painel]
+                    painel = next(
+                        (item for item in encontrados if str(item.id) == str(painel_id)),
+                        encontrados[0] if encontrados else None,
+                    )
+                elif all(item.id != painel.id for item in encontrados):
+                    encontrados.append(painel)
 
                 if painel is None:
                     painel = await canal.send(
