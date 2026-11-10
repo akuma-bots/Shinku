@@ -655,9 +655,11 @@ class Revisoes(commands.Cog):
 
         if acao == "cancelar_aprovar":
             await interaction.response.edit_message(
-                content="Aprovação cancelada. A evidência continua pendente.",
-                embed=None,
-                view=None,
+                view=_card_revisao_view(
+                    discord.ui.View(timeout=120), None,
+                    "APROVAÇÃO CANCELADA",
+                    "A evidência continua pendente e poderá ser analisada novamente.",
+                ),
             )
             return
 
