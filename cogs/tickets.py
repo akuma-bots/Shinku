@@ -1976,7 +1976,7 @@ class Tickets(commands.Cog):
                         mensagem_existente = await canal.fetch_message(int(mensagem_id))
                         if mensagem_existente.embeds or not mensagem_existente.components:
                             await mensagem_existente.edit(
-                                content=None, embed=None, embeds=[], attachments=[], view=view
+                                content=None, embeds=[], attachments=[], view=view
                             )
                             log.info("Painel de atendimento migrado para Components V2 no canal %s.", canal.id)
                         continue
