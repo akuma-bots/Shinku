@@ -218,10 +218,10 @@ def _texto_embed_guia(embed: discord.Embed) -> str:
     if embed.description:
         partes.append(embed.description)
     for campo in embed.fields:
-        partes.append(f"### {campo.name}\\n{campo.value}")
+        partes.append(f"### {campo.name}\n{campo.value}")
     if embed.footer and embed.footer.text:
         partes.append(f"-# {embed.footer.text}")
-    return "\\n\\n".join(partes)
+    return "\n\n".join(partes)
 
 
 def _mensagem_contem_guia(mensagem: discord.Message) -> bool:
