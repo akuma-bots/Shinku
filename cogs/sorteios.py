@@ -145,6 +145,79 @@ async def _registrar_participacao(
         return "ok", sorteio
 
 
+
+def _texto_components_sorteio(mensagem: discord.Message) -> str:
+    partes = []
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop(0)
+        conteudo = str(getattr(item, "content", "") or "").strip()
+        if conteudo:
+            partes.append(conteudo)
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return "\n\n".join(partes)
+
+
+def _card_sorteio_legacy(origem: discord.ui.View, embed: discord.Embed | None = None,
+                         mensagem: discord.Message | None = None) -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = []
+    if embed:
+        if embed.title:
+            partes.append(f"## {embed.title}")
+        if embed.description:
+            partes.append(embed.description)
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.image and embed.image.url:
+            partes.append(f"[Abrir banner]({embed.image.url})")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    elif mensagem is not None:
+        texto = _texto_components_sorteio(mensagem)
+        if texto:
+            partes.append(texto)
+        elif mensagem.embeds:
+            antigo = mensagem.embeds[0]
+            if antigo.title:
+                partes.append(f"## {antigo.title}")
+            if antigo.description:
+                partes.append(antigo.description)
+            for campo in antigo.fields:
+                partes.append(f"**{campo.name}**\n{campo.value}")
+            if antigo.image and antigo.image.url:
+                partes.append(f"[Abrir banner]({antigo.image.url})")
+            if antigo.footer and antigo.footer.text:
+                partes.append(f"-# {antigo.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900] or "## SORTEIO NÊMESIS\nParticipe pelo botão abaixo."),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            callback = getattr(item, "callback", None)
+            if callback is not None:
+                novo.callback = callback
+            botoes.append(novo)
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Sorteios • V2"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
+def _mensagem_tem_cartao_sorteio_legacy(mensagem: discord.Message) -> bool:
+    return "NÊMESIS • Sorteios • V2".casefold() in _texto_components_sorteio(mensagem).casefold()
+
+
 class BotaoParticipar(discord.ui.View):
 
     def __init__(
@@ -230,8 +303,10 @@ class BotaoParticipar(discord.ui.View):
         )
 
         try:
+            if not _mensagem_tem_cartao_sorteio_legacy(interaction.message):
+                await interaction.message.edit(content=None, embeds=[], attachments=[])
             await interaction.message.edit(
-                view=view
+                view=_card_sorteio_legacy(view, mensagem=interaction.message)
             )
         except discord.HTTPException:
             pass
@@ -755,10 +830,11 @@ class Sorteios(commands.Cog):
             return
 
         try:
+            view = self.criar_view_legada(sorteio)
+            if not _mensagem_tem_cartao_sorteio_legacy(interaction.message):
+                await interaction.message.edit(content=None, embeds=[], attachments=[])
             await interaction.message.edit(
-                view=self.criar_view_legada(
-                    sorteio
-                )
+                view=_card_sorteio_legacy(view, mensagem=interaction.message)
             )
         except discord.HTTPException:
             pass
@@ -944,8 +1020,7 @@ class Sorteios(commands.Cog):
 
         try:
             mensagem = await canal_destino.send(
-                embed=embed,
-                view=view,
+                view=_card_sorteio_legacy(view, embed=embed),
             )
 
         except discord.Forbidden:
@@ -1093,7 +1168,12 @@ class Sorteios(commands.Cog):
         try:
             if cartao_avancado and not _mensagem_tem_cartao_sorteio(mensagem, sorteio.get("id", "")):
                 await mensagem.edit(content=None, embeds=[], attachments=[])
-            await mensagem.edit(view=view)
+            if not cartao_avancado and not _mensagem_tem_cartao_sorteio_legacy(mensagem):
+                await mensagem.edit(content=None, embeds=[], attachments=[])
+            if cartao_avancado:
+                await mensagem.edit(view=view)
+            else:
+                await mensagem.edit(view=_card_sorteio_legacy(view, mensagem=mensagem))
 
         except discord.HTTPException:
             pass
