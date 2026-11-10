@@ -342,6 +342,42 @@ class ParceriaView(discord.ui.View):
 
 
 
+class ParceriaLayoutView(discord.ui.LayoutView):
+    """Apresentação da parceria e botão de cargo no mesmo cartão."""
+
+    def __init__(self, role_id: int | None, embed: discord.Embed | None = None):
+        super().__init__(timeout=None)
+        partes = [f"## {embed.title if embed and embed.title else '🤝 ALIANÇA OFICIAL'}"]
+        if embed and embed.description:
+            partes.append(embed.description)
+        if embed:
+            for campo in embed.fields:
+                partes.append(f"**{campo.name}**\n{campo.value}")
+        componentes = []
+        if embed and embed.image and embed.image.url:
+            componentes.append(discord.ui.MediaGallery(
+                discord.MediaGalleryItem(url=embed.image.url, description="NÊMESIS • Parceria")
+            ))
+        componentes.extend([
+            discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ])
+        if role_id:
+            origem = ParceriaView(int(role_id))
+            original = origem.children[0]
+            botao = discord.ui.Button(
+                label=original.label, style=original.style,
+                custom_id=original.custom_id, emoji=original.emoji,
+            )
+            botao.callback = original.callback
+            componentes.append(discord.ui.ActionRow(botao))
+        componentes.extend([
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam • Alianças e parcerias"),
+        ])
+        self.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+
+
 def _embed_parceria_publica(parceria: dict, guild: discord.Guild, indice: int | None = None) -> discord.Embed:
     """Cartão público padronizado das alianças oficiais."""
     nome = str(parceria.get("nome") or "Comunidade parceira")[:180]
@@ -419,8 +455,7 @@ async def registrar_parceria_aprovada(
         if isinstance(canal, discord.TextChannel):
             try:
                 mensagem = await canal.send(
-                    embed=_embed_parceria_publica(parceria, guild),
-                    view=ParceriaView(cargo.id) if cargo else None,
+                    view=ParceriaLayoutView(cargo.id if cargo else None, _embed_parceria_publica(parceria, guild)),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 parceria["mensagem_id"] = mensagem.id
@@ -619,12 +654,7 @@ class Parcerias(commands.Cog):
         try:
 
             mensagem = await canal.send(
-                embed=embed,
-                view=(
-                    ParceriaView(cargo.id)
-                    if cargo
-                    else None
-                ),
+                view=ParceriaLayoutView(cargo.id if cargo else None, embed),
             )
 
             parceria["mensagem_id"] = (
@@ -894,11 +924,8 @@ class Parcerias(commands.Cog):
                 else None
             )
 
-            view = ParceriaView(cargo.id) if cargo else None
-
             await interaction.followup.send(
-                embed=embed,
-                view=view,
+                view=ParceriaLayoutView(cargo.id if cargo else None, embed),
                 ephemeral=True,
             )
 
@@ -946,11 +973,7 @@ async def setup(
                 not in cargos_registrados
             ):
 
-                bot.add_view(
-                    ParceriaView(
-                        cargo_id
-                    )
-                )
+                bot.add_view(ParceriaLayoutView(cargo_id))
 
                 cargos_registrados.add(
                     cargo_id
