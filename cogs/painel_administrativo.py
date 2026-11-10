@@ -225,16 +225,18 @@ async def _embed_secao(bot: commands.Bot, guild: discord.Guild, chave: str):
 def _texto_embed_componentes(embed: discord.Embed) -> str:
     """Converte o conteúdo institucional do embed em texto nativo de Components V2."""
     partes = []
-    autor = getattr(embed.author, "name", None)
+    autor = getattr(getattr(embed, "author", None), "name", None)
+    titulo = getattr(embed, "title", None)
+    descricao = getattr(embed, "description", None)
     if autor:
         partes.append(f"-# {autor}")
-    if embed.title:
-        partes.append(f"## {embed.title}")
-    if embed.description:
-        partes.append(embed.description)
-    for campo in embed.fields:
+    if titulo:
+        partes.append(f"## {titulo}")
+    if descricao:
+        partes.append(descricao)
+    for campo in getattr(embed, "fields", ()) or ():
         partes.append(f"**{campo.name}**\n{campo.value}")
-    rodape = getattr(embed.footer, "text", None)
+    rodape = getattr(getattr(embed, "footer", None), "text", None)
     if rodape:
         partes.append(f"-# {rodape}")
     return "\n\n".join(partes)[:4000] or "Central administrativa da NÊMESIS."
@@ -248,13 +250,20 @@ class CentralAdministrativaView(discord.ui.LayoutView):
         bot: commands.Bot,
         owner_id: int,
         guild: discord.Guild,
-        embed: discord.Embed,
+        embed: discord.Embed | None = None,
         *,
         chave: str = "visao_geral",
         atalhos: list[tuple[str, str]] | None = None,
+        octogono: bool = False,
     ):
         super().__init__(timeout=300)
         self.bot, self.owner_id, self.guild = bot, owner_id, guild
+        if embed is None:
+            embed = criar_embed(
+                "NÊMESIS • CENTRAL ADMINISTRATIVA",
+                "Selecione uma área para consultar os sistemas e registros da organização.",
+                rodape="NÊMESIS • PAINEL ADMINISTRATIVO CENTRAL",
+            )
         self.chave = chave
         self.seletor = discord.ui.Select(
             placeholder="Navegar pela central administrativa",
@@ -307,7 +316,7 @@ class CentralAdministrativaView(discord.ui.LayoutView):
             botoes_acao.append(botao)
 
         if chave == "operacoes":
-            if membro_tem_octogono(getattr(guild, "get_member", lambda _id: None)(owner_id)):
+            if octogono:
                 async def abrir_inteligencia(clique: discord.Interaction):
                     cog_missoes = self.bot.get_cog("Missoes")
                     if cog_missoes is None:
@@ -370,6 +379,7 @@ class CentralAdministrativaView(discord.ui.LayoutView):
                 embed,
                 chave=chave,
                 atalhos=atalhos,
+                octogono=membro_tem_octogono(getattr(interaction, "user", None)),
             )
             await interaction.edit_original_response(view=nova_view)
         except Exception:
@@ -424,6 +434,7 @@ class PainelAdministrativoView(discord.ui.LayoutView):
                 interaction.user.id,
                 interaction.guild,
                 embed,
+                octogono=membro_tem_octogono(interaction.user),
             ),
             ephemeral=True,
         )
