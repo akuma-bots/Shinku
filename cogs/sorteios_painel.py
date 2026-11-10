@@ -552,7 +552,9 @@ class SorteiosPainel(commands.Cog):
                 rodape=MARCADOR_PAINEL,
             )
             if painel:
-                await painel.edit(content=None, embeds=[], attachments=[], view=view)
+                if not _componentes_contem_marcador(painel.components, MARCADOR_PAINEL):
+                    await painel.edit(content=None, embeds=[], attachments=[])
+                    await painel.edit(view=view)
             else:
                 await canal.send(view=view)
             todos = await _carregar_todos()
