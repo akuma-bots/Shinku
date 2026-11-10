@@ -132,6 +132,9 @@ def _card_com_view(origem: discord.ui.View, titulo: str, descricao: str,
         discord.ui.TextDisplay(f"-# {rodape}"),
     ])
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
     return layout
 
 
