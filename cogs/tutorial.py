@@ -421,6 +421,28 @@ class TutorialPainelView(discord.ui.View):
         self.add_item(SeletorTutorialPublico())
 
 
+class TutorialPainelLayoutView(discord.ui.LayoutView):
+    """Painel público de #Sistemas com o seletor dentro do cartão."""
+
+    def __init__(self, embed: discord.Embed):
+        super().__init__(timeout=None)
+        linhas = [f"## {embed.title or 'CENTRAL DE TUTORIAIS'}"]
+        if embed.description:
+            linhas.append(embed.description)
+        for campo in embed.fields:
+            linhas.append(f"**{campo.name}**\n{campo.value}")
+        seletor = SeletorTutorialPublico()
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(linhas)),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("### ◈ BIBLIOTECA DE SISTEMAS"),
+            discord.ui.ActionRow(seletor),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay(f"-# {MARCADOR_CENTRAL_TUTORIAIS}"),
+            accent_colour=0x9F1239,
+        ))
+
+
 class SeletorTutorialDetalhe(discord.ui.Select):
     def __init__(self, autor_id: int, selecionado: str):
         self.autor_id = autor_id
@@ -532,7 +554,7 @@ class Tutorial(commands.Cog):
 
     async def cog_load(self):
         if not self._view_registrada:
-            self.bot.add_view(TutorialPainelView())
+            self.bot.add_view(TutorialPainelLayoutView(_embed_indice(None, self.bot)))
             self._view_registrada = True
 
     @commands.Cog.listener()
@@ -586,24 +608,23 @@ class Tutorial(commands.Cog):
                         logger.info("Guia antigo removido do canal #Sistemas (message=%s).", antiga.id)
                     except discord.HTTPException:
                         logger.exception("Não foi possível remover um guia antigo (message=%s).", antiga.id)
-                if mensagem is None and any(
-                    embed.footer and embed.footer.text == MARCADOR_CENTRAL_TUTORIAIS
-                    for embed in antiga.embeds
+                if mensagem is None and (
+                    any(embed.footer and embed.footer.text == MARCADOR_CENTRAL_TUTORIAIS for embed in antiga.embeds)
+                    or any(MARCADOR_CENTRAL_TUTORIAIS in getattr(component, "content", "") for component in antiga.components)
                 ):
                     mensagem = antiga
 
             embed = _embed_indice(guild, self.bot)
             if mensagem is None:
                 mensagem = await canal.send(
-                    embed=embed,
-                    view=TutorialPainelView(),
+                    view=TutorialPainelLayoutView(embed),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 logger.info("Central pública de tutoriais publicada em #Sistemas (message=%s).", mensagem.id)
             else:
                 await mensagem.edit(
-                    embed=embed,
-                    view=TutorialPainelView(),
+                    content=None, embed=None, embeds=[], attachments=[],
+                    view=TutorialPainelLayoutView(embed),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 logger.info("Central pública de tutoriais atualizada em #Sistemas (message=%s).", mensagem.id)
