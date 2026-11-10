@@ -1028,7 +1028,9 @@ class Musica(commands.Cog):
         embed.set_footer(text=MARCADOR_PAINEL_MUSICA)
         view = MusicPanelLayoutView(self, embed)
         if mensagem:
-            await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
+            if not _componentes_contem_marcador(mensagem.components, MARCADOR_PAINEL_MUSICA):
+                await mensagem.edit(content=None, embeds=[], attachments=[])
+                await mensagem.edit(view=view)
         else:
             mensagem = await canal.send(view=view)
         try:
