@@ -74,6 +74,7 @@ class NotasDMView(discord.ui.LayoutView):
             emoji="⚔️", url=CANAL_MISSOES_URL,
         )
         preferencias = AlternarAvisosButton()
+        preferencias.row = None
         self.add_item(discord.ui.Container(
             discord.ui.TextDisplay(texto),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
@@ -156,7 +157,7 @@ class Novidades(commands.Cog):
         return {
             "release_id": release_id[:100],
             "titulo": titulo[:200],
-            "mensagem": mensagem[:3500],
+            "mensagem": mensagem[:3000],
             "tipo": str(release.get("tipo", "Melhorias dos sistemas"))[:100],
             "data_atualizacao": str(release.get("data_atualizacao") or instante.strftime("%d/%m/%Y"))[:20],
             "hora_atualizacao": str(release.get("hora_atualizacao") or instante.strftime("%H:%M"))[:10],
@@ -234,8 +235,6 @@ class Novidades(commands.Cog):
                 tentadas_ids = set(str(x) for x in release_estado.get("dms_tentadas", []))
                 tentadas_ids.update(str(x) for x in release_estado.get("dms_enviadas", []))
                 tentadas_ids.update(str(x) for x in release_estado.get("dms_indisponiveis", []))
-
-                view_notas = NotasDMView(release)
 
                 membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
                 inscritos = await listar_inscritos(
