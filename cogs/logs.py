@@ -159,7 +159,7 @@ class DossieMembroRegistroView(discord.ui.View):
             self.pagina_mensagens = min(self.pagina_mensagens, paginas - 1)
             self.anterior.disabled = chave != "mensagens" or self.pagina_mensagens <= 0
             self.proxima.disabled = chave != "mensagens" or self.pagina_mensagens >= paginas - 1
-            await interaction.edit_original_response(content=None, embed=None, embeds=[], view=_card_registro(self, embed))
+            await interaction.edit_original_response(content=None, embeds=[], view=_card_registro(self, embed))
         except Exception:
             logger.exception("Falha ao atualizar dossiê individual.")
             await interaction.edit_original_response(content=None, embed=None, view=_card_registro(self, None, "DADOS INDISPONÍVEIS", "Não foi possível atualizar os dados agora."))
@@ -248,7 +248,7 @@ class SeletorMembroRegistroView(discord.ui.View):
         await interaction.response.defer()
         try:
             dossie = await construir_dossie(interaction.guild, membro)
-            await interaction.edit_original_response(content=None, embed=None, embeds=[], view=_card_registro(DossieMembroRegistroView(dossie, self.owner_id), _embed_geral(dossie)))
+            await interaction.edit_original_response(content=None, embeds=[], view=_card_registro(DossieMembroRegistroView(dossie, self.owner_id), _embed_geral(dossie)))
         except Exception:
             logger.exception("Falha ao montar histórico individual (guild=%s, membro=%s).", interaction.guild.id, membro.id)
             await interaction.edit_original_response(content="Não foi possível carregar o histórico agora. Tente novamente.", embed=None, view=None)
