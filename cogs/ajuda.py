@@ -191,8 +191,7 @@ class PaginacaoAjuda(
         self._atualizar_botoes()
 
         await interaction.response.edit_message(
-            embed=self.paginas[self.indice],
-            view=self,
+            view=_card_ajuda(self, self.paginas[self.indice]),
         )
 
 
