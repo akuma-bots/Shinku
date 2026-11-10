@@ -361,6 +361,19 @@ class PainelConsultaConvitesLayoutView(discord.ui.LayoutView):
         ))
 
 
+
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador.casefold() in str(getattr(componente, "content", "") or "").casefold():
+            return True
+        if str(getattr(componente, "custom_id", "") or "") == "nemesis:convites:abrir":
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
 def _mensagem_eh_painel_convites(mensagem: discord.Message) -> bool:
     # Reconhece a versão atual, os painéis legados (embed) e o botão antigo,
     # mesmo que o texto/título tenha sido alterado em uma publicação anterior.
