@@ -1322,9 +1322,14 @@ class Sugestoes(commands.Cog):
 
         if mensagem is None and isinstance(canal, discord.TextChannel):
             async for candidata in canal.history(limit=100, oldest_first=True):
-                if candidata.author.id == self.bot.user.id and any(
-                    embed.footer.text == "NÊMESIS • CENTRAL DE SUGESTÕES • PAINEL OFICIAL"
-                    for embed in candidata.embeds
+                if candidata.author.id == self.bot.user.id and (
+                    _mensagem_tem_cartao_sugestoes(
+                        candidata, "NÊMESIS • CENTRAL DE SUGESTÕES • V2"
+                    )
+                    or any(
+                        embed.footer.text == "NÊMESIS • CENTRAL DE SUGESTÕES • PAINEL OFICIAL"
+                        for embed in candidata.embeds
+                    )
                 ):
                     mensagem = candidata
                     break
