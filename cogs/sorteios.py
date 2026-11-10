@@ -440,7 +440,7 @@ class Sorteios(commands.Cog):
         self.bot = bot
 
         self.bot.add_view(
-            BotaoParticipar()
+            _card_sorteio_legacy(BotaoParticipar())
         )
 
         self.verificar_sorteios.start()
