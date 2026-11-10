@@ -332,8 +332,7 @@ class CentralAdministrativaView(discord.ui.LayoutView):
             if formularios is not None:
                 adicionar_acao("Processos seletivos", "📋", formularios.formulario_central)
             gestao = bot.get_cog("GestaoMissoes")
-            membro = guild.get_member(owner_id)
-            if gestao is not None and membro is not None and membro_tem_octogono(membro):
+            if gestao is not None and octogono:
                 adicionar_acao("Gestão de missões", "🎯", gestao.central_missoes)
             revisoes = bot.get_cog("Revisoes")
             if revisoes is not None:
