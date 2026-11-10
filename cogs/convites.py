@@ -256,13 +256,59 @@ class PainelConsultaConvitesView(discord.ui.View):
         )
 
 
+class PainelConsultaConvitesLayoutView(discord.ui.LayoutView):
+    """Painel de consulta com o botão dentro do cartão Components V2."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+        legado = PainelConsultaConvitesView()
+        original = next(
+            item for item in legado.children
+            if getattr(item, "custom_id", None) == "nemesis:convites:abrir"
+        )
+        botao = discord.ui.Button(
+            label=original.label,
+            emoji=original.emoji,
+            style=original.style,
+            custom_id=original.custom_id,
+        )
+        botao.callback = original.callback
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(
+                "## 🔗 CENTRAL DE CONVITES\n"
+                "**Consulta individual da NÊMESIS.**\n"
+                "Selecione um integrante para conferir os convites atribuídos, "
+                "os links utilizados e quem permanece no servidor.\n\n"
+                "A consulta é privada e não funciona como ranking."
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(botao),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+            accent_colour=0x9F1239,
+        ))
+
+
+def _mensagem_eh_painel_convites(mensagem: discord.Message) -> bool:
+    if any(embed.title == "🔗 CENTRAL DE CONVITES" for embed in mensagem.embeds):
+        return True
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        componente = pendentes.pop()
+        conteudo = str(getattr(componente, "content", "") or "")
+        if "CENTRAL DE CONVITES" in conteudo and "Nêmesis Systeam" in conteudo:
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
 class ConvitesNemesis(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._convites = {}
         self._locks = defaultdict(asyncio.Lock)
         self._inicializados = set()
-        self.bot.add_view(PainelConsultaConvitesView())
+        self.bot.add_view(PainelConsultaConvitesLayoutView())
 
     async def _buscar_convites(self, guild):
         try:
@@ -304,27 +350,14 @@ class ConvitesNemesis(commands.Cog):
             async for mensagem in canal.history(limit=50):
                 if (
                     mensagem.author.id == self.bot.user.id
-                    and mensagem.embeds
-                    and mensagem.embeds[0].title == "🔗 CENTRAL DE CONVITES"
+                    and _mensagem_eh_painel_convites(mensagem)
                 ):
                     painel = mensagem
                     break
 
-            embed = criar_embed(
-                title="🔗 CENTRAL DE CONVITES",
-                description=(
-                    "**Consulte os convites de qualquer integrante.**\n"
-                    "Selecione uma pessoa para visualizar a quantidade de convidados, "
-                    "os links utilizados e quem permanece no servidor. "
-                    "A consulta é individual e privada; não existe ranking."
-                ),
-                cor=0x991B33,
-                rodape="NÊMESIS • CENTRAL DE CONVITES",
-            )
             if painel is None:
                 await canal.send(
-                    embed=embed,
-                    view=PainelConsultaConvitesView(),
+                    view=PainelConsultaConvitesLayoutView(),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 logger.info(
@@ -333,8 +366,8 @@ class ConvitesNemesis(commands.Cog):
                 )
             else:
                 await painel.edit(
-                    embed=embed,
-                    view=PainelConsultaConvitesView(),
+                    content=None, embeds=[], attachments=[],
+                    view=PainelConsultaConvitesLayoutView(),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 logger.info(
