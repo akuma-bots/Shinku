@@ -1504,7 +1504,7 @@ class Missoes(commands.Cog):
                 except discord.HTTPException:
                     pass
             else:
-                await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+                await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Não foi possível atualizar o painel de missões.")
             raise
