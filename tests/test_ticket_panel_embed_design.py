@@ -64,7 +64,7 @@ class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seletor.custom_id, "ticket:abrir_select")
         self.assertEqual([opcao.value for opcao in seletor.options], ["suporte", "recrutamento"])
 
-    def test_cartao_da_central_de_gestao_aninha_todos_os_controles(self):
+    async def test_cartao_da_central_de_gestao_aninha_todos_os_controles(self):
         origem = discord.ui.View(timeout=300)
         botao = discord.ui.Button(label="Atualizar", custom_id="ticket:atualizar")
         seletor = discord.ui.Select(
