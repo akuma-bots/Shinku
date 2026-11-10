@@ -970,6 +970,17 @@ class FecharTicketView(discord.ui.View):
         )
 
 
+
+def _mensagem_tem_cartao_ticket(mensagem: discord.Message) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if "CENTRAL DE ATENDIMENTO" in str(getattr(item, "content", "") or "").upper():
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
 async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
     config = await get_config(guild.id)
     canal_id = int(config.get("ticket_painel_canal_id") or TICKET_PAINEL_CANAL_ID)
@@ -989,7 +1000,9 @@ async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
             mensagem = None
 
     if mensagem is not None:
-        await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
+        if not _mensagem_tem_cartao_ticket(mensagem):
+            await mensagem.edit(content=None, embeds=[], attachments=[])
+        await mensagem.edit(view=view)
     else:
         mensagem = await canal.send(view=view)
         try:
@@ -1976,11 +1989,12 @@ class Tickets(commands.Cog):
                 if mensagem_id:
                     try:
                         mensagem_existente = await canal.fetch_message(int(mensagem_id))
-                        if mensagem_existente.embeds or not mensagem_existente.components:
-                            await mensagem_existente.edit(
-                                content=None, embeds=[], attachments=[], view=view
-                            )
+                        if not _mensagem_tem_cartao_ticket(mensagem_existente):
+                            await mensagem_existente.edit(content=None, embeds=[], attachments=[])
+                            await mensagem_existente.edit(view=view)
                             log.info("Painel de atendimento migrado para Components V2 no canal %s.", canal.id)
+                        else:
+                            await mensagem_existente.edit(view=view)
                         continue
                     except discord.NotFound:
                         pass
