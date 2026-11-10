@@ -520,6 +520,67 @@ def _texto_embed_missoes(embed: discord.Embed | None) -> str:
     return "\n\n".join(partes)
 
 
+
+def _card_view_missoes(origem: discord.ui.View, embed: discord.Embed | None = None,
+                       titulo: str = "CENTRAL NÊMESIS", descricao: str = "") -> discord.ui.LayoutView:
+    """Envolve fluxos privados legados em cartão sem perder os callbacks originais."""
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    texto = _texto_embed_missoes(embed) if embed else f"## {titulo}\n{descricao}".strip()
+    componentes = [
+        discord.ui.TextDisplay(texto[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes = []
+    seletores = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.UserSelect):
+            novo = discord.ui.UserSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = selecionar
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = selecionar
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Gestão de Missões"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 class NavegacaoMissoesView(discord.ui.LayoutView):
     """Painel de missões em Components V2; todos os controles ficam no cartão."""
     def __init__(self, cog, categoria="missao", pagina=0, total_paginas=1, embed=None):
@@ -609,8 +670,9 @@ class InteligenciaMissoesView(discord.ui.View):
         self.pagina = max(0, min(3, self.pagina + delta))
         embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
         await interaction.response.edit_message(
-            embed=embed,
-            view=InteligenciaMissoesView(self.cog, self.owner_id, self.pagina),
+            view=_card_view_missoes(
+                InteligenciaMissoesView(self.cog, self.owner_id, self.pagina), embed
+            ),
         )
 
     @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary)
@@ -805,8 +867,9 @@ class RelatoriosMissoesView(discord.ui.View):
             interaction.guild, self.periodo, self.user_id
         )
         await interaction.response.edit_message(
-            embed=embed,
-            view=RelatoriosMissoesView(self.cog, self.owner_id, self.periodo, self.user_id),
+            view=_card_view_missoes(
+                RelatoriosMissoesView(self.cog, self.owner_id, self.periodo, self.user_id), embed
+            ),
         )
 
     @discord.ui.button(label="Atualizar relatório", emoji="🔄", style=discord.ButtonStyle.success, row=2)
@@ -847,8 +910,9 @@ class RelatoriosMissoesView(discord.ui.View):
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed = await self.cog._montar_embed_auditoria_integridade(interaction.guild, 0)
         await interaction.followup.send(
-            embed=embed,
-            view=AuditoriaIntegridadeView(self.cog, self.owner_id, 0),
+            view=_card_view_missoes(
+                AuditoriaIntegridadeView(self.cog, self.owner_id, 0), embed
+            ),
             ephemeral=True,
         )
 
@@ -890,8 +954,9 @@ class AuditoriaIntegridadeView(discord.ui.View):
             interaction.guild, self.pagina
         )
         await interaction.response.edit_message(
-            embed=embed,
-            view=AuditoriaIntegridadeView(self.cog, self.owner_id, self.pagina),
+            view=_card_view_missoes(
+                AuditoriaIntegridadeView(self.cog, self.owner_id, self.pagina), embed
+            ),
         )
 
     @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=0)
@@ -943,7 +1008,9 @@ class HistoricoDesempenhoView(discord.ui.View):
         nova_view = HistoricoDesempenhoView(
             self.cog, self.owner_id, self.registros, self.pagina
         )
-        await interaction.response.edit_message(embed=embed, view=nova_view)
+        await interaction.response.edit_message(
+            view=_card_view_missoes(nova_view, embed)
+        )
 
     @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary)
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1405,8 +1472,10 @@ class Missoes(commands.Cog):
         atividades.sort(key=lambda item: (str(item.get("titulo") or "").casefold(), str(item.get("id") or "")))
         total_paginas = max(1, (len(atividades) + 24) // 25)
         await interaction.response.send_message(
-            embed=self._embed_selecao_prova(categoria, 0, total_paginas, atividades, interaction.guild),
-            view=SeletorMissaoProvaView(self, interaction.user.id, categoria, atividades),
+            view=_card_view_missoes(
+                SeletorMissaoProvaView(self, interaction.user.id, categoria, atividades),
+                self._embed_selecao_prova(categoria, 0, total_paginas, atividades, interaction.guild),
+            ),
             ephemeral=True,
         )
 
@@ -1818,8 +1887,9 @@ class Missoes(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed = await self._montar_embed_relatorio_missoes(interaction.guild, "30")
         await interaction.followup.send(
-            embed=embed,
-            view=RelatoriosMissoesView(self, interaction.user.id, "30"),
+            view=_card_view_missoes(
+                RelatoriosMissoesView(self, interaction.user.id, "30"), embed
+            ),
             ephemeral=True,
         )
 
@@ -2199,8 +2269,9 @@ class Missoes(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
         embed = await self._montar_embed_inteligencia(interaction.guild, 0)
         await interaction.followup.send(
-            embed=embed,
-            view=InteligenciaMissoesView(self, interaction.user.id, 0),
+            view=_card_view_missoes(
+                InteligenciaMissoesView(self, interaction.user.id, 0), embed
+            ),
             ephemeral=True,
         )
 
@@ -2395,8 +2466,9 @@ class Missoes(commands.Cog):
             )
         embed.set_footer(text="NÊMESIS • XP de missões calculado apenas com recompensas persistidas")
         await interaction.followup.send(
-            embed=embed,
-            view=HistoricoDesempenhoView(self, interaction.user.id, resumo["historico"]),
+            view=_card_view_missoes(
+                HistoricoDesempenhoView(self, interaction.user.id, resumo["historico"]), embed
+            ),
             ephemeral=True,
         )
 
