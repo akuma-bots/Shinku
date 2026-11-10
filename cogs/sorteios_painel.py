@@ -399,12 +399,20 @@ class SorteiosPainel(commands.Cog):
 
     async def registrar_view_publica(self, sorteio):
         try:
-            self.bot.add_view(
-                _card_sorteio(sorteio, len(sorteio.get("participantes", [])), ViewSorteioPublico()),
-                message_id=int(sorteio["mensagem_id"]),
+            mensagem_id = int(sorteio["mensagem_id"])
+            view = _card_sorteio(
+                sorteio, len(sorteio.get("participantes", [])), ViewSorteioPublico()
             )
-        except (KeyError, TypeError, ValueError, discord.HTTPException):
-            logger.exception("Não foi possível registrar a view persistente do sorteio %s.", sorteio.get("id"))
+            self.bot.add_view(view, message_id=mensagem_id)
+            guild = self.bot.get_guild(int(sorteio.get("guild_id") or GUILD_NEMESIS_ID))
+            canal = guild.get_channel(int(sorteio.get("canal_id") or 0)) if guild else None
+            if canal is not None:
+                mensagem = await canal.fetch_message(mensagem_id)
+                await mensagem.edit(
+                    content=None, embed=None, embeds=[], attachments=[], view=view
+                )
+        except (KeyError, TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
+            logger.exception("Não foi possível sincronizar o cartão persistente do sorteio %s.", sorteio.get("id"))
 
     async def participar(self, interaction):
         if not interaction.guild or interaction.guild.id != GUILD_NEMESIS_ID:
@@ -514,7 +522,10 @@ class SorteiosPainel(commands.Cog):
             canal = canais[0]
             painel = None
             async for mensagem in canal.history(limit=100):
-                if mensagem.author == self.bot.user and any(MARCADOR_PAINEL in (e.footer.text or "") for e in mensagem.embeds if e.footer):
+                if mensagem.author == self.bot.user and (
+                    any(MARCADOR_PAINEL in (e.footer.text or "") for e in mensagem.embeds if e.footer)
+                    or any(MARCADOR_PAINEL in getattr(component, "content", "") for component in mensagem.components)
+                ):
                     painel = mensagem
                     break
             embed = criar_embed(title="🎁 CENTRAL DE SORTEIOS", description="Área administrativa para criar e configurar sorteios oficiais da NÊMESIS. A criação e as configurações são restritas à liderança.", color=COR_PRIMARIA)
