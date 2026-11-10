@@ -60,6 +60,20 @@ def _layout_boas_vindas(embed: discord.Embed) -> discord.ui.LayoutView:
     return layout
 
 
+
+MARCADOR_ARQUIVO_MEMBROS = "NÊMESIS • ARQUIVO DE MEMBROS • V2"
+
+
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador.casefold() in str(getattr(componente, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
 def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
                    titulo: str = "CENTRAL DE HISTÓRICO", descricao: str = "Consulta restrita à liderança autorizada."):
     """Mantém seletores e botões de consulta dentro de um cartão Components V2."""
@@ -294,7 +308,7 @@ class PainelHistoricoMembrosLayoutView(discord.ui.LayoutView):
         self.add_item(discord.ui.Container(
             discord.ui.TextDisplay(
                 "## 📚 ARQUIVO DE MEMBROS\n"
-                "Consulta individual de histórico e atividade, disponível somente à liderança autorizada."
+                "Consulta individual de histórico e atividade, disponível somente à liderança autorizada.\n-# " + MARCADOR_ARQUIVO_MEMBROS
             ),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(botao),
@@ -328,9 +342,32 @@ class Logs(commands.Cog):
                 return
             if thread.archived or thread.locked:
                 await thread.edit(archived=False, locked=False, reason="Atualizar painel de consulta do histórico individual")
-            mensagem = await thread.fetch_message(thread.id)
-            await mensagem.edit(view=PainelHistoricoMembrosLayoutView(), allowed_mentions=discord.AllowedMentions.none())
-            logger.info("Painel de consulta individual atualizado no tópico Histórico de membros (%s).", thread.id)
+
+            painel = None
+            async for mensagem in thread.history(limit=50, oldest_first=True):
+                if mensagem.author.id == self.bot.user.id and _componentes_contem_marcador(
+                    mensagem.components, MARCADOR_ARQUIVO_MEMBROS
+                ):
+                    painel = mensagem
+                    break
+            if painel is not None:
+                logger.info("Painel do Arquivo de Membros já está em Components V2 (%s).", painel.id)
+                return
+
+            # Não se edita um embed e ativa Components V2 na mesma requisição.
+            # Limpa o tópico inicial separadamente e publica um cartão próprio.
+            try:
+                inicial = await thread.fetch_message(thread.id)
+                if inicial.embeds or inicial.content:
+                    await inicial.edit(content=None, embeds=[], attachments=[])
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.debug("Mensagem inicial do tópico não precisou ser limpa.", exc_info=True)
+
+            painel = await thread.send(
+                view=PainelHistoricoMembrosLayoutView(),
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            logger.info("Painel do Arquivo de Membros publicado em Components V2 (%s).", painel.id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível atualizar o painel de histórico individual.")
 
