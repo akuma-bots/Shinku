@@ -180,6 +180,16 @@ async def _atualizar_cabecalho_topico(
     embed = _embed_cabecalho_topico(nome, descricao)
     try:
         mensagem = await thread.fetch_message(thread.id)
+        # Uma mensagem Components V2 não pode receber embeds tradicionais.
+        # Nesse caso, o próprio painel V2 é o cabeçalho visual do tópico.
+        if getattr(getattr(mensagem, "flags", None), "is_components_v2", False):
+            _CABECALHOS_VERIFICADOS.add(chave)
+            _LOG.debug(
+                "Cabeçalho do tópico %s (%s) já é gerenciado por Components V2.",
+                nome,
+                thread.id,
+            )
+            return
         atual = mensagem.embeds[0].to_dict() if mensagem.embeds else None
         if atual != embed.to_dict():
             await mensagem.edit(embed=embed, allowed_mentions=discord.AllowedMentions.none())
