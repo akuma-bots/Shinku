@@ -110,6 +110,37 @@ async def registrar_log(guild, titulo, descricao, *, cor=VERMELHO, view=None):
         return False
 
 
+
+def _card_parceria_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+                        titulo: str = "COMITÊ DE PARCERIAS", descricao: str = "") -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    texto = _texto_embed_componentes(embed) if embed else f"## {titulo}\n{descricao}".strip()
+    componentes = [
+        discord.ui.TextDisplay(texto[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Alianças e Parcerias"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 class FormularioCandidatura(discord.ui.Modal, title="Candidatura institucional NÊMESIS"):
     nome = discord.ui.TextInput(label="Nome oficial da comunidade", max_length=80)
     convite = discord.ui.TextInput(label="Convite permanente do Discord", max_length=200, placeholder="https://discord.gg/...")
@@ -146,15 +177,20 @@ class FormularioCandidatura(discord.ui.Modal, title="Candidatura institucional N
             dados.setdefault("candidaturas", []).append(item)
             return dados
         await atualizar_candidaturas(inserir)
-        view = DecisaoCandidaturaView(item["id"])
-        await registrar_log(
-            interaction.guild, "Nova candidatura de parceria recebida",
+        descricao_log = (
             f"**Protocolo:** {protocolo}\n**Comunidade:** {item['nome']}\n"
             f"**Responsável:** {interaction.user.mention} (ID: {interaction.user.id})\n"
             f"**Membros declarados:** {membros}\n**Segmento:** {item['segmento']}\n"
             f"**Convite:** {item['convite']}\n**Proposta:** {item['proposta']}\n"
-            "**Situação:** aguardando deliberação administrativa.",
-            cor=DOURADO, view=view,
+            "**Situação:** aguardando deliberação administrativa."
+        )
+        view = _card_parceria_view(
+            DecisaoCandidaturaView(item["id"]), None,
+            "NOVA CANDIDATURA DE PARCERIA", descricao_log,
+        )
+        await registrar_log(
+            interaction.guild, "Nova candidatura de parceria recebida",
+            descricao_log, cor=DOURADO, view=view,
         )
         await interaction.followup.send(
             f"Candidatura protocolada. Protocolo: **{protocolo}**. "
@@ -284,7 +320,12 @@ class DecisaoCandidaturaView(discord.ui.View):
                 canal_origem = await interaction.guild.fetch_channel(int(canal_id))
                 mensagem_origem = await canal_origem.fetch_message(int(mensagem_id))
             if mensagem_origem is not None:
-                await mensagem_origem.edit(embed=embed_candidatura(item), view=None, allowed_mentions=discord.AllowedMentions.none())
+                await mensagem_origem.edit(
+                    view=_card_parceria_view(
+                        discord.ui.View(timeout=120), embed_candidatura(item)
+                    ),
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, AttributeError, TypeError, ValueError):
             LOG.exception("Falha ao atualizar dossiê %s", self.protocolo)
         await registrar_log(
@@ -339,11 +380,14 @@ class RevisaoParceriaView(discord.ui.View):
             return
         try:
             await interaction.message.edit(
-                embed=discord.Embed(
-                    title="NÊMESIS  |  RESULTADO DA REVISÃO QUINZENAL",
-                    description="**Comunidade:** " + str(resultado.get("nome")) + "\n**Resultado:** " + ("Mantida por mais 15 dias" if manter else "Suspensa") + "\n**Responsável:** " + interaction.user.mention,
-                    color=0x2D9D68 if manter else 0xB93636,
-                ), view=None,
+                view=_card_parceria_view(
+                    discord.ui.View(timeout=120),
+                    discord.Embed(
+                        title="NÊMESIS  |  RESULTADO DA REVISÃO QUINZENAL",
+                        description="**Comunidade:** " + str(resultado.get("nome")) + "\n**Resultado:** " + ("Mantida por mais 15 dias" if manter else "Suspensa") + "\n**Responsável:** " + interaction.user.mention,
+                        color=0x2D9D68 if manter else 0xB93636,
+                    ),
+                ),
             )
         except (discord.Forbidden, discord.HTTPException, AttributeError):
             LOG.exception("Falha ao atualizar cartão de revisão %s", self.parceria_id)
@@ -353,10 +397,14 @@ class RevisaoParceriaView(discord.ui.View):
             canal_publico = interaction.guild.get_channel(int(canal_id)) if canal_id else None
             if isinstance(canal_publico, discord.TextChannel) and mensagem_id:
                 mensagem_publica = await canal_publico.fetch_message(int(mensagem_id))
-                from cogs.parcerias import _embed_parceria_publica, ParceriaView
+                from cogs.parcerias import _embed_parceria_publica, ParceriaLayoutView
+                embed_publico = _embed_parceria_publica(resultado, interaction.guild)
+                await mensagem_publica.edit(content=None, embeds=[], attachments=[])
                 await mensagem_publica.edit(
-                    embed=_embed_parceria_publica(resultado, interaction.guild),
-                    view=ParceriaView(int(resultado["cargo_id"])) if manter and resultado.get("cargo_id") else None,
+                    view=ParceriaLayoutView(
+                        int(resultado["cargo_id"]) if manter and resultado.get("cargo_id") else None,
+                        embed_publico,
+                    ),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
@@ -382,14 +430,21 @@ class RequisitosParcerias(commands.Cog):
         dados = await ler_candidaturas()
         for item in dados.get("candidaturas", []):
             if isinstance(item, dict) and item.get("status") == "pendente" and item.get("id"):
-                self.bot.add_view(DecisaoCandidaturaView(str(item["id"])))
+                self.bot.add_view(_card_parceria_view(
+                    DecisaoCandidaturaView(str(item["id"])), None,
+                    "CANDIDATURA DE PARCERIA", "Painel administrativo de deliberação.",
+                ))
         parcerias = await carregar(ARQ_PARCERIAS, {})
         if isinstance(parcerias, dict):
             for lista in parcerias.values():
                 if isinstance(lista, list):
                     for item in lista:
                         if isinstance(item, dict) and item.get("status") == "revisao_pendente" and item.get("id"):
-                            self.bot.add_view(RevisaoParceriaView(str(item["id"])))
+                            self.bot.add_view(_card_parceria_view(
+                                RevisaoParceriaView(str(item["id"])), None,
+                                "REVISÃO QUINZENAL DE ALIANÇA",
+                                "Painel administrativo para renovar ou suspender a parceria.",
+                            ))
         self.tarefa = asyncio.create_task(self.rotina_revisoes())
 
     async def cog_unload(self):
@@ -468,11 +523,17 @@ class RequisitosParcerias(commands.Cog):
                 guild = self.bot.get_guild(GUILD_ID)
                 if guild:
                     for item in vencidas:
+                        descricao_revisao = (
+                            f"**Comunidade:** {item.get('nome')}\n**Registro:** {item.get('id')}\n"
+                            "**Ação necessária:** verificar atividade, reputação, reciprocidade e conformidade."
+                        )
+                        view_revisao = _card_parceria_view(
+                            RevisaoParceriaView(str(item.get("id"))), None,
+                            "REVISÃO QUINZENAL DE ALIANÇA", descricao_revisao,
+                        )
                         await registrar_log(
                             guild, "Revisão quinzenal de aliança pendente",
-                            f"**Comunidade:** {item.get('nome')}\n**Registro:** {item.get('id')}\n"
-                            "**Ação necessária:** verificar atividade, reputação, reciprocidade e conformidade.",
-                            cor=DOURADO, view=RevisaoParceriaView(str(item.get("id"))),
+                            descricao_revisao, cor=DOURADO, view=view_revisao,
                         )
                 await asyncio.sleep(1800)
             except asyncio.CancelledError:
