@@ -343,7 +343,8 @@ def _texto_embed_inscricoes(embed: discord.Embed) -> str:
 
 
 def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
-                    titulo: str = "CENTRAL DE INSCRIÇÕES", descricao: str = "") -> discord.ui.LayoutView:
+                    titulo: str = "CENTRAL DE INSCRIÇÕES", descricao: str = "",
+                    marcador: str = "NÊMESIS • Gestão de Inscrições") -> discord.ui.LayoutView:
     """Mantém seletores, botões e callbacks dos fluxos de formulário dentro do cartão."""
     layout = discord.ui.LayoutView(timeout=origem.timeout)
     if isinstance(embed, (list, tuple)):
@@ -436,7 +437,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
         componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
     componentes.extend([
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-        discord.ui.TextDisplay("-# NÊMESIS • Gestão de Inscrições"),
+        discord.ui.TextDisplay(f"-# {marcador}"),
     ])
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     verificacao = getattr(origem, "interaction_check", None)
