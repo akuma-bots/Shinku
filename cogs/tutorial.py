@@ -42,17 +42,17 @@ TUTORIAIS = {
     },
     "musica": {
         "titulo": "Sistema de música",
-        "descricao": "Como colocar o bot em call e controlar a reprodução.",
+        "descricao": "Como acessar a central musical e controlar a reprodução pelos cartões do sistema.",
         "passos": [
             "Entre primeiro no canal de voz em que quer ouvir música.",
-            "No Discord, use /play e informe o nome da música ou um link compatível do YouTube ou SoundCloud.",
-            "O bot entra automaticamente no seu canal de voz e começa a tocar; você precisa estar conectado a um canal de voz.",
-            "Use /queue para ver a fila e /nowplaying para conferir a música atual.",
-            "Use /pause para pausar, /resume para continuar, /skip para pular e /volume para ajustar o volume entre 1 e 100.",
-            "Use /stop para encerrar a reprodução, limpar a fila e desconectar o bot da call.",
+            "Abra o painel Central Musical no canal Músicas e selecione Buscar para informar o nome ou link da faixa.",
+            "Conecte-se a um canal de voz antes de iniciar a busca. A Shinku entrará na sua call e começará a reprodução.",
+            "Use os botões Fila e Tocando agora para consultar a reprodução atual.",
+            "Use os botões de reprodução para pausar, continuar, avançar e ajustar o volume.",
+            "Use o controle Encerrar para limpar a reprodução e desconectar a Shinku da call.",
             "Se o bot não entrar, confirme que ele tem as permissões Conectar, Falar e Ver canal; a hospedagem também precisa ter as dependências de voz instaladas.",
         ],
-        "comandos": "/play · /queue · /nowplaying · /pause · /resume · /skip · /volume · /stop",
+        "comandos": "Canal Músicas · Central Musical · Botões de reprodução",
     },
     "inicio": {
         "titulo": "Começando na NÊMESIS",
@@ -65,10 +65,10 @@ TUTORIAIS = {
             "Consulte #Sistemas: o painel Central de Tutoriais possui um seletor para abrir o guia de cada sistema sem precisar de comando.",
             "Use Inscrições para conhecer os formulários disponíveis e Missões para consultar atividades e requisitos.",
             "Acompanhe Progressão e Ranking para entender sua evolução. As recompensas e estatísticas seguem os critérios oficiais de cada sistema.",
-            "Use /help para localizar apenas os comandos disponíveis ao seu cargo. Não possuir um comando significa que ele pode ser restrito a outra função.",
+            "Use os painéis e seletores oficiais do servidor para acessar os sistemas disponíveis ao seu cargo.",
             "Se precisar de suporte, abra um atendimento pelo canal oficial. Nunca compartilhe senhas, tokens ou códigos de autenticação.",
         ],
-        "comandos": "#Sistemas · #Regras · #Como-funciona · #Divisões · /help · /perfil",
+        "comandos": "#Sistemas · #Regras · #Como-funciona · #Divisões · Painéis oficiais",
     },
     "missoes": {
         "titulo": "Missões e Contribuições",
@@ -418,7 +418,7 @@ class SeletorTutorialPublico(discord.ui.Select):
         chave = self.values[0]
         await interaction.response.send_message(
             embed=_embed_tutorial(chave, interaction.guild, interaction.client),
-            view=TutorialDetalheView(interaction.user.id, chave),
+            view=TutorialDetalheLayoutView(interaction.user.id, chave),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -485,8 +485,72 @@ class SeletorTutorialDetalhe(discord.ui.Select):
         chave = self.values[0]
         await interaction.response.edit_message(
             embed=_embed_tutorial(chave, interaction.guild, interaction.client),
-            view=TutorialDetalheView(self.autor_id, chave),
+            view=TutorialDetalheLayoutView(self.autor_id, chave),
         )
+
+
+
+class TutorialDetalheLayoutView(discord.ui.LayoutView):
+    """Consulta privada de tutorial: conteúdo e navegação dentro de um único cartão."""
+
+    def __init__(self, autor_id: int, selecionado: str):
+        super().__init__(timeout=900)
+        self.autor_id = int(autor_id)
+        embed = _embed_tutorial(selecionado, None, None)
+        linhas = [f"## {embed.title or 'GUIA NÊMESIS'}"]
+        if embed.description:
+            linhas.append(embed.description)
+        for campo in embed.fields:
+            linhas.append(f"**{campo.name}**\n{campo.value}")
+        seletor = SeletorTutorialDetalhe(self.autor_id, selecionado)
+        voltar = discord.ui.Button(
+            label="Voltar ao índice", style=discord.ButtonStyle.secondary,
+            emoji="📚", custom_id=f"nemesis:tutoriais:voltar:{self.autor_id}",
+        )
+
+        async def callback(interaction: discord.Interaction):
+            if interaction.user.id != self.autor_id:
+                await interaction.response.send_message(
+                    "Esta consulta pertence a outro integrante.", ephemeral=True
+                )
+                return
+            await interaction.response.edit_message(
+                view=TutorialIndiceLayoutView(self.autor_id)
+            )
+
+        voltar.callback = callback
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(linhas)[:3900]),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(seletor),
+            discord.ui.ActionRow(voltar),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# NÊMESIS • BIBLIOTECA DE SISTEMAS"),
+            accent_colour=0x9F1239,
+        ))
+
+
+class TutorialIndiceLayoutView(discord.ui.LayoutView):
+    """Índice de tutoriais em cartão, com o seletor no próprio conteúdo."""
+
+    def __init__(self, autor_id: int):
+        super().__init__(timeout=900)
+        self.autor_id = int(autor_id)
+        embed = _embed_indice(None, None)
+        linhas = [f"## {embed.title or 'ÍNDICE DE SISTEMAS'}"]
+        if embed.description:
+            linhas.append(embed.description)
+        for campo in embed.fields:
+            linhas.append(f"**{campo.name}**\n{campo.value}")
+        seletor = SeletorTutorialIndice(self.autor_id)
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(linhas)[:3900]),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(seletor),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# NÊMESIS • BIBLIOTECA DE SISTEMAS"),
+            accent_colour=0x9F1239,
+        ))
 
 
 class TutorialDetalheView(discord.ui.View):
@@ -508,7 +572,7 @@ class TutorialDetalheView(discord.ui.View):
     async def voltar_indice(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             embed=_embed_indice(interaction.guild, interaction.client),
-            view=TutorialDetalheIndiceView(self.autor_id),
+            view=TutorialIndiceLayoutView(self.autor_id),
         )
 
 
