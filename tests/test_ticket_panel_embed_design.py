@@ -1,27 +1,94 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from cogs.tickets import _montar_embed_painel, FecharTicketView
+import discord
+
+from cogs.tickets import (
+    _montar_select,
+    _card_central_tickets,
+    FecharTicketView,
+)
+
+
+def _controles_aninhados(view):
+    pendentes = [(item, None) for item in view.children]
+    while pendentes:
+        item, pai = pendentes.pop(0)
+        if isinstance(item, (discord.ui.Button, discord.ui.Select,
+                             discord.ui.ChannelSelect, discord.ui.RoleSelect)):
+            yield item, pai
+        for filho in getattr(item, "children", ()) or ():
+            pendentes.append((filho, item))
 
 
 class TestTicketPanelEmbedDesign(unittest.IsolatedAsyncioTestCase):
-    async def test_painel_padrao_tem_orientacoes_e_privacidade_separadas(self):
-        with patch("cogs.tickets.get_config", new=AsyncMock(return_value={})):
-            embed = await _montar_embed_painel(1563995879981981817)
+    async def test_painel_publico_usa_components_v2_com_seletor_no_cartao(self):
+        tipos = [
+            {
+                "valor": "suporte",
+                "label": "Suporte à comunidade",
+                "descricao": "Ajuda com dúvidas e dificuldades.",
+                "emoji": "🛟",
+            },
+            {
+                "valor": "recrutamento",
+                "label": "Recrutamento e admissão",
+                "descricao": "Processos de ingresso na organização.",
+                "emoji": "✦",
+            },
+        ]
+        with (
+            patch("cogs.tickets.get_config", new=AsyncMock(return_value={})),
+            patch("cogs.tickets.tickets.get_tipos", new=AsyncMock(return_value=tipos)),
+        ):
+            view = await _montar_select(1563995879981981817)
 
-        self.assertIn("CENTRAL DE ATENDIMENTO", embed.title)
-        self.assertIn("Selecione abaixo a categoria", embed.description)
-        nomes = [field.name for field in embed.fields]
-        self.assertEqual(len(nomes), 13)
-        self.assertIn("✦  01  /  Recrutamento e Admissão", nomes)
-        self.assertIn("♟️  02  /  Estrutura e Hierarquia", nomes)
-        self.assertIn("♜  PRIVACIDADE E SEGURANÇA", nomes)
-        self.assertIn("◈  CATÁLOGO DE ATENDIMENTO", nomes)
-        self.assertIn("⏱️  ATENDIMENTO", nomes)
-        self.assertIn("▰  COMO FUNCIONA", nomes)
-        self.assertEqual(embed.color.value, 0x9F1239)
-        self.assertEqual(embed.footer.text, 'Nêmesis Systeam')
+        self.assertIsInstance(view, discord.ui.LayoutView)
+        self.assertEqual(len(view.children), 1)
+        container = view.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        texto = "\\n".join(
+            getattr(item, "content", "")
+            for item in container.children
+            if isinstance(item, discord.ui.TextDisplay)
+        )
+        self.assertIn("CENTRAL DE ATENDIMENTO", texto)
+        self.assertIn("Suporte à comunidade", texto)
+        controles = list(_controles_aninhados(view))
+        self.assertEqual(len(controles), 1)
+        seletor, linha = controles[0]
+        self.assertIsInstance(seletor, discord.ui.Select)
+        self.assertIsInstance(linha, discord.ui.ActionRow)
+        self.assertIn(linha, container.children)
+        self.assertEqual(seletor.custom_id, "ticket:abrir_select")
+        self.assertEqual([opcao.value for opcao in seletor.options], ["suporte", "recrutamento"])
 
+    def test_cartao_da_central_de_gestao_aninha_todos_os_controles(self):
+        origem = discord.ui.View(timeout=300)
+        botao = discord.ui.Button(label="Atualizar", custom_id="ticket:atualizar")
+        seletor = discord.ui.Select(
+            placeholder="Categoria",
+            options=[discord.SelectOption(label="Suporte", value="suporte")],
+            custom_id="ticket:categoria",
+        )
+        botao.callback = AsyncMock()
+        seletor.callback = AsyncMock()
+        origem.add_item(botao)
+        origem.add_item(seletor)
+
+        cartao = _card_central_tickets(origem, titulo="CENTRAL DE GESTÃO")
+        self.assertIsInstance(cartao, discord.ui.LayoutView)
+        self.assertEqual(len(cartao.children), 1)
+        container = cartao.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        controles = list(_controles_aninhados(cartao))
+        self.assertEqual(len(controles), 2)
+        for controle, linha in controles:
+            self.assertIsInstance(linha, discord.ui.ActionRow)
+            self.assertIn(linha, container.children)
+        ids = {controle.custom_id for controle, _ in controles}
+        self.assertEqual(ids, {"ticket:atualizar", "ticket:categoria"})
 
     def test_controles_persistentes_incluem_acoes_de_atendimento(self):
         view = FecharTicketView()
