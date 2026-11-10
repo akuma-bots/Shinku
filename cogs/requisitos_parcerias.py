@@ -434,7 +434,7 @@ class RequisitosParcerias(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 LOG.exception("Não foi possível procurar um painel de parcerias anterior.")
         if mensagem:
-            await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
+            await mensagem.edit(content=None, embeds=[], attachments=[], view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
             await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
         else:
             mensagem = await canal.send(view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
