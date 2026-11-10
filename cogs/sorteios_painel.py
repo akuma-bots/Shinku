@@ -115,7 +115,12 @@ def _card_com_view(origem: discord.ui.View, titulo: str, descricao: str,
                 disabled=item.disabled,
                 row=item.row,
             )
-            novo.callback = item.callback
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = selecionar
         else:
             continue
         linhas.setdefault(item.row or 0, []).append(novo)
