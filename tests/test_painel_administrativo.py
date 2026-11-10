@@ -1,4 +1,6 @@
 import unittest
+
+import discord
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -185,7 +187,7 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         view.seletor._values = ["sistemas"]
         interaction = SimpleNamespace(
             user=SimpleNamespace(id=123),
-            response=SimpleMock() if False else SimpleNamespace(defer=AsyncMock()),
+            response=SimpleNamespace(defer=AsyncMock()),
             edit_original_response=AsyncMock(),
         )
         with patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Sistemas"), []))):
