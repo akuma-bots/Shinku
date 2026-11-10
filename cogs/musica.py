@@ -556,8 +556,11 @@ class MusicPlaylistView(discord.ui.View):
             await interaction.response.send_message("Selecione uma playlist primeiro.", ephemeral=True)
             return
         await interaction.response.send_message(
-            f"Confirma excluir a playlist **{discord.utils.escape_markdown(playlist['nome'])}**?",
-            view=ConfirmarExclusaoPlaylistView(self, self.playlist_id),
+            view=_card_music_view(
+                ConfirmarExclusaoPlaylistView(self, self.playlist_id),
+                "CONFIRMAR EXCLUSÃO",
+                f"Confirma excluir a playlist **{discord.utils.escape_markdown(playlist['nome'])}**?",
+            ),
             ephemeral=True,
         )
 
@@ -587,6 +590,59 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
         await interaction.response.edit_message(content="Exclusão cancelada.", view=None)
 
 
+
+
+
+def _card_music_view(origem: discord.ui.View, titulo: str,
+                     descricao: str = "", embed: discord.Embed | None = None):
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    linhas = {}
+    for item in origem.children:
+        if isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled, row=item.row,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = selecionar
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji, row=item.row,
+            )
+            novo.callback = item.callback
+        else:
+            continue
+        linhas.setdefault(item.row or 0, []).append(novo)
+    for _, itens in sorted(linhas.items()):
+        for inicio in range(0, len(itens), 5):
+            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Central Musical"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
 
 
 GUILD_NEMESIS_ID = 1563995879981981817
@@ -1170,8 +1226,7 @@ class Musica(commands.Cog):
             "Selecione uma para carregar na fila ou excluir. Você também pode salvar a fila atual."
         )
         await interaction.response.send_message(
-            embed=self._embed_musica("🎼 Sua biblioteca musical", descricao),
-            view=view,
+            view=_card_music_view(view, "🎼 Sua biblioteca musical", descricao),
             ephemeral=True,
         )
 
@@ -1475,12 +1530,13 @@ class Musica(commands.Cog):
                     )
                     canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
                     if canal_texto:
-                        await canal_texto.send(embed=self._embed_musica(
-                            "▶ Tocando agora",
+                        await canal_texto.send(view=_card_music_view(
+                            MusicControlView(self, gid),
+                            "▶ TOCANDO AGORA",
                             f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
                             f"Duração: {self._tempo(item['duration'])}\n"
                             f"Repetição: { {'off': 'desligada', 'track': 'música atual', 'queue': 'fila'}.get(self.loop_modes.get(gid, 'off'), 'desligada') }",
-                        ), view=MusicControlView(self, gid))
+                        ))
                     await terminou.wait()
                     historico = self.historico.setdefault(gid, [])
                     historico.append({
