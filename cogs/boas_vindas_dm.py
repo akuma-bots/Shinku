@@ -122,6 +122,51 @@ class SeletorBoasVindas(discord.ui.Select):
         )
 
 
+
+def _reconstruir_cartao_preferencias(mensagem: discord.Message, botao: discord.ui.Button) -> discord.ui.LayoutView:
+    """Atualiza somente os controles, preservando o texto original da DM."""
+    texto = ""
+    links = []
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop(0)
+        conteudo = str(getattr(item, "content", "") or "").strip()
+        if conteudo and not texto:
+            texto = conteudo
+        url = getattr(item, "url", None)
+        if url:
+            links.append(discord.ui.Button(
+                label=getattr(item, "label", None),
+                style=discord.ButtonStyle.link,
+                url=url,
+                emoji=getattr(item, "emoji", None),
+            ))
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    if not texto:
+        texto = "## NÊMESIS • NOTAS DE ATUALIZAÇÃO\nConfigure aqui o recebimento de comunicados automáticos."
+    preferencia = discord.ui.Button(
+        label=botao.label,
+        style=botao.style,
+        emoji=botao.emoji,
+        custom_id=botao.custom_id,
+    )
+    preferencia.callback = botao.callback
+    componentes = [
+        discord.ui.TextDisplay(texto[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    if links:
+        componentes.append(discord.ui.ActionRow(*links[:5]))
+    componentes.append(discord.ui.ActionRow(preferencia))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam"),
+    ])
+    layout = discord.ui.LayoutView(timeout=None)
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
 class AlternarAvisosButton(discord.ui.Button):
     """Alterna o recebimento das notas automáticas diretamente pela mensagem."""
 
@@ -146,7 +191,9 @@ class AlternarAvisosButton(discord.ui.Button):
             discord.ButtonStyle.success if novo_estado
             else discord.ButtonStyle.secondary
         )
-        await interaction.response.edit_message(view=self.view)
+        await interaction.response.edit_message(
+            view=_reconstruir_cartao_preferencias(interaction.message, self)
+        )
         estado = "ativadas" if novo_estado else "desativadas"
         await interaction.followup.send(
             f"**Notas automáticas por DM {estado}.** "
