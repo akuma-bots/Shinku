@@ -1010,6 +1010,75 @@ async def sincronizar_painel_ticket(guild: discord.Guild) -> discord.Message:
     return mensagem
 
 
+def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None = None,
+                          titulo: str = "CENTRAL DE GESTÃO DE ATENDIMENTO",
+                          descricao: str = "Configurações restritas à liderança autorizada."):
+    """Coloca todos os seletores e botões administrativos dentro do cartão."""
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    linhas = {}
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+        elif isinstance(item, discord.ui.ChannelSelect):
+            novo = discord.ui.ChannelSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, channel_types=item.channel_types,
+                custom_id=item.custom_id, disabled=item.disabled, row=item.row,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = callback
+        elif isinstance(item, discord.ui.RoleSelect):
+            novo = discord.ui.RoleSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled, row=item.row,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = callback
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled, row=item.row,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = callback
+        else:
+            continue
+        linhas.setdefault(item.row or 0, []).append(novo)
+    for _, itens in sorted(linhas.items()):
+        for inicio in range(0, len(itens), 5):
+            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Central de Atendimento"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=COR_TICKET))
+    return layout
+
+
 class SeletorCategoriaTickets(discord.ui.ChannelSelect):
     def __init__(self, central):
         self.central = central
@@ -1030,8 +1099,8 @@ class SeletorCategoriaTickets(discord.ui.ChannelSelect):
             ticket_category_id=categoria.id,
         )
         await interaction.response.edit_message(
-            embed=await self.central.criar_embed(),
-            view=self.central,
+            content=None, embed=None,
+            view=_card_central_tickets(self.central, await self.central.criar_embed()),
         )
 
 
@@ -1295,9 +1364,8 @@ class CentralTicketsView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
-            content="Central de Gestão de Atendimento encerrada.",
-            embed=None,
-            view=self,
+            content=None, embed=None,
+            view=_card_central_tickets(self, None, "CENTRAL ENCERRADA", "Central de Gestão de Atendimento encerrada."),
         )
 
 
@@ -1855,8 +1923,7 @@ class Tickets(commands.Cog):
             return
         view = await CentralTicketsView(self, interaction.guild, owner_id).configurar()
         await interaction.response.send_message(
-            embed=await view.criar_embed(),
-            view=view,
+            view=_card_central_tickets(view, await view.criar_embed()),
             ephemeral=True,
         )
 
