@@ -181,8 +181,14 @@ async def _atualizar_cabecalho_topico(
     try:
         mensagem = await thread.fetch_message(thread.id)
         # Uma mensagem Components V2 não pode receber embeds tradicionais.
-        # Nesse caso, o próprio painel V2 é o cabeçalho visual do tópico.
-        if getattr(getattr(mensagem, "flags", None), "is_components_v2", False):
+        # Algumas versões de discord.py não expõem is_components_v2 como
+        # propriedade; por isso também verificamos diretamente o bit oficial.
+        flags = getattr(mensagem, "flags", None)
+        flags_v2 = bool(
+            getattr(flags, "is_components_v2", False)
+            or (getattr(flags, "value", 0) & (1 << 15))
+        )
+        if flags_v2:
             _CABECALHOS_VERIFICADOS.add(chave)
             _LOG.debug(
                 "Cabeçalho do tópico %s (%s) já é gerenciado por Components V2.",
