@@ -361,6 +361,89 @@ def _embed_sugestao(registro: dict) -> discord.Embed:
     return embed
 
 
+
+def _card_sugestoes_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+                         titulo: str = "CENTRAL DE SUGESTÕES", descricao: str = "",
+                         marcador: str = "NÊMESIS • SUGESTÕES • V2") -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.image and embed.image.url:
+            partes.append(f"[Abrir imagem anexada]({embed.image.url})")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    seletores, botoes = [], []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay(f"-# {marcador}"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
+def _mensagem_tem_cartao_sugestoes(mensagem: discord.Message, marcador: str) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if marcador.casefold() in str(getattr(item, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
+async def _atualizar_cartao_sugestao(mensagem: discord.Message, registro: dict) -> None:
+    embed = _embed_sugestao(registro)
+    view = _card_sugestoes_view(
+        PublicacaoSugestaoView(
+            votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
+            edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
+        ),
+        embed,
+        marcador="NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
+    )
+    if not _mensagem_tem_cartao_sugestoes(mensagem, "NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2"):
+        await mensagem.edit(content=None, embeds=[], attachments=[])
+    await mensagem.edit(view=view, allowed_mentions=discord.AllowedMentions.none())
+
+
 async def _obter_registro(message_id: str) -> dict | None:
     dados = await carregar(ARQUIVO_SUGESTOES, {})
     item = dados.get(str(message_id)) if isinstance(dados, dict) else None
@@ -564,23 +647,23 @@ class ModalNovaSugestao(discord.ui.Modal, title="Enviar uma sugestão"):
             if isinstance(canal, discord.ForumChannel):
                 thread, mensagem = await canal.create_thread(
                     name=f"💡・{registro['titulo']}"[:100],
-                    embed=_embed_sugestao(registro),
-                    view=PublicacaoSugestaoView(),
+                    view=_card_sugestoes_view(
+                        PublicacaoSugestaoView(), _embed_sugestao(registro),
+                        marcador="NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
+                    ),
                     reason="Nova sugestão enviada pela comunidade",
                 )
                 registro["canal_publicacao_id"] = thread.id
             else:
                 mensagem = await canal.send(
-                    embed=_embed_sugestao(registro),
-                    view=PublicacaoSugestaoView(),
+                    view=_card_sugestoes_view(
+                        PublicacaoSugestaoView(), _embed_sugestao(registro),
+                        marcador="NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
+                    ),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
             registro["id"] = mensagem.id
-            await mensagem.edit(
-                embed=_embed_sugestao(registro),
-                view=PublicacaoSugestaoView(),
-                allowed_mentions=discord.AllowedMentions.none(),
-            )
+            await _atualizar_cartao_sugestao(mensagem, registro)
             await _salvar_registro(str(mensagem.id), registro)
             persistida = True
 
@@ -645,8 +728,11 @@ class PainelSugestoesView(discord.ui.View):
             if not isinstance(registros, dict):
                 registros = {}
             await interaction.edit_original_response(
-                embed=_embed_painel_administrativo(registros),
-                view=PainelAdminSugestoesView(registros),
+                view=_card_sugestoes_view(
+                    PainelAdminSugestoesView(registros),
+                    _embed_painel_administrativo(registros),
+                    marcador="NÊMESIS • PAINEL ADMINISTRATIVO DE SUGESTÕES • V2",
+                ),
             )
         except Exception:
             _LOG.exception("Falha ao abrir painel administrativo de sugestões.")
@@ -749,8 +835,11 @@ class PainelAdminSugestoesView(discord.ui.View):
             registros = await carregar(ARQUIVO_SUGESTOES, {})
             self.registros = registros if isinstance(registros, dict) else {}
             await interaction.edit_original_response(
-                embed=_embed_painel_administrativo(self.registros, self.children[0].values[0]),
-                view=self,
+                view=_card_sugestoes_view(
+                    self,
+                    _embed_painel_administrativo(self.registros, self.children[0].values[0]),
+                    marcador="NÊMESIS • PAINEL ADMINISTRATIVO DE SUGESTÕES • V2",
+                ),
             )
         except Exception:
             _LOG.exception("Falha ao atualizar filtro do painel de sugestões.")
@@ -901,8 +990,11 @@ class PublicacaoSugestaoView(discord.ui.View):
                 await interaction.followup.send("Esta publicação não pertence à Central de Sugestões.", ephemeral=True)
                 return
             await interaction.edit_original_response(
-                content="Selecione a decisão administrativa para esta sugestão.",
-                view=MenuDecisaoSugestaoView(_chave_mensagem(interaction)),
+                view=_card_sugestoes_view(
+                    MenuDecisaoSugestaoView(_chave_mensagem(interaction)),
+                    None, "GESTÃO DA SUGESTÃO",
+                    "Selecione a situação administrativa que será registrada.",
+                ),
             )
         except Exception:
             _LOG.exception("Falha ao abrir gestão da sugestão %s.", _chave_mensagem(interaction))
@@ -928,13 +1020,7 @@ class PublicacaoSugestaoView(discord.ui.View):
             if registro.get("encerrada"):
                 await interaction.followup.send("A votação desta sugestão foi encerrada.", ephemeral=True)
                 return
-            await interaction.message.edit(
-                embed=_embed_sugestao(registro),
-                view=PublicacaoSugestaoView(
-                    votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
-                    edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
-                ),
-            )
+            await _atualizar_cartao_sugestao(interaction.message, registro)
             apoios, oposicoes = _contagem_votos(registro.get("votos", {}))
             await interaction.followup.send(
                 f"Voto atualizado. 👍 **{apoios}** • 👎 **{oposicoes}**",
@@ -1006,13 +1092,7 @@ class ModalEditarSugestao(discord.ui.Modal, title="Editar minha sugestão"):
             if canal is None:
                 canal = await interaction.guild.fetch_channel(canal_id)
             mensagem = await canal.fetch_message(int(self.message_id))
-            await mensagem.edit(
-                embed=_embed_sugestao(registro),
-                view=PublicacaoSugestaoView(
-                    votacao_encerrada=registro.get("status") in STATUS_TERMINAIS,
-                    edicao_encerrada=registro.get("status") not in {"pendente", "analise"},
-                ),
-            )
+            await _atualizar_cartao_sugestao(mensagem, registro)
             if isinstance(canal, discord.Thread) and canal.parent_id == CANAL_SUGESTOES_ID:
                 await canal.edit(name=f"💡・{registro['titulo']}"[:100], reason="Autor atualizou a própria sugestão")
             await registrar_global(
@@ -1100,13 +1180,7 @@ class ModalDecisaoSugestao(discord.ui.Modal, title="Registrar decisão da lidera
             if canal is None:
                 canal = await interaction.guild.fetch_channel(canal_id)
             mensagem = await canal.fetch_message(int(self.message_id))
-            await mensagem.edit(
-                embed=_embed_sugestao(registro),
-                view=PublicacaoSugestaoView(
-                    votacao_encerrada=self.status in STATUS_TERMINAIS,
-                    edicao_encerrada=self.status not in {"pendente", "analise"},
-                ),
-            )
+            await _atualizar_cartao_sugestao(mensagem, registro)
 
             enviados, falhas_dm = await _notificar_atualizacao_sugestao(
                 interaction.guild, registro, self.message_id, self.status, str(self.motivo.value)
