@@ -1037,6 +1037,7 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
     ]
     linhas = {}
     for item in origem.children:
+        eh_seletor = False
         if isinstance(item, discord.ui.Button):
             novo = discord.ui.Button(
                 label=item.label, style=item.style, disabled=item.disabled,
@@ -1044,6 +1045,7 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
             )
             novo.callback = item.callback
         elif isinstance(item, discord.ui.ChannelSelect):
+            eh_seletor = True
             novo = discord.ui.ChannelSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, channel_types=item.channel_types,
@@ -1056,6 +1058,7 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
                 await original.callback(interaction)
             novo.callback = callback
         elif isinstance(item, discord.ui.RoleSelect):
+            eh_seletor = True
             novo = discord.ui.RoleSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, custom_id=item.custom_id,
@@ -1066,6 +1069,7 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
                 await original.callback(interaction)
             novo.callback = callback
         elif isinstance(item, discord.ui.Select):
+            eh_seletor = True
             novo = discord.ui.Select(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, options=list(item.options),
@@ -1077,10 +1081,27 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
             novo.callback = callback
         else:
             continue
-        linhas.setdefault(item.row or 0, []).append(novo)
+        linhas.setdefault(item.row or 0, []).append((eh_seletor, novo))
+
     for _, itens in sorted(linhas.items()):
-        for inicio in range(0, len(itens), 5):
-            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
+        botoes = []
+
+        def adicionar_linha_botoes():
+            if botoes:
+                componentes.append(discord.ui.ActionRow(*botoes))
+                botoes.clear()
+
+        for eh_seletor, componente in itens:
+            if eh_seletor:
+                # Select menus ocupam uma ActionRow inteira; nunca misturá-los
+                # com botões ou com outro seletor na mesma linha.
+                adicionar_linha_botoes()
+                componentes.append(discord.ui.ActionRow(componente))
+            else:
+                botoes.append(componente)
+                if len(botoes) == 5:
+                    adicionar_linha_botoes()
+        adicionar_linha_botoes()
     componentes.extend([
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# Nêmesis Systeam • Central de Atendimento"),
