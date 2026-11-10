@@ -1574,7 +1574,8 @@ class Missoes(commands.Cog):
                 except discord.HTTPException:
                     pass
             else:
-                await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
+                await mensagem.edit(content=None, embeds=[], attachments=[])
+                    await mensagem.edit(view=view)
         except (discord.Forbidden, discord.HTTPException):
             log.exception("Não foi possível atualizar o painel de missões.")
             raise
@@ -1741,7 +1742,11 @@ class Missoes(commands.Cog):
                     for indice, embed in enumerate(embeds):
                         if indice < len(mensagens):
                             mensagem = mensagens[indice]
-                            await mensagem.edit(embed=embed, view=EnviarProvaMissaoView(self) if indice == 0 else None)
+                            await mensagem.edit(
+                    view=_card_view_missoes(EnviarProvaMissaoView(self), embed)
+                    if indice == 0 else None,
+                    content=None, embeds=[], attachments=[],
+                )
                             ids_novos.append(mensagem.id)
                             resultado["atualizadas"] += 1
                         else:
