@@ -1038,6 +1038,8 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
                 await original.callback(interaction)
             novo.callback = callback
         elif isinstance(item, discord.ui.RoleSelect):
@@ -1125,7 +1127,7 @@ class SeletorEquipeTickets(discord.ui.RoleSelect):
         )
         await interaction.response.edit_message(
             embed=await self.central.criar_embed(),
-            view=self.central,
+            view=_card_central_tickets(self.central, await self.central.criar_embed()),
         )
 
 
