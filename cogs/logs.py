@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 from utils.guia_servidores import (
     GuiaServidoresView,
+    GuiaCanaisSelect,
     CARGO_VISITANTES_ID,
     NOME_CARGO_VISITANTES,
     TAG_ORG_NEMESIS,
@@ -35,6 +36,28 @@ def _formatar_linhas_registro(linhas, limite: int = 3800) -> str:
 
 def _usuario_pode_consultar_historico(interaction: discord.Interaction) -> bool:
     return bool(interaction.guild_id == GUILD_NEMESIS_ID and membro_tem_lideranca(interaction.user))
+
+
+def _layout_boas_vindas(embed: discord.Embed) -> discord.ui.LayoutView:
+    """Mensagem de entrada com a navegação do servidor dentro do cartão."""
+    partes = [f"## {embed.title or 'NÊMESIS — BOAS-VINDAS'}"]
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"### {campo.name}\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    layout = discord.ui.LayoutView(timeout=None)
+    layout.add_item(discord.ui.Container(
+        discord.ui.TextDisplay("\n\n".join(partes)),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("### ◈ PRIMEIROS PASSOS"),
+        discord.ui.ActionRow(GuiaCanaisSelect()),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Integração de novos integrantes"),
+        accent_colour=0x9F1239,
+    ))
+    return layout
 
 
 class DossieMembroRegistroView(discord.ui.View):
@@ -270,7 +293,10 @@ class Logs(commands.Cog):
                 return await registrar_global(
                     canal.guild, categoria, titulo, embed=embed,
                 )
-            await canal.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
+            if isinstance(view, discord.ui.LayoutView):
+                await canal.send(view=view, allowed_mentions=discord.AllowedMentions.none())
+            else:
+                await canal.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
             return True
         except Exception:
             logger.exception("Falha ao publicar registro (channel=%s).", getattr(canal, "id", "desconhecido"))
@@ -369,7 +395,7 @@ class Logs(commands.Cog):
         )
         embed.set_footer(text="NÊMESIS • TAG DA ORG: NΞM • Sistema oficial de integração")
         if canal is not None:
-            enviado = await self._enviar_log(canal, embed, view=GuiaServidoresView())
+            enviado = await self._enviar_log(canal, embed, view=_layout_boas_vindas(embed))
             if enviado:
                 logger.info("Mensagem de entrada publicada (guild=%s, member=%s, channel=%s, inviter=%s).",
                             member.guild.id, member.id, canal.id, convidador_id or "desconhecido")
