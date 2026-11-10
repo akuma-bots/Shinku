@@ -463,11 +463,12 @@ class ConvitesNemesis(commands.Cog):
                     )
                     logger.info("Painel da Central de Convites publicado no canal %s (message=%s).", CANAL_CONVITES_ID, painel.id)
                 else:
-                    await painel.edit(
-                        content=None, embeds=[], attachments=[],
-                        view=PainelConsultaConvitesLayoutView(),
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
+                    if not _componentes_contem_marcador(painel.components, "CENTRAL DE CONVITES"):
+                        await painel.edit(content=None, embeds=[], attachments=[])
+                        await painel.edit(
+                            view=PainelConsultaConvitesLayoutView(),
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
                     logger.info("Painel da Central de Convites sincronizado (message=%s).", painel.id)
 
                 servidor["_painel_message_id"] = str(painel.id)
