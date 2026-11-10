@@ -33,6 +33,30 @@ MAX_QUEUE = 100
 VOLUME_PADRAO = 0.5
 ARQUIVO_ESTADO_MUSICA = "estado_musica.json"
 
+
+def _configurar_cookies_youtube() -> str | None:
+    """Carrega cookies Netscape fornecidos por variável privada do ambiente."""
+    valor = os.getenv("YOUTUBE_COOKIES_BASE64", "").strip()
+    if not valor:
+        LOG.info("YouTube: cookies privados não configurados; usando extração pública.")
+        return None
+    try:
+        dados = base64.b64decode(valor, validate=True)
+        if not dados.startswith((b"# Netscape HTTP Cookie File", b"# HTTP Cookie File")):
+            raise ValueError("formato inválido; exporte cookies no formato Netscape")
+        caminho = "/tmp/shinku-youtube-cookies.txt"
+        with open(caminho, "wb") as arquivo:
+            arquivo.write(dados)
+        os.chmod(caminho, 0o600)
+        LOG.info("YouTube: cookies privados carregados com segurança.")
+        return caminho
+    except Exception as erro:
+        LOG.error("YouTube: não foi possível carregar YOUTUBE_COOKIES_BASE64 (%s).", type(erro).__name__)
+        return None
+
+
+YOUTUBE_COOKIEFILE = _configurar_cookies_youtube()
+
 YDL_OPCOES = {
     "format": "bestaudio/best",
     "noplaylist": True,
@@ -43,8 +67,10 @@ YDL_OPCOES = {
     "extractor_retries": 2,
     "socket_timeout": 15,
     # Tenta clientes públicos alternativos quando o cliente web padrão é bloqueado.
-    "extractor_args": {"youtube": {"player_client": ["android", "ios", "web_safari"]}},
+    "extractor_args": {"youtube": {"player_client": ["web", "android", "ios"]}},
 }
+if YOUTUBE_COOKIEFILE:
+    YDL_OPCOES["cookiefile"] = YOUTUBE_COOKIEFILE
 FFMPEG_OPCOES = {
     "before_options": "-nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-vn -sn -dn -loglevel warning",
