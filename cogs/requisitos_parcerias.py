@@ -163,12 +163,36 @@ class FormularioCandidatura(discord.ui.Modal, title="Candidatura institucional N
         )
 
 
-class PainelCandidaturaView(discord.ui.View):
+def _texto_embed_componentes(embed: discord.Embed) -> str:
+    partes = []
+    if embed.author and embed.author.name:
+        partes.append(f"-# {embed.author.name}")
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"### {campo.name}\\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    return "\\n\\n".join(partes)
+
+
+class PainelCandidaturaView(discord.ui.LayoutView):
     def __init__(self):
         super().__init__(timeout=None)
+        botao = discord.ui.Button(label="Apresentar candidatura", style=discord.ButtonStyle.primary, emoji="🤝", custom_id="nemesis:parcerias:candidatar")
+        botao.callback = self.candidatar
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(_texto_embed_componentes(embed_painel())),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(botao),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+            accent_colour=VERMELHO,
+        ))
 
-    @discord.ui.button(label="Apresentar candidatura", style=discord.ButtonStyle.primary, emoji="🤝", custom_id="nemesis:parcerias:candidatar")
-    async def candidatar(self, interaction, button):
+    async def candidatar(self, interaction: discord.Interaction):
         if interaction.guild_id != GUILD_ID:
             await interaction.response.send_message("Ação exclusiva da NÊMESIS.", ephemeral=True)
             return
@@ -410,10 +434,10 @@ class RequisitosParcerias(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 LOG.exception("Não foi possível procurar um painel de parcerias anterior.")
         if mensagem:
-            await mensagem.edit(embed=embed_painel(), view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
+            await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
             await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
         else:
-            mensagem = await canal.send(embed=embed_painel(), view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
+            mensagem = await canal.send(view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
             await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
 
     async def rotina_revisoes(self):
