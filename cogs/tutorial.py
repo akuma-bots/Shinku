@@ -599,8 +599,7 @@ class SeletorTutorialIndice(discord.ui.Select):
             return
         chave = self.values[0]
         await interaction.response.edit_message(
-            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
-            view=TutorialDetalheView(self.autor_id, chave),
+            view=TutorialDetalheLayoutView(self.autor_id, chave),
         )
 
 
