@@ -32,7 +32,20 @@ def _card_temporada(origem: discord.ui.View, embed: discord.Embed | None = None,
     ]
     botoes, seletores = [], []
     for item in origem.children:
-        if isinstance(item, discord.ui.Select):
+        if isinstance(item, discord.ui.ChannelSelect):
+            novo = discord.ui.ChannelSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, channel_types=list(item.channel_types),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Select):
             novo = discord.ui.Select(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, options=list(item.options),
@@ -226,14 +239,22 @@ class TemporadaPublicaView(discord.ui.View):
     @discord.ui.button(label="Atualizar", emoji="🔄", style=discord.ButtonStyle.success)
     async def atualizar(self, interaction, button):
         resultado = await temporadas_missoes.obter_status(interaction.guild.id)
-        await interaction.response.edit_message(embed=_embed_status(interaction.guild, self.cog.bot, resultado),
-                                                view=TemporadaPublicaView(self.cog, self.owner_id))
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                TemporadaPublicaView(self.cog, self.owner_id),
+                _embed_status(interaction.guild, self.cog.bot, resultado),
+            )
+        )
 
     @discord.ui.button(label="Histórico", emoji="📚", style=discord.ButtonStyle.secondary)
     async def historico(self, interaction, button):
         dados = await temporadas_missoes.listar_historico(interaction.guild.id, limite=10)
-        await interaction.response.edit_message(embed=_embed_historico(interaction.guild, self.cog.bot, dados),
-                                                view=TemporadaPublicaView(self.cog, self.owner_id))
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                TemporadaPublicaView(self.cog, self.owner_id),
+                _embed_historico(interaction.guild, self.cog.bot, dados),
+            )
+        )
 
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction, button):
@@ -296,8 +317,12 @@ class TemporadasMissoesCentralView(discord.ui.View):
     @discord.ui.button(label="Histórico", emoji="📚", style=discord.ButtonStyle.secondary, row=1)
     async def historico(self, interaction, button):
         dados = await temporadas_missoes.listar_historico(interaction.guild.id, limite=10)
-        await interaction.response.edit_message(embed=_embed_historico(interaction.guild, self.cog.bot, dados),
-                                                view=TemporadasMissoesCentralView(self.cog, self.owner_id))
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                TemporadasMissoesCentralView(self.cog, self.owner_id),
+                _embed_historico(interaction.guild, self.cog.bot, dados),
+            )
+        )
 
     @discord.ui.button(label="Encerrar agora", emoji="🏁", style=discord.ButtonStyle.danger, row=1)
     async def encerrar(self, interaction, button):
@@ -306,8 +331,11 @@ class TemporadasMissoesCentralView(discord.ui.View):
             await interaction.response.send_message("Não existe uma temporada ativa para encerrar.", ephemeral=True)
             return
         await interaction.response.send_message(
-            "Confirme o encerramento. O resultado será arquivado e uma nova temporada começará imediatamente.",
-            view=ConfirmarEncerramentoTemporadaView(self.cog, self.owner_id), ephemeral=True,
+            view=_card_temporada(
+                ConfirmarEncerramentoTemporadaView(self.cog, self.owner_id),
+                None, "CONFIRMAR ENCERRAMENTO",
+                "Confirme o encerramento. O resultado será arquivado e uma nova temporada começará imediatamente.",
+            ), ephemeral=True,
         )
 
     @discord.ui.button(label="Atualizar", emoji="🔄", style=discord.ButtonStyle.success, row=2)
@@ -378,32 +406,47 @@ class TemporadasMissoes(commands.Cog):
         if mensagem is None:
             return
         try:
-            await mensagem.edit(embed=await self._montar_central(guild),
-                                view=TemporadasMissoesCentralView(self, owner_id))
+            await mensagem.edit(content=None, embeds=[], attachments=[])
+            await mensagem.edit(
+                view=_card_temporada(
+                    TemporadasMissoesCentralView(self, owner_id),
+                    await self._montar_central(guild),
+                )
+            )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             log.exception("Falha ao atualizar a Central de Temporadas.")
 
     async def _atualizar_interacao(self, interaction, owner_id):
-        await interaction.response.edit_message(embed=await self._montar_central(interaction.guild),
-                                                 view=TemporadasMissoesCentralView(self, owner_id))
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                TemporadasMissoesCentralView(self, owner_id),
+                await self._montar_central(interaction.guild),
+            )
+        )
 
     async def abrir_central(self, interaction, owner_id=None):
         responsavel = int(owner_id or interaction.user.id)
         if not _autorizado(interaction, responsavel):
             await interaction.response.send_message("A Central de Temporadas é restrita à liderança do OCTÓGONO.", ephemeral=True)
             return
-        await interaction.response.send_message(embed=await self._montar_central(interaction.guild),
-                                                 view=TemporadasMissoesCentralView(self, responsavel),
-                                                 ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_temporada(
+                TemporadasMissoesCentralView(self, responsavel),
+                await self._montar_central(interaction.guild),
+            ), ephemeral=True,
+        )
 
     async def abrir_status_publico(self, interaction):
         if interaction.guild is None:
             await interaction.response.send_message("Este painel só funciona dentro do servidor.", ephemeral=True)
             return
         resultado = await temporadas_missoes.obter_status(interaction.guild.id)
-        await interaction.response.send_message(embed=_embed_status(interaction.guild, self.bot, resultado),
-                                                 view=TemporadaPublicaView(self, interaction.user.id),
-                                                 ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_temporada(
+                TemporadaPublicaView(self, interaction.user.id),
+                _embed_status(interaction.guild, self.bot, resultado),
+            ), ephemeral=True,
+        )
 
     @tasks.loop(minutes=15)
     async def verificar_temporadas(self):
