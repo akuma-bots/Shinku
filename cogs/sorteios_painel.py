@@ -424,9 +424,7 @@ class SorteiosPainel(commands.Cog):
             canal = guild.get_channel(int(sorteio.get("canal_id") or 0)) if guild else None
             if canal is not None:
                 mensagem = await canal.fetch_message(mensagem_id)
-                await mensagem.edit(
-                    content=None, embeds=[], attachments=[], view=view
-                )
+                await mensagem.edit(view=view)
         except (KeyError, TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível sincronizar o cartão persistente do sorteio %s.", sorteio.get("id"))
 
@@ -465,8 +463,9 @@ class SorteiosPainel(commands.Cog):
         await interaction.followup.send(f"Você está participando! Suas chances neste sorteio: **{chances}**.", ephemeral=True)
         try:
             await interaction.message.edit(
-                content=None, embeds=[], attachments=[],
-                view=_card_sorteio(atual, len(atual.get("participantes", [])), ViewSorteioPublico()),
+                view=_card_sorteio(
+                    atual, len(atual.get("participantes", [])), ViewSorteioPublico()
+                ),
             )
         except discord.HTTPException:
             logger.warning("Inscrição registrada, mas não foi possível atualizar a mensagem do sorteio %s.", sorteio.get("id"))
