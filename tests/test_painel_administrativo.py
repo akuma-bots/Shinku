@@ -37,6 +37,53 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(botoes), 1)
         self.assertEqual(PainelAdministrativo.__cog_app_commands__, [])
 
+    def test_painel_publico_aninha_botao_no_container_components_v2(self):
+        painel = PainelAdministrativoView(SimpleNamespace())
+        self.assertEqual(len(painel.children), 1)
+        container = painel.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        controles = [
+            (item, pai) for item, pai in _itens_aninhados(painel)
+            if isinstance(item, (discord.ui.Button, discord.ui.Select))
+        ]
+        self.assertEqual(len(controles), 1)
+        botao, linha = controles[0]
+        self.assertIsInstance(linha, discord.ui.ActionRow)
+        self.assertIn(linha, container.children)
+        self.assertEqual(botao.custom_id, "nemesis:administracao:central:abrir")
+
+    def test_central_privada_aninha_seletor_links_e_acoes_no_mesmo_cartao(self):
+        bot = SimpleNamespace(get_cog=lambda _nome: None)
+        view = CentralAdministrativaView(
+            bot,
+            owner_id=123,
+            guild=SimpleNamespace(id=1563995879981981817),
+            chave="operacoes",
+            atalhos=[("Missões", "https://discord.com/channels/1/2")],
+            octogono=True,
+        )
+        self.assertEqual(len(view.children), 1)
+        container = view.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        controles = [
+            (item, pai) for item, pai in _itens_aninhados(view)
+            if isinstance(item, (discord.ui.Button, discord.ui.Select))
+        ]
+        self.assertGreaterEqual(len(controles), 3)
+        for controle, linha in controles:
+            with self.subTest(controle=type(controle).__name__, custom_id=controle.custom_id):
+                self.assertIsInstance(linha, discord.ui.ActionRow)
+                self.assertIn(linha, container.children)
+        self.assertTrue(any(isinstance(item, discord.ui.Select) for item, _ in controles))
+        self.assertTrue(any(
+            isinstance(item, discord.ui.Button) and item.style == discord.ButtonStyle.link
+            for item, _ in controles
+        ))
+        self.assertTrue(any(
+            isinstance(item, discord.ui.Button) and item.style == discord.ButtonStyle.primary
+            for item, _ in controles
+        ))
+
     def test_central_privada_tem_seis_areas_de_navegacao(self):
         view = CentralAdministrativaView(
             SimpleNamespace(),
