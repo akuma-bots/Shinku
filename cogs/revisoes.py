@@ -416,7 +416,9 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
             embed.add_field(name="✕ DECISÃO", value="**REJEITADA**", inline=True)
             embed.add_field(name="◈ RESPONSÁVEL PELA ANÁLISE", value=self.revisor.mention, inline=True)
             embed.add_field(name="◈ JUSTIFICATIVA", value=motivo[:800], inline=False)
-            await self.mensagem.edit(embed=embed, view=None)
+            await self.mensagem.edit(
+                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
+            )
             await auditoria.registrar(
                 self.guild,
                 "✕ Comprovante rejeitado",
@@ -867,7 +869,9 @@ class Revisoes(commands.Cog):
             embed = _embed_revisao(revisao, interaction.guild, self.bot)
             embed.color = 0xED4245
             embed.add_field(name="❌ Rejeitado por", value=interaction.user.mention, inline=False)
-            await interaction.message.edit(embed=embed, view=None)
+            await interaction.message.edit(
+                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
+            )
 
             await auditoria.registrar(
                 interaction.guild, "📋 Revisão rejeitada",
