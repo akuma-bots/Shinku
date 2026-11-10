@@ -1074,8 +1074,11 @@ class Sorteios(commands.Cog):
         #
         # Sorteios criados pelo comando
         # continuam utilizando a view tradicional.
-        if sorteio.get("painel_avancado"):
-            from cogs.sorteios_painel import ViewSorteioPublico, _card_sorteio
+        cartao_avancado = bool(sorteio.get("painel_avancado"))
+        if cartao_avancado:
+            from cogs.sorteios_painel import (
+                ViewSorteioPublico, _card_sorteio, _mensagem_tem_cartao_sorteio,
+            )
             view = _card_sorteio(sorteio, quantidade, ViewSorteioPublico(
                 encerrado=sorteio.get("encerrado", False)
             ))
@@ -1088,10 +1091,9 @@ class Sorteios(commands.Cog):
             )
 
         try:
-            if sorteio.get("painel_avancado"):
-                await mensagem.edit(view=view)
-            else:
-                await mensagem.edit(view=view)
+            if cartao_avancado and not _mensagem_tem_cartao_sorteio(mensagem, sorteio.get("id", "")):
+                await mensagem.edit(content=None, embeds=[], attachments=[])
+            await mensagem.edit(view=view)
 
         except discord.HTTPException:
             pass
