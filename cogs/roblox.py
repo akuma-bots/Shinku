@@ -91,9 +91,12 @@ class ModalMapearPatenteRoblox(discord.ui.Modal, title="Mapear patente Roblox"):
         if not patente:
             await interaction.response.send_message("Informe o nome da patente.", ephemeral=True)
             return
+        origem = SeletorCargoRoblox(self.cog, patente)
         await interaction.response.send_message(
-            f"Selecione o cargo do Discord que corresponde à patente **{discord.utils.escape_markdown(patente)}**.",
-            view=SeletorCargoRoblox(self.cog, patente),
+            view=_card_roblox(
+                origem, None, "MAPEAR PATENTE ROBLOX",
+                f"Selecione o cargo do Discord que corresponde à patente **{discord.utils.escape_markdown(patente)}**.",
+            ),
             ephemeral=True,
         )
 
@@ -359,7 +362,20 @@ def _card_roblox(origem: discord.ui.View, embed: discord.Embed | None = None,
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
     ]
     for item in origem.children:
-        if isinstance(item, discord.ui.Select):
+        if isinstance(item, discord.ui.RoleSelect):
+            novo = discord.ui.RoleSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = selecionar
+            componentes.append(discord.ui.ActionRow(novo))
+        elif isinstance(item, discord.ui.Select):
             novo = discord.ui.Select(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, options=list(item.options),
