@@ -101,6 +101,9 @@ def _card_ajuda(origem: discord.ui.View, embed: discord.Embed) -> discord.ui.Lay
         componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
     componentes.append(discord.ui.TextDisplay("-# NÊMESIS • Central de Orientação"))
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
     return layout
 
 
