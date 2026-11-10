@@ -128,6 +128,18 @@ class Novidades(commands.Cog):
         self._lock = asyncio.Lock()
         self._processando = False
 
+    async def cog_load(self):
+        # Registra o botão de preferências para que DMs antigas continuem
+        # interativas mesmo depois de uma reinicialização da Shinku.
+        self.bot.add_view(NotasDMView({
+            "titulo": "Atualização",
+            "mensagem": "Consulte as notas de atualização da NÊMESIS.",
+            "tipo": "Sistema",
+            "data_atualizacao": "—",
+            "hora_atualizacao": "—",
+            "fuso_horario": "America/Sao_Paulo",
+        }))
+
     def _ler_release(self) -> dict | None:
         try:
             release = json.loads(CAMINHO_RELEASE.read_text(encoding="utf-8"))
