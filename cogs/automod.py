@@ -552,6 +552,17 @@ def _card_automod_view(origem: discord.ui.View | None, embed: discord.Embed | No
     return layout
 
 
+
+def _mensagem_tem_cartao_automod(mensagem: discord.Message) -> bool:
+    return "NÊMESIS • Segurança e Moderação" in _texto_components_v2(mensagem)
+
+
+async def _atualizar_cartao_automod(mensagem: discord.Message, embed: discord.Embed) -> None:
+    if not _mensagem_tem_cartao_automod(mensagem):
+        await mensagem.edit(content=None, embeds=[], attachments=[])
+    await _atualizar_cartao_automod(mensagem, embed)
+
+
 class ModalMotivoDecisao(discord.ui.Modal):
     def __init__(self, bot: commands.Bot, nivel: int, guild_id: int, channel_id: int, message_id: int, alvo_id: int):
         super().__init__(title="Justificar decisão da moderação", timeout=300)
