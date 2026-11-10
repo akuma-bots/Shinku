@@ -704,9 +704,11 @@ class InteligenciaMissoesView(discord.ui.View):
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="Central administrativa encerrada.",
-            embed=None,
-            view=None,
+            view=_card_view_missoes(
+                discord.ui.View(timeout=120), None,
+                "CENTRAL ADMINISTRATIVA ENCERRADA",
+                "A consulta foi encerrada. Nenhuma informação foi alterada.",
+            ),
         )
 
 
@@ -909,7 +911,13 @@ class RelatoriosMissoesView(discord.ui.View):
 
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger, row=2)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Central de relatórios encerrada.", embed=None, view=None)
+        await interaction.response.edit_message(
+            view=_card_view_missoes(
+                discord.ui.View(timeout=120), None,
+                "CENTRAL DE RELATÓRIOS ENCERRADA",
+                "A consulta foi encerrada. Os registros permanecem preservados.",
+            )
+        )
 
     @discord.ui.button(label="Auditoria de integridade", emoji="🛡️", style=discord.ButtonStyle.secondary, row=3)
     async def abrir_auditoria(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -980,7 +988,11 @@ class AuditoriaIntegridadeView(discord.ui.View):
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger, row=0)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="Auditoria de integridade encerrada.", embed=None, view=None
+            view=_card_view_missoes(
+                discord.ui.View(timeout=120), None,
+                "AUDITORIA ENCERRADA",
+                "A consulta de integridade foi encerrada. Nenhum dado foi alterado.",
+            )
         )
 
 
@@ -1029,9 +1041,11 @@ class HistoricoDesempenhoView(discord.ui.View):
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            content="Histórico encerrado.",
-            embed=None,
-            view=None,
+            view=_card_view_missoes(
+                discord.ui.View(timeout=120), None,
+                "HISTÓRICO ENCERRADO",
+                "A consulta foi encerrada. O histórico permanece preservado.",
+            ),
         )
 
 
