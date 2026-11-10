@@ -326,9 +326,33 @@ class SeletorInscricaoPublico(discord.ui.Select):
         await interaction.response.send_modal(ModalFormulario(formulario, usuario_id=interaction.user.id))
 
 
-def _view_central_inscricoes(lista: list) -> discord.ui.View:
-    view = discord.ui.View(timeout=None)
-    view.add_item(SeletorInscricaoPublico(lista))
+def _texto_embed_inscricoes(embed: discord.Embed) -> str:
+    partes = []
+    if embed.author and embed.author.name:
+        partes.append(f"-# {embed.author.name}")
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"### {campo.name}\\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    return "\\n\\n".join(partes)
+
+
+def _view_central_inscricoes(lista: list, embed: discord.Embed) -> discord.ui.LayoutView:
+    view = discord.ui.LayoutView(timeout=None)
+    seletor = SeletorInscricaoPublico(lista)
+    view.add_item(discord.ui.Container(
+        discord.ui.TextDisplay(_texto_embed_inscricoes(embed)),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("### ◈ ACESSO AOS PROCESSOS SELETIVOS"),
+        discord.ui.ActionRow(seletor),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam"),
+        accent_colour=0x9F1239,
+    ))
     return view
 
 def _view_painel(formulario: dict) -> discord.ui.View:
@@ -1819,18 +1843,18 @@ class Formularios(commands.Cog):
                 mensagem_existente = None
         lista = await formularios.listar_formularios(guild.id)
         embed = _embed_central_inscricoes(lista, guild, self.bot)
-        view = _view_central_inscricoes(lista)
+        view = _view_central_inscricoes(lista, embed)
         if mensagem_existente is not None:
-            mensagem = await mensagem_existente.edit(embed=embed, view=view)
+            mensagem = await mensagem_existente.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
             acao = "atualizada"
         else:
-            mensagem = await canal.send(embed=embed, view=view)
+            mensagem = await canal.send(view=view)
             acao = "publicada"
         estado.pop("staff", None)
         estado["central_inscricoes"] = {"canal_id": canal_id, "mensagem_id": mensagem.id, "tipo": "seletor_dinamico"}
         await salvar(ARQUIVO_PAINÉIS_AUTOMÁTICOS, estado)
         if not getattr(self, "_view_inscricoes_registrada", False):
-            self.bot.add_view(_view_central_inscricoes(lista))
+            self.bot.add_view(_view_central_inscricoes(lista, embed))
             self._view_inscricoes_registrada = True
         logging.info("Central pública de inscrições %s (canal=%s, mensagem=%s, disponíveis=%s).",
                      acao, canal_id, mensagem.id, len(_formularios_disponiveis(lista)))
