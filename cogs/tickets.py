@@ -590,12 +590,27 @@ class AvaliacaoTicketLayoutView(discord.ui.LayoutView):
 
 
 class FecharTicketLayoutView(discord.ui.LayoutView):
-    """Mantém os controles operacionais do ticket dentro do cartão."""
+    """Mantém apresentação e controles operacionais do ticket no mesmo cartão."""
 
-    def __init__(self, origem: discord.ui.View | None = None):
+    def __init__(self, origem: discord.ui.View | None = None, embed: discord.Embed | None = None):
         super().__init__(timeout=None)
         origem = origem or FecharTicketView()
-        botoes_por_linha = {}
+        if embed is not None:
+            partes = [f"## {embed.title or 'NÊMESIS • CENTRAL DE ATENDIMENTO'}"]
+            if embed.description:
+                partes.append(embed.description)
+            for campo in embed.fields:
+                partes.append(f"**{campo.name}**\n{campo.value}")
+            if embed.footer and embed.footer.text:
+                partes.append(f"-# {embed.footer.text}")
+            origem._card_content = "\n\n".join(partes)[:3900]
+        texto_cartao = getattr(
+            origem,
+            "_card_content",
+            "## 🎟️ NÊMESIS — CENTRAL DE ATENDIMENTO\n"
+            "Utilize os controles abaixo para assumir, encaminhar ou encerrar este atendimento.",
+        )
+        botoes_por_linha = {};
         for item in origem.children:
             if not isinstance(item, discord.ui.Button):
                 continue
@@ -610,10 +625,7 @@ class FecharTicketLayoutView(discord.ui.LayoutView):
             botao.callback = item.callback
             botoes_por_linha.setdefault(item.row or 0, []).append(botao)
         componentes = [
-            discord.ui.TextDisplay(
-                "## 🎟️ NÊMESIS — CENTRAL DE ATENDIMENTO\n"
-                "Utilize os controles abaixo para assumir, encaminhar ou encerrar este atendimento."
-            ),
+            discord.ui.TextDisplay(texto_cartao),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         ]
         for _, botoes in sorted(botoes_por_linha.items()):
@@ -1422,9 +1434,9 @@ class Tickets(commands.Cog):
             embed.set_image(url=config["ticket_painel_banner_url"])
 
         try:
+            origem_view = FecharTicketView()
             mensagem = await canal.send(
-                embed=embed,
-                view=FecharTicketLayoutView(),
+                view=FecharTicketLayoutView(origem_view, embed),
                 allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
 
