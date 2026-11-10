@@ -342,6 +342,20 @@ class ParceriaView(discord.ui.View):
 
 
 
+
+MARCADOR_CARTAO_PARCERIAS = "NÊMESIS • ALIANÇAS E PARCERIAS • V2"
+
+
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador.casefold() in str(getattr(componente, "content", "") or "").casefold():
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
 class ParceriaLayoutView(discord.ui.LayoutView):
     """Apresentação da parceria e botão de cargo no mesmo cartão."""
 
@@ -373,7 +387,7 @@ class ParceriaLayoutView(discord.ui.LayoutView):
             componentes.append(discord.ui.ActionRow(botao))
         componentes.extend([
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-            discord.ui.TextDisplay("-# Nêmesis Systeam • Alianças e parcerias"),
+            discord.ui.TextDisplay(f"-# Nêmesis Systeam • Alianças e parcerias • {MARCADOR_CARTAO_PARCERIAS}"),
         ])
         self.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
 
@@ -980,10 +994,11 @@ async def setup(
                 try:
                     mensagem = await canal.fetch_message(mensagem_id)
                     embed = _embed_parceria_publica(parceria, guild)
-                    await mensagem.edit(
-                        content=None, embeds=[], attachments=[],
-                        view=ParceriaLayoutView(cargo_id, embed),
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
+                    if not _componentes_contem_marcador(mensagem.components, MARCADOR_CARTAO_PARCERIAS):
+                        await mensagem.edit(content=None, embeds=[], attachments=[])
+                        await mensagem.edit(
+                            view=ParceriaLayoutView(cargo_id, embed),
+                            allowed_mentions=discord.AllowedMentions.none(),
+                        )
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     logger.exception("Falha ao migrar cartão da parceria %s.", parceria.get("id"))
