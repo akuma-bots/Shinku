@@ -1845,7 +1845,7 @@ class Formularios(commands.Cog):
         embed = _embed_central_inscricoes(lista, guild, self.bot)
         view = _view_central_inscricoes(lista, embed)
         if mensagem_existente is not None:
-            mensagem = await mensagem_existente.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+            mensagem = await mensagem_existente.edit(content=None, embeds=[], attachments=[], view=view)
             acao = "atualizada"
         else:
             mensagem = await canal.send(view=view)
