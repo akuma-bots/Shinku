@@ -222,14 +222,44 @@ async def _embed_secao(bot: commands.Bot, guild: discord.Guild, chave: str):
     return embed, atalhos
 
 
-class CentralAdministrativaView(discord.ui.View):
-    """Navegação privada por áreas administrativas, vinculada à sessão que abriu o painel."""
+def _texto_embed_componentes(embed: discord.Embed) -> str:
+    """Converte o conteúdo institucional do embed em texto nativo de Components V2."""
+    partes = []
+    autor = getattr(embed.author, "name", None)
+    if autor:
+        partes.append(f"-# {autor}")
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"**{campo.name}**\n{campo.value}")
+    rodape = getattr(embed.footer, "text", None)
+    if rodape:
+        partes.append(f"-# {rodape}")
+    return "\n\n".join(partes)[:4000] or "Central administrativa da NÊMESIS."
 
-    def __init__(self, bot: commands.Bot, owner_id: int, guild: discord.Guild):
+
+class CentralAdministrativaView(discord.ui.LayoutView):
+    """Central privada com navegação e ações contidas no cartão Components V2."""
+
+    def __init__(
+        self,
+        bot: commands.Bot,
+        owner_id: int,
+        guild: discord.Guild,
+        embed: discord.Embed,
+        *,
+        chave: str = "visao_geral",
+        atalhos: list[tuple[str, str]] | None = None,
+    ):
         super().__init__(timeout=300)
         self.bot, self.owner_id, self.guild = bot, owner_id, guild
+        self.chave = chave
         self.seletor = discord.ui.Select(
-            placeholder="Navegar pela central administrativa", min_values=1, max_values=1,
+            placeholder="Navegar pela central administrativa",
+            min_values=1,
+            max_values=1,
             options=[
                 discord.SelectOption(label="Visão geral", value="visao_geral", emoji="📊"),
                 discord.SelectOption(label="Membros e hierarquia", value="membros", emoji="👥"),
@@ -238,28 +268,82 @@ class CentralAdministrativaView(discord.ui.View):
                 discord.SelectOption(label="Sistemas e infraestrutura", value="sistemas", emoji="⚙️"),
                 discord.SelectOption(label="Auditoria e registros", value="registros", emoji="📚"),
             ],
-            row=0,
         )
         self.seletor.callback = self._selecionar_secao
-        self.add_item(self.seletor)
-        self._botoes_acao = []
 
-    def _limpar_botoes_acao(self):
-        for item in self._botoes_acao:
-            if item in self.children:
-                self.remove_item(item)
-        self._botoes_acao.clear()
+        itens: list = [
+            discord.ui.TextDisplay(_texto_embed_componentes(embed)),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("### ◈ NAVEGAÇÃO DA CENTRAL"),
+            discord.ui.ActionRow(self.seletor),
+        ]
 
-    def _adicionar_acao(self, label: str, emoji: str, row: int, callback):
-        botao = discord.ui.Button(label=label, emoji=emoji, style=discord.ButtonStyle.primary, row=row)
-        async def executar(interaction: discord.Interaction):
-            if not _tem_acesso(interaction, self.owner_id):
-                await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
-                return
-            await callback(interaction)
-        botao.callback = executar
-        self.add_item(botao)
-        self._botoes_acao.append(botao)
+        links = [
+            discord.ui.Button(label=rotulo[:80], url=url, style=discord.ButtonStyle.link)
+            for rotulo, url in (atalhos or [])[:10]
+        ]
+        for inicio in range(0, len(links), 5):
+            itens.append(discord.ui.ActionRow(*links[inicio:inicio + 5]))
+
+        botoes_acao: list[discord.ui.Button] = []
+
+        def adicionar_acao(label: str, emoji: str, callback):
+            botao = discord.ui.Button(
+                label=label[:80],
+                emoji=emoji,
+                style=discord.ButtonStyle.primary,
+            )
+
+            async def executar(clique: discord.Interaction):
+                if not _tem_acesso(clique, self.owner_id):
+                    await clique.response.send_message(
+                        "Acesso restrito à liderança autorizada da NÊMESIS.",
+                        ephemeral=True,
+                    )
+                    return
+                await callback(clique)
+
+            botao.callback = executar
+            botoes_acao.append(botao)
+
+        if chave == "operacoes":
+            if membro_tem_octogono(getattr(guild, "get_member", lambda _id: None)(owner_id)):
+                async def abrir_inteligencia(clique: discord.Interaction):
+                    cog_missoes = self.bot.get_cog("Missoes")
+                    if cog_missoes is None:
+                        await clique.response.send_message(
+                            "O módulo de operações não está disponível no momento.",
+                            ephemeral=True,
+                        )
+                        return
+                    await cog_missoes.enviar_painel_inteligencia(clique)
+                adicionar_acao("Inteligência de operações", "📈", abrir_inteligencia)
+
+            formularios = bot.get_cog("Formularios")
+            if formularios is not None:
+                adicionar_acao("Processos seletivos", "📋", formularios.formulario_central)
+            gestao = bot.get_cog("GestaoMissoes")
+            membro = guild.get_member(owner_id)
+            if gestao is not None and membro is not None and membro_tem_octogono(membro):
+                adicionar_acao("Gestão de missões", "🎯", gestao.central_missoes)
+            revisoes = bot.get_cog("Revisoes")
+            if revisoes is not None:
+                adicionar_acao("Revisão de provas", "🧾", revisoes.painel_provas)
+
+        if chave == "sistemas":
+            status = bot.get_cog("StatusSistema")
+            if status is not None:
+                adicionar_acao("Saúde do sistema", "📡", status.status)
+                adicionar_acao("Diagnóstico do armazenamento", "🗄️", status.diagnostico)
+
+        for inicio in range(0, len(botoes_acao), 5):
+            itens.append(discord.ui.ActionRow(*botoes_acao[inicio:inicio + 5]))
+
+        itens.extend([
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+        ])
+        self.add_item(discord.ui.Container(*itens, accent_colour=CORES_SECOES.get(chave, _COR_NEMESIS)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if not _tem_acesso(interaction, self.owner_id):
@@ -279,78 +363,50 @@ class CentralAdministrativaView(discord.ui.View):
                 atalhos = []
             else:
                 embed, atalhos = await _embed_secao(self.bot, self.guild, chave)
-            self._limpar_botoes_acao()
-            for item in list(self.children):
-                if isinstance(item, discord.ui.Button) and item not in self._botoes_acao:
-                    self.remove_item(item)
-            for indice, (rotulo, url) in enumerate(atalhos[:10]):
-                self.add_item(discord.ui.Button(label=rotulo[:80], url=url, row=1 + indice // 5))
-
-            # A inteligência de missões já possui fluxo próprio e é exclusiva
-            # do OCTÓGONO. Integrá-la aqui facilita o acesso sem ampliar autoridade.
-            if chave == "operacoes" and membro_tem_octogono(interaction.user):
-                botao_inteligencia = discord.ui.Button(
-                    label="Inteligência de operações",
-                    emoji="📈",
-                    style=discord.ButtonStyle.primary,
-                    row=3,
-                )
-
-                async def abrir_inteligencia(clique: discord.Interaction):
-                    cog_missoes = self.bot.get_cog("Missoes")
-                    if cog_missoes is None:
-                        await clique.response.send_message(
-                            "O módulo de operações não está disponível no momento.",
-                            ephemeral=True,
-                        )
-                        return
-                    await cog_missoes.enviar_painel_inteligencia(clique)
-
-                botao_inteligencia.callback = abrir_inteligencia
-                self.add_item(botao_inteligencia)
-                self._botoes_acao.append(botao_inteligencia)
-
-            # Atalhos abrem os painéis existentes; nenhum fluxo administrativo
-            # depende de comandos digitados.
-            if chave == "operacoes":
-                formularios = self.bot.get_cog("Formularios")
-                if formularios is not None:
-                    self._adicionar_acao("Processos seletivos", "📋", 4, formularios.formulario_central)
-                gestao = self.bot.get_cog("GestaoMissoes")
-                if gestao is not None and membro_tem_octogono(interaction.user):
-                    self._adicionar_acao("Gestão de missões", "🎯", 4, gestao.central_missoes)
-                revisoes = self.bot.get_cog("Revisoes")
-                if revisoes is not None:
-                    self._adicionar_acao("Revisão de provas", "🧾", 4, revisoes.painel_provas)
-
-            if chave == "sistemas":
-                status = self.bot.get_cog("StatusSistema")
-                if status is not None:
-                    self._adicionar_acao("Saúde do sistema", "📡", 3, status.status)
-                    self._adicionar_acao("Diagnóstico do armazenamento", "🗄️", 3, status.diagnostico)
-
-            await interaction.edit_original_response(embed=embed, view=self)
+            nova_view = CentralAdministrativaView(
+                self.bot,
+                self.owner_id,
+                self.guild,
+                embed,
+                chave=chave,
+                atalhos=atalhos,
+            )
+            await interaction.edit_original_response(view=nova_view)
         except Exception:
             _LOG.exception("Falha ao abrir seção %s da Central Administrativa.", chave)
-            await interaction.edit_original_response(
-                content="Não consegui carregar esta área agora. Tente selecionar novamente.",
-                embed=None,
-                view=self,
+            await interaction.followup.send(
+                "Não consegui carregar esta área agora. Tente selecionar novamente.",
+                ephemeral=True,
             )
 
 
-class PainelAdministrativoView(discord.ui.View):
-    """Botão persistente instalado no cabeçalho do tópico Administração."""
+class PainelAdministrativoView(discord.ui.LayoutView):
+    """Painel persistente com o botão de acesso dentro do cartão Components V2."""
 
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=None)
         self.bot = bot
+        botao = discord.ui.Button(
+            label="Abrir Central Administrativa",
+            emoji="🏛️",
+            style=discord.ButtonStyle.primary,
+            custom_id="nemesis:administracao:central:abrir",
+        )
+        botao.callback = self.abrir_central
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(
+                "## 🏛️ NÊMESIS • CENTRAL ADMINISTRATIVA\n"
+                "Área de gestão restrita à liderança autorizada. "
+                "Acesse a visão operacional, os membros, as operações, a segurança e os registros."
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(botao),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+            accent_colour=_COR_NEMESIS,
+        ))
 
-    @discord.ui.button(
-        label="Abrir Central Administrativa", emoji="🏛️",
-        style=discord.ButtonStyle.primary, custom_id="nemesis:administracao:central:abrir",
-    )
-    async def abrir_central(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def abrir_central(self, interaction: discord.Interaction):
         if not _tem_acesso(interaction):
             await interaction.response.send_message(
                 "Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True,
@@ -363,8 +419,12 @@ class PainelAdministrativoView(discord.ui.View):
             return
         embed = await _embed_visao_geral(self.bot, interaction.guild)
         await interaction.response.send_message(
-            embed=embed,
-            view=CentralAdministrativaView(self.bot, interaction.user.id, interaction.guild),
+            view=CentralAdministrativaView(
+                self.bot,
+                interaction.user.id,
+                interaction.guild,
+                embed,
+            ),
             ephemeral=True,
         )
 
@@ -409,6 +469,9 @@ class PainelAdministrativo(commands.Cog):
                     )
                 mensagem = await thread.fetch_message(thread.id)
                 await mensagem.edit(
+                    content=None,
+                    embeds=[],
+                    attachments=[],
                     view=PainelAdministrativoView(self.bot),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
