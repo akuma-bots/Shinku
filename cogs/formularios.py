@@ -346,7 +346,9 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
                     titulo: str = "CENTRAL DE INSCRIÇÕES", descricao: str = "") -> discord.ui.LayoutView:
     """Mantém seletores, botões e callbacks dos fluxos de formulário dentro do cartão."""
     layout = discord.ui.LayoutView(timeout=origem.timeout)
-    if embed:
+    if isinstance(embed, (list, tuple)):
+        texto = "\n\n".join(_texto_embed_inscricoes(item) for item in embed if isinstance(item, discord.Embed))
+    elif embed:
         texto = _texto_embed_inscricoes(embed)
     else:
         texto = f"## {titulo}\n{descricao}".strip()
@@ -571,8 +573,10 @@ class ModalFormulario(discord.ui.Modal):
                 custom_id=f"{PREFIXO_CONTINUAR}{self.formulario['id']}:{proxima_pagina}:{interaction.user.id}",
             ))
             await interaction.response.send_message(
-                f"Etapa {self.pagina_indice + 1} concluída. Continue para responder às próximas perguntas.",
-                view=view,
+                view=_card_form_view(
+                    view, None, "INSCRIÇÃO • ETAPA CONCLUÍDA",
+                    f"Etapa {self.pagina_indice + 1} concluída. Continue para responder às próximas perguntas.",
+                ),
                 ephemeral=True,
             )
             return
@@ -1314,8 +1318,11 @@ class SeletorPaginaRemover(discord.ui.Select):
             return
         indice = int(self.values[0])
         await interaction.response.send_message(
-            f"Confirme a remoção da etapa **{indice + 1}**. As candidaturas existentes não serão apagadas.",
-            view=ConfirmarRemocaoPaginaView(self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice),
+            view=_card_form_view(
+                ConfirmarRemocaoPaginaView(self.cog, self.guild_id, self.usuario_id, self.formulario_id, indice),
+                None, "CONFIRMAR REMOÇÃO",
+                f"Confirme a remoção da etapa **{indice + 1}**. As candidaturas existentes não serão apagadas.",
+            ),
             ephemeral=True,
         )
 
@@ -1658,7 +1665,9 @@ class SeletorHistoricoCandidaturas(discord.ui.Select):
         encerradas = [item for item in respostas if item.get("status") in {"aprovada", "recusada"}]
         encerradas.sort(key=lambda item: float(item.get("atualizado_em", item.get("criado_em", 0)) or 0), reverse=True)
         view = FilaHistoricoView(central, encerradas)
-        await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_form_view(view, view.montar_embed()), ephemeral=True
+        )
 
 
 class FilaHistoricoView(discord.ui.View):
@@ -1791,7 +1800,9 @@ class SeletorFichaHistorica(discord.ui.Select):
         anexos = [resumo] + _embeds_resposta(formulario, resposta, interaction.guild, central.cog.bot)
         view = discord.ui.View(timeout=120)
         view.add_item(discord.ui.Button(label="Consultar histórico", style=discord.ButtonStyle.secondary, emoji="📚", custom_id=f"{PREFIXO_HISTORICO}{protocolo}"))
-        await interaction.response.send_message(embeds=anexos[:10], view=view, ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_form_view(view, anexos[:10]), ephemeral=True
+        )
         for inicio in range(10, len(anexos), 10):
             await interaction.followup.send(embeds=anexos[inicio:inicio + 10], ephemeral=True)
 
@@ -1907,7 +1918,9 @@ class Formularios(commands.Cog):
         lista = await formularios.listar_formularios(guild_id)
         lista.sort(key=lambda item: (bool(item.get("arquivado")), str(item.get("nome", "")).casefold()))
         view = CentralFormulariosView(self, guild_id, usuario_id, lista, formulario_id=formulario_id)
-        await interaction.followup.send(embed=view.montar_embed(mensagem), view=view, ephemeral=True)
+        await interaction.followup.send(
+            view=_card_form_view(view, view.montar_embed(mensagem)), ephemeral=True
+        )
 
     async def formulario_central(self, interaction: discord.Interaction):
         if interaction.guild is None or not membro_tem_lideranca(interaction.user):
@@ -1916,7 +1929,9 @@ class Formularios(commands.Cog):
         lista = await formularios.listar_formularios(interaction.guild.id)
         lista.sort(key=lambda item: (bool(item.get("arquivado")), str(item.get("nome", "")).casefold()))
         view = CentralFormulariosView(self, interaction.guild.id, interaction.user.id, lista)
-        await interaction.response.send_message(embed=view.montar_embed(), view=view, ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_form_view(view, view.montar_embed()), ephemeral=True
+        )
 
     @commands.Cog.listener()
     async def on_ready(self):
