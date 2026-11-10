@@ -1003,7 +1003,9 @@ class FilaCandidaturasView(discord.ui.View):
             return
         self.pagina = min(self.total_paginas - 1, self.pagina + 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
     @discord.ui.button(label="Atualizar fila", style=discord.ButtonStyle.primary, emoji="🔄")
     async def atualizar_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1018,7 +1020,9 @@ class FilaCandidaturasView(discord.ui.View):
         self.pendentes = atuais
         self.pagina = min(self.pagina, self.total_paginas - 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
 
 class SeletorFichaPendente(discord.ui.Select):
@@ -1337,7 +1341,12 @@ class GerenciarCargosView(discord.ui.View):
             await interaction.response.send_message("Configuração restrita à administração.", ephemeral=True)
             return
         self.selected_role_ids = {role.id for role in self.seletor.values if not role.is_default() and not role.managed}
-        await interaction.response.edit_message(content=f"Cargos selecionados: **{len(self.selected_role_ids)}**. Salve para aplicar.", view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(
+                self, None, "COMISSÃO DE ANÁLISE",
+                f"Cargos selecionados: **{len(self.selected_role_ids)}**. Salve para aplicar.",
+            )
+        )
 
     @discord.ui.button(label="Salvar cargos", style=discord.ButtonStyle.success, emoji="💾")
     async def salvar(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1466,7 +1475,12 @@ class EditarPerguntasView(discord.ui.View):
             return
         self.pagina = max(0, self.pagina - 1)
         self._montar()
-        await interaction.response.edit_message(view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(
+                self, None, "EDIÇÃO DO FORMULÁRIO",
+                f"Página {self.pagina + 1}/{self.total_paginas}. Selecione uma opção para continuar.",
+            )
+        )
 
     @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1474,7 +1488,12 @@ class EditarPerguntasView(discord.ui.View):
             return
         self.pagina = min(self.total_paginas - 1, self.pagina + 1)
         self._montar()
-        await interaction.response.edit_message(view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(
+                self, None, "EDIÇÃO DO FORMULÁRIO",
+                f"Página {self.pagina + 1}/{self.total_paginas}. Selecione uma opção para continuar.",
+            )
+        )
 
 
 class SeletorPerguntaEditar(discord.ui.Select):
@@ -1707,7 +1726,9 @@ class FilaHistoricoView(discord.ui.View):
         )
         self.pagina = min(self.pagina, self.total_paginas - 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
     @discord.ui.button(label="Anterior", style=discord.ButtonStyle.secondary, emoji="◀️")
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1715,7 +1736,9 @@ class FilaHistoricoView(discord.ui.View):
             return
         self.pagina = max(0, self.pagina - 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
     @discord.ui.button(label="Próxima", style=discord.ButtonStyle.secondary, emoji="▶️")
     async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1723,7 +1746,9 @@ class FilaHistoricoView(discord.ui.View):
             return
         self.pagina = min(self.total_paginas - 1, self.pagina + 1)
         self._montar()
-        await interaction.response.edit_message(embed=self.montar_embed(), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed())
+        )
 
 
 class SeletorFichaHistorica(discord.ui.Select):
@@ -1855,7 +1880,9 @@ class CentralFormulariosView(discord.ui.View):
         if not any(str(item.get("id")) == str(self.formulario_id) for item in self.lista):
             self.formulario_id = str(self.lista[0].get("id")) if self.lista else None
         self._montar_seletores()
-        await interaction.response.edit_message(embed=self.montar_embed(mensagem), view=self)
+        await interaction.response.edit_message(
+            view=_card_form_view(self, self.montar_embed(mensagem))
+        )
 
 
 class Formularios(commands.Cog):
