@@ -308,6 +308,7 @@ class ConvitesNemesis(commands.Cog):
         self._convites = {}
         self._locks = defaultdict(asyncio.Lock)
         self._inicializados = set()
+        self._painel_lock = asyncio.Lock()
         self.bot.add_view(PainelConsultaConvitesLayoutView())
 
     async def _buscar_convites(self, guild):
@@ -337,48 +338,71 @@ class ConvitesNemesis(commands.Cog):
         return dados, servidor
 
     async def _atualizar_painel(self, guild):
-        try:
-            canal = guild.get_channel(CANAL_CONVITES_ID)
-            if canal is None:
-                canal = await guild.fetch_channel(CANAL_CONVITES_ID)
-            if not isinstance(canal, discord.TextChannel):
-                raise TypeError(
-                    f"O canal {CANAL_CONVITES_ID} precisa ser um canal de texto."
-                )
+        # on_ready pode disparar novamente após reconexões. Serializar a
+        # sincronização e persistir a mensagem evita criar um painel por evento.
+        async with self._painel_lock:
+            try:
+                canal = guild.get_channel(CANAL_CONVITES_ID)
+                if canal is None:
+                    canal = await guild.fetch_channel(CANAL_CONVITES_ID)
+                if not isinstance(canal, discord.TextChannel):
+                    raise TypeError(
+                        f"O canal {CANAL_CONVITES_ID} precisa ser um canal de texto."
+                    )
 
-            painel = None
-            async for mensagem in canal.history(limit=50):
-                if (
-                    mensagem.author.id == self.bot.user.id
-                    and _mensagem_eh_painel_convites(mensagem)
-                ):
-                    painel = mensagem
-                    break
+                dados, servidor = await self._carregar()
+                painel = None
+                painel_id = servidor.get("_painel_message_id")
+                if painel_id:
+                    try:
+                        painel = await canal.fetch_message(int(painel_id))
+                        if painel.author.id != self.bot.user.id or not _mensagem_eh_painel_convites(painel):
+                            painel = None
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError, TypeError):
+                        painel = None
 
-            if painel is None:
-                await canal.send(
-                    view=PainelConsultaConvitesLayoutView(),
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                logger.info(
-                    "Painel da Central de Convites publicado no canal %s.",
+                encontrados = []
+                # Uma única varredura de recuperação limpa duplicatas antigas.
+                if painel is None:
+                    async for mensagem in canal.history(limit=None, oldest_first=True):
+                        if mensagem.author.id == self.bot.user.id and _mensagem_eh_painel_convites(mensagem):
+                            encontrados.append(mensagem)
+                    painel = encontrados[0] if encontrados else None
+                else:
+                    # O ID persistido é a fonte primária; não republique por
+                    # simples reconexão do gateway.
+                    encontrados = [painel]
+
+                if painel is None:
+                    painel = await canal.send(
+                        view=PainelConsultaConvitesLayoutView(),
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    logger.info("Painel da Central de Convites publicado no canal %s (message=%s).", CANAL_CONVITES_ID, painel.id)
+                else:
+                    await painel.edit(
+                        content=None, embeds=[], attachments=[],
+                        view=PainelConsultaConvitesLayoutView(),
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    logger.info("Painel da Central de Convites sincronizado (message=%s).", painel.id)
+
+                servidor["_painel_message_id"] = str(painel.id)
+                await salvar(ARQUIVO_CONVITES, dados)
+
+                # Remove cópias antigas, mantendo o painel canônico.
+                for duplicada in encontrados:
+                    if duplicada.id == painel.id:
+                        continue
+                    try:
+                        await duplicada.delete()
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        logger.warning("Não foi possível remover painel duplicado de convites: %s", duplicada.id)
+            except Exception:
+                logger.exception(
+                    "Falha ao publicar a Central de Convites no canal %s.",
                     CANAL_CONVITES_ID,
                 )
-            else:
-                await painel.edit(
-                    content=None, embeds=[], attachments=[],
-                    view=PainelConsultaConvitesLayoutView(),
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                logger.info(
-                    "Painel da Central de Convites atualizado no canal %s.",
-                    CANAL_CONVITES_ID,
-                )
-        except Exception:
-            logger.exception(
-                "Falha ao publicar a Central de Convites no canal %s.",
-                CANAL_CONVITES_ID,
-            )
 
     @commands.Cog.listener()
     async def on_ready(self):
