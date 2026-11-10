@@ -252,8 +252,7 @@ class VoltarConvitesView(discord.ui.View):
             self.pagina = max(0, min(self.total_paginas - 1, self.pagina + delta))
             self.anterior.disabled = self.pagina <= 0
             self.proxima.disabled = self.pagina >= self.total_paginas - 1
-            await interaction.response.edit_message(content=None, embed=None, view=None)
-            await interaction.edit_original_response(
+            await interaction.response.edit_message(
                 view=_card_convites(self, _embed(membro, servidor, self.pagina))
             )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
