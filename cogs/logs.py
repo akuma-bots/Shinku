@@ -60,6 +60,66 @@ def _layout_boas_vindas(embed: discord.Embed) -> discord.ui.LayoutView:
     return layout
 
 
+def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
+                   titulo: str = "CENTRAL DE HISTÓRICO", descricao: str = "Consulta restrita à liderança autorizada."):
+    """Mantém seletores e botões de consulta dentro de um cartão Components V2."""
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    linhas = {}
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+        elif isinstance(item, discord.ui.UserSelect):
+            novo = discord.ui.UserSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled, row=item.row,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = callback
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled, row=item.row,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = callback
+        else:
+            continue
+        linhas.setdefault(item.row or 0, []).append(novo)
+    for _, itens in sorted(linhas.items()):
+        for inicio in range(0, len(itens), 5):
+            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Arquivo e auditoria"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
 class DossieMembroRegistroView(discord.ui.View):
     """Navegação privada pelas seções do histórico de um membro."""
     def __init__(self, dossie: dict, owner_id: int):
@@ -96,7 +156,7 @@ class DossieMembroRegistroView(discord.ui.View):
             self.pagina_mensagens = min(self.pagina_mensagens, paginas - 1)
             self.anterior.disabled = chave != "mensagens" or self.pagina_mensagens <= 0
             self.proxima.disabled = chave != "mensagens" or self.pagina_mensagens >= paginas - 1
-            await interaction.edit_original_response(embed=embed, view=self)
+            await interaction.edit_original_response(content=None, embed=None, embeds=[], view=_card_registro(self, embed))
         except Exception:
             logger.exception("Falha ao atualizar dossiê individual.")
             await interaction.edit_original_response(content="Não foi possível atualizar os dados agora.", embed=None, view=self)
@@ -119,7 +179,7 @@ class DossieMembroRegistroView(discord.ui.View):
         paginas = max(1, (len(mensagens) + 5) // 6)
         self.anterior.disabled = self.pagina_mensagens <= 0
         self.proxima.disabled = self.pagina_mensagens >= paginas - 1
-        await interaction.response.edit_message(embed=_embed_mensagens(self.dossie, self.pagina_mensagens), view=self)
+        await interaction.response.edit_message(content=None, embed=None, view=_card_registro(self, _embed_mensagens(self.dossie, self.pagina_mensagens)))
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id or not _usuario_pode_consultar_historico(interaction):
@@ -135,7 +195,7 @@ class DossieMembroRegistroView(discord.ui.View):
             "atividade": None, "registros": _embed_registros,
         }
         from utils.historico_membros import _embed_mensagens, _embed_atividade
-        chave = self.seletor.values[0]
+        chave = (interaction.data or {}).get("values", [self.aba_atual])[0]
         self.aba_atual = chave
         self.pagina_mensagens = 0
         if chave == "mensagens":
@@ -148,7 +208,7 @@ class DossieMembroRegistroView(discord.ui.View):
             opcao.default = opcao.value == chave
         self.anterior.disabled = chave != "mensagens" or not self.dossie.get("atividade", {}).get("mensagens")
         self.proxima.disabled = chave != "mensagens" or len(self.dossie.get("atividade", {}).get("mensagens", [])) <= 6
-        await interaction.response.edit_message(embed=embed, view=self)
+        await interaction.response.edit_message(content=None, embed=None, view=_card_registro(self, embed))
 
 
 class SeletorMembroRegistroView(discord.ui.View):
@@ -174,18 +234,18 @@ class SeletorMembroRegistroView(discord.ui.View):
         if interaction.guild is None or interaction.guild.id != GUILD_NEMESIS_ID:
             await interaction.response.send_message("Esta consulta só está disponível na NÊMESIS.", ephemeral=True)
             return
-        selecionado = self.seletor.values[0]
-        membro = selecionado
+        selecionado_id = int((interaction.data or {}).get("values", [0])[0])
+        membro = interaction.guild.get_member(selecionado_id)
         if not isinstance(membro, discord.Member):
             try:
-                membro = await interaction.guild.fetch_member(selecionado.id)
+                membro = await interaction.guild.fetch_member(selecionado_id)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 await interaction.response.send_message("Não consegui localizar esse integrante na NÊMESIS.", ephemeral=True)
                 return
         await interaction.response.defer()
         try:
             dossie = await construir_dossie(interaction.guild, membro)
-            await interaction.edit_original_response(content=None, embed=_embed_geral(dossie), view=DossieMembroRegistroView(dossie, self.owner_id))
+            await interaction.edit_original_response(content=None, embed=None, embeds=[], view=_card_registro(DossieMembroRegistroView(dossie, self.owner_id), _embed_geral(dossie)))
         except Exception:
             logger.exception("Falha ao montar histórico individual (guild=%s, membro=%s).", interaction.guild.id, membro.id)
             await interaction.edit_original_response(content="Não foi possível carregar o histórico agora. Tente novamente.", embed=None, view=None)
@@ -202,14 +262,40 @@ class PainelHistoricoMembrosView(discord.ui.View):
             await interaction.response.send_message("Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True)
             return
         await interaction.response.send_message(
-            embed=criar_embed(
-                "📚 CENTRAL DE HISTÓRICO INDIVIDUAL",
-                "Pesquise e selecione um integrante. O dossiê mostra mensagens enviadas/editadas/excluídas e eventos de atividade dos últimos 30 dias. O monitoramento é informado e começa após a implantação.",
-                cor=0x9F2035, rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+            view=_card_registro(
+                SeletorMembroRegistroView(interaction.user.id),
+                criar_embed(
+                    "📚 CENTRAL DE HISTÓRICO INDIVIDUAL",
+                    "Pesquise e selecione um integrante. O dossiê mostra mensagens enviadas/editadas/excluídas e eventos de atividade dos últimos 30 dias. O monitoramento é informado e começa após a implantação.",
+                    cor=0x9F2035, rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+                ),
             ),
-            view=SeletorMembroRegistroView(interaction.user.id),
             ephemeral=True,
         )
+
+
+class PainelHistoricoMembrosLayoutView(discord.ui.LayoutView):
+    """Botão de consulta individual contido no cartão do Arquivo de Membros."""
+
+    def __init__(self):
+        super().__init__(timeout=None)
+        origem = PainelHistoricoMembrosView()
+        original = origem.children[0]
+        botao = discord.ui.Button(
+            label=original.label, style=original.style,
+            custom_id=original.custom_id, emoji=original.emoji,
+        )
+        botao.callback = original.callback
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(
+                "## 📚 ARQUIVO DE MEMBROS\n"
+                "Consulta individual de histórico e atividade, disponível somente à liderança autorizada."
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(botao),
+            discord.ui.TextDisplay("-# Nêmesis Systeam • Consulta privada"),
+            accent_colour=0x9F1239,
+        ))
 
 
 class Logs(commands.Cog):
@@ -220,7 +306,7 @@ class Logs(commands.Cog):
         self.bot = bot
         self._topicos_prontos = False
         self._guia_publicado = False
-        self.bot.add_view(PainelHistoricoMembrosView())
+        self.bot.add_view(PainelHistoricoMembrosLayoutView())
         self.bot.add_view(GuiaServidoresView())
 
     async def _atualizar_painel_historico_membros(self, guild: discord.Guild, topicos: dict) -> None:
@@ -238,7 +324,7 @@ class Logs(commands.Cog):
             if thread.archived or thread.locked:
                 await thread.edit(archived=False, locked=False, reason="Atualizar painel de consulta do histórico individual")
             mensagem = await thread.fetch_message(thread.id)
-            await mensagem.edit(view=PainelHistoricoMembrosView(), allowed_mentions=discord.AllowedMentions.none())
+            await mensagem.edit(view=PainelHistoricoMembrosLayoutView(), allowed_mentions=discord.AllowedMentions.none())
             logger.info("Painel de consulta individual atualizado no tópico Histórico de membros (%s).", thread.id)
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível atualizar o painel de histórico individual.")
