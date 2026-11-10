@@ -134,6 +134,19 @@ def _reconstruir_cartao_preferencias(mensagem: discord.Message, botao: discord.u
             texto = conteudo
         pendentes.extend(list(getattr(item, "children", []) or []))
 
+    if not texto and mensagem.embeds:
+        embed = mensagem.embeds[0]
+        partes = []
+        if embed.title:
+            partes.append(f"## {embed.title}")
+        if embed.description:
+            partes.append(embed.description)
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+        texto = "\n\n".join(partes)
+
     origem = getattr(botao, "view", None)
     itens = []
     pendentes = list(getattr(origem, "children", []) or [])
