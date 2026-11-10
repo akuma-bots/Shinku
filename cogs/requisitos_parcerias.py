@@ -419,6 +419,22 @@ class RevisaoParceriaView(discord.ui.View):
         await self.concluir(interaction, False)
 
 
+
+def _mensagem_eh_painel_candidatura(mensagem: discord.Message) -> bool:
+    if any(
+        embed.title == "NÊMESIS  |  DIRETORIA DE RELAÇÕES INSTITUCIONAIS"
+        for embed in mensagem.embeds
+    ):
+        return True
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if str(getattr(componente, "custom_id", "") or "") == "nemesis:parcerias:candidatar":
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
 class RequisitosParcerias(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -481,24 +497,14 @@ class RequisitosParcerias(commands.Cog):
                 async for candidata in canal.history(limit=60):
                     if (
                         candidata.author.id == self.bot.user.id
-                        and candidata.embeds
-                        and candidata.embeds[0].title == "NÊMESIS  |  DIRETORIA DE RELAÇÕES INSTITUCIONAIS"
+                        and _mensagem_eh_painel_candidatura(candidata)
                     ):
                         mensagem = candidata
                         break
             except (discord.Forbidden, discord.HTTPException):
                 LOG.exception("Não foi possível procurar um painel de parcerias anterior.")
         if mensagem:
-            componentes = list(getattr(mensagem, "components", []) or [])
-            pendentes = componentes[:]
-            painel_v2 = False
-            while pendentes:
-                componente = pendentes.pop()
-                if str(getattr(componente, "custom_id", "") or "") == "nemesis:parcerias:candidatar":
-                    painel_v2 = True
-                    break
-                pendentes.extend(list(getattr(componente, "children", []) or []))
-            if not painel_v2:
+            if not _mensagem_eh_painel_candidatura(mensagem) or mensagem.embeds:
                 await mensagem.edit(content=None, embeds=[], attachments=[])
             await mensagem.edit(
                 view=PainelCandidaturaView(),
