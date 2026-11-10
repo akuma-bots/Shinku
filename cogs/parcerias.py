@@ -981,7 +981,7 @@ async def setup(
                     mensagem = await canal.fetch_message(mensagem_id)
                     embed = _embed_parceria_publica(parceria, guild)
                     await mensagem.edit(
-                        content=None, embed=None, embeds=[], attachments=[],
+                        content=None, embeds=[], attachments=[],
                         view=ParceriaLayoutView(cargo_id, embed),
                         allowed_mentions=discord.AllowedMentions.none(),
                     )
