@@ -105,6 +105,67 @@ def _embed(membro, servidor, pagina=0):
     return embed
 
 
+
+def _card_convites(origem: discord.ui.View, embed: discord.Embed | None = None,
+                   titulo: str = "CENTRAL DE CONVITES", descricao: str = "Consulta individual e privada."):
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    for item in origem.children:
+        if isinstance(item, discord.ui.UserSelect):
+            novo = discord.ui.UserSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, custom_id=item.custom_id,
+                disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo, view=origem):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await view.selecionar(interaction)
+            novo.callback = selecionar
+            componentes.append(discord.ui.ActionRow(novo))
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = selecionar
+            componentes.append(discord.ui.ActionRow(novo))
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            componentes.append(discord.ui.ActionRow(novo))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Consulta privada"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 class SeletorConvitesView(discord.ui.View):
     def __init__(self, owner_id):
         super().__init__(timeout=180)
@@ -149,13 +210,13 @@ class SeletorConvitesView(discord.ui.View):
             )
             await interaction.edit_original_response(
                 content=None,
-                embed=_embed(membro, servidor),
-                view=VoltarConvitesView(
+                embed=None,
+                view=_card_convites(VoltarConvitesView(
                     self.owner_id,
                     membro.id,
                     0,
                     _total_paginas(servidor, membro.id),
-                ),
+                ), _embed(membro, servidor)),
             )
         except Exception:
             logger.exception("Falha na consulta de convites do membro %s.", membro.id)
@@ -190,7 +251,8 @@ class VoltarConvitesView(discord.ui.View):
             self.anterior.disabled = self.pagina <= 0
             self.proxima.disabled = self.pagina >= self.total_paginas - 1
             await interaction.response.edit_message(
-                embed=_embed(membro, servidor, self.pagina), view=self
+                content=None, embed=None,
+                view=_card_convites(self, _embed(membro, servidor, self.pagina)),
             )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             await interaction.response.send_message(
@@ -222,9 +284,16 @@ class VoltarConvitesView(discord.ui.View):
             )
             return
         await interaction.response.edit_message(
-            content="Selecione um integrante.",
+            content=None,
             embed=None,
-            view=SeletorConvitesView(self.owner_id),
+            view=_card_convites(
+                SeletorConvitesView(self.owner_id),
+                criar_embed(
+                    title="🔗 CENTRAL DE CONVITES",
+                    description="Selecione um integrante para consultar convites atribuídos e convidados presentes.",
+                    cor=0x991B33,
+                ),
+            ),
         )
 
 
@@ -244,14 +313,17 @@ class PainelConsultaConvitesView(discord.ui.View):
                 "Acesso restrito à liderança autorizada da NÊMESIS.", ephemeral=True
             )
             return
+        origem = SeletorConvitesView(interaction.user.id)
         await interaction.response.send_message(
-            embed=criar_embed(
-                title="🔗 CENTRAL DE CONVITES",
-                description="Selecione um integrante para consultar quantos convites trouxe, quais links foram utilizados e quem continua no servidor. Consulta individual, não é um ranking.",
-                cor=0x991B33,
-                rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+            view=_card_convites(
+                origem,
+                criar_embed(
+                    title="🔗 CENTRAL DE CONVITES",
+                    description="Selecione um integrante para consultar quantos convites trouxe, quais links foram utilizados e quem continua no servidor. Consulta individual, não é um ranking.",
+                    cor=0x991B33,
+                    rodape="NÊMESIS • REGISTRO GLOBAL • CONSULTA PRIVADA",
+                ),
             ),
-            view=SeletorConvitesView(interaction.user.id),
             ephemeral=True,
         )
 
