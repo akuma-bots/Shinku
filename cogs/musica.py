@@ -788,6 +788,45 @@ class MusicPanelView(discord.ui.View):
         )
 
 
+class MusicPanelLayoutView(discord.ui.LayoutView):
+    """Central musical com todos os controles contidos no cartão."""
+
+    def __init__(self, cog: "Musica", embed: discord.Embed | None = None):
+        super().__init__(timeout=None)
+        origem = MusicPanelView(cog)
+        botoes_por_linha = {}
+        for item in origem.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            botao = discord.ui.Button(
+                label=item.label,
+                style=item.style,
+                disabled=item.disabled,
+                custom_id=item.custom_id,
+                url=item.url,
+                emoji=item.emoji,
+            )
+            botao.callback = item.callback
+            botoes_por_linha.setdefault(item.row or 0, []).append(botao)
+
+        titulo = embed.title if embed and embed.title else "𓂀 CENTRAL MUSICAL"
+        descricao = embed.description if embed and embed.description else (
+            "Pesquise músicas, organize sua fila e mantenha suas playlists pessoais."
+        )
+        componentes = [
+            discord.ui.TextDisplay(f"## {titulo}\n{descricao}"),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ]
+        for _, botoes in sorted(botoes_por_linha.items()):
+            for inicio in range(0, len(botoes), 5):
+                componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+        componentes.extend([
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay(f"-# Nêmesis Systeam • {MARCADOR_PAINEL_MUSICA}"),
+        ])
+        self.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+
+
 class AudioDiagnostico(discord.AudioSource):
     """Mede o PCM entregue ao player sem alterar os bytes enviados."""
 
@@ -898,7 +937,7 @@ class Musica(commands.Cog):
         if self._painel_sync:
             return
         if not self._painel_view_registrada:
-            self.bot.add_view(MusicPanelView(self))
+            self.bot.add_view(MusicPanelLayoutView(self))
             self._painel_view_registrada = True
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
         if guild is None:
@@ -960,6 +999,9 @@ class Musica(commands.Cog):
                     if any(
                         embed.footer and embed.footer.text == MARCADOR_PAINEL_MUSICA
                         for embed in antiga.embeds
+                    ) or any(
+                        MARCADOR_PAINEL_MUSICA in getattr(component, "content", "")
+                        for component in antiga.components
                     ):
                         mensagem = antiga
                         break
@@ -976,11 +1018,11 @@ class Musica(commands.Cog):
             "⏯️ Pausar, retomar e pular músicas",
         )
         embed.set_footer(text=MARCADOR_PAINEL_MUSICA)
-        view = MusicPanelView(self)
+        view = MusicPanelLayoutView(self, embed)
         if mensagem:
-            await mensagem.edit(content=None, embed=embed, view=view)
+            await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
         else:
-            mensagem = await canal.send(embed=embed, view=view)
+            mensagem = await canal.send(view=view)
         try:
             await mensagem.pin(reason="Painel oficial de música da NÊMESIS")
         except (discord.Forbidden, discord.HTTPException):
