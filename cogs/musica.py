@@ -592,6 +592,17 @@ class ConfirmarExclusaoPlaylistView(discord.ui.View):
 GUILD_NEMESIS_ID = 1563995879981981817
 CANAL_MUSICA_ID = 1563995881508831335
 MARCADOR_PAINEL_MUSICA = "NÊMESIS • Painel de música"
+
+
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador in str(getattr(componente, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
 ARQUIVO_PAINEL_MUSICA = "painel_musica.json"
 
 
@@ -999,10 +1010,7 @@ class Musica(commands.Cog):
                     if any(
                         embed.footer and embed.footer.text == MARCADOR_PAINEL_MUSICA
                         for embed in antiga.embeds
-                    ) or any(
-                        MARCADOR_PAINEL_MUSICA in getattr(component, "content", "")
-                        for component in antiga.components
-                    ):
+                    ) or _componentes_contem_marcador(antiga.components, MARCADOR_PAINEL_MUSICA):
                         mensagem = antiga
                         break
             except (discord.Forbidden, discord.HTTPException):
