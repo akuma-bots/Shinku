@@ -74,6 +74,36 @@ def _iterar_comandos(comandos):
             yield comando
 
 
+
+def _card_ajuda(origem: discord.ui.View, embed: discord.Embed) -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title or 'CENTRAL DE AJUDA'}"]
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"**{campo.name}**\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.append(discord.ui.TextDisplay("-# NÊMESIS • Central de Orientação"))
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
 class PaginacaoAjuda(
     discord.ui.View
 ):
@@ -118,7 +148,7 @@ class PaginacaoAjuda(
 
             await interaction.response.send_message(
                 "Esse menu não é seu. "
-                "Use `/help` para abrir o seu.",
+                "Abra sua própria consulta pelo painel oficial de orientação.",
                 ephemeral=True,
             )
 
@@ -142,8 +172,7 @@ class PaginacaoAjuda(
         self._atualizar_botoes()
 
         await interaction.response.edit_message(
-            embed=self.paginas[self.indice],
-            view=self,
+            view=_card_ajuda(self, self.paginas[self.indice]),
         )
 
 
@@ -384,8 +413,7 @@ class Ajuda(commands.Cog):
 
 
         await interaction.response.send_message(
-            embed=paginas[0],
-            view=view,
+            view=_card_ajuda(view, paginas[0]),
             ephemeral=True,
         )
 
