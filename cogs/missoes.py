@@ -1742,18 +1742,22 @@ class Missoes(commands.Cog):
                     for indice, embed in enumerate(embeds):
                         if indice < len(mensagens):
                             mensagem = mensagens[indice]
-                            await mensagem.edit(
-                    view=_card_view_missoes(EnviarProvaMissaoView(self), embed)
-                    if indice == 0 else None,
-                    content=None, embeds=[], attachments=[],
-                )
+                            if indice == 0:
+                                await mensagem.edit(content=None, embeds=[], attachments=[])
+                                await mensagem.edit(
+                                    view=_card_view_missoes(EnviarProvaMissaoView(self), embed)
+                                )
+                            else:
+                                await mensagem.edit(embed=embed, view=None)
                             ids_novos.append(mensagem.id)
                             resultado["atualizadas"] += 1
                         else:
-                            mensagem = await canal.send(
-                                embed=embed,
-                                view=EnviarProvaMissaoView(self) if indice == 0 else None,
-                            )
+                            if indice == 0:
+                                mensagem = await canal.send(
+                                    view=_card_view_missoes(EnviarProvaMissaoView(self), embed)
+                                )
+                            else:
+                                mensagem = await canal.send(embed=embed)
                             ids_novos.append(mensagem.id)
                             resultado["publicadas"] += 1
                     for mensagem_extra in mensagens[len(embeds):]:
@@ -1764,10 +1768,12 @@ class Missoes(commands.Cog):
                 else:
                     novas = []
                     for indice, embed in enumerate(embeds):
-                        mensagem = await canal.send(
-                            embed=embed,
-                            view=EnviarProvaMissaoView(self) if indice == 0 else None,
-                        )
+                        if indice == 0:
+                            mensagem = await canal.send(
+                                view=_card_view_missoes(EnviarProvaMissaoView(self), embed)
+                            )
+                        else:
+                            mensagem = await canal.send(embed=embed)
                         novas.append(mensagem)
                         ids_novos.append(mensagem.id)
                         resultado["publicadas"] += 1
