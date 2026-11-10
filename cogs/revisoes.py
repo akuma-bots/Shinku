@@ -675,9 +675,10 @@ class Revisoes(commands.Cog):
                 custom_id=f"revisao:cancelar_aprovar:{revisao_id}",
             ))
             await interaction.response.send_message(
-                f"**Confirmar aprovação da evidência?**\nProtocolo: {revisao_id}\n"
-                "A recompensa em XP será aplicada após a confirmação. Esta ação ficará registrada na auditoria.",
-                view=view,
+                view=_card_revisao_view(
+                    view, None, "CONFIRMAR APROVAÇÃO",
+                    f"Protocolo: **{revisao_id}**\nA recompensa em XP será aplicada após a confirmação. Esta ação ficará registrada na auditoria.",
+                ),
                 ephemeral=True,
             )
             return
