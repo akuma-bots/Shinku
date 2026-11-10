@@ -967,14 +967,23 @@ async def setup(
                 "cargo_id"
             )
 
-            if (
-                cargo_id
-                and cargo_id
-                not in cargos_registrados
-            ):
-
+            if cargo_id and cargo_id not in cargos_registrados:
                 bot.add_view(ParceriaLayoutView(cargo_id))
+                cargos_registrados.add(cargo_id)
 
-                cargos_registrados.add(
-                    cargo_id
-                )
+            guild_id = int(parceria.get("guild_id") or 0)
+            canal_id = int(parceria.get("canal_id") or 0)
+            mensagem_id = int(parceria.get("mensagem_id") or 0)
+            guild = bot.get_guild(guild_id)
+            canal = guild.get_channel(canal_id) if guild and canal_id else None
+            if canal is not None and mensagem_id:
+                try:
+                    mensagem = await canal.fetch_message(mensagem_id)
+                    embed = _embed_parceria_publica(parceria, guild)
+                    await mensagem.edit(
+                        content=None, embed=None, embeds=[], attachments=[],
+                        view=ParceriaLayoutView(cargo_id, embed),
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.exception("Falha ao migrar cartão da parceria %s.", parceria.get("id"))
