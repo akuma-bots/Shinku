@@ -141,7 +141,7 @@ async def fechar_canal_ticket(
                         f"Seu atendimento #{ticket.get('id', '—')} foi encerrado.\n\nSua avaliação é necessária para concluir o atendimento. Escolha uma nota de 1 a 5 abaixo.",
                         rodape="NÊMESIS • Central de atendimento",
                     )
-                    await dono.send(embed=embed, view=AvaliacaoTicketView(
+                    await dono.send(view=AvaliacaoTicketLayoutView(
                         canal.guild.id, str(ticket["id"]), int(ticket.get("usuario_id") or 0),
                         int(ticket.get("atendido_por_id") or 0),
                     ))
@@ -562,6 +562,70 @@ class AvaliacaoTicketView(discord.ui.View):
             self.add_item(AvaliacaoTicketButton(guild_id, ticket_id, nota))
 
 
+class AvaliacaoTicketLayoutView(discord.ui.LayoutView):
+    """Apresenta as notas dentro de um cartão Components V2."""
+
+    def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
+        super().__init__(timeout=None)
+        botoes = [
+            discord.ui.Button(
+                label=f"{nota}/5",
+                emoji="⭐",
+                style=discord.ButtonStyle.primary,
+                custom_id=f"ticket:avaliar:{guild_id}:{ticket_id}:{nota}",
+            )
+            for nota in range(1, 6)
+        ]
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(
+                "## ✦ NÊMESIS — AVALIAÇÃO DE ATENDIMENTO\n"
+                f"**Ticket #{ticket_id}**\n"
+                "Como foi sua experiência? Selecione uma nota de 1 a 5."
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(*botoes[:5]),
+            discord.ui.TextDisplay("-# Nêmesis Systeam • Central de Atendimento"),
+            accent_colour=COR_TICKET,
+        ))
+
+
+class FecharTicketLayoutView(discord.ui.LayoutView):
+    """Mantém os controles operacionais do ticket dentro do cartão."""
+
+    def __init__(self, origem: discord.ui.View | None = None):
+        super().__init__(timeout=None)
+        origem = origem or FecharTicketView()
+        botoes_por_linha = {}
+        for item in origem.children:
+            if not isinstance(item, discord.ui.Button):
+                continue
+            botao = discord.ui.Button(
+                label=item.label,
+                style=item.style,
+                disabled=item.disabled,
+                custom_id=item.custom_id,
+                url=item.url,
+                emoji=item.emoji,
+            )
+            botao.callback = item.callback
+            botoes_por_linha.setdefault(item.row or 0, []).append(botao)
+        componentes = [
+            discord.ui.TextDisplay(
+                "## 🎟️ NÊMESIS — CENTRAL DE ATENDIMENTO\n"
+                "Utilize os controles abaixo para assumir, encaminhar ou encerrar este atendimento."
+            ),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        ]
+        for _, botoes in sorted(botoes_por_linha.items()):
+            for inicio in range(0, len(botoes), 5):
+                componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+        componentes.extend([
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam • Atendimento privado"),
+        ])
+        self.add_item(discord.ui.Container(*componentes, accent_colour=COR_TICKET))
+
+
 class AdicionarParticipanteModal(discord.ui.Modal, title="Adicionar participante ao ticket"):
     usuario = discord.ui.TextInput(label="ID ou menção do membro", placeholder="ID do Discord ou @membro", required=True, max_length=40)
 
@@ -747,7 +811,7 @@ class FecharTicketView(discord.ui.View):
         button.label = f"Responsável: {membro.display_name}"[:80]
         button.disabled = True
         try:
-            await interaction.message.edit(view=self)
+            await interaction.message.edit(view=FecharTicketLayoutView(self))
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             log.warning("Não foi possível atualizar os botões do ticket %s após atribuir atendimento.", canal.id)
         await interaction.followup.send(
@@ -1250,7 +1314,7 @@ class Tickets(commands.Cog):
             "knowledge_base.json"
         )["entradas"]
 
-        bot.add_view(FecharTicketView())
+        bot.add_view(FecharTicketLayoutView())
         bot.add_dynamic_items(AvaliacaoTicketButton)
 
         self.verificar_inatividade.start()
@@ -1360,7 +1424,7 @@ class Tickets(commands.Cog):
         try:
             mensagem = await canal.send(
                 embed=embed,
-                view=FecharTicketView(),
+                view=FecharTicketLayoutView(),
                 allowed_mentions=discord.AllowedMentions(users=True, roles=False, everyone=False),
             )
 
