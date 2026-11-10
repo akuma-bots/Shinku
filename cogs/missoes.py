@@ -1429,8 +1429,7 @@ class Missoes(commands.Cog):
         match = re.search(r"PAGINA:(\d+)/(\d+)", footer)
         total = int(match.group(2)) if match else 1
         await interaction.response.edit_message(
-            embed=embed,
-            view=NavegacaoMissoesView(self, categoria=categoria, pagina=pagina_alvo, total_paginas=total),
+            view=NavegacaoMissoesView(self, categoria=categoria, pagina=pagina_alvo, total_paginas=total, embed=embed),
         )
 
     async def _limpar_mensagens_missoes_duplicadas(self, guild: discord.Guild) -> int:
