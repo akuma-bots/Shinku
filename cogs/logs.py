@@ -291,7 +291,6 @@ class Logs(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         if member.guild.id != 1563995879981981817:
             return
-        await monitoramento_membros.registrar_evento(member.guild.id, member.id, "entrada", "Entrou no servidor.", timestamp=member.joined_at.timestamp() if member.joined_at else None)
         canal = member.guild.get_channel(CANAL_ENTRADAS_ID)
         if canal is None:
             try:
@@ -377,45 +376,12 @@ class Logs(commands.Cog):
             else:
                 logger.error("Falha ao publicar mensagem de entrada (guild=%s, member=%s, channel=%s).",
                              member.guild.id, member.id, canal.id)
-        await registrar_global(
-            member.guild,
-            "historico_membros",
-            "Entrada de membro",
-            (
-                f"Membro: {member.mention} (`{member.id}`)\n"
-                f"Entrada: {discord.utils.format_dt(agora, style='F')}\n"
-                f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
-                f"Efetivo após entrada: {total_membros}\n"
-                f"Convidador: <@{convidador_id}>"
-                if convidador_id else
-                f"Membro: {member.mention} (`{member.id}`)\n"
-                f"Entrada: {discord.utils.format_dt(agora, style='F')}\n"
-                f"Conta criada: {discord.utils.format_dt(member.created_at, style='F')}\n"
-                f"Efetivo após entrada: {total_membros}\nConvidador: Não identificado"
-            ),
-            cor=0x57F287,
-        )
+
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        agora = datetime.now(timezone.utc)
-        await monitoramento_membros.registrar_evento(member.guild.id, member.id, "saida", "Saiu do servidor.", timestamp=agora.timestamp())
-        canal = await self._canal_logs(member.guild)
-        if canal:
-            embed = criar_embed(
-                title="Saída de membro",
-                description=f"📤 {member} (ID: {member.id}) saiu da NÊMESIS.",
-                color=0xED4245,
-                timestamp=agora,
-            )
-            embed.set_thumbnail(url=member.display_avatar.url)
-            await self._enviar_log(canal, embed, categoria="entradas")
-        await registrar_global(
-            member.guild, "historico_membros", "Saída do membro",
-            f"Membro: {member} (ID: {member.id})\nSaída registrada: {discord.utils.format_dt(agora, style='F')}",
-            cor=0xED4245,
-        )
-
+        """Saídas não geram mais notificações no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
         """Arquiva a exclusão somente no histórico privado do autor.
@@ -677,23 +643,7 @@ class Logs(commands.Cog):
                         "depois": timeout_depois.timestamp() if timeout_depois else None,
                     },
                 )
-            ids_antes_privados = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
-            ids_depois_privados = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
-            ganhos_privados = [cargo for cargo_id, cargo in ids_depois_privados.items() if cargo_id not in ids_antes_privados]
-            perdidos_privados = [cargo for cargo_id, cargo in ids_antes_privados.items() if cargo_id not in ids_depois_privados]
-            if ganhos_privados or perdidos_privados:
-                partes_privadas = []
-                if ganhos_privados:
-                    partes_privadas.append("Recebeu: " + ", ".join(cargo.name for cargo in ganhos_privados[:20]))
-                if perdidos_privados:
-                    partes_privadas.append("Perdeu: " + ", ".join(cargo.name for cargo in perdidos_privados[:20]))
-                await monitoramento_membros.registrar_evento(
-                    depois.guild.id, depois.id, "cargos", " | ".join(partes_privadas),
-                    detalhes={
-                        "recebidos": [{"id": cargo.id, "nome": cargo.name} for cargo in ganhos_privados[:30]],
-                        "removidos": [{"id": cargo.id, "nome": cargo.name} for cargo in perdidos_privados[:30]],
-                    },
-                )
+
         canal = await self._canal_logs(depois.guild)
         if not canal:
             return
@@ -739,30 +689,6 @@ class Logs(commands.Cog):
                 categoria="membros",
             )
 
-        ids_antes = {cargo.id: cargo for cargo in antes.roles if not cargo.is_default()}
-        ids_depois = {cargo.id: cargo for cargo in depois.roles if not cargo.is_default()}
-        ganhos = [cargo for cargo_id, cargo in ids_depois.items() if cargo_id not in ids_antes]
-        perdidos = [cargo for cargo_id, cargo in ids_antes.items() if cargo_id not in ids_depois]
-        if ganhos or perdidos:
-            embed_cargos = criar_embed(
-                title="Cargos do membro alterados",
-                description=f"**Membro:** {depois.mention} ({depois.id})",
-                color=0xB3132B,
-            )
-            if ganhos:
-                embed_cargos.add_field(
-                    name=f"Cargos recebidos ({len(ganhos)})",
-                    value=" ".join(cargo.mention for cargo in ganhos)[:1024],
-                    inline=False,
-                )
-            if perdidos:
-                embed_cargos.add_field(
-                    name=f"Cargos removidos ({len(perdidos)})",
-                    value=" ".join(cargo.mention for cargo in perdidos)[:1024],
-                    inline=False,
-                )
-            # Auditoria de cargos permanece no tópico administrativo, nunca no Arquivo de Membros.
-            await self._enviar_log(canal, embed_cargos, categoria="administracao")
 
         # Usa o atributo oficial de discord.py e mantém fallback para forks antigos.
         timeout_antes = _timeout_membro(antes)
@@ -789,18 +715,12 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
-        canal = await self._canal_logs(channel.guild)
-        if not canal:
-            return
-        await self._enviar_log(canal, criar_embed(description=f"📁 Canal criado: **{channel.name}** ({channel.type}).", color=0x57F287), categoria="administracao")
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
-        canal = await self._canal_logs(channel.guild)
-        if not canal:
-            return
-        await self._enviar_log(canal, criar_embed(description=f"🗑️ Canal apagado: **{channel.name}** ({channel.type}).", color=0xED4245), categoria="administracao")
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_presence_update(self, antes: discord.Member, depois: discord.Member):
         """Registra mudanças de presença e jogos, sem armazenar status personalizado ou mídia pessoal."""
@@ -936,116 +856,32 @@ class Logs(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_channel_update(self, antes: discord.abc.GuildChannel, depois: discord.abc.GuildChannel):
-        mudancas = []
-        if antes.name != depois.name:
-            mudancas.append(f"Nome: {antes.name} → {depois.name}")
-        if antes.category_id != depois.category_id:
-            categoria_antes = antes.category.name if antes.category else "Nenhuma"
-            categoria_depois = depois.category.name if depois.category else "Nenhuma"
-            mudancas.append(f"Categoria: {categoria_antes} → {categoria_depois}")
-        if isinstance(antes, discord.TextChannel) and isinstance(depois, discord.TextChannel):
-            if antes.topic != depois.topic:
-                mudancas.append(f"Tópico alterado: {(antes.topic or 'vazio')[:200]} → {(depois.topic or 'vazio')[:200]}")
-            if antes.slowmode_delay != depois.slowmode_delay:
-                mudancas.append(f"Modo lento: {antes.slowmode_delay}s → {depois.slowmode_delay}s")
-            if antes.nsfw != depois.nsfw:
-                mudancas.append(f"NSFW: {antes.nsfw} → {depois.nsfw}")
-        if antes.overwrites != depois.overwrites:
-            mudancas.append("As permissões e sobrescritas de acesso do canal foram alteradas.")
-        if not mudancas:
-            return
-        canal = await self._canal_logs(depois.guild)
-        if not canal:
-            return
-        embed = criar_embed(
-            title="Canal atualizado",
-            description=f"Canal: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
-            color=0xFEE75C,
-        )
-        await self._enviar_log(canal, embed, categoria="administracao")
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role):
-        canal = await self._canal_logs(role.guild)
-        if canal:
-            await self._enviar_log(canal, criar_embed(
-                title="Cargo criado",
-                description=f"Cargo: {role.name} ({role.id})\nCor: {role.color}",
-                color=0x57F287,
-            ), categoria="administracao")
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role):
-        canal = await self._canal_logs(role.guild)
-        if canal:
-            await self._enviar_log(canal, criar_embed(
-                title="Cargo excluído",
-                description=f"Cargo: {role.name} ({role.id})",
-                color=0xED4245,
-            ), categoria="administracao")
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_guild_role_update(self, antes: discord.Role, depois: discord.Role):
-        mudancas = []
-        if antes.name != depois.name:
-            mudancas.append(f"Nome: {antes.name} → {depois.name}")
-        if antes.color != depois.color:
-            mudancas.append(f"Cor: {antes.color} → {depois.color}")
-        if antes.hoist != depois.hoist:
-            mudancas.append(f"Separado na lista: {antes.hoist} → {depois.hoist}")
-        if antes.mentionable != depois.mentionable:
-            mudancas.append(f"Mencionável: {antes.mentionable} → {depois.mentionable}")
-        if antes.permissions != depois.permissions:
-            mudancas.append("As permissões do cargo foram alteradas.")
-        if not mudancas:
-            return
-        canal = await self._canal_logs(depois.guild)
-        if canal:
-            await self._enviar_log(canal, criar_embed(
-                title="Cargo atualizado",
-                description=f"Cargo: {depois.name} ({depois.id})\n" + "\n".join(mudancas),
-                color=0xFEE75C,
-            ), categoria="administracao")
-
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_thread_create(self, thread: discord.Thread):
-        if thread.guild.id != GUILD_NEMESIS_ID or thread.parent_id == CANAL_REGISTRO_GLOBAL_ID:
-            return
-        await registrar_global(
-            thread.guild, "administracao", "Tópico criado",
-            f"Tópico: **{thread.name}** (`{thread.id}`)\nCanal pai: <#{thread.parent_id}>",
-            cor=0x57F287,
-        )
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_thread_delete(self, thread: discord.Thread):
-        if thread.guild.id != GUILD_NEMESIS_ID or thread.parent_id == CANAL_REGISTRO_GLOBAL_ID:
-            return
-        await registrar_global(
-            thread.guild, "administracao", "Tópico excluído",
-            f"Tópico: **{thread.name}** (`{thread.id}`)\nCanal pai: `{thread.parent_id}`",
-            cor=0xED4245,
-        )
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_thread_update(self, antes: discord.Thread, depois: discord.Thread):
-        if depois.guild.id != GUILD_NEMESIS_ID or depois.parent_id == CANAL_REGISTRO_GLOBAL_ID:
-            return
-        mudancas = []
-        if antes.name != depois.name:
-            mudancas.append(f"Nome: {antes.name} → {depois.name}")
-        if antes.archived != depois.archived:
-            mudancas.append(f"Arquivado: {antes.archived} → {depois.archived}")
-        if antes.locked != depois.locked:
-            mudancas.append(f"Bloqueado: {antes.locked} → {depois.locked}")
-        if mudancas:
-            await registrar_global(
-                depois.guild, "administracao", "Tópico atualizado",
-                f"Tópico: **{depois.name}** (`{depois.id}`)\n" + "\n".join(mudancas),
-                cor=0xFEE75C,
-            )
-
+        """Auditoria estrutural automática desativada para evitar ruído no Registro Global."""
+        return
     @commands.Cog.listener()
     async def on_invite_create(self, invite: discord.Invite):
         if invite.guild is None or invite.guild.id != GUILD_NEMESIS_ID:
