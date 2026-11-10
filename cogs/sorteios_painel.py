@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 MARCADOR_PAINEL = "NEMESIS-PAINEL-SORTEIOS"
 
 
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador in str(getattr(componente, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
+
 def _canal_oficial_sorteios(guild):
     exatos = []
     candidatos = []
@@ -524,7 +535,7 @@ class SorteiosPainel(commands.Cog):
             async for mensagem in canal.history(limit=100):
                 if mensagem.author == self.bot.user and (
                     any(MARCADOR_PAINEL in (e.footer.text or "") for e in mensagem.embeds if e.footer)
-                    or any(MARCADOR_PAINEL in getattr(component, "content", "") for component in mensagem.components)
+                    or _componentes_contem_marcador(mensagem.components, MARCADOR_PAINEL)
                 ):
                     painel = mensagem
                     break
