@@ -1399,6 +1399,7 @@ class Tickets(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._painel_views_registradas: set[int] = set()
 
         self.base_conhecimento = carregar_config(
             "knowledge_base.json"
@@ -1943,6 +1944,12 @@ class Tickets(commands.Cog):
         for guild in self.bot.guilds:
             try:
                 mensagem = await sincronizar_painel_ticket(guild)
+                if guild.id not in self._painel_views_registradas:
+                    self.bot.add_view(
+                        await _montar_select(guild.id, guild),
+                        message_id=mensagem.id,
+                    )
+                    self._painel_views_registradas.add(guild.id)
                 log.info(
                     "Central de atendimento sincronizada no Discord (guild=%s, canal=%s, mensagem=%s, components_v2=True).",
                     guild.id,
@@ -1995,6 +2002,7 @@ class Tickets(commands.Cog):
                             log.info("Painel de atendimento migrado para Components V2 no canal %s.", canal.id)
                         else:
                             await mensagem_existente.edit(view=view)
+                        self.bot.add_view(view, message_id=mensagem_existente.id)
                         continue
                     except discord.NotFound:
                         pass
@@ -2003,6 +2011,7 @@ class Tickets(commands.Cog):
                         continue
 
                 mensagem = await canal.send(view=view)
+                self.bot.add_view(view, message_id=mensagem.id)
                 try:
                     await mensagem.pin(
                         reason="Restaurando o painel permanente de tickets NÊMESIS"
