@@ -258,7 +258,12 @@ class TemporadaPublicaView(discord.ui.View):
 
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
     async def fechar(self, interaction, button):
-        await interaction.response.edit_message(content="Consulta de temporada encerrada.", embed=None, view=None)
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                discord.ui.View(timeout=120), None,
+                "CONSULTA ENCERRADA", "A consulta de temporada foi encerrada.",
+            )
+        )
 
 
 class ConfirmarEncerramentoTemporadaView(discord.ui.View):
@@ -286,13 +291,24 @@ class ConfirmarEncerramentoTemporadaView(discord.ui.View):
             "O XP histórico e a progressão organizacional permaneceram intactos.", ephemeral=True,
         )
         try:
-            await interaction.message.edit(content="Encerramento concluído.", embed=None, view=None)
+            await interaction.message.edit(
+                view=_card_temporada(
+                    discord.ui.View(timeout=120), None,
+                    "TEMPORADA ENCERRADA",
+                    "O encerramento foi concluído e o histórico foi arquivado.",
+                )
+            )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
     @discord.ui.button(label="Cancelar", emoji="↩️", style=discord.ButtonStyle.secondary)
     async def cancelar(self, interaction, button):
-        await interaction.response.edit_message(content="Encerramento cancelado.", embed=None, view=None)
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                discord.ui.View(timeout=120), None,
+                "ENCERRAMENTO CANCELADO", "A temporada atual foi mantida.",
+            )
+        )
 
 
 class TemporadasMissoesCentralView(discord.ui.View):
@@ -344,7 +360,12 @@ class TemporadasMissoesCentralView(discord.ui.View):
 
     @discord.ui.button(label="Fechar", emoji="✕", style=discord.ButtonStyle.secondary, row=2)
     async def fechar(self, interaction, button):
-        await interaction.response.edit_message(content="Central de Temporadas encerrada.", embed=None, view=None)
+        await interaction.response.edit_message(
+            view=_card_temporada(
+                discord.ui.View(timeout=120), None,
+                "CENTRAL ENCERRADA", "A consulta foi encerrada. O histórico permanece preservado.",
+            )
+        )
 
 
 class TemporadasMissoes(commands.Cog):
