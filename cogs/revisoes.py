@@ -596,9 +596,7 @@ class Revisoes(commands.Cog):
                 f"Prova original: {msg.jump_url}",
                 cor=0xFEE75C,
                 view=_card_revisao_view(
-                    _view_link_revisao(msg.jump_url), None,
-                    "EVIDÊNCIA DE MISSÃO",
-                    f"Protocolo: **{revisao.get('id', '—')}**\nAcesse a publicação original para revisar a evidência.",
+                    _view_link_revisao(msg.jump_url), registro,
                 ),
             )
             await registrar(
