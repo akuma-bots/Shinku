@@ -362,13 +362,22 @@ class PainelConsultaConvitesLayoutView(discord.ui.LayoutView):
 
 
 def _mensagem_eh_painel_convites(mensagem: discord.Message) -> bool:
-    if any(embed.title == "🔗 CENTRAL DE CONVITES" for embed in mensagem.embeds):
-        return True
+    # Reconhece a versão atual, os painéis legados (embed) e o botão antigo,
+    # mesmo que o texto/título tenha sido alterado em uma publicação anterior.
+    for embed in mensagem.embeds:
+        titulo = str(embed.title or "").casefold()
+        descricao = str(embed.description or "").casefold()
+        rodape = str(embed.footer.text or "").casefold() if embed.footer else ""
+        if "central de convites" in titulo or (
+            "convites" in titulo and ("nemesis" in descricao or "consulta" in descricao)
+        ) or "painel de convites" in rodape:
+            return True
     pendentes = list(getattr(mensagem, "components", []) or [])
     while pendentes:
         componente = pendentes.pop()
-        conteudo = str(getattr(componente, "content", "") or "")
-        if "CENTRAL DE CONVITES" in conteudo and "Nêmesis Systeam" in conteudo:
+        conteudo = str(getattr(componente, "content", "") or "").casefold()
+        custom_id = str(getattr(componente, "custom_id", "") or "")
+        if "central de convites" in conteudo or custom_id == "nemesis:convites:abrir":
             return True
         pendentes.extend(list(getattr(componente, "children", []) or []))
     return False
