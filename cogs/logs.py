@@ -117,6 +117,9 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
         discord.ui.TextDisplay("-# Nêmesis Systeam • Arquivo e auditoria"),
     ])
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
     return layout
 
 
@@ -159,7 +162,7 @@ class DossieMembroRegistroView(discord.ui.View):
             await interaction.edit_original_response(content=None, embed=None, embeds=[], view=_card_registro(self, embed))
         except Exception:
             logger.exception("Falha ao atualizar dossiê individual.")
-            await interaction.edit_original_response(content="Não foi possível atualizar os dados agora.", embed=None, view=self)
+            await interaction.edit_original_response(content=None, embed=None, view=_card_registro(self, None, "DADOS INDISPONÍVEIS", "Não foi possível atualizar os dados agora."))
 
     @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=1, disabled=True)
     async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
