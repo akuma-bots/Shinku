@@ -568,12 +568,7 @@ class AvaliacaoTicketLayoutView(discord.ui.LayoutView):
     def __init__(self, guild_id: int, ticket_id: str, owner_id: int, atendente_id: int):
         super().__init__(timeout=None)
         botoes = [
-            discord.ui.Button(
-                label=f"{nota}/5",
-                emoji="⭐",
-                style=discord.ButtonStyle.primary,
-                custom_id=f"ticket:avaliar:{guild_id}:{ticket_id}:{nota}",
-            )
+            AvaliacaoTicketButton(guild_id, ticket_id, nota)
             for nota in range(1, 6)
         ]
         self.add_item(discord.ui.Container(
@@ -583,7 +578,7 @@ class AvaliacaoTicketLayoutView(discord.ui.LayoutView):
                 "Como foi sua experiência? Selecione uma nota de 1 a 5."
             ),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-            discord.ui.ActionRow(*botoes[:5]),
+            discord.ui.ActionRow(*botoes),
             discord.ui.TextDisplay("-# Nêmesis Systeam • Central de Atendimento"),
             accent_colour=COR_TICKET,
         ))
