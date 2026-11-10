@@ -420,7 +420,7 @@ class SorteiosPainel(commands.Cog):
             if canal is not None:
                 mensagem = await canal.fetch_message(mensagem_id)
                 await mensagem.edit(
-                    content=None, embed=None, embeds=[], attachments=[], view=view
+                    content=None, embeds=[], attachments=[], view=view
                 )
         except (KeyError, TypeError, ValueError, discord.NotFound, discord.Forbidden, discord.HTTPException):
             logger.exception("Não foi possível sincronizar o cartão persistente do sorteio %s.", sorteio.get("id"))
@@ -460,7 +460,7 @@ class SorteiosPainel(commands.Cog):
         await interaction.followup.send(f"Você está participando! Suas chances neste sorteio: **{chances}**.", ephemeral=True)
         try:
             await interaction.message.edit(
-                content=None, embed=None, embeds=[], attachments=[],
+                content=None, embeds=[], attachments=[],
                 view=_card_sorteio(atual, len(atual.get("participantes", [])), ViewSorteioPublico()),
             )
         except discord.HTTPException:
@@ -547,7 +547,7 @@ class SorteiosPainel(commands.Cog):
                 rodape=MARCADOR_PAINEL,
             )
             if painel:
-                await painel.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+                await painel.edit(content=None, embeds=[], attachments=[], view=view)
             else:
                 await canal.send(view=view)
             todos = await _carregar_todos()
