@@ -159,6 +159,24 @@ def _card_revisao_view(origem: discord.ui.View, embed: discord.Embed | None = No
     return layout
 
 
+
+def _mensagem_tem_cartao_revisao(mensagem: discord.Message) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        if "NÊMESIS • Auditoria de Operações" in str(getattr(item, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
+async def _atualizar_cartao_revisao(mensagem: discord.Message, embed: discord.Embed) -> None:
+    view = _card_revisao_view(discord.ui.View(timeout=120), embed)
+    if not _mensagem_tem_cartao_revisao(mensagem):
+        await mensagem.edit(content=None, embeds=[], attachments=[])
+    await mensagem.edit(view=view)
+
+
 STATUS_LABELS = {
     "pendente": ("⏳ Pendentes", 0xFEE75C),
     "aprovada": ("✅ Aprovadas", 0x57F287),
@@ -416,9 +434,7 @@ class MotivoRejeicaoModal(discord.ui.Modal, title="Rejeitar comprovante"):
             embed.add_field(name="✕ DECISÃO", value="**REJEITADA**", inline=True)
             embed.add_field(name="◈ RESPONSÁVEL PELA ANÁLISE", value=self.revisor.mention, inline=True)
             embed.add_field(name="◈ JUSTIFICATIVA", value=motivo[:800], inline=False)
-            await self.mensagem.edit(
-                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
-            )
+            await _atualizar_cartao_revisao(self.mensagem, embed)
             await auditoria.registrar(
                 self.guild,
                 "✕ Comprovante rejeitado",
@@ -790,9 +806,7 @@ class Revisoes(commands.Cog):
             embed.add_field(name="✅ Aprovado por", value=interaction.user.mention, inline=False)
             if resultado_texto:
                 embed.add_field(name="Resultado aplicado", value=resultado_texto, inline=False)
-            await mensagem_decisao.edit(
-                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
-            )
+            await _atualizar_cartao_revisao(mensagem_decisao, embed)
             await interaction.message.edit(
                 view=_card_revisao_view(
                     discord.ui.View(timeout=120), None,
@@ -869,9 +883,7 @@ class Revisoes(commands.Cog):
             embed = _embed_revisao(revisao, interaction.guild, self.bot)
             embed.color = 0xED4245
             embed.add_field(name="❌ Rejeitado por", value=interaction.user.mention, inline=False)
-            await interaction.message.edit(
-                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
-            )
+            await _atualizar_cartao_revisao(interaction.message, embed)
 
             await auditoria.registrar(
                 interaction.guild, "📋 Revisão rejeitada",
