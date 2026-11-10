@@ -14,6 +14,17 @@ ARQUIVO_CENTRAL_TUTORIAIS = "central_tutoriais.json"
 MARCADOR_CENTRAL_TUTORIAIS = "NÊMESIS • CENTRAL DE TUTORIAIS • V4"
 
 
+def _componentes_contem_marcador(componentes, marcador: str) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if marcador in str(getattr(componente, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
+
 TUTORIAIS = {
     "dados_atividade": {
         "titulo": "Dados e histórico de atividade",
@@ -610,7 +621,7 @@ class Tutorial(commands.Cog):
                         logger.exception("Não foi possível remover um guia antigo (message=%s).", antiga.id)
                 if mensagem is None and (
                     any(embed.footer and embed.footer.text == MARCADOR_CENTRAL_TUTORIAIS for embed in antiga.embeds)
-                    or any(MARCADOR_CENTRAL_TUTORIAIS in getattr(component, "content", "") for component in antiga.components)
+                    or _componentes_contem_marcador(antiga.components, MARCADOR_CENTRAL_TUTORIAIS)
                 ):
                     mensagem = antiga
 
