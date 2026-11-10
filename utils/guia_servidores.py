@@ -134,10 +134,31 @@ class GuiaCanaisSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        if interaction.guild is None or interaction.guild.id != GUILD_NEMESIS_ID:
+        guild = interaction.guild
+        if guild is None:
+            guild = interaction.client.get_guild(GUILD_NEMESIS_ID)
+            if guild is None:
+                try:
+                    guild = await interaction.client.fetch_guild(GUILD_NEMESIS_ID)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    guild = None
+        if guild is None or guild.id != GUILD_NEMESIS_ID:
             await interaction.response.send_message(
-                "Este guia está disponível exclusivamente na NÊMESIS.",
-                ephemeral=True,
+                "Não consegui acessar a NÊMESIS agora. Abra o servidor e tente novamente.",
+                ephemeral=interaction.guild is not None,
+            )
+            return
+
+        membro = interaction.user if isinstance(interaction.user, discord.Member) else guild.get_member(interaction.user.id)
+        if membro is None:
+            try:
+                membro = await guild.fetch_member(interaction.user.id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                membro = None
+        if membro is None:
+            await interaction.response.send_message(
+                "Esta navegação está disponível apenas para integrantes da NÊMESIS.",
+                ephemeral=interaction.guild is not None,
             )
             return
 
@@ -154,7 +175,7 @@ class GuiaCanaisSelect(discord.ui.Select):
             return
 
         nome, _, emoji, descricao = selecionado
-        canal = interaction.guild.get_channel(canal_id)
+        canal = guild.get_channel(canal_id)
         if canal is None:
             try:
                 canal = await interaction.guild.fetch_channel(canal_id)
@@ -169,7 +190,7 @@ class GuiaCanaisSelect(discord.ui.Select):
             )
             return
 
-        permissoes = canal.permissions_for(interaction.user)
+        permissoes = canal.permissions_for(membro)
         if not permissoes.view_channel:
             await interaction.response.send_message(
                 "Este espaço não está disponível para sua conta. O guia não revela canais internos ou acessos restritos.",
@@ -196,7 +217,7 @@ class GuiaCanaisSelect(discord.ui.Select):
         resposta.set_footer(text="NÊMESIS • Orientação do servidor")
         await interaction.response.send_message(
             embed=resposta,
-            ephemeral=True,
+            ephemeral=interaction.guild is not None,
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
