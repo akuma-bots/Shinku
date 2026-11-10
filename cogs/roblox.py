@@ -352,6 +352,8 @@ def _card_roblox(origem: discord.ui.View, embed: discord.Embed | None = None,
             )
             async def selecionar(interaction, original=item, clone=novo):
                 original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
                 await original.callback(interaction)
             novo.callback = selecionar
             componentes.append(discord.ui.ActionRow(novo))
