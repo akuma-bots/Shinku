@@ -50,22 +50,47 @@ def _aplicar_identidade_bot(embed: discord.Embed, guild: discord.Guild, bot: dis
 
 
 
-class NotasDMView(discord.ui.View):
-    """Ações úteis dentro da DM da atualização."""
-    def __init__(self):
+class NotasDMView(discord.ui.LayoutView):
+    """Cartão Components V2 para as notas automáticas enviadas por DM."""
+
+    def __init__(self, release: dict):
         super().__init__(timeout=None)
-        self.add_item(discord.ui.Button(label="Ver sistemas", style=discord.ButtonStyle.link, emoji="📚", url=CANAL_SISTEMAS_URL))
-        self.add_item(discord.ui.Button(label="Ver missões", style=discord.ButtonStyle.link, emoji="⚔️", url=CANAL_MISSOES_URL))
-        self.add_item(AlternarAvisosButton())
+        texto = (
+            "## 𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  NOTAS DE ATUALIZAÇÃO\n"
+            f"### {release['titulo']}\n"
+            f"{release['mensagem']}\n\n"
+            "### ◈ INFORMAÇÕES DA ATUALIZAÇÃO\n"
+            f"**Categoria:** {release['tipo']}\n"
+            f"**Data:** {release['data_atualizacao']}\n"
+            f"**Horário:** {release['hora_atualizacao']} — {release['fuso_horario']}\n\n"
+            "Acesse os atalhos para consultar os sistemas e acompanhar as missões."
+        )
+        sistemas = discord.ui.Button(
+            label="Ver sistemas", style=discord.ButtonStyle.link,
+            emoji="📚", url=CANAL_SISTEMAS_URL,
+        )
+        missoes = discord.ui.Button(
+            label="Ver missões", style=discord.ButtonStyle.link,
+            emoji="⚔️", url=CANAL_MISSOES_URL,
+        )
+        preferencias = AlternarAvisosButton()
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(texto),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(sistemas, missoes),
+            discord.ui.ActionRow(preferencias),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+            accent_colour=COR_PRIMARIA,
+        ))
 
 
-async def _enviar_dm_com_retry(membro: discord.abc.User, *, embed: discord.Embed) -> str:
+async def _enviar_dm_com_retry(membro: discord.abc.User, *, view: discord.ui.LayoutView) -> str:
     """Faz uma única tentativa para evitar duplicações em retries ambíguos."""
     user_id = getattr(membro, "id", "desconhecido")
     try:
         await membro.send(
-            embed=embed,
-            view=NotasDMView(),
+            view=view,
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return "enviada"
@@ -210,24 +235,7 @@ class Novidades(commands.Cog):
                 tentadas_ids.update(str(x) for x in release_estado.get("dms_enviadas", []))
                 tentadas_ids.update(str(x) for x in release_estado.get("dms_indisponiveis", []))
 
-                embed = criar_embed(
-                    description=(
-                        "╭────────────── ◈ ──────────────╮\n"
-                        "**𝐍̷Ê𝐌𝐄𝐒𝐈𝐒  /  NOTAS DE ATUALIZAÇÃO**\n"
-                        "╰────────────── ◈ ──────────────╯\n\n"
-                        f"**{release['titulo']}**\n"
-                        f"{release['mensagem']}\n\n"
-                        "**◈ INFORMAÇÕES DA ATUALIZAÇÃO**\n"
-                        "Consulte os botões abaixo para acessar os sistemas e acompanhar as missões."
-                    ),
-                    color=COR_PRIMARIA,
-                    timestamp=datetime.now(timezone.utc),
-                )
-                _aplicar_identidade_bot(embed, guild, self.bot)
-                embed.add_field(name="◈ CATEGORIA", value=f"**{release['tipo']}**", inline=True)
-                embed.add_field(name="◈ DATA", value=f"**{release['data_atualizacao']}**", inline=True)
-                embed.add_field(name="◈ HORÁRIO", value=f"**{release['hora_atualizacao']}**\n{release['fuso_horario']}", inline=True)
-                embed.set_footer(text=f"NÊMESIS • Atualização em {release['data_atualizacao']} às {release['hora_atualizacao']} (BRT)")
+                view_notas = NotasDMView(release)
 
                 membros = [m async for m in guild.fetch_members(limit=None) if not m.bot]
                 inscritos = await listar_inscritos(
@@ -247,7 +255,7 @@ class Novidades(commands.Cog):
                     if not await self._reservar_destinatario_release(guild.id, release["release_id"], user_id):
                         continue
 
-                    resultado = await _enviar_dm_com_retry(membro, embed=embed)
+                    resultado = await _enviar_dm_com_retry(membro, view=NotasDMView(release))
                     await self._registrar_resultado_release(guild.id, release["release_id"], user_id, resultado)
                     if resultado == "enviada":
                         enviados += 1
