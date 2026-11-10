@@ -482,6 +482,76 @@ def membro_pode_moderar(membro, canal=None) -> bool:
 
 
 
+
+def _texto_components_v2(mensagem: discord.Message) -> str:
+    partes = []
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop(0)
+        conteudo = str(getattr(item, "content", "") or "").strip()
+        if conteudo:
+            partes.append(conteudo)
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return "\n\n".join(partes)
+
+
+def _embed_automod_da_mensagem(mensagem: discord.Message) -> discord.Embed | None:
+    if mensagem.embeds:
+        return mensagem.embeds[0].copy()
+    texto = _texto_components_v2(mensagem)
+    if not texto:
+        return None
+    titulo = "AUTO MOD • REGISTRO DE INFRAÇÃO"
+    descricao = texto
+    for linha in texto.splitlines():
+        if linha.startswith("## "):
+            titulo = linha[3:].strip()
+            descricao = texto.split(linha, 1)[1].strip()
+            break
+    descricao = re.sub(r"-# NÊMESIS • Segurança e Moderação\s*$", "", descricao).strip()
+    return discord.Embed(title=titulo[:256], description=descricao[:4096])
+
+
+def _card_automod_view(origem: discord.ui.View | None, embed: discord.Embed | None = None,
+                       titulo: str = "PAINEL DE MODERAÇÃO", descricao: str = "") -> discord.ui.LayoutView:
+    origem = origem or discord.ui.View(timeout=120)
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.ui.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Segurança e Moderação"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 class ModalMotivoDecisao(discord.ui.Modal):
     def __init__(self, bot: commands.Bot, nivel: int, guild_id: int, channel_id: int, message_id: int, alvo_id: int):
         super().__init__(title="Justificar decisão da moderação", timeout=300)
@@ -505,11 +575,14 @@ class ModalMotivoDecisao(discord.ui.Modal):
         if not membro_pode_moderar(interaction.user):
             await interaction.response.send_message("Você não tem permissão para decidir sobre esta infração.", ephemeral=True)
             return
+        origem = ConfirmarDecisaoView(
+            self.bot, self.guild_id, self.channel_id, self.message_id,
+            self.alvo_id, self.nivel, str(self.motivo.value).strip(),
+        )
         await interaction.response.send_message(
-            "Confirme a decisão abaixo. A ação só será aplicada após a confirmação.",
-            view=ConfirmarDecisaoView(
-                self.bot, self.guild_id, self.channel_id, self.message_id,
-                self.alvo_id, self.nivel, str(self.motivo.value).strip(),
+            view=_card_automod_view(
+                origem, None, "CONFIRMAR DECISÃO DE MODERAÇÃO",
+                "A ação só será aplicada após sua confirmação. Confira o nível e o motivo selecionados.",
             ),
             ephemeral=True,
         )
@@ -549,11 +622,11 @@ class ConfirmarDecisaoView(discord.ui.View):
         except discord.HTTPException:
             await interaction.response.send_message("O registro da infração não está mais acessível.", ephemeral=True)
             return
-        if not mensagem.embeds:
+        embed = _embed_automod_da_mensagem(mensagem)
+        if embed is None:
             await interaction.response.send_message("O registro não contém os dados da infração.", ephemeral=True)
             return
-        embed = mensagem.embeds[0]
-        if any(field.name == "Decisão da moderação" for field in embed.fields):
+        if "Decisão da moderação" in (embed.description or "") or any(field.name == "Decisão da moderação" for field in embed.fields):
             await interaction.response.send_message("Esta infração já foi analisada pela moderação.", ephemeral=True)
             return
         cog = self.bot.get_cog("AutoMod")
@@ -576,7 +649,9 @@ class ConfirmarDecisaoView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
             try:
-                await interaction.message.edit(content=resultado, view=self)
+                await interaction.message.edit(
+                    view=_card_automod_view(self, None, "DECISÃO REGISTRADA", resultado)
+                )
             except (discord.HTTPException, AttributeError):
                 pass
             await interaction.delete_original_response()
@@ -584,8 +659,10 @@ class ConfirmarDecisaoView(discord.ui.View):
             print(f"[AUTOMOD][ERRO] Falha na decisão confirmada: {erro}")
             try:
                 await interaction.edit_original_response(
-                    content="Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
-                    view=None,
+                    view=_card_automod_view(
+                        None, None, "DECISÃO NÃO CONCLUÍDA",
+                        "Não foi possível concluir a decisão. Confira permissões, hierarquia de cargos e configuração.",
+                    )
                 )
             except discord.HTTPException:
                 pass
@@ -596,7 +673,9 @@ class ConfirmarDecisaoView(discord.ui.View):
     async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content="Decisão cancelada. Nenhuma punição foi aplicada.", view=self)
+        await interaction.response.edit_message(
+            view=_card_automod_view(self, None, "DECISÃO CANCELADA", "Nenhuma punição foi aplicada.")
+        )
 
 
 class PainelPunicao(discord.ui.View):
@@ -613,11 +692,11 @@ class PainelPunicao(discord.ui.View):
         if not membro_pode_moderar(interaction.user):
             await interaction.response.send_message("Você não tem permissão para decidir sobre esta infração.", ephemeral=True)
             return
-        if not interaction.message.embeds:
+        embed = _embed_automod_da_mensagem(interaction.message)
+        if embed is None:
             await interaction.response.send_message("Não foi possível localizar os dados desta infração.", ephemeral=True)
             return
-        embed = interaction.message.embeds[0]
-        if any(field.name == "Decisão da moderação" for field in embed.fields):
+        if "Decisão da moderação" in (embed.description or "") or any(field.name == "Decisão da moderação" for field in embed.fields):
             await interaction.response.send_message("Esta infração já foi analisada pela moderação.", ephemeral=True)
             return
         alvo_match = re.search(r"\*\*Usuário:\*\*\s*<@!?(\d+)>", embed.description or "")
@@ -1568,7 +1647,9 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
             await registrar_global(
                 message.guild, "automod", "AutoMod — Infração detectada",
-                embed=embed, view=PainelPunicao(self.bot),
+                embed=embed, view=_card_automod_view(
+                    PainelPunicao(self.bot), embed,
+                ),
             )
             await registrar_global(
                 message.guild,
@@ -1917,7 +1998,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             inline=False,
         )
         embed.color = COR_ERRO if nivel >= 3 else COR_AVISO
-        await mensagem.edit(embed=embed, view=None)
+        await mensagem.edit(view=_card_automod_view(None, embed))
 
         try:
             if alvo is not None:
@@ -1967,7 +2048,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             inline=False,
         )
         embed.color = COR_SUCESSO
-        await mensagem.edit(embed=embed, view=None)
+        await mensagem.edit(view=_card_automod_view(None, embed))
         log = criar_embed(
             title="🛡️ Auditoria — AutoMod",
             description=(
@@ -2551,7 +2632,7 @@ async def setup(
     await bot.add_cog(
         AutoMod(bot)
     )
-    bot.add_view(PainelPunicao(bot))
+    bot.add_view(_card_automod_view(PainelPunicao(bot), None, "PAINEL DE MODERAÇÃO", "Selecione o nível adequado para a infração. Toda decisão exige justificativa e confirmação."))
 
     print(
         "[AUTOMOD] Cog registrado no bot."
