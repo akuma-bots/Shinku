@@ -417,7 +417,6 @@ class SeletorTutorialPublico(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         chave = self.values[0]
         await interaction.response.send_message(
-            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
             view=TutorialDetalheLayoutView(interaction.user.id, chave),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
@@ -484,7 +483,6 @@ class SeletorTutorialDetalhe(discord.ui.Select):
             return
         chave = self.values[0]
         await interaction.response.edit_message(
-            embed=_embed_tutorial(chave, interaction.guild, interaction.client),
             view=TutorialDetalheLayoutView(self.autor_id, chave),
         )
 
@@ -571,7 +569,6 @@ class TutorialDetalheView(discord.ui.View):
     @discord.ui.button(label="Voltar ao índice", style=discord.ButtonStyle.secondary, emoji="📚", row=1)
     async def voltar_indice(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
-            embed=_embed_indice(interaction.guild, interaction.client),
             view=TutorialIndiceLayoutView(self.autor_id),
         )
 
