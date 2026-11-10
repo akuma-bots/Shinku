@@ -28,6 +28,35 @@ def _view_com_botoes(botao1_texto, botao1_url, botao2_texto, botao2_url):
     return view if tem_botao else None
 
 
+
+def _layout_embed_publicado(embed: discord.Embed, origem: discord.ui.View) -> discord.ui.LayoutView:
+    partes = []
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    if embed.image and embed.image.url:
+        partes.append(f"[Abrir imagem]({embed.image.url})")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    botoes = []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            botoes.append(discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            ))
+    componentes = [discord.ui.TextDisplay("\n\n".join(partes)[:3900])]
+    if botoes:
+        componentes.append(discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small))
+        for inicio in range(0, len(botoes), 5):
+            componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.append(discord.ui.TextDisplay("-# NÊMESIS • Publicação institucional"))
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
 class EmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CRIAR MODELO"):
     parte1 = discord.ui.TextInput(label="Descrição — parte 1/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
     parte2 = discord.ui.TextInput(label="Descrição — parte 2/5", style=discord.TextStyle.paragraph, required=False, max_length=4000)
@@ -114,7 +143,10 @@ class EmbedModal(discord.ui.Modal, title="𝐍̷Ê𝐌𝐄𝐒𝐈𝐒 ━ CRIAR
                     if self.rodape_embed:
                         embed.set_footer(text=self.rodape_embed)
 
-                await self.canal.send(embed=embed, view=view if indice == 0 else None)
+                await self.canal.send(
+                    view=_layout_embed_publicado(embed, view) if indice == 0 else None,
+                    embed=embed if indice > 0 else None,
+                )
                 enviados += 1
         except discord.HTTPException as erro:
             await interaction.followup.send(
