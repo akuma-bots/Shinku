@@ -123,8 +123,13 @@ class SeletorMissaoProvaView(discord.ui.View):
             self.cog, self.owner_id, self.categoria, self.atividades, self.pagina
         )
         await interaction.response.edit_message(
-            embed=self.cog._embed_selecao_prova(self.categoria, self.pagina, self.total_paginas, self.atividades, interaction.guild),
-            view=nova,
+            view=_card_view_missoes(
+                nova,
+                self.cog._embed_selecao_prova(
+                    self.categoria, self.pagina, self.total_paginas,
+                    self.atividades, interaction.guild,
+                ),
+            ),
         )
 
     @discord.ui.button(label="Página anterior", style=discord.ButtonStyle.secondary, emoji="◀️", row=1)
