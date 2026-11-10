@@ -691,8 +691,9 @@ class InteligenciaMissoesView(discord.ui.View):
     async def atualizar(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = await self.cog._montar_embed_inteligencia(interaction.guild, self.pagina)
         await interaction.response.edit_message(
-            embed=embed,
-            view=InteligenciaMissoesView(self.cog, self.owner_id, self.pagina),
+            view=_card_view_missoes(
+                InteligenciaMissoesView(self.cog, self.owner_id, self.pagina), embed
+            ),
         )
 
     @discord.ui.button(label="Fechar", emoji="❌", style=discord.ButtonStyle.danger)
