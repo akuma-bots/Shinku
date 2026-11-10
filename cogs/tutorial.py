@@ -633,12 +633,13 @@ class Tutorial(commands.Cog):
                 )
                 logger.info("Central pública de tutoriais publicada em #Sistemas (message=%s).", mensagem.id)
             else:
-                await mensagem.edit(
-                    content=None, embeds=[], attachments=[],
-                    view=TutorialPainelLayoutView(embed),
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                logger.info("Central pública de tutoriais atualizada em #Sistemas (message=%s).", mensagem.id)
+                if not _componentes_contem_marcador(mensagem.components, MARCADOR_CENTRAL_TUTORIAIS):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
+                    await mensagem.edit(
+                        view=TutorialPainelLayoutView(embed),
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                logger.info("Central pública de tutoriais sincronizada em #Sistemas (message=%s).", mensagem.id)
 
             await salvar(
                 ARQUIVO_CENTRAL_TUTORIAIS,
