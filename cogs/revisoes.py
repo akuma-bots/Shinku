@@ -788,7 +788,16 @@ class Revisoes(commands.Cog):
             embed.add_field(name="✅ Aprovado por", value=interaction.user.mention, inline=False)
             if resultado_texto:
                 embed.add_field(name="Resultado aplicado", value=resultado_texto, inline=False)
-            await mensagem_decisao.edit(embed=embed, view=None)
+            await mensagem_decisao.edit(
+                view=_card_revisao_view(discord.ui.View(timeout=120), embed)
+            )
+            await interaction.message.edit(
+                view=_card_revisao_view(
+                    discord.ui.View(timeout=120), None,
+                    "APROVAÇÃO CONFIRMADA",
+                    "A decisão foi registrada e a recompensa foi processada.",
+                )
+            )
             await interaction.edit_original_response(
                 content="Aprovação confirmada. A decisão foi registrada e a recompensa foi processada.",
                 view=None,
