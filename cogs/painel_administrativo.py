@@ -439,6 +439,18 @@ class PainelAdministrativoView(discord.ui.LayoutView):
         )
 
 
+
+def _mensagem_tem_cartao_administrativo(mensagem: discord.Message) -> bool:
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        item = pendentes.pop()
+        conteudo = str(getattr(item, "content", "") or "").casefold()
+        if "central administrativa" in conteudo or "centro administrativo" in conteudo:
+            return True
+        pendentes.extend(list(getattr(item, "children", []) or []))
+    return False
+
+
 class PainelAdministrativo(commands.Cog):
     """Publica e mantém o painel central no tópico canônico de Administração."""
 
@@ -478,10 +490,9 @@ class PainelAdministrativo(commands.Cog):
                         reason="Atualizar painel administrativo central",
                     )
                 mensagem = await thread.fetch_message(thread.id)
+                if not _mensagem_tem_cartao_administrativo(mensagem):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
                 await mensagem.edit(
-                    content=None,
-                    embeds=[],
-                    attachments=[],
                     view=PainelAdministrativoView(self.bot),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
