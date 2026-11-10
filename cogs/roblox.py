@@ -705,8 +705,11 @@ class Roblox(commands.Cog):
             interaction.user.id,
         )
         await interaction.response.edit_message(
-            content=f"✅ A patente **{discord.utils.escape_markdown(patente)}** agora corresponde ao cargo {cargo.mention}.",
-            view=None,
+            view=_card_roblox(
+                discord.ui.View(timeout=120), None,
+                "MAPEAMENTO ATUALIZADO",
+                f"A patente **{discord.utils.escape_markdown(patente)}** agora corresponde ao cargo {cargo.mention}.",
+            )
         )
 
     # ---------------- Verificação de conta ----------------
