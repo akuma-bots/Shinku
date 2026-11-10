@@ -303,11 +303,10 @@ class BotaoParticipar(discord.ui.View):
         )
 
         try:
+            cartao = _card_sorteio_legacy(view, mensagem=interaction.message)
             if not _mensagem_tem_cartao_sorteio_legacy(interaction.message):
                 await interaction.message.edit(content=None, embeds=[], attachments=[])
-            await interaction.message.edit(
-                view=_card_sorteio_legacy(view, mensagem=interaction.message)
-            )
+            await interaction.message.edit(view=cartao)
         except discord.HTTPException:
             pass
 
@@ -831,11 +830,10 @@ class Sorteios(commands.Cog):
 
         try:
             view = self.criar_view_legada(sorteio)
+            cartao = _card_sorteio_legacy(view, mensagem=interaction.message)
             if not _mensagem_tem_cartao_sorteio_legacy(interaction.message):
                 await interaction.message.edit(content=None, embeds=[], attachments=[])
-            await interaction.message.edit(
-                view=_card_sorteio_legacy(view, mensagem=interaction.message)
-            )
+            await interaction.message.edit(view=cartao)
         except discord.HTTPException:
             pass
 
@@ -1168,12 +1166,13 @@ class Sorteios(commands.Cog):
         try:
             if cartao_avancado and not _mensagem_tem_cartao_sorteio(mensagem, sorteio.get("id", "")):
                 await mensagem.edit(content=None, embeds=[], attachments=[])
-            if not cartao_avancado and not _mensagem_tem_cartao_sorteio_legacy(mensagem):
-                await mensagem.edit(content=None, embeds=[], attachments=[])
             if cartao_avancado:
                 await mensagem.edit(view=view)
             else:
-                await mensagem.edit(view=_card_sorteio_legacy(view, mensagem=mensagem))
+                cartao = _card_sorteio_legacy(view, mensagem=mensagem)
+                if not _mensagem_tem_cartao_sorteio_legacy(mensagem):
+                    await mensagem.edit(content=None, embeds=[], attachments=[])
+                await mensagem.edit(view=cartao)
 
         except discord.HTTPException:
             pass
