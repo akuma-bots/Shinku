@@ -102,6 +102,63 @@ def _view_revisao(revisao_id: str) -> discord.ui.View:
     return view
 
 
+
+def _card_revisao_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+                       titulo: str = "CENTRAL DE VALIDAÇÃO", descricao: str = "") -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.image and embed.image.url:
+            partes.append(f"[Abrir evidência anexada]({embed.image.url})")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    seletores, botoes = [], []
+    for item in origem.children:
+        if isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Auditoria de Operações"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 STATUS_LABELS = {
     "pendente": ("⏳ Pendentes", 0xFEE75C),
     "aprovada": ("✅ Aprovadas", 0x57F287),
@@ -406,9 +463,15 @@ class Revisoes(commands.Cog):
         todos = await revisoes.listar(interaction.guild.id)
         pendentes = _filtrar_provas(todos, "pendente", "todos")
         contagens = _contagens_provas(todos)
+        embed = _embed_painel_provas(
+            interaction.guild, "pendente", pendentes,
+            total=len(pendentes), contagens=contagens, bot=self.bot,
+        )
         await interaction.response.send_message(
-            embed=_embed_painel_provas(interaction.guild, "pendente", pendentes, total=len(pendentes), contagens=contagens, bot=self.bot),
-            view=PainelProvasView(self, interaction.guild.id, interaction.user.id, "pendente", "todos", 0, len(pendentes)),
+            view=_card_revisao_view(
+                PainelProvasView(self, interaction.guild.id, interaction.user.id, "pendente", "todos", 0, len(pendentes)),
+                embed,
+            ),
             ephemeral=True,
         )
 
@@ -444,11 +507,11 @@ class Revisoes(commands.Cog):
         view = PainelProvasView(
             self, interaction.guild.id, owner_id, status, tipo, pagina, total
         )
+        embed = _embed_painel_provas(
+            interaction.guild, status, filtrados, tipo, pagina, total, contagens, self.bot
+        )
         await interaction.response.edit_message(
-            embed=_embed_painel_provas(
-                interaction.guild, status, filtrados, tipo, pagina, total, contagens, self.bot
-            ),
-            view=view,
+            view=_card_revisao_view(view, embed)
         )
 
     async def abrir_revisao(
@@ -518,7 +581,7 @@ class Revisoes(commands.Cog):
                 inline=False,
             )
 
-        msg = await canal.send(embed=embed, view=_view_revisao(revisao["id"]))
+        msg = await canal.send(view=_card_revisao_view(_view_revisao(revisao["id"]), embed))
         await revisoes.definir_mensagem(guild.id, revisao["id"], canal.id, msg.id)
         try:
             from utils.registro_global import registrar
@@ -532,7 +595,11 @@ class Revisoes(commands.Cog):
                 f"Status: **Pendente de revisão**\n"
                 f"Prova original: {msg.jump_url}",
                 cor=0xFEE75C,
-                view=_view_link_revisao(msg.jump_url),
+                view=_card_revisao_view(
+                    _view_link_revisao(msg.jump_url), None,
+                    "EVIDÊNCIA DE MISSÃO",
+                    f"Protocolo: **{revisao.get('id', '—')}**\nAcesse a publicação original para revisar a evidência.",
+                ),
             )
             await registrar(
                 guild,
