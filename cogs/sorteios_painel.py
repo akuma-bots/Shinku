@@ -73,6 +73,70 @@ def _calcular_chances(membro, sorteio):
     return 1
 
 
+def _card_com_view(origem: discord.ui.View, titulo: str, descricao: str,
+                   rodape: str = "Nêmesis Systeam • Sorteios", imagem: str | None = None):
+    """Converte controles tradicionais em componentes contidos no mesmo cartão."""
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    componentes = []
+    if imagem:
+        componentes.append(discord.ui.MediaGallery(
+            discord.MediaGalleryItem(url=imagem, description=titulo[:100])
+        ))
+    componentes.extend([
+        discord.ui.TextDisplay(f"## {titulo}\n{descricao}"),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ])
+    linhas = {}
+    for item in origem.children:
+        if isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder,
+                min_values=item.min_values,
+                max_values=item.max_values,
+                options=list(item.options),
+                custom_id=item.custom_id,
+                disabled=item.disabled,
+                row=item.row,
+            )
+            novo.callback = item.callback
+        else:
+            continue
+        linhas.setdefault(item.row or 0, []).append(novo)
+    for _, itens in sorted(linhas.items()):
+        for inicio in range(0, len(itens), 5):
+            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay(f"-# {rodape}"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    return layout
+
+
+def _card_sorteio(sorteio: dict, quantidade: int, view: discord.ui.View):
+    return _card_com_view(
+        view,
+        "🎉 " + str(sorteio.get("titulo") or "SORTEIO NÊMESIS"),
+        (
+            f"{sorteio.get('descricao') or 'Participe e concorra ao prêmio.'}\n\n"
+            f"**Prêmio:** {sorteio.get('premio', 'Não informado')}\n"
+            f"**Vencedores:** {int(sorteio.get('vencedores', 1))}\n"
+            f"**Encerra:** {timestamp_discord(float(sorteio.get('fim') or 0), 'F')} "
+            f"({timestamp_discord(float(sorteio.get('fim') or 0), 'R')})\n"
+            f"**Participantes:** {quantidade}\n\n"
+            "Cada membro pode participar uma única vez."
+        ),
+        rodape=f"NÊMESIS • Sorteios • ID:{sorteio['id']}",
+        imagem=sorteio.get("banner"),
+    )
+
+
 class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
     titulo = discord.ui.TextInput(label="Nome do sorteio", placeholder="Ex.: Sorteio Diário", default="Sorteio NÊMESIS", max_length=100)
     premio = discord.ui.TextInput(label="Prêmio", placeholder="Ex.: recompensa, item ou benefício", max_length=300)
@@ -123,7 +187,11 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
         await _salvar_item(sorteio)
         await interaction.response.send_message(
             f"Rascunho **{sorteio['id']}** criado. Personalize a apresentação e publique quando estiver pronto.",
-            view=ConfigurarSorteioView(self.cog, sorteio["id"]),
+            view=_card_com_view(
+                ConfigurarSorteioView(self.cog, sorteio["id"]),
+                "CONFIGURAR SORTEIO",
+                "Ajuste a apresentação do rascunho e publique quando estiver pronto.",
+            ),
             ephemeral=True,
         )
 
@@ -179,7 +247,7 @@ class ConfigurarSorteioView(discord.ui.View):
             return
         canal = canais[0]
         try:
-            mensagem = await canal.send(embed=_embed_sorteio(sorteio), view=ViewSorteioPublico())
+            mensagem = await canal.send(view=_card_sorteio(sorteio, len(sorteio.get("participantes", [])), ViewSorteioPublico()))
         except (discord.Forbidden, discord.HTTPException):
             await interaction.response.send_message("Não consegui publicar no canal #Sorteios. Verifique minhas permissões.", ephemeral=True)
             return
@@ -267,8 +335,11 @@ class SeletorSorteioAtivo(discord.ui.Select):
             await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
             return
         await interaction.response.send_message(
-            "Confirma o encerramento antecipado deste sorteio?",
-            view=ConfirmarEncerramentoSorteioView(self.cog, self.values[0]),
+            view=_card_com_view(
+                ConfirmarEncerramentoSorteioView(self.cog, self.values[0]),
+                "CONFIRMAR ENCERRAMENTO",
+                "Confirma o encerramento antecipado deste sorteio? A ação selecionará os vencedores.",
+            ),
             ephemeral=True,
         )
 
@@ -311,8 +382,15 @@ class SorteiosPainel(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._painel_lock = False
-        bot.add_view(PainelAdministrativoView())
-        bot.add_view(ViewSorteioPublico())
+        bot.add_view(_card_com_view(
+            PainelAdministrativoView(), "🎁 CENTRAL DE SORTEIOS",
+            "Área administrativa para criar e configurar sorteios oficiais da NÊMESIS. A criação e as configurações são restritas à liderança.",
+            rodape=MARCADOR_PAINEL,
+        ))
+        bot.add_view(_card_com_view(
+            ViewSorteioPublico(), "SORTEIO NÊMESIS",
+            "Participe do sorteio e consulte suas chances usando os controles abaixo.",
+        ))
 
     async def obter(self, sorteio_id):
         todos = await _carregar_todos()
@@ -321,7 +399,10 @@ class SorteiosPainel(commands.Cog):
 
     async def registrar_view_publica(self, sorteio):
         try:
-            self.bot.add_view(ViewSorteioPublico(), message_id=int(sorteio["mensagem_id"]))
+            self.bot.add_view(
+                _card_sorteio(sorteio, len(sorteio.get("participantes", [])), ViewSorteioPublico()),
+                message_id=int(sorteio["mensagem_id"]),
+            )
         except (KeyError, TypeError, ValueError, discord.HTTPException):
             logger.exception("Não foi possível registrar a view persistente do sorteio %s.", sorteio.get("id"))
 
@@ -359,7 +440,10 @@ class SorteiosPainel(commands.Cog):
             await salvar(ARQUIVO, todos)
         await interaction.followup.send(f"Você está participando! Suas chances neste sorteio: **{chances}**.", ephemeral=True)
         try:
-            await interaction.message.edit(embed=_embed_sorteio(atual, len(atual.get("participantes", []))), view=ViewSorteioPublico())
+            await interaction.message.edit(
+                content=None, embed=None, embeds=[], attachments=[],
+                view=_card_sorteio(atual, len(atual.get("participantes", [])), ViewSorteioPublico()),
+            )
         except discord.HTTPException:
             logger.warning("Inscrição registrada, mas não foi possível atualizar a mensagem do sorteio %s.", sorteio.get("id"))
 
@@ -398,7 +482,14 @@ class SorteiosPainel(commands.Cog):
             await interaction.response.send_message("Não há sorteios ativos no momento.", ephemeral=True)
             return
         embed = criar_embed(title="📋 SORTEIOS EM ANDAMENTO", description="Selecione um sorteio para encerrar antecipadamente. A ação exige confirmação.", color=COR_PRIMARIA)
-        await interaction.response.send_message(embed=embed, view=SeletorSorteioAtivoView(self, ativos), ephemeral=True)
+        await interaction.response.send_message(
+            view=_card_com_view(
+                SeletorSorteioAtivoView(self, ativos),
+                "📋 SORTEIOS EM ANDAMENTO",
+                "Selecione um sorteio para encerrar antecipadamente. A ação exige confirmação.",
+            ),
+            ephemeral=True,
+        )
 
     async def _por_mensagem(self, mensagem_id):
         todos = await _carregar_todos()
@@ -428,10 +519,15 @@ class SorteiosPainel(commands.Cog):
                     break
             embed = criar_embed(title="🎁 CENTRAL DE SORTEIOS", description="Área administrativa para criar e configurar sorteios oficiais da NÊMESIS. A criação e as configurações são restritas à liderança.", color=COR_PRIMARIA)
             embed.set_footer(text=MARCADOR_PAINEL)
+            view = _card_com_view(
+                PainelAdministrativoView(), "🎁 CENTRAL DE SORTEIOS",
+                "Área administrativa para criar e configurar sorteios oficiais da NÊMESIS. A criação e as configurações são restritas à liderança.",
+                rodape=MARCADOR_PAINEL,
+            )
             if painel:
-                await painel.edit(embed=embed, view=PainelAdministrativoView())
+                await painel.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
             else:
-                await canal.send(embed=embed, view=PainelAdministrativoView())
+                await canal.send(view=view)
             todos = await _carregar_todos()
             for sorteio in todos.values():
                 if isinstance(sorteio, dict) and sorteio.get("mensagem_id") and not sorteio.get("encerrado") and not sorteio.get("rascunho"):
