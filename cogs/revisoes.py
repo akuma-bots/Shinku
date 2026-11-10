@@ -596,7 +596,7 @@ class Revisoes(commands.Cog):
                 f"Prova original: {msg.jump_url}",
                 cor=0xFEE75C,
                 view=_card_revisao_view(
-                    _view_link_revisao(msg.jump_url), registro,
+                    _view_link_revisao(msg.jump_url), embed,
                 ),
             )
             await registrar(
