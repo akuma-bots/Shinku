@@ -32,6 +32,74 @@ from utils.competitivo_sync import (
 )
 
 
+
+def _card_ranking_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+                       titulo: str = "CENTRAL DE RANKING", descricao: str = "") -> discord.ui.LayoutView:
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    botoes, seletores = [], []
+    for item in origem.children:
+        if isinstance(item, discord.ui.ChannelSelect):
+            novo = discord.ui.ChannelSelect(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, channel_types=list(item.channel_types),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def callback(interaction, original=item, clone=novo):
+                original._values = clone._values
+                if hasattr(clone, "_resolved"):
+                    original._resolved = clone._resolved
+                await original.callback(interaction)
+            novo.callback = callback
+            seletores.append(novo)
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            botoes.append(novo)
+    for seletor in seletores:
+        componentes.append(discord.ui.ActionRow(seletor))
+    for inicio in range(0, len(botoes), 5):
+        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# NÊMESIS • Competitivo"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
+
+
 # O cálculo de tempo no Top 10 roda a cada minuto, mas o painel do Discord
 # não deve ser editado com essa frequência: mensagens antigas têm limite de edições.
 INTERVALO_RANKING_MINUTOS = 1
@@ -113,8 +181,7 @@ class SeletorCanalRanking(discord.ui.ChannelSelect):
         if cog_missoes is not None:
             await cog_missoes._atualizar_ranking_geral(self.central.guild)
         await interaction.response.edit_message(
-            embed=await self.central.criar_embed(),
-            view=self.central,
+            view=_card_ranking_view(self.central, await self.central.criar_embed()),
         )
 
 
@@ -148,7 +215,9 @@ class ConfirmarTemporadaRankingView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         try:
-            await interaction.message.edit(view=self)
+            await interaction.message.edit(
+                view=_card_ranking_view(self, None, "TEMPORADA ENCERRADA", "A temporada foi encerrada e os dados permanentes foram preservados.")
+            )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
@@ -159,8 +228,7 @@ class ConfirmarTemporadaRankingView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
-            content="Encerramento da temporada cancelado.",
-            view=self,
+            view=_card_ranking_view(self, None, "ENCERRAMENTO CANCELADO", "A temporada atual foi mantida."),
         )
 
 
@@ -289,7 +357,11 @@ class CentralRankingGeralView(discord.ui.View):
         await interaction.response.send_message(
             f"Confirme o encerramento da temporada **#{numero}**. "
             "O Top 10 será arquivado e uma nova temporada começará. O XP total permanece; apenas o XP sazonal reinicia.",
-            view=ConfirmarTemporadaRankingView(self, numero),
+            view=_card_ranking_view(
+                ConfirmarTemporadaRankingView(self, numero), None,
+                "CONFIRMAR ENCERRAMENTO",
+                f"Confirme o encerramento da temporada **#{numero}**. O Top 10 será arquivado e uma nova temporada começará. O XP total permanece; apenas o XP sazonal reinicia.",
+            ),
             ephemeral=True,
         )
 
@@ -301,8 +373,7 @@ class CentralRankingGeralView(discord.ui.View):
         if cog_missoes is not None:
             await cog_missoes._atualizar_ranking_geral(self.guild)
         await interaction.response.edit_message(
-            embed=await self.criar_embed(),
-            view=self,
+            view=_card_ranking_view(self, await self.criar_embed()),
         )
 
     @discord.ui.button(label="Resetar dados globais", style=discord.ButtonStyle.danger, emoji="⚠️", row=2)
@@ -318,9 +389,7 @@ class CentralRankingGeralView(discord.ui.View):
         for item in self.children:
             item.disabled = True
         await interaction.response.edit_message(
-            content="Central de Ranking Competitivo encerrada.",
-            embed=None,
-            view=self,
+            view=_card_ranking_view(self, None, "CENTRAL ENCERRADA", "A central de ranking foi encerrada. Nenhuma estatística foi alterada."),
         )
 
 
@@ -357,8 +426,7 @@ class RankingGeral(
             return
         view = CentralRankingGeralView(self, interaction.guild, owner_id)
         await interaction.response.send_message(
-            embed=await view.criar_embed(),
-            view=view,
+            view=_card_ranking_view(view, await view.criar_embed()),
             ephemeral=True,
         )
 
