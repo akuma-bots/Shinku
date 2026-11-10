@@ -489,7 +489,21 @@ class RequisitosParcerias(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 LOG.exception("Não foi possível procurar um painel de parcerias anterior.")
         if mensagem:
-            await mensagem.edit(content=None, embeds=[], attachments=[], view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
+            componentes = list(getattr(mensagem, "components", []) or [])
+            pendentes = componentes[:]
+            painel_v2 = False
+            while pendentes:
+                componente = pendentes.pop()
+                if str(getattr(componente, "custom_id", "") or "") == "nemesis:parcerias:candidatar":
+                    painel_v2 = True
+                    break
+                pendentes.extend(list(getattr(componente, "children", []) or []))
+            if not painel_v2:
+                await mensagem.edit(content=None, embeds=[], attachments=[])
+            await mensagem.edit(
+                view=PainelCandidaturaView(),
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
             await atualizar_candidaturas(lambda atual: {**(atual if isinstance(atual, dict) else {}), "painel_mensagem_id": mensagem.id})
         else:
             mensagem = await canal.send(view=PainelCandidaturaView(), allowed_mentions=discord.AllowedMentions.none())
