@@ -58,14 +58,14 @@ FORMULARIOS_AUTOMATICOS = [
         "nome": "Inscrição para Staff",
         "titulo": "NÊMESIS — RECRUTAMENTO STAFF",
         "descricao": (
-            "CENTRAL DE RECRUTAMENTO • EQUIPE NÊMESIS\\n\\n"
+            "CENTRAL DE RECRUTAMENTO • EQUIPE NÊMESIS\n\n"
             "Use este formulário para se candidatar à equipe. Responda com clareza e sinceridade; "
-            "candidaturas incompletas ou com informações falsas poderão ser recusadas.\\n\\n"
-            "REQUISITOS\\n"
-            "— Conhecer e respeitar as regras da NÊMESIS.\\n"
-            "— Ter postura respeitosa, responsabilidade e maturidade.\\n"
-            "— Conseguir agir com imparcialidade em conflitos.\\n"
-            "— Ter disponibilidade para auxiliar a comunidade.\\n\\n"
+            "candidaturas incompletas ou com informações falsas poderão ser recusadas.\n\n"
+            "REQUISITOS\n"
+            "— Conhecer e respeitar as regras da NÊMESIS.\n"
+            "— Ter postura respeitosa, responsabilidade e maturidade.\n"
+            "— Conseguir agir com imparcialidade em conflitos.\n"
+            "— Ter disponibilidade para auxiliar a comunidade.\n\n"
             "O envio não garante aprovação. A equipe analisará sua candidatura."
         ),
         "canal_id": 1563995880623841338,
@@ -335,10 +335,10 @@ def _texto_embed_inscricoes(embed: discord.Embed) -> str:
     if embed.description:
         partes.append(embed.description)
     for campo in embed.fields:
-        partes.append(f"### {campo.name}\\n{campo.value}")
+        partes.append(f"### {campo.name}\n{campo.value}")
     if embed.footer and embed.footer.text:
         partes.append(f"-# {embed.footer.text}")
-    return "\\n\\n".join(partes)
+    return "\n\n".join(partes)
 
 
 def _view_central_inscricoes(lista: list, embed: discord.Embed) -> discord.ui.LayoutView:
