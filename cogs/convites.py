@@ -285,8 +285,7 @@ class VoltarConvitesView(discord.ui.View):
                 "Acesso restrito à liderança autorizada.", ephemeral=True
             )
             return
-        await interaction.response.edit_message(content=None, embed=None, view=None)
-        await interaction.edit_original_response(
+        await interaction.response.edit_message(
             view=_card_convites(
                 SeletorConvitesView(self.owner_id),
                 criar_embed(
