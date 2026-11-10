@@ -756,8 +756,6 @@ class Logs(commands.Cog):
         if member.guild.id == GUILD_NEMESIS_ID:
             if antes.channel is None and depois.channel is not None:
                 await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_entrada", f"Entrou no canal de voz {depois.channel.name}.")
-            elif antes.channel is not None and depois.channel is None:
-                await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_saida", f"Saiu do canal de voz {antes.channel.name}.")
             elif antes.channel != depois.channel and antes.channel and depois.channel:
                 await monitoramento_membros.registrar_evento(member.guild.id, member.id, "voz_movimentacao", f"Mudou de {antes.channel.name} para {depois.channel.name}.")
             alteracoes_privadas = []
@@ -778,10 +776,6 @@ class Logs(commands.Cog):
             detalhe = f"Entrou no canal de voz {depois.channel.name}."
             await self._enviar_log(canal, criar_embed(description=f"🔊 {detalhe}", color=0x57F287), categoria="voz")
             await registrar_global(member.guild, "historico_membros", "Entrada em chamada", detalhe, cor=0x57F287)
-        elif antes.channel is not None and depois.channel is None:
-            detalhe = f"Saiu do canal de voz {antes.channel.name}."
-            await self._enviar_log(canal, criar_embed(description=f"🔇 {detalhe}", color=0xED4245), categoria="voz")
-            await registrar_global(member.guild, "historico_membros", "Saída de chamada", detalhe, cor=0xED4245)
         elif antes.channel != depois.channel:
             detalhe = f"Mudou de {antes.channel.name} para {depois.channel.name}."
             await self._enviar_log(canal, criar_embed(description=f"🔀 {detalhe}", color=0xFEE75C), categoria="voz")
