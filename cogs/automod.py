@@ -482,35 +482,6 @@ def membro_pode_moderar(membro, canal=None) -> bool:
 
 
 
-def _card_automod_view(origem: discord.ui.View, titulo: str,
-                       descricao: str = "") -> discord.ui.LayoutView:
-    layout = discord.ui.LayoutView(timeout=origem.timeout)
-    componentes = [
-        discord.ui.TextDisplay(f"## {titulo}\n{descricao}"[:3900]),
-        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-    ]
-    botoes = []
-    for item in origem.children:
-        if isinstance(item, discord.ui.Button):
-            novo = discord.ui.Button(
-                label=item.label, style=item.style, disabled=item.disabled,
-                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
-            )
-            novo.callback = item.callback
-            botoes.append(novo)
-    for inicio in range(0, len(botoes), 5):
-        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
-    componentes.extend([
-        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-        discord.ui.TextDisplay("-# NÊMESIS • Segurança e Moderação"),
-    ])
-    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
-    verificacao = getattr(origem, "interaction_check", None)
-    if callable(verificacao):
-        layout.interaction_check = verificacao
-    return layout
-
-
 class ModalMotivoDecisao(discord.ui.Modal):
     def __init__(self, bot: commands.Bot, nivel: int, guild_id: int, channel_id: int, message_id: int, alvo_id: int):
         super().__init__(title="Justificar decisão da moderação", timeout=300)
@@ -534,14 +505,11 @@ class ModalMotivoDecisao(discord.ui.Modal):
         if not membro_pode_moderar(interaction.user):
             await interaction.response.send_message("Você não tem permissão para decidir sobre esta infração.", ephemeral=True)
             return
-        origem = ConfirmarDecisaoView(
-            self.bot, self.guild_id, self.channel_id, self.message_id,
-            self.alvo_id, self.nivel, str(self.motivo.value).strip(),
-        )
         await interaction.response.send_message(
-            view=_card_automod_view(
-                origem, "CONFIRMAR DECISÃO DE MODERAÇÃO",
-                "A ação só será aplicada após sua confirmação. Confira o motivo e o nível selecionado.",
+            "Confirme a decisão abaixo. A ação só será aplicada após a confirmação.",
+            view=ConfirmarDecisaoView(
+                self.bot, self.guild_id, self.channel_id, self.message_id,
+                self.alvo_id, self.nivel, str(self.motivo.value).strip(),
             ),
             ephemeral=True,
         )
@@ -608,9 +576,7 @@ class ConfirmarDecisaoView(discord.ui.View):
             for item in self.children:
                 item.disabled = True
             try:
-                await interaction.message.edit(
-                    view=_card_automod_view(self, "DECISÃO REGISTRADA", resultado)
-                )
+                await interaction.message.edit(content=resultado, view=self)
             except (discord.HTTPException, AttributeError):
                 pass
             await interaction.delete_original_response()
@@ -630,9 +596,7 @@ class ConfirmarDecisaoView(discord.ui.View):
     async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(
-            view=_card_automod_view(self, "DECISÃO CANCELADA", "Nenhuma punição foi aplicada.")
-        )
+        await interaction.response.edit_message(content="Decisão cancelada. Nenhuma punição foi aplicada.", view=self)
 
 
 class PainelPunicao(discord.ui.View):
@@ -1604,10 +1568,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
 
             await registrar_global(
                 message.guild, "automod", "AutoMod — Infração detectada",
-                embed=embed, view=_card_automod_view(
-                    PainelPunicao(self.bot), "PAINEL DE MODERAÇÃO",
-                    "Selecione o nível de medida adequado para a infração. Toda decisão exige justificativa e confirmação.",
-                ),
+                embed=embed, view=PainelPunicao(self.bot),
             )
             await registrar_global(
                 message.guild,
@@ -2590,10 +2551,7 @@ async def setup(
     await bot.add_cog(
         AutoMod(bot)
     )
-    bot.add_view(_card_automod_view(
-        PainelPunicao(bot), "PAINEL DE MODERAÇÃO",
-        "Selecione o nível de medida adequado para a infração. Toda decisão exige justificativa e confirmação.",
-    ))
+    bot.add_view(PainelPunicao(bot))
 
     print(
         "[AUTOMOD] Cog registrado no bot."
