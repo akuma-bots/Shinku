@@ -634,7 +634,7 @@ class Tutorial(commands.Cog):
                 logger.info("Central pública de tutoriais publicada em #Sistemas (message=%s).", mensagem.id)
             else:
                 await mensagem.edit(
-                    content=None, embed=None, embeds=[], attachments=[],
+                    content=None, embeds=[], attachments=[],
                     view=TutorialPainelLayoutView(embed),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
