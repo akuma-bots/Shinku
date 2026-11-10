@@ -560,7 +560,7 @@ def _mensagem_tem_cartao_automod(mensagem: discord.Message) -> bool:
 async def _atualizar_cartao_automod(mensagem: discord.Message, embed: discord.Embed) -> None:
     if not _mensagem_tem_cartao_automod(mensagem):
         await mensagem.edit(content=None, embeds=[], attachments=[])
-    await _atualizar_cartao_automod(mensagem, embed)
+    await mensagem.edit(view=_card_automod_view(None, embed))
 
 
 class ModalMotivoDecisao(discord.ui.Modal):
