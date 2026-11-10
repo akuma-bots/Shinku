@@ -195,9 +195,12 @@ class CentralAdministrativaRobloxView(discord.ui.View):
         if not config["mapeamentos"]:
             await interaction.response.send_message("Ainda não existem patentes mapeadas.", ephemeral=True)
             return
+        origem = SeletorRemoverPatenteRoblox(self.cog, config["mapeamentos"])
         await interaction.response.send_message(
-            "Escolha qual associação deseja remover.",
-            view=SeletorRemoverPatenteRoblox(self.cog, config["mapeamentos"]),
+            view=_card_roblox(
+                origem, None, "REMOVER MAPEAMENTO",
+                "Selecione a patente cuja associação deve ser removida.",
+            ),
             ephemeral=True,
         )
 
@@ -294,9 +297,9 @@ class CentralRobloxView(discord.ui.View):
             ),
             color=0xB3132B,
         )
+        origem = CentralAdministrativaRobloxView(self.cog)
         await interaction.response.send_message(
-            embed=embed,
-            view=CentralAdministrativaRobloxView(self.cog),
+            view=_card_roblox(origem, embed),
             ephemeral=True,
         )
 
@@ -322,6 +325,52 @@ class CentralRobloxView(discord.ui.View):
             embed.add_field(name="COMUNIDADE NÊMESIS", value="Não foi possível consultar agora", inline=False)
         embed.set_thumbnail(url=f"https://www.roblox.com/headshot-thumbnail/image?userId={rid}&width=150&height=150&format=png")
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+
+def _card_roblox(origem: discord.ui.View, embed: discord.Embed | None = None,
+                 titulo: str = "ADMINISTRAÇÃO ROBLOX", descricao: str = ""):
+    layout = discord.ui.LayoutView(timeout=origem.timeout)
+    partes = [f"## {embed.title if embed and embed.title else titulo}"]
+    if embed and embed.description:
+        partes.append(embed.description)
+    elif descricao:
+        partes.append(descricao)
+    if embed:
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+    componentes = [
+        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    ]
+    for item in origem.children:
+        if isinstance(item, discord.ui.Select):
+            novo = discord.ui.Select(
+                placeholder=item.placeholder, min_values=item.min_values,
+                max_values=item.max_values, options=list(item.options),
+                custom_id=item.custom_id, disabled=item.disabled,
+            )
+            async def selecionar(interaction, original=item, clone=novo):
+                original._values = clone._values
+                await original.callback(interaction)
+            novo.callback = selecionar
+            componentes.append(discord.ui.ActionRow(novo))
+        elif isinstance(item, discord.ui.Button):
+            novo = discord.ui.Button(
+                label=item.label, style=item.style, disabled=item.disabled,
+                custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+            )
+            novo.callback = item.callback
+            componentes.append(discord.ui.ActionRow(novo))
+    componentes.extend([
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        discord.ui.TextDisplay("-# Nêmesis Systeam • Roblox"),
+    ])
+    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+    verificacao = getattr(origem, "interaction_check", None)
+    if callable(verificacao):
+        layout.interaction_check = verificacao
+    return layout
 
 
 class CentralRobloxLayoutView(discord.ui.LayoutView):
