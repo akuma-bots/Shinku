@@ -593,13 +593,23 @@ async def registrar(
             registro.set_author(name="NÊMESIS | Registro Global")
         if not registro.footer.text:
             registro.set_footer(text=f"◈ NÊMESIS • REGISTRO GLOBAL • {CATEGORIAS[categoria][0]}")
-        await thread.send(
-            content=content,
-            embed=registro,
-            file=arquivo,
-            view=view,
-            allowed_mentions=allowed_mentions or discord.AllowedMentions.none(),
-        )
+        if isinstance(view, discord.ui.LayoutView):
+            # Components V2 não podem coexistir com embeds tradicionais.
+            # A LayoutView já deve conter o resumo e os controles no mesmo cartão.
+            await thread.send(
+                content=content,
+                file=arquivo,
+                view=view,
+                allowed_mentions=allowed_mentions or discord.AllowedMentions.none(),
+            )
+        else:
+            await thread.send(
+                content=content,
+                embed=registro,
+                file=arquivo,
+                view=view,
+                allowed_mentions=allowed_mentions or discord.AllowedMentions.none(),
+            )
         return True
     except (discord.Forbidden, discord.NotFound, discord.HTTPException, TypeError, ValueError):
         _LOG.exception("Não foi possível publicar no Registro Global (guild=%s, categoria=%s).", guild.id, categoria)
