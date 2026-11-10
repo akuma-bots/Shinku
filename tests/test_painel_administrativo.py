@@ -11,15 +11,28 @@ from cogs.painel_administrativo import (
 )
 
 
+def _itens_aninhados(view):
+    pendentes = [(item, None) for item in view.children]
+    while pendentes:
+        item, pai = pendentes.pop(0)
+        yield item, pai
+        for filho in getattr(item, "children", ()) or ():
+            pendentes.append((filho, item))
+
+
+def _nova_view(interaction):
+    return interaction.edit_original_response.await_args.kwargs["view"]
+
+
 class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
     def test_painel_publico_e_persistente_sem_comando_slash(self):
         painel = PainelAdministrativoView(SimpleNamespace())
         self.assertIsNone(painel.timeout)
-        self.assertEqual(len(painel.children), 1)
-        self.assertEqual(
-            painel.children[0].custom_id,
-            "nemesis:administracao:central:abrir",
-        )
+        botoes = [
+            item for item, _ in _itens_aninhados(painel)
+            if getattr(item, "custom_id", None) == "nemesis:administracao:central:abrir"
+        ]
+        self.assertEqual(len(botoes), 1)
         self.assertEqual(PainelAdministrativo.__cog_app_commands__, [])
 
     def test_central_privada_tem_seis_areas_de_navegacao(self):
@@ -34,8 +47,10 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
             {opcao.value for opcao in view.seletor.options},
             set(SECOES_ADMINISTRATIVAS),
         )
+        itens = list(_itens_aninhados(view))
+        self.assertTrue(any(item is view.seletor and pai.__class__.__name__ == "ActionRow" for item, pai in itens))
 
-    async def test_seletor_administrativo_reconhece_clique_antes_de_carregar_secao(self):
+    async def test_seletor_administrativo_atualiza_cartao_components_v2(self):
         view = CentralAdministrativaView(
             SimpleNamespace(), owner_id=123,
             guild=SimpleNamespace(id=1563995879981981817),
@@ -45,13 +60,17 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
             response=SimpleNamespace(defer=AsyncMock()),
             edit_original_response=AsyncMock(),
         )
+
         async def carregar_secao(_bot, _guild, _chave):
             interaction.response.defer.assert_awaited_once_with()
             return (SimpleNamespace(title="Membros"), [])
+
         with patch("cogs.painel_administrativo._embed_secao", AsyncMock(side_effect=carregar_secao)):
             await view._selecionar_secao(interaction)
         interaction.edit_original_response.assert_awaited_once()
-        self.assertEqual(interaction.edit_original_response.await_args.kwargs["embed"].title, "Membros")
+        nova = _nova_view(interaction)
+        self.assertIsInstance(nova, discord.ui.LayoutView)
+        self.assertTrue(any("Membros" in getattr(item, "content", "") for item, _ in _itens_aninhados(nova)))
 
     async def test_inteligencia_de_operacoes_aparece_apenas_para_octogono(self):
         bot = SimpleNamespace(get_cog=lambda _nome: None)
@@ -70,11 +89,12 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
             patch("cogs.painel_administrativo.membro_tem_octogono", return_value=True),
         ):
             await view._selecionar_secao(interaction)
+        nova = _nova_view(interaction)
         botao = next(
-            item for item in view.children
+            item for item, _ in _itens_aninhados(nova)
             if getattr(item, "label", None) == "Inteligência de operações"
         )
-        self.assertEqual(botao.row, 3)
+        self.assertEqual(botao.style, discord.ButtonStyle.primary)
 
         view_nao_octogono = CentralAdministrativaView(
             bot, owner_id=123,
@@ -86,9 +106,10 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
             patch("cogs.painel_administrativo.membro_tem_octogono", return_value=False),
         ):
             await view_nao_octogono._selecionar_secao(interaction)
+        nova_sem_octogono = _nova_view(interaction)
         self.assertFalse(any(
             getattr(item, "label", None) == "Inteligência de operações"
-            for item in view_nao_octogono.children
+            for item, _ in _itens_aninhados(nova_sem_octogono)
         ))
 
     async def test_botao_inteligencia_encaminha_para_modulo_original(self):
@@ -110,11 +131,12 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         ):
             await view._selecionar_secao(interaction)
         botao = next(
-            item for item in view.children
+            item for item, _ in _itens_aninhados(_nova_view(interaction))
             if getattr(item, "label", None) == "Inteligência de operações"
         )
         clique = SimpleNamespace()
-        await botao.callback(clique)
+        with patch("cogs.painel_administrativo._tem_acesso", return_value=True):
+            await botao.callback(clique)
         cog_missoes.enviar_painel_inteligencia.assert_awaited_once_with(clique)
 
     def test_paineis_administrativos_migrados_nao_sao_comandos_slash(self):
@@ -150,7 +172,7 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
             patch("cogs.painel_administrativo.membro_tem_octogono", return_value=True),
         ):
             await view._selecionar_secao(interacao_secao)
-        botao = next(item for item in view.children if getattr(item, "label", "") == "Processos seletivos")
+        botao = next(item for item, _ in _itens_aninhados(_nova_view(interacao_secao)) if getattr(item, "label", "") == "Processos seletivos")
         clique = SimpleNamespace()
         with patch("cogs.painel_administrativo._tem_acesso", return_value=True):
             await botao.callback(clique)
@@ -163,12 +185,12 @@ class TestPainelAdministrativoCentral(unittest.IsolatedAsyncioTestCase):
         view.seletor._values = ["sistemas"]
         interaction = SimpleNamespace(
             user=SimpleNamespace(id=123),
-            response=SimpleNamespace(defer=AsyncMock()),
+            response=SimpleMock() if False else SimpleNamespace(defer=AsyncMock()),
             edit_original_response=AsyncMock(),
         )
         with patch("cogs.painel_administrativo._embed_secao", AsyncMock(return_value=(SimpleNamespace(title="Sistemas"), []))):
             await view._selecionar_secao(interaction)
-        labels = {getattr(item, "label", "") for item in view.children}
+        labels = {getattr(item, "label", "") for item, _ in _itens_aninhados(_nova_view(interaction))}
         self.assertIn("Saúde do sistema", labels)
         self.assertIn("Diagnóstico do armazenamento", labels)
 
