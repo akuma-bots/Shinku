@@ -208,15 +208,17 @@ class SeletorConvitesView(discord.ui.View):
             servidor = (
                 dados.get(str(GUILD_NEMESIS_ID), {}) if isinstance(dados, dict) else {}
             )
+            await interaction.edit_original_response(content=None, embed=None)
             await interaction.edit_original_response(
-                content=None,
-                embed=None,
-                view=_card_convites(VoltarConvitesView(
-                    self.owner_id,
-                    membro.id,
-                    0,
-                    _total_paginas(servidor, membro.id),
-                ), _embed(membro, servidor)),
+                view=_card_convites(
+                    VoltarConvitesView(
+                        self.owner_id,
+                        membro.id,
+                        0,
+                        _total_paginas(servidor, membro.id),
+                    ),
+                    _embed(membro, servidor),
+                )
             )
         except Exception:
             logger.exception("Falha na consulta de convites do membro %s.", membro.id)
@@ -250,9 +252,9 @@ class VoltarConvitesView(discord.ui.View):
             self.pagina = max(0, min(self.total_paginas - 1, self.pagina + delta))
             self.anterior.disabled = self.pagina <= 0
             self.proxima.disabled = self.pagina >= self.total_paginas - 1
-            await interaction.response.edit_message(
-                content=None, embed=None,
-                view=_card_convites(self, _embed(membro, servidor, self.pagina)),
+            await interaction.response.edit_message(content=None, embed=None, view=None)
+            await interaction.edit_original_response(
+                view=_card_convites(self, _embed(membro, servidor, self.pagina))
             )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             await interaction.response.send_message(
@@ -283,9 +285,8 @@ class VoltarConvitesView(discord.ui.View):
                 "Acesso restrito à liderança autorizada.", ephemeral=True
             )
             return
-        await interaction.response.edit_message(
-            content=None,
-            embed=None,
+        await interaction.response.edit_message(content=None, embed=None, view=None)
+        await interaction.edit_original_response(
             view=_card_convites(
                 SeletorConvitesView(self.owner_id),
                 criar_embed(
@@ -293,7 +294,7 @@ class VoltarConvitesView(discord.ui.View):
                     description="Selecione um integrante para consultar convites atribuídos e convidados presentes.",
                     cor=0x991B33,
                 ),
-            ),
+            )
         )
 
 
