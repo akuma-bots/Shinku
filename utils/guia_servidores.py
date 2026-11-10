@@ -211,12 +211,47 @@ def adicionar_botoes_guia(view: discord.ui.View) -> discord.ui.View:
     return adicionar_seletor_guia(view)
 
 
-class GuiaServidoresView(discord.ui.View):
-    """Navegação persistente do guia oficial da NÊMESIS."""
+def _texto_embed_guia(embed: discord.Embed) -> str:
+    partes = []
+    if embed.title:
+        partes.append(f"## {embed.title}")
+    if embed.description:
+        partes.append(embed.description)
+    for campo in embed.fields:
+        partes.append(f"### {campo.name}\\n{campo.value}")
+    if embed.footer and embed.footer.text:
+        partes.append(f"-# {embed.footer.text}")
+    return "\\n\\n".join(partes)
+
+
+def _mensagem_contem_guia(mensagem: discord.Message) -> bool:
+    if any(item.footer and item.footer.text == RODAPE_GUIA for item in mensagem.embeds):
+        return True
+
+    pendentes = list(getattr(mensagem, "components", []) or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if RODAPE_GUIA in str(getattr(componente, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
+class GuiaServidoresView(discord.ui.LayoutView):
+    """Guia oficial com navegação contida no próprio cartão Components V2."""
 
     def __init__(self):
         super().__init__(timeout=None)
-        adicionar_seletor_guia(self)
+        seletor = GuiaCanaisSelect()
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(_texto_embed_guia(criar_embed_guia_servidor())),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("### ◈ NAVEGAÇÃO DO SERVIDOR"),
+            discord.ui.ActionRow(seletor),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam"),
+            accent_colour=0x9F1239,
+        ))
 
 async def publicar_guia_servidor(bot) -> bool:
     """Cria o guia no canal oficial ou atualiza a mensagem existente, sem duplicar."""
@@ -251,12 +286,9 @@ async def publicar_guia_servidor(bot) -> bool:
         async for mensagem in canal.history(limit=75):
             if mensagem.author.id != bot.user.id:
                 continue
-            if any(
-                item.footer and item.footer.text == RODAPE_GUIA
-                for item in mensagem.embeds
-            ):
+            if _mensagem_contem_guia(mensagem):
                 await mensagem.edit(
-                    embed=embed,
+                    content=None, embed=None, embeds=[], attachments=[],
                     view=GuiaServidoresView(),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
@@ -264,7 +296,6 @@ async def publicar_guia_servidor(bot) -> bool:
                 return True
 
         await canal.send(
-            embed=embed,
             view=GuiaServidoresView(),
             allowed_mentions=discord.AllowedMentions.none(),
         )
