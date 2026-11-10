@@ -1086,8 +1086,10 @@ class SeletorFichaPendente(discord.ui.Select):
         )
         anexos = [resumo] + _embeds_resposta(formulario, resposta, interaction.guild, central.cog.bot)
         await interaction.response.send_message(
-            embeds=anexos[:10],
-            view=_view_resposta(protocolo),
+            view=_card_form_view(
+                _view_resposta(protocolo), anexos[:10],
+                marcador="NÊMESIS • DOSSIÊ DE CANDIDATURA • V2",
+            ),
             ephemeral=True,
         )
         for inicio in range(10, len(anexos), 10):
