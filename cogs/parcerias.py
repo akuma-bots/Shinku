@@ -840,9 +840,13 @@ class Parcerias(commands.Cog):
         if isinstance(canal_anuncio, discord.TextChannel) and mensagem_anuncio_id:
             try:
                 mensagem_anuncio = await canal_anuncio.fetch_message(int(mensagem_anuncio_id))
+                embed_encerrado = _embed_parceria_publica(alvo, interaction.guild)
+                if not _componentes_contem_marcador(
+                    mensagem_anuncio.components, MARCADOR_CARTAO_PARCERIAS
+                ):
+                    await mensagem_anuncio.edit(content=None, embeds=[], attachments=[])
                 await mensagem_anuncio.edit(
-                    embed=_embed_parceria_publica(alvo, interaction.guild),
-                    view=None,
+                    view=ParceriaLayoutView(None, embed_encerrado),
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
             except (discord.NotFound, discord.Forbidden, discord.HTTPException, TypeError, ValueError):
