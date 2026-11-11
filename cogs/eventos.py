@@ -398,119 +398,141 @@ class Eventos(commands.Cog):
             ephemeral=True,
         )
 
-    async def atualizar_agenda(self, guild: discord.Guild):
-        """Mantém uma única publicação de agenda com eventos, sorteios e marcos."""
-        canal = guild.get_channel(CANAL_EVENTOS_PADRAO_ID)
-        if canal is None:
-            try:
-                canal = await guild.fetch_channel(CANAL_EVENTOS_PADRAO_ID)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                _LOG.exception("Canal Agenda não encontrado ou inacessível.")
-                return False
-        if not isinstance(canal, discord.TextChannel):
-            _LOG.error("O canal Agenda precisa ser um canal de texto.")
+    async def atualizar_agenda(self, guild: discord.Guild, *, force: bool = False):
+        """Atualiza um único cartão com métricas do Gateway, eventos, sorteios e marcos."""
+        if guild.id != GUILD_NEMESIS_ID:
             return False
-
         agora = time.time()
-        eventos = await _todos_eventos()
-        eventos_abertos = [
-            item for item in eventos.values()
-            if isinstance(item, dict)
-            and int(item.get("guild_id", guild.id) or guild.id) == guild.id
-            and item.get("status") not in {"cancelled", "completed", "deleted"}
-            and float(item.get("inicio") or 0) >= agora
-        ]
-        eventos_abertos.sort(key=lambda item: float(item.get("inicio") or 0))
-
-        sorteios = await carregar("sorteios.json", {})
-        sorteios = sorteios if isinstance(sorteios, dict) else {}
-        sorteios_abertos = [
-            item for item in sorteios.values()
-            if isinstance(item, dict)
-            and int(item.get("guild_id", 0) or 0) == guild.id
-            and not item.get("encerrado")
-            and float(item.get("fim") or 0) >= agora
-        ]
-        sorteios_abertos.sort(key=lambda item: float(item.get("fim") or 0))
-
-        metas_dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
-        metas_dados = metas_dados if isinstance(metas_dados, dict) else {}
-        metas = metas_dados.get(str(guild.id), [])
-        metas = metas if isinstance(metas, list) else []
-        metas.sort(key=lambda item: int(item.get("alvo", 0) or 0) if isinstance(item, dict) else 0)
-
-        embed = criar_embed(
-            "𓂀 NÊMESIS · AGENDA",
-            "Calendário central de eventos, encerramentos de sorteios e marcos da comunidade.",
-            color=0x9F1239,
-            rodape="NÊMESIS • AGENDA OFICIAL • Atualização automática",
-        )
-        if eventos_abertos:
-            linhas = [
-                f"**{item.get('nome', 'Evento')[:100]}**\n"
-                f"Início: <t:{int(float(item.get('inicio') or 0))}:F> "
-                f"(<t:{int(float(item.get('inicio') or 0))}:R>)"
-                for item in eventos_abertos[:10]
-            ]
-            embed.add_field(name="📅 EVENTOS PROGRAMADOS", value="\n\n".join(linhas)[:1024], inline=False)
-        else:
-            embed.add_field(name="📅 EVENTOS PROGRAMADOS", value="Nenhum evento futuro registrado.", inline=False)
-
-        if sorteios_abertos:
-            linhas = [
-                f"**{item.get('premio', 'Sorteio')[:100]}** · "
-                f"encerra <t:{int(float(item.get('fim') or 0))}:R> "
-                f"(<t:{int(float(item.get('fim') or 0))}:F>)"
-                for item in sorteios_abertos[:10]
-            ]
-            embed.add_field(name="🎁 SORTEIOS EM ANDAMENTO", value="\n".join(linhas)[:1024], inline=False)
-        else:
-            embed.add_field(name="🎁 SORTEIOS EM ANDAMENTO", value="Nenhum sorteio ativo no momento.", inline=False)
-
-        if metas:
-            linhas = []
-            for meta in metas[:10]:
-                if not isinstance(meta, dict):
-                    continue
-                alvo = int(meta.get("alvo", 0) or 0)
-                estado = "✓ ALCANÇADO" if meta.get("atingido_em") else "◷ EM PROGRESSO"
-                descricao = str(meta.get("descricao") or "Marco da comunidade")[:90]
-                linhas.append(f"**{alvo:,} membros** · {estado}\n{descricao}".replace(",", "."))
-            embed.add_field(name="👥 MARCOS DA COMUNIDADE", value="\n\n".join(linhas)[:1024] or "Nenhum marco cadastrado.", inline=False)
-        else:
-            embed.add_field(name="👥 MARCOS DA COMUNIDADE", value="Nenhum marco cadastrado.", inline=False)
-
-        estado = await carregar(ARQUIVO_AGENDA_PUBLICACAO, {})
-        estado = estado if isinstance(estado, dict) else {}
-        registro = estado.get(str(guild.id), {})
-        mensagem = None
-        if isinstance(registro, dict) and registro.get("message_id"):
-            try:
-                mensagem = await canal.fetch_message(int(registro["message_id"]))
-            except discord.NotFound:
-                mensagem = None
-            except (discord.Forbidden, discord.HTTPException):
-                _LOG.exception("Não foi possível recuperar a mensagem existente da Agenda.")
+        async with self._agenda_lock:
+            if not force and agora - self._ultima_atualizacao_agenda < 10:
+                return True
+            canal = guild.get_channel(CANAL_EVENTOS_PADRAO_ID)
+            if canal is None:
+                try:
+                    canal = await guild.fetch_channel(CANAL_EVENTOS_PADRAO_ID)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    _LOG.exception("Canal Agenda não encontrado ou inacessível.")
+                    return False
+            if not isinstance(canal, discord.TextChannel):
+                _LOG.error("O canal Agenda precisa ser um canal de texto.")
                 return False
-        if mensagem is None:
-            try:
-                async for antiga in canal.history(limit=30):
-                    if antiga.author.id == self.bot.user.id and antiga.embeds and antiga.embeds[0].title == "𓂀 NÊMESIS · AGENDA":
-                        mensagem = antiga
-                        break
-            except (discord.Forbidden, discord.HTTPException):
-                _LOG.exception("Falha ao procurar publicação anterior da Agenda.")
-        try:
-            if mensagem is None:
-                mensagem = await canal.send(embed=embed)
+
+            resumo = _resumo_servidor(guild)
+            eventos = sorted([
+                evento for evento in (getattr(guild, "scheduled_events", []) or [])
+                if evento.start_time and evento.start_time.timestamp() >= agora
+                and str(getattr(evento.status, "name", evento.status)).lower() not in {"cancelled", "completed"}
+            ], key=lambda evento: evento.start_time.timestamp())
+
+            sorteios = await carregar("sorteios.json", {})
+            sorteios = sorteios if isinstance(sorteios, dict) else {}
+            sorteios_abertos = [item for item in sorteios.values() if isinstance(item, dict) and int(item.get("guild_id", 0) or 0) == guild.id and not item.get("encerrado") and float(item.get("fim") or 0) >= agora]
+            sorteios_abertos.sort(key=lambda item: float(item.get("fim") or 0))
+
+            metas_dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+            metas_dados = metas_dados if isinstance(metas_dados, dict) else {}
+            metas = metas_dados.get(str(guild.id), [])
+            metas = [item for item in metas if isinstance(item, dict)] if isinstance(metas, list) else []
+            metas.sort(key=lambda item: int(item.get("alvo", 0) or 0))
+            metas_alteradas = False
+            for meta in metas:
+                alvo = int(meta.get("alvo", 0) or 0)
+                if alvo > 0 and not meta.get("atingido_em") and resumo["total"] >= alvo:
+                    meta["atingido_em"] = agora
+                    meta["atingido_por_sincronizacao"] = True
+                    metas_alteradas = True
+            if metas_alteradas:
+                metas_dados[str(guild.id)] = metas
+                await salvar(ARQUIVO_METAS_MEMBROS, metas_dados)
+
+            humanos_label = "humanos" if resumo["cache_completo"] else "humanos em cache"
+            bots_label = "bots" if resumo["cache_completo"] else "bots em cache"
+            linhas = [
+                "## 𓂀 NÊMESIS · AGENDA AO VIVO",
+                "Acompanhamento automático da comunidade, atividades e próximos compromissos.",
+                "### 👥 MOVIMENTO DO SERVIDOR",
+                f"**{resumo['total']:,} membros no servidor**".replace(",", "."),
+                f"👤 {resumo['humanos_cache']:,} {humanos_label}  ·  🤖 {resumo['bots_cache']:,} {bots_label}".replace(",", "."),
+                f"🟢 {resumo['online']:,} online  ·  🌙 {resumo['ausentes']:,} ausentes  ·  ⛔ {resumo['ocupados']:,} ocupados".replace(",", "."),
+                f"⚫ {resumo['offline_cache']:,} offline no cache  ·  🔊 {resumo['voz']:,} em canais de voz".replace(",", "."),
+            ]
+            if not resumo["cache_completo"]:
+                linhas.append("-# Presenças e divisão humano/bot consideram os membros atualmente carregados pelo Gateway.")
+            linhas.append("### 📅 PRÓXIMOS EVENTOS")
+            if eventos:
+                for evento in eventos[:5]:
+                    inicio = int(evento.start_time.timestamp())
+                    nome = discord.utils.escape_markdown(str(evento.name)[:100])
+                    linhas.append(f"**{nome}** · <t:{inicio}:F> (<t:{inicio}:R>)")
             else:
-                await mensagem.edit(embed=embed)
-        except (discord.Forbidden, discord.HTTPException):
-            _LOG.exception("Falha ao publicar/atualizar a Agenda.")
-            return False
-        estado[str(guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id, "atualizado_em": agora}
-        await salvar(ARQUIVO_AGENDA_PUBLICACAO, estado)
-        return True
+                linhas.append("Nenhum evento futuro publicado no Discord.")
+            linhas.append("### 🎁 SORTEIOS EM ANDAMENTO")
+            if sorteios_abertos:
+                for sorteio in sorteios_abertos[:5]:
+                    fim = int(float(sorteio.get("fim") or 0))
+                    premio = discord.utils.escape_markdown(str(sorteio.get("premio") or "Sorteio")[:90])
+                    linhas.append(f"**{premio}** · encerra <t:{fim}:R>")
+            else:
+                linhas.append("Nenhum sorteio ativo no momento.")
+            linhas.append("### 🎯 MARCOS DA COMUNIDADE")
+            if metas:
+                for meta in metas[:6]:
+                    alvo = int(meta.get("alvo", 0) or 0)
+                    if alvo <= 0:
+                        continue
+                    atingido = bool(meta.get("atingido_em")) or resumo["total"] >= alvo
+                    status = "✓ ALCANÇADO" if atingido else "◷ EM PROGRESSO"
+                    barra = _barra_progresso(resumo["total"], alvo)
+                    descricao = discord.utils.escape_markdown(str(meta.get("descricao") or "Marco da comunidade")[:80])
+                    linhas.append(f"**{alvo:,} membros** · {status}\\n**{barra}** · {min(resumo['total'], alvo):,}/{alvo:,}\\n{descricao}".replace(",", "."))
+            else:
+                linhas.append("Nenhum marco cadastrado. A liderança pode registrar metas de crescimento.")
+            linhas.extend(["### ⏱️ SINCRONIZAÇÃO", f"Dados recebidos do Discord · <t:{int(agora)}:R>"])
+            texto = "\\n\\n".join(linhas)
+            view = AgendaLayoutView(self, texto)
+
+            estado = await carregar(ARQUIVO_AGENDA_PUBLICACAO, {})
+            estado = estado if isinstance(estado, dict) else {}
+            registro = estado.get(str(guild.id), {})
+            mensagem = None
+            if isinstance(registro, dict) and registro.get("message_id"):
+                try:
+                    mensagem = await canal.fetch_message(int(registro["message_id"]))
+                except discord.NotFound:
+                    mensagem = None
+                except (discord.Forbidden, discord.HTTPException):
+                    _LOG.exception("Não foi possível recuperar a mensagem existente da Agenda.")
+                    return False
+            if mensagem is None:
+                try:
+                    async for antiga in canal.history(limit=50):
+                        if antiga.author.id == self.bot.user.id and (_componentes_sao_agenda(getattr(antiga, "components", [])) or any(embed.title == "𓂀 NÊMESIS · AGENDA" for embed in (antiga.embeds or []))):
+                            mensagem = antiga
+                            break
+                except (discord.Forbidden, discord.HTTPException):
+                    _LOG.exception("Falha ao procurar publicação anterior da Agenda.")
+            try:
+                if mensagem is None:
+                    mensagem = await canal.send(view=view)
+                else:
+                    await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+            except (discord.Forbidden, discord.HTTPException):
+                _LOG.exception("Falha ao publicar/atualizar a Agenda.")
+                return False
+            estado[str(guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id, "atualizado_em": agora, "versao": 2}
+            await salvar(ARQUIVO_AGENDA_PUBLICACAO, estado)
+            self._ultima_atualizacao_agenda = agora
+            return True
+
+    @app_commands.command(name="agenda", description="Publica ou atualiza o painel ao vivo da NÊMESIS.")
+    @lideranca_only()
+    async def agenda(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != GUILD_NEMESIS_ID:
+            await interaction.response.send_message("Este sistema pertence à NÊMESIS.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        atualizado = await self.atualizar_agenda(interaction.guild, force=True)
+        await interaction.followup.send("A Agenda ao Vivo foi sincronizada no canal oficial." if atualizado else "Não foi possível sincronizar a Agenda. Confira as permissões do canal.", ephemeral=True)
 
     @app_commands.command(
         name="agenda-meta-membros",
