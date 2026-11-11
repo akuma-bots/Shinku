@@ -92,8 +92,8 @@ def gerar(before: str, after: str) -> dict | None:
 
     textos = " ".join(assuntos).lower()
     status = [s for s, _ in alteracoes]
-    tem_correcao = bool(re.search(r"\\b(fix|bug|corrig\\w*|hotfix|patch|repar\\w*)\\b", textos))
-    tem_recurso = bool(re.search(r"\\b(feat|feature|adicion\\w*|cria\\w*|implement\\w*|novo|nova)\\b", textos))
+    tem_correcao = bool(re.search(r"\b(fix|bug|corrig\w*|hotfix|patch|repar\w*)\b", textos))
+    tem_recurso = bool(re.search(r"\b(feat|feature|adicion\w*|cria\w*|implement\w*|novo|nova)\b", textos))
     if tem_correcao and (tem_recurso or len(assuntos) > 1):
         tipo = "Melhorias e correções"
     elif tem_correcao:
