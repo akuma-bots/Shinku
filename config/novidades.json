@@ -1,11 +1,11 @@
 {
-  "release_id": "20261111-104511",
+  "release_id": "20261111-104611",
   "habilitada": true,
-  "tipo": "Correções",
-  "titulo": "Corrige persistência concorrente dos lembretes de sorteios.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Corrige persistência concorrente dos lembretes de sorteios.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "tipo": "Melhorias dos sistemas",
+  "titulo": "Atualiza identidade do Centro Administrativo.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Atualiza identidade do Centro Administrativo.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "11/11/2026",
-  "hora_atualizacao": "10:45",
+  "hora_atualizacao": "10:46",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-11T10:45:11.777105-03:00"
+  "gerado_em": "2026-11-11T10:46:11.991059-03:00"
 }
