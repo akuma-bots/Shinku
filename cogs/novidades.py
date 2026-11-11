@@ -86,8 +86,30 @@ class NotasDMView(discord.ui.LayoutView):
         ))
 
 
-async def _enviar_dm_com_retry(membro: discord.abc.User, *, view: discord.ui.LayoutView) -> str:
-    """Faz uma única tentativa para evitar duplicações em retries ambíguos."""
+async def _enviar_dm_com_retry(
+    membro: discord.abc.User,
+    *,
+    view: discord.ui.LayoutView | None = None,
+    embed: discord.Embed | None = None,
+) -> str:
+    """Envia uma única vez; aceita embed legado convertendo-o para cartão V2."""
+    if view is None and embed is not None:
+        partes = []
+        if embed.title:
+            partes.append(f"## {embed.title}")
+        if embed.description:
+            partes.append(embed.description)
+        for campo in embed.fields:
+            partes.append(f"**{campo.name}**\n{campo.value}")
+        if embed.footer and embed.footer.text:
+            partes.append(f"-# {embed.footer.text}")
+        view = discord.ui.LayoutView(timeout=None)
+        view.add_item(discord.ui.Container(
+            discord.ui.TextDisplay("\n\n".join(partes)[:3900] or "## NÊMESIS • Comunicado"),
+            accent_colour=COR_PRIMARIA,
+        ))
+    if view is None:
+        raise ValueError("É necessário informar um cartão para enviar a DM.")
     user_id = getattr(membro, "id", "desconhecido")
     try:
         await membro.send(
