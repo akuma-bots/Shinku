@@ -181,17 +181,76 @@ def _atualizar_participantes(
 
 
 def _resumo_servidor(guild: discord.Guild) -> dict:
-    """Métricas em tempo real calculadas a partir do cache atualizado pelo Gateway."""
+    """Retorna somente a quantidade total de membros atualmente no servidor."""
     membros = list(getattr(guild, "members", []) or [])
-    humanos = [m for m in membros if not getattr(m, "bot", False)]
-    bots = [m for m in membros if getattr(m, "bot", False)]
-    online = sum(getattr(m, "status", discord.Status.offline) == discord.Status.online for m in humanos)
-    ausentes = sum(getattr(m, "status", discord.Status.offline) == discord.Status.idle for m in humanos)
-    ocupados = sum(getattr(m, "status", discord.Status.offline) == discord.Status.dnd for m in humanos)
-    canais_voz = list(getattr(guild, "voice_channels", []) or []) + list(getattr(guild, "stage_channels", []) or [])
-    em_voz = {membro.id for canal in canais_voz for membro in (getattr(canal, "members", []) or []) if not getattr(membro, "bot", False)}
     total = int(getattr(guild, "member_count", 0) or len(membros))
-    return {"total": total, "humanos_cache": len(humanos), "bots_cache": len(bots), "online": online, "ausentes": ausentes, "ocupados": ocupados, "offline_cache": max(0, len(humanos) - online - ausentes - ocupados), "voz": len(em_voz), "cache_completo": len(membros) >= total}
+    return {"total": total}
+
+
+def _data_local(timestamp: float) -> datetime.date:
+    return datetime.datetime.fromtimestamp(float(timestamp), FUSO_BRASIL).date()
+
+
+def _classificar_sorteio_historico(
+    sorteio: dict,
+    metas: list,
+    eventos_historico: list,
+) -> list[str]:
+    """Identifica contextos especiais comprováveis pela data do sorteio."""
+    try:
+        inicio = float(sorteio.get("criado_em") or sorteio.get("fim") or 0)
+        fim = float(sorteio.get("encerrado_em") or sorteio.get("fim") or inicio)
+    except (TypeError, ValueError):
+        return []
+
+    if inicio <= 0:
+        return []
+    if fim < inicio:
+        fim = inicio
+
+    datas = {_data_local(inicio), _data_local(fim)}
+    contextos = []
+
+    datas_especiais = {
+        (1, 1): "Ano-Novo",
+        (7, 9): "Independência do Brasil",
+        (12, 10): "Dia das Crianças",
+        (11, 2): "Finados",
+        (11, 15): "Proclamação da República",
+        (12, 25): "Natal",
+        (12, 31): "Virada do ano",
+    }
+    for data in datas:
+        nome_data = datas_especiais.get((data.month, data.day))
+        if nome_data and nome_data not in contextos:
+            contextos.append(f"Data especial: {nome_data}")
+
+    for meta in metas if isinstance(metas, list) else []:
+        if not isinstance(meta, dict):
+            continue
+        try:
+            atingido_em = float(meta.get("atingido_em") or 0)
+        except (TypeError, ValueError):
+            continue
+        if atingido_em and inicio <= atingido_em <= fim:
+            descricao = str(meta.get("descricao") or f"Meta de {meta.get('alvo', '?')} membros")
+            contextos.append(f"Meta: {descricao[:70]}")
+        elif atingido_em and _data_local(atingido_em) in datas:
+            descricao = str(meta.get("descricao") or f"Meta de {meta.get('alvo', '?')} membros")
+            contextos.append(f"Meta: {descricao[:70]}")
+
+    for evento in eventos_historico if isinstance(eventos_historico, list) else []:
+        if not isinstance(evento, dict):
+            continue
+        try:
+            inicio_evento = float(evento.get("inicio") or 0)
+        except (TypeError, ValueError):
+            continue
+        if inicio_evento and _data_local(inicio_evento) in datas:
+            nome = str(evento.get("nome") or "Evento da comunidade")
+            contextos.append(f"Evento: {nome[:70]}")
+
+    return list(dict.fromkeys(contextos))
 
 
 def _barra_progresso(atual: int, alvo: int, largura: int = 10) -> str:
@@ -522,20 +581,36 @@ class Eventos(commands.Cog):
             for meta in metas_para_notificar:
                 await self._notificar_lideranca_meta(guild, meta)
 
-            humanos_label = "humanos" if resumo["cache_completo"] else "humanos em cache"
-            bots_label = "bots" if resumo["cache_completo"] else "bots em cache"
+            eventos_historico_dados = await _todos_eventos()
+            eventos_historico = [
+                item for item in eventos_historico_dados.values()
+                if isinstance(item, dict) and int(item.get("guild_id", 0) or 0) == guild.id
+            ]
+            sorteios_concluidos = [
+                item for item in sorteios.values()
+                if isinstance(item, dict)
+                and int(item.get("guild_id", 0) or 0) == guild.id
+                and item.get("encerrado")
+            ]
+            sorteios_concluidos.sort(
+                key=lambda item: float(item.get("encerrado_em") or item.get("fim") or 0),
+                reverse=True,
+            )
+            sorteios_especiais = []
+            for sorteio_historico in sorteios_concluidos:
+                contextos = _classificar_sorteio_historico(
+                    sorteio_historico, metas, eventos_historico
+                )
+                if contextos:
+                    sorteios_especiais.append((sorteio_historico, contextos))
+
             linhas = [
                 "## 𓂀 NÊMESIS · AGENDA AO VIVO",
-                "Acompanhamento automático da comunidade, atividades e próximos compromissos.",
-                "### 👥 MOVIMENTO DO SERVIDOR",
-                f"**{resumo['total']:,} membros no servidor**".replace(",", "."),
-                f"👤 {resumo['humanos_cache']:,} {humanos_label}  ·  🤖 {resumo['bots_cache']:,} {bots_label}".replace(",", "."),
-                f"🟢 {resumo['online']:,} online  ·  🌙 {resumo['ausentes']:,} ausentes  ·  ⛔ {resumo['ocupados']:,} ocupados".replace(",", "."),
-                f"⚫ {resumo['offline_cache']:,} offline no cache  ·  🔊 {resumo['voz']:,} em canais de voz".replace(",", "."),
+                "Acompanhamento automático da comunidade e dos próximos compromissos.",
+                "### 👥 MEMBROS NO SERVIDOR",
+                f"**{resumo['total']:,} membros**".replace(",", "."),
+                "### 📅 PRÓXIMOS EVENTOS"
             ]
-            if not resumo["cache_completo"]:
-                linhas.append("-# Presenças e divisão humano/bot consideram os membros atualmente carregados pelo Gateway.")
-            linhas.append("### 📅 PRÓXIMOS EVENTOS")
             if eventos:
                 for evento in eventos[:5]:
                     inicio = int(evento.start_time.timestamp())
@@ -551,6 +626,23 @@ class Eventos(commands.Cog):
                     linhas.append(f"**{premio}** · encerra <t:{fim}:R>")
             else:
                 linhas.append("Nenhum sorteio ativo no momento.")
+            linhas.append("### 🏆 HISTÓRICO DE SORTEIOS")
+            linhas.append(
+                f"**{len(sorteios_concluidos)} sorteios realizados** · "
+                f"**{len(sorteios_especiais)} em ocasiões especiais**"
+            )
+            if sorteios_concluidos:
+                for sorteio_historico in sorteios_concluidos[:5]:
+                    premio = discord.utils.escape_markdown(
+                        str(sorteio_historico.get("premio") or "Sorteio")[:70]
+                    )
+                    contexto = _classificar_sorteio_historico(
+                        sorteio_historico, metas, eventos_historico
+                    )
+                    selo = " · " + " / ".join(contexto[:2]) if contexto else " · Sorteio comum"
+                    linhas.append(f"**{premio}**{selo}")
+            else:
+                linhas.append("Nenhum sorteio encerrado foi encontrado no histórico.")
             linhas.append("### 🎯 MARCOS DA COMUNIDADE")
             if metas:
                 for meta in metas[:6]:
@@ -599,7 +691,7 @@ class Eventos(commands.Cog):
             estado[str(guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id, "atualizado_em": agora, "versao": 2}
             await salvar(ARQUIVO_AGENDA_PUBLICACAO, estado)
             self._ultima_atualizacao_agenda = agora
-            _LOG.info("Agenda ao Vivo sincronizada (guild=%s, membros=%s, online=%s, voz=%s, eventos=%s, sorteios=%s).", guild.id, resumo["total"], resumo["online"], resumo["voz"], len(eventos), len(sorteios_abertos))
+            _LOG.info("Agenda ao Vivo sincronizada (guild=%s, membros=%s, eventos=%s, sorteios_ativos=%s, sorteios_concluidos=%s, sorteios_especiais=%s).", guild.id, resumo["total"], len(eventos), len(sorteios_abertos), len(sorteios_concluidos), len(sorteios_especiais))
             return True
 
     @app_commands.command(name="agenda", description="Publica ou atualiza o painel ao vivo da NÊMESIS.")
