@@ -471,13 +471,14 @@ class SorteiosPainel(commands.Cog):
 
     @tasks.loop(seconds=60)
     async def republicar_sorteios_ativos(self):
-        """Lembra os membros a cada 2h sobre sorteios ativos, sem ping em massa."""
+        """Envia lembretes privados em lotes para todos os membros dos sorteios ativos."""
         agora = time.time()
         try:
             todos = await _carregar_todos()
         except Exception:
             logger.exception("Falha ao carregar sorteios para lembretes periódicos.")
             return
+
         for sorteio in list(todos.values()):
             if not isinstance(sorteio, dict) or sorteio.get("rascunho") or sorteio.get("encerrado"):
                 continue
@@ -488,29 +489,71 @@ class SorteiosPainel(commands.Cog):
                 mensagem_id = int(sorteio.get("mensagem_id") or 0)
             except (TypeError, ValueError):
                 continue
-            if agora >= fim or agora < proximo or not canal_id or not mensagem_id:
+            if agora >= fim or not canal_id or not mensagem_id:
                 continue
-            canal = self.bot.get_channel(canal_id)
-            if canal is None:
+
+            guild = self.bot.get_guild(int(sorteio.get("guild_id") or GUILD_NEMESIS_ID))
+            if guild is None:
+                continue
+
+            # Inicia uma nova rodada privada a cada 2 horas.
+            if agora >= proximo and not sorteio.get("lembrete_fila_ids"):
+                canal = guild.get_channel(canal_id)
+                if canal is None:
+                    try:
+                        canal = await self.bot.fetch_channel(canal_id)
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        logger.warning("Canal indisponível para lembrete do sorteio %s.", sorteio.get("id"))
+                        continue
                 try:
-                    canal = await self.bot.fetch_channel(canal_id)
+                    original = await canal.fetch_message(mensagem_id)
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    logger.warning("Canal indisponível para lembrete do sorteio %s.", sorteio.get("id"))
+                    logger.warning("Mensagem original indisponível para o sorteio %s.", sorteio.get("id"))
                     continue
-            try:
-                original = await canal.fetch_message(mensagem_id)
-                await canal.send(
-                    f"🔔 **Atenção, NÊMESIS!** Ainda dá tempo de participar de **{str(sorteio.get('titulo') or 'nosso sorteio')[:100]}**.\n"
-                    f"Confira o prêmio, as informações e participe por aqui: {original.jump_url}",
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
-                sorteio["lembrete_proximo_em"] = agora + 7200
+                membros = [m.id for m in guild.members if not m.bot]
+                sorteio["lembrete_fila_ids"] = membros
+                sorteio["lembrete_fila_indice"] = 0
+                sorteio["lembrete_jump_url"] = original.jump_url
                 await _salvar_item(sorteio)
-                logger.info("Lembrete periódico publicado para sorteio %s.", sorteio.get("id"))
-            except discord.NotFound:
-                logger.warning("Mensagem original do sorteio %s não existe; lembrete ignorado.", sorteio.get("id"))
-            except (discord.Forbidden, discord.HTTPException):
-                logger.exception("Falha ao publicar lembrete do sorteio %s.", sorteio.get("id"))
+
+            fila = sorteio.get("lembrete_fila_ids") or []
+            indice = int(sorteio.get("lembrete_fila_indice") or 0)
+            if not fila:
+                # Sem membros disponíveis: tenta novamente em 2 horas.
+                if agora >= proximo:
+                    sorteio["lembrete_proximo_em"] = agora + 7200
+                    await _salvar_item(sorteio)
+                continue
+
+            fim_lote = min(indice + 10, len(fila))
+            link = str(sorteio.get("lembrete_jump_url") or f"https://discord.com/channels/{guild.id}/{canal_id}/{mensagem_id}")
+            mensagem = (
+                f"🔔 **NÊMESIS • Lembrete de sorteio**\n\n"
+                f"**{str(sorteio.get('titulo') or 'Sorteio NÊMESIS')[:100]}** ainda está recebendo participantes.\n"
+                f"Confira o prêmio e as informações no canal oficial: {link}"
+            )
+            for user_id in fila[indice:fim_lote]:
+                try:
+                    membro = guild.get_member(int(user_id))
+                    if membro is None:
+                        membro = await guild.fetch_member(int(user_id))
+                    if not membro.bot:
+                        await membro.send(mensagem, allowed_mentions=discord.AllowedMentions.none())
+                except (discord.NotFound, discord.Forbidden):
+                    # DMs fechadas ou usuário indisponível: segue para o próximo.
+                    pass
+                except discord.HTTPException:
+                    logger.warning("Falha temporária ao enviar DM do sorteio %s para %s.", sorteio.get("id"), user_id)
+                await __import__("asyncio").sleep(1.0)
+
+            sorteio["lembrete_fila_indice"] = fim_lote
+            if fim_lote >= len(fila):
+                sorteio["lembrete_fila_ids"] = []
+                sorteio["lembrete_fila_indice"] = 0
+                sorteio["lembrete_jump_url"] = None
+                sorteio["lembrete_proximo_em"] = time.time() + 7200
+                logger.info("Rodada de DMs do sorteio %s concluída para %s membros.", sorteio.get("id"), len(fila))
+            await _salvar_item(sorteio)
 
     @republicar_sorteios_ativos.before_loop
     async def antes_republicar_sorteios(self):
