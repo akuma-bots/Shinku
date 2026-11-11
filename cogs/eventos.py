@@ -208,7 +208,13 @@ def _classificar_sorteio_historico(
     if fim < inicio:
         fim = inicio
 
-    datas = {_data_local(inicio), _data_local(fim)}
+    data_inicio = _data_local(inicio)
+    data_fim = _data_local(fim)
+    datas = set()
+    cursor = data_inicio
+    while cursor <= data_fim and len(datas) <= 32:
+        datas.add(cursor)
+        cursor += datetime.timedelta(days=1)
     contextos = []
 
     datas_especiais = {
@@ -766,16 +772,6 @@ class Eventos(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, membro: discord.Member):
         if membro.guild.id == GUILD_NEMESIS_ID:
-            await self.atualizar_agenda(membro.guild)
-
-    @commands.Cog.listener()
-    async def on_presence_update(self, antes: discord.Member, depois: discord.Member):
-        if depois.guild.id == GUILD_NEMESIS_ID:
-            await self.atualizar_agenda(depois.guild)
-
-    @commands.Cog.listener()
-    async def on_voice_state_update(self, membro: discord.Member, antes: discord.VoiceState, depois: discord.VoiceState):
-        if membro.guild.id == GUILD_NEMESIS_ID and antes.channel != depois.channel:
             await self.atualizar_agenda(membro.guild)
 
     def _embed_evento(
