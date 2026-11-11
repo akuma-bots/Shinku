@@ -1,11 +1,11 @@
 {
-  "release_id": "20261111-105214",
+  "release_id": "20261111-112544",
   "habilitada": true,
-  "tipo": "Melhorias dos sistemas",
-  "titulo": "Atualiza nome do bot na visão geral administrativa.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Atualiza nome do bot na visão geral administrativa.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "tipo": "Correções",
+  "titulo": "Corrige alinhamento do fluxo de músicas.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Corrige alinhamento do fluxo de músicas.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "11/11/2026",
-  "hora_atualizacao": "10:52",
+  "hora_atualizacao": "11:25",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-11T10:52:14.884712-03:00"
+  "gerado_em": "2026-11-11T11:25:44.789239-03:00"
 }
