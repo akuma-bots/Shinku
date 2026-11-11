@@ -526,6 +526,7 @@ class Eventos(commands.Cog):
             estado[str(guild.id)] = {"channel_id": canal.id, "message_id": mensagem.id, "atualizado_em": agora, "versao": 2}
             await salvar(ARQUIVO_AGENDA_PUBLICACAO, estado)
             self._ultima_atualizacao_agenda = agora
+            _LOG.info("Agenda ao Vivo sincronizada (guild=%s, membros=%s, online=%s, voz=%s, eventos=%s, sorteios=%s).", guild.id, resumo["total"], resumo["online"], resumo["voz"], len(eventos), len(sorteios_abertos))
             return True
 
     @app_commands.command(name="agenda", description="Publica ou atualiza o painel ao vivo da NÊMESIS.")
