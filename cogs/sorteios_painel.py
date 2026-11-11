@@ -10,7 +10,7 @@ from discord.ext import commands, tasks
 from cogs.sorteios import ARQUIVO, _SORTEIOS_LOCK, timestamp_discord
 from utils.apresentacao import criar_embed, COR_PRIMARIA, COR_SUCESSO, COR_ERRO
 from utils.guild_config import GUILD_NEMESIS_ID, membro_tem_lideranca
-from utils.storage import carregar, salvar
+from utils.storage import carregar, salvar, atualizar_json
 
 logger = logging.getLogger(__name__)
 MARCADOR_PAINEL = "NEMESIS-PAINEL-SORTEIOS"
@@ -51,6 +51,40 @@ async def _salvar_item(sorteio):
         todos[str(sorteio["id"])] = sorteio
         sorteio["atualizado_em"] = time.time()
         await salvar(ARQUIVO, todos)
+
+
+async def _salvar_estado_lembretes(sorteio):
+    """Atualiza somente a fila de lembretes sem sobrescrever participantes ou outros dados."""
+    campos = (
+        "lembrete_fila_ids",
+        "lembrete_fila_indice",
+        "lembrete_jump_url",
+        "lembrete_proximo_em",
+    )
+    valores = {
+        "lembrete_fila_ids": list(sorteio.get("lembrete_fila_ids") or []),
+        "lembrete_fila_indice": int(sorteio.get("lembrete_fila_indice") or 0),
+        "lembrete_jump_url": sorteio.get("lembrete_jump_url"),
+        "lembrete_proximo_em": sorteio.get("lembrete_proximo_em"),
+    }
+    sorteio_id = str(sorteio.get("id") or "")
+
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {}
+        atual = dados.get(sorteio_id)
+        if not isinstance(atual, dict):
+            return dados
+        atual.update(valores)
+        atual["atualizado_em"] = time.time()
+        dados[sorteio_id] = atual
+        return dados
+
+    estado = await atualizar_json(ARQUIVO, {}, aplicar)
+    persistido = estado.get(sorteio_id) if isinstance(estado, dict) else None
+    if isinstance(persistido, dict):
+        for campo in campos:
+            sorteio[campo] = persistido.get(campo)
 
 
 def _eh_lideranca(interaction):
@@ -510,11 +544,11 @@ class SorteiosPainel(commands.Cog):
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     logger.warning("Mensagem original indisponível para o sorteio %s.", sorteio.get("id"))
                     continue
-                membros = [m.id for m in guild.members if not m.bot]
+                membros = [m.id async for m in guild.fetch_members(limit=None) if not m.bot]
                 sorteio["lembrete_fila_ids"] = membros
                 sorteio["lembrete_fila_indice"] = 0
                 sorteio["lembrete_jump_url"] = original.jump_url
-                await _salvar_item(sorteio)
+                await _salvar_estado_lembretes(sorteio)
 
             fila = sorteio.get("lembrete_fila_ids") or []
             indice = int(sorteio.get("lembrete_fila_indice") or 0)
@@ -522,7 +556,7 @@ class SorteiosPainel(commands.Cog):
                 # Sem membros disponíveis: tenta novamente em 2 horas.
                 if agora >= proximo:
                     sorteio["lembrete_proximo_em"] = agora + 7200
-                    await _salvar_item(sorteio)
+                    await _salvar_estado_lembretes(sorteio)
                 continue
 
             fim_lote = min(indice + 10, len(fila))
@@ -553,7 +587,7 @@ class SorteiosPainel(commands.Cog):
                 sorteio["lembrete_jump_url"] = None
                 sorteio["lembrete_proximo_em"] = time.time() + 7200
                 logger.info("Rodada de DMs do sorteio %s concluída para %s membros.", sorteio.get("id"), len(fila))
-            await _salvar_item(sorteio)
+            await _salvar_estado_lembretes(sorteio)
 
     @republicar_sorteios_ativos.before_loop
     async def antes_republicar_sorteios(self):
