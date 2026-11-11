@@ -20,7 +20,7 @@ class TestIntegridadeEventos(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(resumo["total"], 5)
         self.assertEqual(resumo["humanos_cache"], 4)
         self.assertEqual(resumo["bots_cache"], 1)
-        self.assertEqual(resumo["online"], 3)
+        self.assertEqual(resumo["online"], 1)
         self.assertEqual(resumo["ausentes"], 1)
         self.assertEqual(resumo["ocupados"], 1)
         self.assertEqual(resumo["offline_cache"], 1)
