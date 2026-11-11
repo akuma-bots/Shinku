@@ -460,8 +460,8 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
         elif isinstance(item, discord.ui.RoleSelect):
             novo = discord.ui.RoleSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
-                max_values=item.max_values, custom_id=item.custom_id,
-                disabled=item.disabled,
+                max_values=item.max_values, default_values=list(item.default_values),
+                custom_id=item.custom_id, disabled=item.disabled,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -487,8 +487,8 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
         elif isinstance(item, discord.ui.MentionableSelect):
             novo = discord.ui.MentionableSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
-                max_values=item.max_values, custom_id=item.custom_id,
-                disabled=item.disabled,
+                max_values=item.max_values, default_values=list(item.default_values),
+                custom_id=item.custom_id, disabled=item.disabled,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
