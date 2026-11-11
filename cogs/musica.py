@@ -198,7 +198,7 @@ class MusicControlView(discord.ui.View):
             return False
         return await self.cog._exigir_mesmo_canal(interaction)
 
-    @discord.ui.button(label="Pausar / Retomar", emoji="⏯️", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Pausar / Retomar", emoji="⏯️", style=discord.ButtonStyle.secondary, row=0)
     async def pausar_retomar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
@@ -212,7 +212,7 @@ class MusicControlView(discord.ui.View):
         else:
             await interaction.response.send_message("Não há música tocando agora.", ephemeral=True)
 
-    @discord.ui.button(label="Pular", emoji="⏭️", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Pular", emoji="⏭️", style=discord.ButtonStyle.primary, row=0)
     async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
@@ -224,7 +224,7 @@ class MusicControlView(discord.ui.View):
         voz.stop()
         await interaction.response.send_message("⏭ Música pulada.", ephemeral=True)
 
-    @discord.ui.button(label="Encerrar", emoji="⏹️", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Encerrar", emoji="⏹️", style=discord.ButtonStyle.danger, row=1)
     async def encerrar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
@@ -243,7 +243,7 @@ class MusicControlView(discord.ui.View):
         self.cog.tarefas.pop(self.guild_id, None)
         await interaction.response.send_message("⏹ Reprodução encerrada e fila limpa.", ephemeral=True)
 
-    @discord.ui.button(label="Embaralhar", emoji="🔀", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Embaralhar", emoji="🔀", style=discord.ButtonStyle.secondary, row=1)
     async def embaralhar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
@@ -280,7 +280,7 @@ class MusicControlView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary, row=2)
     async def repeticao(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
