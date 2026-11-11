@@ -178,6 +178,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         forum.archived_threads.side_effect = sem_arquivados
         forum.guild.get_thread.return_value = legado
         forum.create_thread = AsyncMock(return_value=SimpleNamespace(thread=novo))
+        registro_global._CABECALHOS_VERIFICADOS.discard((registro_global.GUILD_NEMESIS_ID, canonico.id))
         with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
