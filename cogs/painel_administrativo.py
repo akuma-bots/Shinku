@@ -156,7 +156,7 @@ async def _embed_visao_geral(bot: commands.Bot, guild: discord.Guild) -> discord
         "Visão consolidada da organização. Os atalhos levam aos painéis e registros oficiais já existentes.",
         cor=cor, rodape="NÊMESIS • PAINEL ADMINISTRATIVO CENTRAL", timestamp=True,
     )
-    embed.add_field(name="◈ ESTADO DO SHINKU", value="🟢 Online" if bot.is_ready() else "🔴 Inicializando", inline=True)
+    embed.add_field(name="◈ ESTADO DO NÊMESIS SYSTEAM", value="🟢 Online" if bot.is_ready() else "🔴 Inicializando", inline=True)
     embed.add_field(name="◈ LATÊNCIA", value=f"{latencia} ms" if latencia is not None else "Indisponível", inline=True)
     embed.add_field(name="◈ TEMPO ATIVO", value=_formatar_uptime(bot), inline=True)
     embed.add_field(name="◈ EFETIVO", value=f"{guild.member_count or len(guild.members):,} membros\n{lideranca:,} em cargos de liderança", inline=True)
