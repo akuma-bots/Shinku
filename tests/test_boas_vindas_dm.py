@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
-from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM, CARGO_VISITANTES_ID
+from cogs.boas_vindas_dm import carregar_catalogo_codigos, TAG_GANGUE, CONVITE_NEMESIS, BoasVindasDM, BoasVindasLayoutView, CARGO_VISITANTES_ID
 from utils.guia_servidores import TAG_ORG_NEMESIS, NOME_CARGO_VISITANTES, GuiaServidoresView, CANAIS_GUIA_SERVIDORES
 
 
@@ -48,16 +49,46 @@ def test_weekly_catalog_period_is_monday_through_sunday():
     assert (fim - inicio).days == 6
 
 
-def test_interactive_codes_slash_command_is_registered():
-    assert BoasVindasDM.consultar_codigos.name == "codigos"
+def test_codes_are_available_in_the_welcome_card_without_slash_commands():
+    import discord
+
+    membro = SimpleNamespace(
+        display_name="Candidato",
+        display_avatar=SimpleNamespace(url="https://cdn.example.org/avatar.png"),
+    )
+    view = BoasVindasLayoutView(membro, 123)
+
+    assert not hasattr(BoasVindasDM, "consultar_codigos")
+    assert isinstance(view, discord.ui.LayoutView)
+    assert len(view.children) == 1
+    container = view.children[0]
+    assert isinstance(container, discord.ui.Container)
+
+    linhas = [item for item in container.children if isinstance(item, discord.ui.ActionRow)]
+    assert len(linhas) == 3
+    seletores = [linha.children[0] for linha in linhas if isinstance(linha.children[0], discord.ui.Select)]
+    valores = {opcao.value for seletor in seletores for opcao in seletor.options}
+    assert {"inicio", "shigaku", "gakuran", "fistborn"}.issubset(valores)
+    assert all(linha in container.children for linha in linhas)
+    assert any(
+        isinstance(controle, discord.ui.Button)
+        and controle.custom_id == "nemesis:alternar_notas_dm"
+        for linha in linhas for controle in linha.children
+    )
 
 
-def test_entry_navigation_uses_one_select_instead_of_link_buttons():
+def test_entry_navigation_uses_select_inside_components_v2_card():
     import discord
 
     view = GuiaServidoresView()
+    assert isinstance(view, discord.ui.LayoutView)
     assert len(view.children) == 1
-    seletor = view.children[0]
+    container = view.children[0]
+    assert isinstance(container, discord.ui.Container)
+    linhas = [item for item in container.children if isinstance(item, discord.ui.ActionRow)]
+    assert len(linhas) == 1
+    seletor = linhas[0].children[0]
     assert isinstance(seletor, discord.ui.Select)
     assert len(seletor.options) == len(CANAIS_GUIA_SERVIDORES) == 12
     assert seletor.placeholder == "◈ Escolha uma área para conhecer"
+    assert linhas[0] in container.children
