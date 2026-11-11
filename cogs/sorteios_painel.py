@@ -217,11 +217,14 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
         }
         await _salvar_item(sorteio)
         await interaction.response.send_message(
-            f"Rascunho **{sorteio['id']}** criado. Personalize a apresentação e publique quando estiver pronto.",
             view=_card_com_view(
                 ConfigurarSorteioView(self.cog, sorteio["id"]),
-                "CONFIGURAR SORTEIO",
-                "Ajuste a apresentação do rascunho e publique quando estiver pronto.",
+                "𓂀 RASCUNHO CRIADO",
+                (
+                    f"O sorteio **{sorteio['id']}** foi criado e está salvo como rascunho.\n\n"
+                    "Ajuste a apresentação, defina uma imagem se desejar e publique quando estiver pronto."
+                ),
+                rodape="NÊMESIS • Central de Sorteios",
             ),
             ephemeral=True,
         )
