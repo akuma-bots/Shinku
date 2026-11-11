@@ -145,7 +145,6 @@ class DossieMembroRegistroView(discord.ui.View):
         super().__init__(timeout=300)
         self.dossie = dossie
         self.owner_id = owner_id
-        self.pagina_mensagens = 0
         self.aba_atual = "geral"
         opcoes = [discord.SelectOption(label=label, value=chave, description=descricao[:100], default=(chave == "geral")) for chave, label, descricao in ABAS]
         self.seletor = discord.ui.Select(placeholder="Escolha o que deseja consultar", min_values=1, max_values=1, options=opcoes, custom_id="nemesis:registro:membro:aba")
@@ -158,23 +157,13 @@ class DossieMembroRegistroView(discord.ui.View):
         try:
             self.dossie = await construir_dossie(self.dossie["guild"], self.dossie["membro"])
             chave = self.aba_atual
-            from utils.historico_membros import _embed_mensagens, _embed_atividade
-            if chave == "mensagens":
-                embed = _embed_mensagens(self.dossie, self.pagina_mensagens)
-            elif chave == "atividade":
-                embed = _embed_atividade(self.dossie)
-            else:
-                renderizadores = {
-                    "geral": _embed_geral, "missoes": _embed_missoes,
-                    "competitivo": _embed_competitivo, "moderacao": _embed_moderacao,
-                    "registros": _embed_registros,
-                }
-                embed = renderizadores.get(chave, _embed_geral)(self.dossie)
-            mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
-            paginas = max(1, (len(mensagens) + 5) // 6)
-            self.pagina_mensagens = min(self.pagina_mensagens, paginas - 1)
-            self.anterior.disabled = chave != "mensagens" or self.pagina_mensagens <= 0
-            self.proxima.disabled = chave != "mensagens" or self.pagina_mensagens >= paginas - 1
+            from utils.historico_membros import _embed_atividade
+            renderizadores = {
+                "geral": _embed_geral, "missoes": _embed_missoes,
+                "competitivo": _embed_competitivo, "moderacao": _embed_moderacao,
+                "atividade": _embed_atividade, "registros": _embed_registros,
+            }
+            embed = renderizadores.get(chave, _embed_geral)(self.dossie)
             await interaction.edit_original_response(view=_card_registro(self, embed))
         except Exception:
             logger.exception("Falha ao atualizar dossiê individual.")
@@ -185,28 +174,6 @@ class DossieMembroRegistroView(discord.ui.View):
                 )
             )
 
-    @discord.ui.button(label="Anterior", emoji="◀️", style=discord.ButtonStyle.secondary, row=1, disabled=True)
-    async def anterior(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.pagina_mensagens = max(0, self.pagina_mensagens - 1)
-        await self._atualizar_mensagens(interaction)
-
-    @discord.ui.button(label="Próxima", emoji="▶️", style=discord.ButtonStyle.secondary, row=1, disabled=True)
-    async def proxima(self, interaction: discord.Interaction, button: discord.ui.Button):
-        mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
-        paginas = max(1, (len(mensagens) + 5) // 6)
-        self.pagina_mensagens = min(paginas - 1, self.pagina_mensagens + 1)
-        await self._atualizar_mensagens(interaction)
-
-    async def _atualizar_mensagens(self, interaction: discord.Interaction):
-        from utils.historico_membros import _embed_mensagens
-        mensagens = self.dossie.get("atividade", {}).get("mensagens", [])
-        paginas = max(1, (len(mensagens) + 5) // 6)
-        self.anterior.disabled = self.pagina_mensagens <= 0
-        self.proxima.disabled = self.pagina_mensagens >= paginas - 1
-        await interaction.response.edit_message(
-            view=_card_registro(self, _embed_mensagens(self.dossie, self.pagina_mensagens))
-        )
-
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id or not _usuario_pode_consultar_historico(interaction):
             await interaction.response.send_message("Acesso restrito à liderança autorizada.", ephemeral=True)
@@ -216,24 +183,18 @@ class DossieMembroRegistroView(discord.ui.View):
     async def _selecionar_aba(self, interaction: discord.Interaction):
         renderizadores = {
             "geral": _embed_geral, "missoes": _embed_missoes,
-            "competitivo": _embed_competitivo,
-            "moderacao": _embed_moderacao, "mensagens": None,
+            "competitivo": _embed_competitivo, "moderacao": _embed_moderacao,
             "atividade": None, "registros": _embed_registros,
         }
-        from utils.historico_membros import _embed_mensagens, _embed_atividade
+        from utils.historico_membros import _embed_atividade
         chave = (interaction.data or {}).get("values", [self.aba_atual])[0]
         self.aba_atual = chave
-        self.pagina_mensagens = 0
-        if chave == "mensagens":
-            embed = _embed_mensagens(self.dossie, self.pagina_mensagens)
-        elif chave == "atividade":
+        if chave == "atividade":
             embed = _embed_atividade(self.dossie)
         else:
             embed = renderizadores.get(chave, _embed_geral)(self.dossie)
         for opcao in self.seletor.options:
             opcao.default = opcao.value == chave
-        self.anterior.disabled = chave != "mensagens" or not self.dossie.get("atividade", {}).get("mensagens")
-        self.proxima.disabled = chave != "mensagens" or len(self.dossie.get("atividade", {}).get("mensagens", [])) <= 6
         await interaction.response.edit_message(view=_card_registro(self, embed))
 
 
