@@ -6,7 +6,7 @@ import time
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from utils.guild_config import lideranca_only
 from utils.storage import carregar, salvar
@@ -19,6 +19,7 @@ ARQUIVO_AGENDA_PUBLICACAO = "agenda_publicacao.json"
 ARQUIVO_METAS_MEMBROS = "agenda_metas_membros.json"
 GUILD_NEMESIS_ID = 1563995879981981817
 _EVENTOS_LOCK = asyncio.Lock()
+_AGENDA_ATUALIZAR_CUSTOM_ID = "nemesis:agenda:atualizar"
 _LOG = logging.getLogger(__name__)
 
 FUSO_BRASIL = datetime.timezone(
@@ -179,6 +180,69 @@ def _atualizar_participantes(
     return registro, True
 
 
+def _resumo_servidor(guild: discord.Guild) -> dict:
+    """Métricas em tempo real calculadas a partir do cache atualizado pelo Gateway."""
+    membros = list(getattr(guild, "members", []) or [])
+    humanos = [m for m in membros if not getattr(m, "bot", False)]
+    bots = [m for m in membros if getattr(m, "bot", False)]
+    status_online = {discord.Status.online, discord.Status.idle, discord.Status.dnd}
+    online = sum(getattr(m, "status", discord.Status.offline) in status_online for m in humanos)
+    ausentes = sum(getattr(m, "status", discord.Status.offline) == discord.Status.idle for m in humanos)
+    ocupados = sum(getattr(m, "status", discord.Status.offline) == discord.Status.dnd for m in humanos)
+    canais_voz = list(getattr(guild, "voice_channels", []) or []) + list(getattr(guild, "stage_channels", []) or [])
+    em_voz = {membro.id for canal in canais_voz for membro in (getattr(canal, "members", []) or []) if not getattr(membro, "bot", False)}
+    total = int(getattr(guild, "member_count", 0) or len(membros))
+    return {"total": total, "humanos_cache": len(humanos), "bots_cache": len(bots), "online": online, "ausentes": ausentes, "ocupados": ocupados, "offline_cache": max(0, len(humanos) - online), "voz": len(em_voz), "cache_completo": len(membros) >= total}
+
+
+def _barra_progresso(atual: int, alvo: int, largura: int = 10) -> str:
+    if alvo <= 0:
+        return "░" * largura
+    preenchido = max(0, min(largura, int((atual / alvo) * largura)))
+    return "█" * preenchido + "░" * (largura - preenchido)
+
+
+def _componentes_sao_agenda(componentes) -> bool:
+    pendentes = list(componentes or [])
+    while pendentes:
+        componente = pendentes.pop()
+        if getattr(componente, "custom_id", None) == _AGENDA_ATUALIZAR_CUSTOM_ID:
+            return True
+        if "NEMESIS_AGENDA_LIVE" in str(getattr(componente, "content", "") or ""):
+            return True
+        pendentes.extend(list(getattr(componente, "children", []) or []))
+    return False
+
+
+class AgendaAtualizarButton(discord.ui.Button):
+    def __init__(self, cog):
+        super().__init__(label="Atualizar agora", emoji="🔄", style=discord.ButtonStyle.secondary, custom_id=_AGENDA_ATUALIZAR_CUSTOM_ID)
+        self.cog = cog
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.guild is None or interaction.guild.id != GUILD_NEMESIS_ID:
+            await interaction.response.send_message("Este painel pertence à NÊMESIS.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        atualizado = await self.cog.atualizar_agenda(interaction.guild, force=True)
+        mensagem = "Agenda atualizada com os dados mais recentes do servidor." if atualizado else "Não foi possível atualizar a Agenda. Verifique as permissões do canal."
+        await interaction.followup.send(mensagem, ephemeral=True)
+
+
+class AgendaLayoutView(discord.ui.LayoutView):
+    """Cartão Components V2 persistente da Agenda ao Vivo."""
+    def __init__(self, cog, texto: str):
+        super().__init__(timeout=None)
+        self.add_item(discord.ui.Container(
+            discord.ui.TextDisplay(texto[:3900]),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.ActionRow(AgendaAtualizarButton(cog)),
+            discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+            discord.ui.TextDisplay("-# Nêmesis Systeam • NEMESIS_AGENDA_LIVE"),
+            accent_colour=0x9F1239,
+        ))
+
+
 class Eventos(commands.Cog):
     """
     Sistema de eventos da NÊMESIS.
@@ -188,11 +252,25 @@ class Eventos(commands.Cog):
     interno e recuperação após reinicializações.
     """
 
-    def __init__(
-        self,
-        bot: commands.Bot,
-    ):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self._agenda_lock = asyncio.Lock()
+        self._ultima_atualizacao_agenda = 0.0
+        self.bot.add_view(AgendaLayoutView(self, "## 𓂀 NÊMESIS · AGENDA AO VIVO\n\nSincronizando os dados do servidor..."))
+        self.atualizacao_periodica.start()
+
+    def cog_unload(self):
+        self.atualizacao_periodica.cancel()
+
+    @tasks.loop(seconds=60)
+    async def atualizacao_periodica(self):
+        guild = self.bot.get_guild(GUILD_NEMESIS_ID)
+        if guild is not None:
+            await self.atualizar_agenda(guild, force=True)
+
+    @atualizacao_periodica.before_loop
+    async def antes_da_atualizacao_periodica(self):
+        await self.bot.wait_until_ready()
 
     async def _canal_eventos(self, guild: discord.Guild):
         """Retorna o canal fixo da Agenda, sem misturá-lo com publicações de sorteios."""
