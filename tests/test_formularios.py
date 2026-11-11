@@ -421,7 +421,7 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
                 embed.set_image(url="https://cdn.example.org/banner.png")
             embeds.append(embed)
 
-        esperado = "\n\n".join(
+        esperado = "".join(
             cog_formularios._texto_embed_inscricoes(item) for item in embeds
         )
         cartao = cog_formularios._card_form_view(origem, embeds)
