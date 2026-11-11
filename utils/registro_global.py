@@ -175,6 +175,12 @@ async def _atualizar_cabecalho_topico(
     descricao: str,
 ) -> None:
     chave = (thread.guild.id, thread.id)
+    # O Arquivo de Membros usa um cartão Components V2 próprio, publicado
+    # pelo cog de Logs; o tópico não depende de mensagem inicial tradicional.
+    # Evita tentar buscar um starter inexistente e gerar aviso em cada on_ready.
+    if nome == CATEGORIAS["historico_membros"][0]:
+        _CABECALHOS_VERIFICADOS.add(chave)
+        return
     if chave in _CABECALHOS_VERIFICADOS or thread.archived or thread.locked:
         return
     embed = _embed_cabecalho_topico(nome, descricao)
