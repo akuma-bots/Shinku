@@ -1,11 +1,11 @@
 {
-  "release_id": "20261111-112544",
+  "release_id": "20261111-113443",
   "habilitada": true,
-  "tipo": "Correções",
-  "titulo": "Corrige alinhamento do fluxo de músicas.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Corrige alinhamento do fluxo de músicas.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "tipo": "Melhorias dos sistemas",
+  "titulo": "Separa biblioteca e repetição no cartão de reprodução.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Separa biblioteca e repetição no cartão de reprodução.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "11/11/2026",
-  "hora_atualizacao": "11:25",
+  "hora_atualizacao": "11:34",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-11T11:25:44.789239-03:00"
+  "gerado_em": "2026-11-11T11:34:43.359603-03:00"
 }
