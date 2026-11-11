@@ -3,7 +3,7 @@
   "habilitada": true,
   "tipo": "Melhoria da Central de Atualizações",
   "titulo": "Notas de atualização mais específicas",
-  "mensagem": "A Central de Atualizações foi aprimorada para deixar de repetir comunicados genéricos.\\n\\n• Cada versão passa a destacar os commits funcionais que realmente foram publicados.\\n• As alterações em português são apresentadas com seus títulos reais, em vez de uma descrição vaga por pasta.\\n• As notas podem reunir até seis mudanças relevantes da mesma versão.\\n• Ajustada a classificação entre novos recursos, melhorias e correções.\\n\\nA ideia é que cada comunicado explique o que mudou de verdade no Shinku.",
+  "mensagem": "A Central de Atualizações foi aprimorada para deixar de repetir comunicados genéricos.\n\n• Cada versão passa a destacar os commits funcionais que realmente foram publicados.\n• As alterações em português são apresentadas com seus títulos reais, em vez de uma descrição vaga por pasta.\n• As notas podem reunir até seis mudanças relevantes da mesma versão.\n• Ajustada a classificação entre novos recursos, melhorias e correções.\n\nA ideia é que cada comunicado explique o que mudou de verdade no Shinku.",
   "data_atualizacao": "11/11/2026",
   "hora_atualizacao": "06:58",
   "fuso_horario": "Horário de Brasília (BRT)",
