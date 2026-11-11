@@ -1,5 +1,5 @@
 """Preferências individuais para notificações privadas da NÊMESIS."""
-from utils.storage import carregar, salvar
+from utils.storage import carregar, atualizar_json
 
 ARQUIVO = "preferencias_notificacoes.json"
 
@@ -22,14 +22,16 @@ async def definir_preferencia(
 ) -> dict:
     if categoria not in {"avisos_comunidade", "notas_atualizacao"}:
         raise ValueError("Categoria de notificação inválida.")
-    dados = await carregar(ARQUIVO, {"guilds": {}})
-    if not isinstance(dados, dict):
-        dados = {"guilds": {}}
-    guilds = dados.setdefault("guilds", {})
-    guild = guilds.setdefault(str(guild_id), {})
-    usuario = guild.setdefault(str(user_id), {})
-    usuario[categoria] = bool(habilitada)
-    await salvar(ARQUIVO, dados)
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"guilds": {}}
+        guilds = dados.setdefault("guilds", {})
+        guild = guilds.setdefault(str(guild_id), {})
+        usuario = guild.setdefault(str(user_id), {})
+        usuario[categoria] = bool(habilitada)
+        return dados
+
+    await atualizar_json(ARQUIVO, {"guilds": {}}, aplicar)
     return await obter_preferencias(guild_id, user_id)
 
 
@@ -48,12 +50,14 @@ async def listar_inscritos(guild_id: int, categoria: str, membros_ids: list[str]
 
 
 async def desativar_todas(guild_id: int, user_id: int) -> dict:
-    dados = await carregar(ARQUIVO, {"guilds": {}})
-    if not isinstance(dados, dict):
-        dados = {"guilds": {}}
-    guild = dados.setdefault("guilds", {}).setdefault(str(guild_id), {})
-    usuario = guild.setdefault(str(user_id), {})
-    usuario["avisos_comunidade"] = False
-    usuario["notas_atualizacao"] = False
-    await salvar(ARQUIVO, dados)
+    def aplicar(dados):
+        if not isinstance(dados, dict):
+            dados = {"guilds": {}}
+        guild = dados.setdefault("guilds", {}).setdefault(str(guild_id), {})
+        usuario = guild.setdefault(str(user_id), {})
+        usuario["avisos_comunidade"] = False
+        usuario["notas_atualizacao"] = False
+        return dados
+
+    await atualizar_json(ARQUIVO, {"guilds": {}}, aplicar)
     return await obter_preferencias(guild_id, user_id)
