@@ -205,7 +205,7 @@ def main() -> int:
 
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     MANIFEST.write_text(
-        json.dumps(release, ensure_ascii=False, indent=2) + "\\n",
+        json.dumps(release, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     print(
