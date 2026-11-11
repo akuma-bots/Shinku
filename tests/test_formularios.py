@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import discord
 
@@ -488,11 +488,10 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
 
 
     def test_cartao_preserva_cargos_padrao_do_seletor_de_comissao(self):
-        cargo = SimpleNamespace(
-            id=987654321,
-            managed=False,
-            is_default=lambda: False,
-        )
+        cargo = Mock(spec=discord.Role)
+        cargo.id = 987654321
+        cargo.managed = False
+        cargo.is_default.return_value = False
         guild = SimpleNamespace(id=123, roles=[cargo])
         central = cog_formularios.GerenciarCargosView(
             object(), guild, 456,
