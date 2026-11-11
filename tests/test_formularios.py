@@ -487,6 +487,33 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         self.assertIs(linha.parent, container)
 
 
+    def test_cartao_preserva_cargos_padrao_do_seletor_de_comissao(self):
+        cargo = SimpleNamespace(
+            id=987654321,
+            managed=False,
+            is_default=lambda: False,
+        )
+        guild = SimpleNamespace(id=123, roles=[cargo])
+        central = cog_formularios.GerenciarCargosView(
+            object(), guild, 456,
+            {"id": "form-cargos", "cargos_notificar": [cargo.id]},
+        )
+
+        cartao = cog_formularios._card_form_view(
+            central, None, "COMISSÃO DE ANÁLISE", "Cargos selecionados."
+        )
+        container = cartao.children[0]
+        linha = next(
+            item for item in container.children
+            if isinstance(item, discord.ui.ActionRow)
+            and isinstance(item.children[0], discord.ui.RoleSelect)
+        )
+        seletor = linha.children[0]
+
+        self.assertEqual([item.id for item in seletor.default_values], [cargo.id])
+        self.assertEqual(seletor.custom_id, "nemesis:formularios:cargos_notificar")
+
+
 class TestFormulariosConfiguracaoInterativa(unittest.TestCase):
     def test_modal_de_candidatura_renderiza_escolha_com_select_nativo(self):
         modal = cog_formularios.ModalFormulario({
