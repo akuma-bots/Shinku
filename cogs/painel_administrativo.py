@@ -57,7 +57,7 @@ SECOES_ADMINISTRATIVAS = {
     },
     "sistemas": {
         "titulo": "⚙️ SISTEMAS E INFRAESTRUTURA",
-        "descricao": "Consulte a saúde do Shinku e execute verificações do armazenamento. Os diagnósticos são privados e restritos à liderança.",
+        "descricao": "Consulte a saúde do Nêmesis Systeam e execute verificações do armazenamento. Os diagnósticos são privados e restritos à liderança.",
         "topicos": ("integracoes",),
         "canais": (),
     },
