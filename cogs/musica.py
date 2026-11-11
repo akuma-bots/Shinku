@@ -1684,7 +1684,7 @@ class Musica(commands.Cog):
                 ephemeral=True,
             )
             return
-        item["text_channel_id"] = interaction.channel_id
+        item["voice_channel_id"] = voz.channel.id
         item["requested_by"] = interaction.user.id
         fila = self.filas.setdefault(interaction.guild.id, [])
         if len(fila) >= MAX_QUEUE:
