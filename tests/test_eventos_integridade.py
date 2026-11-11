@@ -5,27 +5,23 @@ from cogs import eventos
 
 
 class TestIntegridadeEventos(unittest.IsolatedAsyncioTestCase):
-    def test_resumo_servidor_contabiliza_presencas_e_voz(self):
+    def test_resumo_servidor_mostra_somente_total_de_membros(self):
         from types import SimpleNamespace
-        online = SimpleNamespace(id=1, bot=False, status=eventos.discord.Status.online)
-        idle = SimpleNamespace(id=2, bot=False, status=eventos.discord.Status.idle)
-        dnd = SimpleNamespace(id=3, bot=False, status=eventos.discord.Status.dnd)
-        offline = SimpleNamespace(id=4, bot=False, status=eventos.discord.Status.offline)
-        bot = SimpleNamespace(id=5, bot=True, status=eventos.discord.Status.online)
-        canal = SimpleNamespace(members=[online, bot])
-        guild = SimpleNamespace(members=[online, idle, dnd, offline, bot], member_count=5, voice_channels=[canal], stage_channels=[])
+        guild = SimpleNamespace(members=[SimpleNamespace(id=1)], member_count=125)
 
         resumo = eventos._resumo_servidor(guild)
 
-        self.assertEqual(resumo["total"], 5)
-        self.assertEqual(resumo["humanos_cache"], 4)
-        self.assertEqual(resumo["bots_cache"], 1)
-        self.assertEqual(resumo["online"], 1)
-        self.assertEqual(resumo["ausentes"], 1)
-        self.assertEqual(resumo["ocupados"], 1)
-        self.assertEqual(resumo["offline_cache"], 1)
-        self.assertEqual(resumo["voz"], 1)
-        self.assertTrue(resumo["cache_completo"])
+        self.assertEqual(resumo, {"total": 125})
+
+    def test_classifica_sorteio_em_meta_atingida(self):
+        from datetime import datetime, timezone
+        inicio = datetime(2026, 11, 10, 12, tzinfo=timezone.utc).timestamp()
+        fim = datetime(2026, 11, 10, 14, tzinfo=timezone.utc).timestamp()
+        meta = {"alvo": 100, "descricao": "Meta centenária", "atingido_em": inicio + 3600}
+        sorteio = {"criado_em": inicio, "encerrado_em": fim}
+        contextos = eventos._classificar_sorteio_historico(sorteio, [meta], [])
+
+        self.assertTrue(any("Meta: Meta centenária" in item for item in contextos))
 
     def test_barra_progresso_limita_valores(self):
         self.assertEqual(eventos._barra_progresso(5, 10), "█████░░░░░")
