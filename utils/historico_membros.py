@@ -34,7 +34,6 @@ ABAS = (
     ("missoes", "🎯 Missões e atividades", "Provas, contribuições, aprovações e recusas."),
     ("competitivo", "⚔️ Competitivo", "XP, progressão, guerras e estatísticas de combate."),
     ("moderacao", "🛡️ Moderação", "Punições registradas e ocorrências de segurança."),
-    ("mensagens", "💬 Mensagens", "Mensagens enviadas, editadas e excluídas nos últimos 30 dias."),
     ("atividade", "◷ Monitoramento", "Entradas, saídas, voz e alterações relevantes do membro."),
     ("registros", "📚 Linha do tempo", "Eventos relevantes registrados nos sistemas da NÊMESIS."),
 )
@@ -384,7 +383,7 @@ def _embed_atividade(d: dict) -> discord.Embed:
         descricao = discord.utils.escape_mentions(discord.utils.escape_markdown(str(item.get("descricao", ""))[:180]))
         linhas.append(f"• **{tipo}** · {_data(_timestamp(item.get('timestamp')))}\n↳ {descricao}")
     embed.add_field(name="◈ ATIVIDADES RECENTES", value="\n\n".join(linhas)[:4000] if linhas else "Nenhum evento de atividade foi capturado ainda.", inline=False)
-    embed.add_field(name="◈ COBERTURA", value="Entradas e saídas; mudanças de presença e jogos; apelidos e identidade; cargos recebidos/removidos; impulsionamento; timeouts; entradas, saídas e estados de voz; banimentos e desbanimentos. Mensagens enviadas, editadas e excluídas ficam na aba própria. Captura iniciada após a implantação, com retenção de 30 dias e limites de armazenamento. Não inclui DMs, atividade fora do servidor nem histórico anterior à ativação.", inline=False)
+    embed.add_field(name="◈ COBERTURA", value="Entradas e saídas; mudanças de presença e jogos; apelidos e identidade; impulsionamento; timeouts; entradas, saídas e estados de voz; banimentos e desbanimentos. O monitoramento de mensagens e anexos permanece nos registros de comunicação, fora do Arquivo de Membros. Captura iniciada após a implantação, com retenção de 30 dias e limites de armazenamento. Não inclui DMs, atividade fora do servidor nem histórico anterior à ativação.", inline=False)
     embed.set_footer(text="NÊMESIS • Retenção de 30 dias • Consulta restrita à liderança")
     return embed
 
