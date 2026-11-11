@@ -94,12 +94,14 @@ def gerar(before: str, after: str) -> dict | None:
 
     textos = " ".join(assuntos).lower()
     status = [s for s, _ in alteracoes]
-    if any(s.startswith("D") for s in status):
-        tipo = "Melhorias e alterações"
-    elif re.search(r"\b(fix|bug|corrig|hotfix|patch)\b", textos):
+    tem_correcao = bool(re.search(r"\\b(fix|bug|corrig|corrigir|hotfix|patch|repar)\\b", textos))
+    tem_recurso = bool(re.search(r"\\b(feat|feature|adicion|cria|implement|novo|nova)\\b", textos))
+    if tem_correcao and (tem_recurso or len(assuntos) > 1):
+        tipo = "Melhorias e correções"
+    elif tem_correcao:
         tipo = "Correções"
-    elif re.search(r"\b(feat|feature)\b", textos) or any(s.startswith("A") for s in status):
-        tipo = "Sistemas novos e melhorias"
+    elif tem_recurso or any(s.startswith("A") for s in status):
+        tipo = "Novos recursos e melhorias"
     else:
         tipo = "Melhorias dos sistemas"
 
@@ -140,66 +142,32 @@ def gerar(before: str, after: str) -> dict | None:
     unicos = list(dict.fromkeys(assuntos))
     linhas = []
     for assunto in unicos[:6]:
-        limpo = traducoes.get(assunto.casefold().strip())
+        chave = assunto.casefold().strip()
+        limpo = traducoes.get(chave)
+        if not limpo:
+            # Os commits em português já descrevem a entrega. Exibir o assunto
+            # real evita substituir alterações distintas por uma frase genérica.
+            limpo = re.sub(
+                r"^(?:feat|feature|fix|perf|security|hotfix)(?:\\([^)]*\\))?:\\s*",
+                "",
+                assunto,
+                flags=re.IGNORECASE,
+            ).strip()
+            if limpo and not re.search(r"[.!?]$", limpo):
+                limpo += "."
+            if limpo:
+                limpo = limpo[0].upper() + limpo[1:]
         if limpo:
             linhas.append(f"• {limpo[:220]}")
     if not linhas:
-        descricao_areas = ", ".join(areas) if areas else "sistemas internos"
-        linhas.append(f"• Foram aplicadas melhorias em {descricao_areas}.")
+        return None
     mensagem = (
-        "A NÊMESIS recebeu uma nova atualização nos sistemas do bot.\n\n"
-        + "\n".join(linhas)
+        "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\\n\\n"
+        + "\\n".join(linhas)
     )
     if areas:
-        mensagem += "\n\n**Áreas envolvidas:** " + ", ".join(areas) + "."
+        mensagem += "\\n\\n**Áreas envolvidas:** " + ", ".join(areas) + "."
     mensagem += (
-        "\n\nAs alterações foram integradas ao repositório principal. "
+        "\\n\\nAs alterações foram integradas ao repositório principal. "
         "A disponibilidade das funções depende da conclusão do deploy do bot."
     )
-
-    titulo = linhas[0].removeprefix("• ") if len(linhas) == 1 else "Novidades e melhorias nos sistemas"
-    agora = datetime.now(FUSO)
-    return {
-        "release_id": agora.strftime("%Y%m%d-%H%M%S"),
-        # A classificação do commit é a aprovação da elegibilidade da release.
-        # O bot só envia quando existe uma release funcional relevante gerada aqui.
-        "habilitada": True,
-        "tipo": tipo,
-        "titulo": titulo[:180] or "Atualização da NÊMESIS",
-        "mensagem": mensagem[:3400],
-        "data_atualizacao": agora.strftime("%d/%m/%Y"),
-        "hora_atualizacao": agora.strftime("%H:%M"),
-        "fuso_horario": "Horário de Brasília (BRT)",
-        "gerado_em": agora.isoformat(),
-    }
-
-
-def main() -> int:
-    before = os.environ.get("BEFORE_SHA", "").strip()
-    after = os.environ.get("AFTER_SHA", "").strip() or git("rev-parse", "HEAD")
-    release = gerar(before, after)
-    if release is None:
-        print("Nenhuma alteração funcional elegível; manifesto preservado.")
-        return 0
-
-    anterior = {}
-    if MANIFEST.exists():
-        try:
-            anterior = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            anterior = {}
-    if anterior.get("release_id") == release["release_id"]:
-        print("Este commit já possui manifesto; nenhuma alteração necessária.")
-        return 0
-
-    MANIFEST.parent.mkdir(parents=True, exist_ok=True)
-    MANIFEST.write_text(
-        json.dumps(release, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-    print(f"Notas geradas: {release['data_atualizacao']} às {release['hora_atualizacao']} — {release['titulo']}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
