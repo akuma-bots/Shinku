@@ -391,13 +391,13 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         origem = discord.ui.View(timeout=120)
         botao = discord.ui.Button(
             label="Aprovar", style=discord.ButtonStyle.success,
-            custom_id="formulario:aprovar:protocolo-1",
+            custom_id="formulario:aprovar:protocolo-1", id=1001,
         )
         botao.callback = AsyncMock()
         seletor = discord.ui.Select(
             placeholder="Ação do dossiê",
             options=[discord.SelectOption(label="Consultar", value="consultar")],
-            custom_id="formulario:dossie:acao",
+            custom_id="formulario:dossie:acao", id=1002,
         )
         seletor.callback = AsyncMock()
         origem.add_item(botao)
@@ -465,6 +465,8 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         botao_clonado = next(item for item in controles if isinstance(item, discord.ui.Button))
         seletor_clonado = next(item for item in controles if isinstance(item, discord.ui.Select))
         self.assertIs(botao_clonado.callback, botao.callback)
+        self.assertEqual(botao_clonado.id, 1001)
+        self.assertEqual(seletor_clonado.id, 1002)
 
         seletor_clonado._values = ["consultar"]
         interacao = SimpleNamespace()
