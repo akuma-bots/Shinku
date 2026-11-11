@@ -1036,6 +1036,7 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
     ]
     linhas = {}
+    indice_controle_automatico = 0
     for item in origem.children:
         eh_seletor = False
         if isinstance(item, discord.ui.Button):
@@ -1081,7 +1082,16 @@ def _card_central_tickets(origem: discord.ui.View, embed: discord.Embed | None =
             novo.callback = callback
         else:
             continue
-        linhas.setdefault(item.row or 0, []).append((eh_seletor, novo))
+        if item.row is not None:
+            linha = item.row
+        elif eh_seletor:
+            # Um seletor ocupa a linha inteira.
+            linha = (indice_controle_automatico + 4) // 5
+            indice_controle_automatico = (linha + 1) * 5
+        else:
+            linha = indice_controle_automatico // 5
+            indice_controle_automatico += 1
+        linhas.setdefault(linha, []).append((eh_seletor, novo))
 
     for _, itens in sorted(linhas.items()):
         botoes = []
