@@ -2009,7 +2009,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             inline=False,
         )
         embed.color = COR_ERRO if nivel >= 3 else COR_AVISO
-        await mensagem.edit(view=_card_automod_view(None, embed))
+        await _atualizar_cartao_automod(mensagem, embed)
 
         try:
             if alvo is not None:
@@ -2059,7 +2059,7 @@ class AutoMod(commands.GroupCog, group_name="automod", group_description="Config
             inline=False,
         )
         embed.color = COR_SUCESSO
-        await mensagem.edit(view=_card_automod_view(None, embed))
+        await _atualizar_cartao_automod(mensagem, embed)
         log = criar_embed(
             title="🛡️ Auditoria — AutoMod",
             description=(
