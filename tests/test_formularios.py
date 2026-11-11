@@ -387,7 +387,7 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         )
 
 
-    def test_cartao_de_dossie_preserva_texto_longo_midia_e_controles(self):
+    async def test_cartao_de_dossie_preserva_texto_longo_midia_e_controles(self):
         origem = discord.ui.View(timeout=120)
         botao = discord.ui.Button(
             label="Aprovar", style=discord.ButtonStyle.success,
