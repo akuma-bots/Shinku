@@ -5,7 +5,7 @@ import re
 import unicodedata
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from cogs.sorteios import ARQUIVO, _SORTEIOS_LOCK, timestamp_discord
 from utils.apresentacao import criar_embed, COR_PRIMARIA, COR_SUCESSO, COR_ERRO
@@ -157,7 +157,8 @@ def _card_sorteio(sorteio: dict, quantidade: int, view: discord.ui.View):
         (
             f"{sorteio.get('descricao') or 'Participe e concorra ao prêmio.'}\n\n"
             f"**Prêmio:** {sorteio.get('premio', 'Não informado')}\n"
-            f"**Vencedores:** {int(sorteio.get('vencedores', 1))}\n"
+            + (f"**Requisitos (opcionais):** {sorteio.get('requisitos')}\n" if sorteio.get("requisitos") else "")
+            + f"**Vencedores:** {int(sorteio.get('vencedores', 1))}\n"
             f"**Encerra:** {timestamp_discord(float(sorteio.get('fim') or 0), 'F')} "
             f"({timestamp_discord(float(sorteio.get('fim') or 0), 'R')})\n"
             f"**Participantes:** {quantidade}\n\n"
@@ -230,6 +231,34 @@ class ModalCriarSorteio(discord.ui.Modal, title="Criar sorteio"):
         )
 
 
+class ModalRequisitosSorteio(discord.ui.Modal, title="Requisitos opcionais"):
+    requisitos = discord.ui.TextInput(
+        label="Requisitos para participar (opcional)",
+        placeholder="Ex.: estar no servidor e ler as regras do sorteio",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=900,
+    )
+
+    def __init__(self, cog, sorteio_id):
+        super().__init__()
+        self.cog = cog
+        self.sorteio_id = sorteio_id
+
+    async def on_submit(self, interaction):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        sorteio = await self.cog.obter(self.sorteio_id)
+        if not sorteio or not sorteio.get("rascunho"):
+            await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
+            return
+        sorteio["requisitos"] = str(self.requisitos.value or "").strip()
+        await _salvar_item(sorteio)
+        resposta = "Requisitos opcionais salvos." if sorteio["requisitos"] else "Requisitos removidos. A participação permanece livre."
+        await interaction.response.send_message(resposta, ephemeral=True)
+
+
 class ModalBannerSorteio(discord.ui.Modal, title="Imagem do sorteio"):
     url = discord.ui.TextInput(label="URL da imagem", placeholder="https://...", max_length=400)
 
@@ -266,6 +295,19 @@ class ConfigurarSorteioView(discord.ui.View):
             await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
             return
         await interaction.response.send_modal(ModalBannerSorteio(self.cog, self.sorteio_id))
+    @discord.ui.button(label="Requisitos opcionais", style=discord.ButtonStyle.primary, emoji="📌")
+    async def definir_requisitos(self, interaction, button):
+        if not _eh_lideranca(interaction):
+            await interaction.response.send_message("Acesso restrito à liderança.", ephemeral=True)
+            return
+        sorteio = await self.cog.obter(self.sorteio_id)
+        if not sorteio or not sorteio.get("rascunho"):
+            await interaction.response.send_message("Este rascunho não está mais disponível.", ephemeral=True)
+            return
+        modal = ModalRequisitosSorteio(self.cog, self.sorteio_id)
+        modal.requisitos.default = str(sorteio.get("requisitos") or "")
+        await interaction.response.send_modal(modal)
+
     @discord.ui.button(label="Publicar sorteio", style=discord.ButtonStyle.success, emoji="🎉")
     async def publicar(self, interaction, button):
         if not _eh_lideranca(interaction):
@@ -287,6 +329,7 @@ class ConfigurarSorteioView(discord.ui.View):
             return
         sorteio["canal_id"] = canal.id
         sorteio["mensagem_id"] = mensagem.id
+        sorteio["lembrete_proximo_em"] = time.time() + 7200
         sorteio["rascunho"] = False
         await _salvar_item(sorteio)
         await self.cog.registrar_view_publica(sorteio)
@@ -426,6 +469,53 @@ class SorteiosPainel(commands.Cog):
             "Participe do sorteio e consulte suas chances usando os controles abaixo.",
         ))
 
+    @tasks.loop(seconds=60)
+    async def republicar_sorteios_ativos(self):
+        """Lembra os membros a cada 2h sobre sorteios ativos, sem ping em massa."""
+        agora = time.time()
+        try:
+            todos = await _carregar_todos()
+        except Exception:
+            logger.exception("Falha ao carregar sorteios para lembretes periódicos.")
+            return
+        for sorteio in list(todos.values()):
+            if not isinstance(sorteio, dict) or sorteio.get("rascunho") or sorteio.get("encerrado"):
+                continue
+            try:
+                fim = float(sorteio.get("fim") or 0)
+                proximo = float(sorteio.get("lembrete_proximo_em") or 0)
+                canal_id = int(sorteio.get("canal_id") or 0)
+                mensagem_id = int(sorteio.get("mensagem_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if agora >= fim or agora < proximo or not canal_id or not mensagem_id:
+                continue
+            canal = self.bot.get_channel(canal_id)
+            if canal is None:
+                try:
+                    canal = await self.bot.fetch_channel(canal_id)
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    logger.warning("Canal indisponível para lembrete do sorteio %s.", sorteio.get("id"))
+                    continue
+            try:
+                original = await canal.fetch_message(mensagem_id)
+                await canal.send(
+                    f"🔔 **Atenção, NÊMESIS!** Ainda dá tempo de participar de **{str(sorteio.get('titulo') or 'nosso sorteio')[:100]}**.\n"
+                    f"Confira o prêmio, as informações e participe por aqui: {original.jump_url}",
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
+                sorteio["lembrete_proximo_em"] = agora + 7200
+                await _salvar_item(sorteio)
+                logger.info("Lembrete periódico publicado para sorteio %s.", sorteio.get("id"))
+            except discord.NotFound:
+                logger.warning("Mensagem original do sorteio %s não existe; lembrete ignorado.", sorteio.get("id"))
+            except (discord.Forbidden, discord.HTTPException):
+                logger.exception("Falha ao publicar lembrete do sorteio %s.", sorteio.get("id"))
+
+    @republicar_sorteios_ativos.before_loop
+    async def antes_republicar_sorteios(self):
+        await self.bot.wait_until_ready()
+
     async def obter(self, sorteio_id):
         todos = await _carregar_todos()
         item = todos.get(str(sorteio_id))
@@ -543,6 +633,8 @@ class SorteiosPainel(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        if not self.republicar_sorteios_ativos.is_running():
+            self.republicar_sorteios_ativos.start()
         if self._painel_lock:
             return
         self._painel_lock = True
