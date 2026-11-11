@@ -169,3 +169,17 @@ def gerar(before: str, after: str) -> dict | None:
         "\n\nAs alterações foram integradas ao repositório principal. "
         "A disponibilidade das funções depende da conclusão do deploy do bot."
     )
+    
+    titulo = linhas[0].removeprefix("• ") if len(linhas) == 1 else "Novidades e melhorias nos sistemas"
+    agora = datetime.now(FUSO)
+    return {
+        "release_id": agora.strftime("%Y%m%d-%H%M%S"),
+        "habilitada": True,
+        "tipo": tipo,
+        "titulo": titulo[:180] or "Atualização da NÊMESIS",
+        "mensagem": mensagem[:3400],
+        "data_atualizacao": agora.strftime("%d/%m/%Y"),
+        "hora_atualizacao": agora.strftime("%H:%M"),
+        "fuso_horario": "Horário de Brasília (BRT)",
+        "gerado_em": agora.isoformat(),
+    }
