@@ -484,11 +484,11 @@ class Eventos(commands.Cog):
                     status = "✓ ALCANÇADO" if atingido else "◷ EM PROGRESSO"
                     barra = _barra_progresso(resumo["total"], alvo)
                     descricao = discord.utils.escape_markdown(str(meta.get("descricao") or "Marco da comunidade")[:80])
-                    linhas.append(f"**{alvo:,} membros** · {status}\\n**{barra}** · {min(resumo['total'], alvo):,}/{alvo:,}\\n{descricao}".replace(",", "."))
+                    linhas.append(f"**{alvo:,} membros** · {status}\n**{barra}** · {min(resumo['total'], alvo):,}/{alvo:,}\n{descricao}".replace(",", "."))
             else:
                 linhas.append("Nenhum marco cadastrado. A liderança pode registrar metas de crescimento.")
             linhas.extend(["### ⏱️ SINCRONIZAÇÃO", f"Dados recebidos do Discord · <t:{int(agora)}:R>"])
-            texto = "\\n\\n".join(linhas)
+            texto = "\n\n".join(linhas)
             view = AgendaLayoutView(self, texto)
 
             estado = await carregar(ARQUIVO_AGENDA_PUBLICACAO, {})
@@ -515,7 +515,7 @@ class Eventos(commands.Cog):
                 if mensagem is None:
                     mensagem = await canal.send(view=view)
                 else:
-                    await mensagem.edit(content=None, embed=None, embeds=[], attachments=[], view=view)
+                    await mensagem.edit(content=None, embeds=[], attachments=[], view=view)
             except (discord.Forbidden, discord.HTTPException):
                 _LOG.exception("Falha ao publicar/atualizar a Agenda.")
                 return False
