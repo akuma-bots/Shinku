@@ -186,7 +186,6 @@ def _resumo_servidor(guild: discord.Guild) -> dict:
     humanos = [m for m in membros if not getattr(m, "bot", False)]
     bots = [m for m in membros if getattr(m, "bot", False)]
     online = sum(getattr(m, "status", discord.Status.offline) == discord.Status.online for m in humanos)
-    online = sum(getattr(m, "status", discord.Status.offline) in status_online for m in humanos)
     ausentes = sum(getattr(m, "status", discord.Status.offline) == discord.Status.idle for m in humanos)
     ocupados = sum(getattr(m, "status", discord.Status.offline) == discord.Status.dnd for m in humanos)
     canais_voz = list(getattr(guild, "voice_channels", []) or []) + list(getattr(guild, "stage_channels", []) or [])
