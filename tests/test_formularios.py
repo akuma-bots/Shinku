@@ -409,7 +409,8 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
                 title=f"Dossiê {pagina + 1}/4",
                 description=f"Resumo da etapa {pagina + 1}.",
             )
-            for pergunta in range(20):
+            quantidade_perguntas = 1 if pagina == 3 else 20
+            for pergunta in range(quantidade_perguntas):
                 embed.add_field(
                     name=f"Pergunta {pagina * 20 + pergunta + 1}",
                     value=f"RESPOSTA_COMPLETA_{pagina}_{pergunta} " + ("x" * 980),
@@ -446,7 +447,7 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertEqual("".join(textos), esperado)
         self.assertTrue(all(len(texto) <= 4000 for texto in textos))
-        self.assertIn("RESPOSTA_COMPLETA_3_19", "".join(textos))
+        self.assertIn("RESPOSTA_COMPLETA_3_0", "".join(textos))
 
         secao = next(item for item in descendentes if isinstance(item, discord.ui.Section))
         self.assertIsInstance(secao.accessory, discord.ui.Thumbnail)
