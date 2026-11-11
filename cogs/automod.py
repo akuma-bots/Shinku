@@ -542,7 +542,7 @@ def _card_automod_view(origem: discord.ui.View | None, embed: discord.Embed | No
     for inicio in range(0, len(botoes), 5):
         componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
     componentes.extend([
-        discord.ui.Separator(visible=True, spacing=discord.ui.SeparatorSpacing.small),
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# NÊMESIS • Segurança e Moderação"),
     ])
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
