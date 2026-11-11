@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from utils.guild_config import lideranca_only
+from utils.guild_config import lideranca_only, CARGOS_LIDERANCA_IDS
 from utils.storage import carregar, salvar
 
 
@@ -401,6 +401,67 @@ class Eventos(commands.Cog):
             ephemeral=True,
         )
 
+    async def _notificar_lideranca_meta(self, guild: discord.Guild, meta: dict):
+        """Notifica uma única vez todos os líderes quando um marco é alcançado."""
+        if not isinstance(meta, dict) or not meta.get("atingido_em") or meta.get("aviso_lideranca_iniciado_em"):
+            return
+
+        # Persiste o bloqueio antes dos envios para impedir duplicidade após reinício.
+        meta["aviso_lideranca_iniciado_em"] = time.time()
+        dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+        dados = dados if isinstance(dados, dict) else {}
+        metas = dados.get(str(guild.id), [])
+        if isinstance(metas, list):
+            for item in metas:
+                if isinstance(item, dict) and item.get("id") == meta.get("id"):
+                    item.update(meta)
+                    break
+            dados[str(guild.id)] = metas
+            await salvar(ARQUIVO_METAS_MEMBROS, dados)
+
+        alvo = int(meta.get("alvo", 0) or 0)
+        descricao = discord.utils.escape_markdown(str(meta.get("descricao") or "Marco da comunidade")[:200])
+        mensagem = (
+            "𓂀 **NÊMESIS · META ALCANÇADA**\n\n"
+            f"A comunidade atingiu **{alvo:,} membros**.\n"
+            f"**Marco:** {descricao}\n\n"
+            "A liderança foi convocada para definir uma celebração. "
+            "Considerem organizar um **evento especial** ou um **sorteio oficial** "
+            "para marcar esta conquista. A publicação deve ser aprovada e organizada pela liderança."
+        ).replace(",", ".")
+
+        enviados = []
+        falhas = []
+        lideres = [
+            membro for membro in (getattr(guild, "members", []) or [])
+            if not getattr(membro, "bot", False)
+            and any(cargo.id in CARGOS_LIDERANCA_IDS for cargo in getattr(membro, "roles", []))
+        ]
+        for lider in lideres:
+            try:
+                await lider.send(mensagem)
+                enviados.append(lider.id)
+            except (discord.Forbidden, discord.HTTPException):
+                falhas.append(lider.id)
+
+        meta["avisos_dm_enviados_ids"] = enviados
+        meta["avisos_dm_falhas_ids"] = falhas
+        meta["aviso_lideranca_concluido_em"] = time.time()
+        dados = await carregar(ARQUIVO_METAS_MEMBROS, {})
+        dados = dados if isinstance(dados, dict) else {}
+        metas = dados.get(str(guild.id), [])
+        if isinstance(metas, list):
+            for item in metas:
+                if isinstance(item, dict) and item.get("id") == meta.get("id"):
+                    item.update(meta)
+                    break
+            dados[str(guild.id)] = metas
+            await salvar(ARQUIVO_METAS_MEMBROS, dados)
+        _LOG.info(
+            "Aviso de meta enviado à liderança (guild=%s, meta=%s, enviados=%s, falhas=%s).",
+            guild.id, meta.get("id"), len(enviados), len(falhas)
+        )
+
     async def atualizar_agenda(self, guild: discord.Guild, *, force: bool = False):
         """Atualiza um único cartão com métricas do Gateway, eventos, sorteios e marcos."""
         if guild.id != GUILD_NEMESIS_ID:
@@ -438,15 +499,20 @@ class Eventos(commands.Cog):
             metas = [item for item in metas if isinstance(item, dict)] if isinstance(metas, list) else []
             metas.sort(key=lambda item: int(item.get("alvo", 0) or 0))
             metas_alteradas = False
+            metas_para_notificar = []
             for meta in metas:
                 alvo = int(meta.get("alvo", 0) or 0)
                 if alvo > 0 and not meta.get("atingido_em") and resumo["total"] >= alvo:
                     meta["atingido_em"] = agora
                     meta["atingido_por_sincronizacao"] = True
                     metas_alteradas = True
+                if alvo > 0 and meta.get("atingido_em") and not meta.get("aviso_lideranca_iniciado_em"):
+                    metas_para_notificar.append(meta)
             if metas_alteradas:
                 metas_dados[str(guild.id)] = metas
                 await salvar(ARQUIVO_METAS_MEMBROS, metas_dados)
+            for meta in metas_para_notificar:
+                await self._notificar_lideranca_meta(guild, meta)
 
             humanos_label = "humanos" if resumo["cache_completo"] else "humanos em cache"
             bots_label = "bots" if resumo["cache_completo"] else "bots em cache"
@@ -568,8 +634,10 @@ class Eventos(commands.Cog):
         metas.append(meta)
         dados[str(interaction.guild.id)] = metas[-100:]
         await salvar(ARQUIVO_METAS_MEMBROS, dados)
+        if meta["atingido_em"]:
+            await self._notificar_lideranca_meta(interaction.guild, meta)
         await self.atualizar_agenda(interaction.guild)
-        situacao = "Esse marco já foi alcançado." if meta["atingido_em"] else "O marco aparecerá como em progresso na Agenda."
+        situacao = "Esse marco já foi alcançado; a liderança foi avisada por DM." if meta["atingido_em"] else "O marco aparecerá como em progresso na Agenda."
         await interaction.response.send_message(f"Marco de **{alvo:,} membros** registrado. {situacao}".replace(",", "."), ephemeral=True)
 
     @commands.Cog.listener()
@@ -590,6 +658,9 @@ class Eventos(commands.Cog):
         if alterado:
             dados[str(membro.guild.id)] = metas
             await salvar(ARQUIVO_METAS_MEMBROS, dados)
+        for meta in metas if isinstance(metas, list) else []:
+            if isinstance(meta, dict) and meta.get("atingido_em") and not meta.get("aviso_lideranca_iniciado_em"):
+                await self._notificar_lideranca_meta(membro.guild, meta)
         await self.atualizar_agenda(membro.guild)
 
     @commands.Cog.listener()
