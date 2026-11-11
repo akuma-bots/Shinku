@@ -387,6 +387,106 @@ class TestFormularios(unittest.IsolatedAsyncioTestCase):
         )
 
 
+    def test_cartao_de_dossie_preserva_texto_longo_midia_e_controles(self):
+        origem = discord.ui.View(timeout=120)
+        botao = discord.ui.Button(
+            label="Aprovar", style=discord.ButtonStyle.success,
+            custom_id="formulario:aprovar:protocolo-1",
+        )
+        botao.callback = AsyncMock()
+        seletor = discord.ui.Select(
+            placeholder="Ação do dossiê",
+            options=[discord.SelectOption(label="Consultar", value="consultar")],
+            custom_id="formulario:dossie:acao",
+        )
+        seletor.callback = AsyncMock()
+        origem.add_item(botao)
+        origem.add_item(seletor)
+
+        embeds = []
+        for pagina in range(4):
+            embed = discord.Embed(
+                title=f"Dossiê {pagina + 1}/4",
+                description=f"Resumo da etapa {pagina + 1}.",
+            )
+            for pergunta in range(20):
+                embed.add_field(
+                    name=f"Pergunta {pagina * 20 + pergunta + 1}",
+                    value=f"RESPOSTA_COMPLETA_{pagina}_{pergunta} " + ("x" * 980),
+                    inline=False,
+                )
+            if pagina == 0:
+                embed.set_thumbnail(url="https://cdn.example.org/icone.png")
+                embed.set_image(url="https://cdn.example.org/banner.png")
+            embeds.append(embed)
+
+        esperado = "\\n\\n".join(
+            cog_formularios._texto_embed_inscricoes(item) for item in embeds
+        )
+        cartao = cog_formularios._card_form_view(origem, embeds)
+
+        self.assertIsInstance(cartao, discord.ui.LayoutView)
+        self.assertEqual(len(cartao.children), 1)
+        container = cartao.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+
+        def percorrer(itens):
+            for item in itens:
+                yield item
+                yield from percorrer(getattr(item, "children", ()) or ())
+                acessorio = getattr(item, "accessory", None)
+                if acessorio is not None:
+                    yield acessorio
+
+        descendentes = list(percorrer(container.children))
+        textos = [
+            item.content for item in descendentes
+            if isinstance(item, discord.ui.TextDisplay)
+            and item.content != "-# NÊMESIS • Gestão de Inscrições"
+        ]
+        self.assertEqual("".join(textos), esperado)
+        self.assertTrue(all(len(texto) <= 4000 for texto in textos))
+        self.assertIn("RESPOSTA_COMPLETA_3_19", "".join(textos))
+
+        secao = next(item for item in descendentes if isinstance(item, discord.ui.Section))
+        self.assertIsInstance(secao.accessory, discord.ui.Thumbnail)
+        galeria = next(item for item in descendentes if isinstance(item, discord.ui.MediaGallery))
+        self.assertEqual(galeria.items[0].media.url, "https://cdn.example.org/banner.png")
+
+        linhas = [item for item in container.children if isinstance(item, discord.ui.ActionRow)]
+        self.assertEqual(len(linhas), 2)
+        self.assertTrue(all(linha in container.children for linha in linhas))
+        controles = [controle for linha in linhas for controle in linha.children]
+        self.assertEqual(
+            {controle.custom_id for controle in controles},
+            {"formulario:aprovar:protocolo-1", "formulario:dossie:acao"},
+        )
+        botao_clonado = next(item for item in controles if isinstance(item, discord.ui.Button))
+        seletor_clonado = next(item for item in controles if isinstance(item, discord.ui.Select))
+        self.assertIs(botao_clonado.callback, botao.callback)
+
+        seletor_clonado._values = ["consultar"]
+        interacao = SimpleNamespace()
+        await seletor_clonado.callback(interacao)
+        self.assertEqual(seletor._values, ["consultar"])
+        seletor.callback.assert_awaited_once_with(interacao)
+
+    def test_central_publica_de_inscricoes_preserva_banner_e_seletor_no_cartao(self):
+        embed = discord.Embed(title="Central de recrutamento", description="Inscrições abertas.")
+        embed.set_thumbnail(url="https://cdn.example.org/icone.png")
+        embed.set_image(url="https://cdn.example.org/banner.png")
+
+        cartao = cog_formularios._view_central_inscricoes([], embed)
+
+        self.assertIsInstance(cartao, discord.ui.LayoutView)
+        container = cartao.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        self.assertTrue(any(isinstance(item, discord.ui.MediaGallery) for item in container.children))
+        linha = next(item for item in container.children if isinstance(item, discord.ui.ActionRow))
+        self.assertIsInstance(linha.children[0], discord.ui.Select)
+        self.assertIs(linha.parent, container)
+
+
 class TestFormulariosConfiguracaoInterativa(unittest.TestCase):
     def test_modal_de_candidatura_renderiza_escolha_com_select_nativo(self):
         modal = cog_formularios.ModalFormulario({
