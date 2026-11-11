@@ -439,9 +439,13 @@ async def _atualizar_cartao_sugestao(mensagem: discord.Message, registro: dict) 
         embed,
         marcador="NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
     )
+    argumentos = {
+        "view": view,
+        "allowed_mentions": discord.AllowedMentions.none(),
+    }
     if not _mensagem_tem_cartao_sugestoes(mensagem, "NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2"):
-        await mensagem.edit(content=None, embeds=[], attachments=[])
-    await mensagem.edit(view=view, allowed_mentions=discord.AllowedMentions.none())
+        argumentos.update(content=None, embeds=[], attachments=[])
+    await mensagem.edit(**argumentos)
 
 
 async def _obter_registro(message_id: str) -> dict | None:
