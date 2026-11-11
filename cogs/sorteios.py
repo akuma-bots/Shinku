@@ -1343,6 +1343,7 @@ class Sorteios(commands.Cog):
                 raise RuntimeError("Sorteio não encontrado ao confirmar anúncio.")
             atual["encerrado"] = True
             atual["anuncio_enviado"] = True
+            atual.setdefault("encerrado_em", time.time())
             atual["atualizado_em"] = time.time()
             todos[str(atual["id"])] = atual
             await salvar(ARQUIVO, todos)
