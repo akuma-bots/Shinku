@@ -250,7 +250,7 @@ class TestMonitoramentoAmpliado(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Valorant", registrar.await_args.args[3])
 
 
-    async def test_mudanca_de_cargo_e_salva_mesmo_sem_forum_de_registros(self):
+    async def test_mudanca_de_cargo_nao_cria_historico_separado(self):
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
         from cogs.logs import Logs, GUILD_NEMESIS_ID
@@ -272,6 +272,5 @@ class TestMonitoramentoAmpliado(unittest.IsolatedAsyncioTestCase):
         ):
             await cog.on_member_update(antes, depois)
 
-        registrar.assert_awaited_once()
-        self.assertEqual(registrar.await_args.args[2], "cargos")
-        self.assertIn("Supervisor", registrar.await_args.args[3])
+        # O Arquivo de Membros não mantém uma trilha separada de cargos.
+        registrar.assert_not_awaited()
