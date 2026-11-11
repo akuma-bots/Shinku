@@ -226,6 +226,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         canonico.locked = False
         starter = Mock()
         starter.embeds = []
+        starter.flags = SimpleNamespace(is_components_v2=False, value=0)
         starter.edit = AsyncMock()
         canonico.fetch_message = AsyncMock(return_value=starter)
         forum.threads = [canonico]
