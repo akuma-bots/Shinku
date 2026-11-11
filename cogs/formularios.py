@@ -448,7 +448,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.UserSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, default_values=list(item.default_values),
-                custom_id=item.custom_id, disabled=item.disabled, id=item.id, id=item.id,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -475,7 +475,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, channel_types=list(item.channel_types),
                 default_values=list(item.default_values),
-                custom_id=item.custom_id, disabled=item.disabled,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
