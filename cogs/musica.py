@@ -540,7 +540,7 @@ class MusicPlaylistView(discord.ui.View):
             return
         fila.extend({
             **faixa,
-            "text_channel_id": interaction.channel_id,
+            "voice_channel_id": voz.channel.id,
             "http_headers": {},
         } for faixa in faixas)
         await self.cog._garantir_reprodutor(interaction.guild)
@@ -1138,14 +1138,10 @@ class Musica(commands.Cog):
             return
         itens = itens[:disponivel]
         for item in itens:
-            item["text_channel_id"] = interaction.channel_id
+            item["voice_channel_id"] = voz.channel.id
             item["requested_by"] = interaction.user.id
         fila.extend(itens)
-        canal_musica = interaction.guild.get_channel(CANAL_MUSICA_ID)
-        if isinstance(canal_musica, discord.TextChannel):
-            for faixa in itens:
-                await self._publicar_topico_faixa(canal_musica, faixa)
-        primeira = itens[0]
+                primeira = itens[0]
         posicao = len(fila) - len(itens) + 1
         estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
         quantidade = f" • {len(itens)} faixa(s)" if len(itens) > 1 else ""
@@ -1356,25 +1352,6 @@ class Musica(commands.Cog):
         embed.set_footer(text="NÊMESIS • Sistema de música")
         return embed
 
-    async def _publicar_topico_faixa(self, canal: discord.TextChannel, faixa: dict[str, Any]) -> None:
-        """Publica cada faixa adicionada como tópico próprio no canal musical."""
-        titulo = " ".join(str(faixa.get("title") or "Música").split())[:90]
-        url = str(faixa.get("webpage_url") or "").strip()
-        if not url.startswith(("https://", "http://")):
-            return
-        artista = str(faixa.get("artist") or "").strip()
-        descricao = (
-            f"**Faixa:** [{discord.utils.escape_markdown(titulo)}]({url})\\n"
-            + (f"**Artista:** {discord.utils.escape_markdown(artista)}\\n" if artista else "")
-            + f"**Duração:** {self._tempo(int(faixa.get('duration') or 0))}\\n"
-            + f"**Solicitada por:** <@{int(faixa.get('requested_by') or 0)}>"
-        )
-        try:
-            inicial = await canal.send(embed=self._embed_musica("♫ " + titulo, descricao))
-            await inicial.create_thread(name=("♫ " + titulo)[:100], auto_archive_duration=10080)
-        except (discord.Forbidden, discord.HTTPException):
-            LOG.exception("Não foi possível publicar tópico para a faixa %s no canal %s.", titulo, canal.id)
-
     async def _tocar_fila(self, guild: discord.Guild):
         gid = guild.id
         try:
@@ -1392,7 +1369,7 @@ class Musica(commands.Cog):
                     item["http_headers"] = atualizado.get("http_headers") or {}
                 except Exception:
                     LOG.exception("Não foi possível atualizar o fluxo de áudio.")
-                    canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
+                    canal_texto = voz.channel
                     if canal_texto:
                         await canal_texto.send(
                             f"Não consegui abrir **{discord.utils.escape_markdown(item['title'])}**. Pulando para a próxima música."
@@ -1409,8 +1386,8 @@ class Musica(commands.Cog):
                 def ao_terminar(erro):
                     if erro:
                         LOG.error("Erro de reprodução no servidor %s: %s", gid, erro)
-                        canal_id = item.get("text_channel_id", 0)
-                        canal = self.bot.get_channel(canal_id)
+                        canal_id = getattr(voz.channel, "id", 0)
+                        canal = voz.channel
                         if canal:
                             asyncio.run_coroutine_threadsafe(
                                 canal.send(
@@ -1539,15 +1516,22 @@ class Musica(commands.Cog):
                         voz.is_playing(),
                         getattr(getattr(voz, "channel", None), "id", None),
                     )
-                    canal_texto = self.bot.get_channel(item.get("text_channel_id", 0))
-                    if canal_texto:
-                        await canal_texto.send(view=_card_music_view(
-                            MusicControlView(self, gid),
-                            "▶ TOCANDO AGORA",
-                            f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
-                            f"Duração: {self._tempo(item['duration'])}\n"
-                            f"Repetição: { {'off': 'desligada', 'track': 'música atual', 'queue': 'fila'}.get(self.loop_modes.get(gid, 'off'), 'desligada') }",
-                        ))
+                    canal_chat_voz = voz.channel
+                    if canal_chat_voz:
+                        try:
+                            permissoes_chat = canal_chat_voz.permissions_for(guild.me)
+                            if permissoes_chat.send_messages:
+                                await canal_chat_voz.send(view=_card_music_view(
+                                    MusicControlView(self, gid),
+                                    "▶ TOCANDO AGORA",
+                                    f"**[{discord.utils.escape_markdown(item['title'])}]({item['webpage_url']})**\n"
+                                    f"Duração: {self._tempo(item['duration'])}\n"
+                                    f"Repetição: { {'off': 'desligada', 'track': 'música atual', 'queue': 'fila'}.get(self.loop_modes.get(gid, 'off'), 'desligada') }",
+                                ))
+                            else:
+                                LOG.warning("Chat do canal de voz sem permissão para mensagens (canal=%s).", canal_chat_voz.id)
+                        except (discord.Forbidden, discord.HTTPException):
+                            LOG.warning("Não foi possível publicar os controles no chat do canal de voz %s.", canal_chat_voz.id, exc_info=True)
                     await terminou.wait()
                     historico = self.historico.setdefault(gid, [])
                     historico.append({
@@ -1576,7 +1560,7 @@ class Musica(commands.Cog):
                             relacionadas = await self._extrair_varios(f"{item.get('title', '')} músicas relacionadas")
                             if relacionadas:
                                 proxima = relacionadas[0]
-                                proxima["text_channel_id"] = item.get("text_channel_id", 0)
+                                proxima["voice_channel_id"] = item.get("voice_channel_id", getattr(voz.channel, "id", 0))
                                 self.filas.setdefault(gid, []).append(proxima)
                         except Exception:
                             LOG.exception("Autoplay não conseguiu localizar faixa relacionada no servidor %s.", gid)
@@ -1584,8 +1568,8 @@ class Musica(commands.Cog):
                     # Antes a falha do FFmpeg/VoiceClient podia encerrar a faixa
                     # sem explicar ao membro por que não houve som.
                     LOG.exception("Falha ao iniciar ou manter o áudio no servidor %s.", gid)
-                    canal_id = item.get("text_channel_id", 0)
-                    canal = self.bot.get_channel(canal_id)
+                    canal_id = getattr(voz.channel, "id", 0)
+                    canal = voz.channel
                     if canal:
                         try:
                             detalhe = str(erro).strip().replace("\\n", " ")[:180]
@@ -1709,10 +1693,7 @@ class Musica(commands.Cog):
             )
             return
         fila.append(item)
-        canal_musica = interaction.guild.get_channel(CANAL_MUSICA_ID)
-        if isinstance(canal_musica, discord.TextChannel):
-            await self._publicar_topico_faixa(canal_musica, item)
-        posicao = len(fila)
+                posicao = len(fila)
         if voz.is_playing() or voz.is_paused() or self.tarefas.get(interaction.guild.id, None):
             await interaction.followup.send(embed=self._embed_musica(
                 "♫ Adicionada à fila",
