@@ -9,7 +9,7 @@ Não existe comando para abrir o histórico individual. A consulta fica integrad
 3. Pesquise pelo nome e selecione a pessoa no seletor nativo do Discord.
 4. Navegue pelas seções do dossiê no menu privado.
 
-O painel é atualizado automaticamente pelo Shinku quando o Registro Global é inicializado. O botão é persistente e continua disponível após reinicializações.
+O painel é atualizado automaticamente pelo Nêmesis Systeam quando o Registro Global é inicializado. O botão é persistente e continua disponível após reinicializações.
 
 ## Seções do dossiê
 
