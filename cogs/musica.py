@@ -254,13 +254,13 @@ class MusicControlView(discord.ui.View):
         random.shuffle(fila)
         await interaction.response.send_message(f"🔀 Fila embaralhada ({len(fila)} músicas).", ephemeral=True)
 
-    @discord.ui.button(label="Playlists", emoji="🎼", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Playlists", emoji="🎼", style=discord.ButtonStyle.secondary, row=2)
     async def playlists(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
         await self.cog.abrir_playlists(interaction)
 
-    @discord.ui.button(label="Ver fila", emoji="📜", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Ver fila", emoji="📜", style=discord.ButtonStyle.secondary, row=2)
     async def ver_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
@@ -280,7 +280,7 @@ class MusicControlView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary, row=2)
+    @discord.ui.button(label="Repetição: desligada", emoji="🔁", style=discord.ButtonStyle.secondary, row=3)
     async def repeticao(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar(interaction):
             return
