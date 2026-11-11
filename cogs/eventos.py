@@ -432,8 +432,16 @@ class Eventos(commands.Cog):
 
         enviados = []
         falhas = []
+        try:
+            membros_servidor = [membro async for membro in guild.fetch_members(limit=None)]
+        except (discord.Forbidden, discord.HTTPException):
+            membros_servidor = list(getattr(guild, "members", []) or [])
+            _LOG.warning(
+                "Não foi possível consultar todos os membros para a convocação da meta; usando cache (guild=%s).",
+                guild.id,
+            )
         lideres = [
-            membro for membro in (getattr(guild, "members", []) or [])
+            membro for membro in membros_servidor
             if not getattr(membro, "bot", False)
             and any(cargo.id in CARGOS_LIDERANCA_IDS for cargo in getattr(membro, "roles", []))
         ]
