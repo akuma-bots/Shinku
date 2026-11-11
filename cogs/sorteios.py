@@ -73,7 +73,7 @@ def _selecionar_vencedores(
     resultado = []
     for _ in range(quantidade):
         escolhido = random.choices(
-            restantes,
+            list(restantes),
             weights=[pesos[uid] for uid in restantes],
             k=1,
         )[0]
