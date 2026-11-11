@@ -75,7 +75,7 @@ def commits_relevantes(assuntos: list[str]) -> list[str]:
         r"|^hotfix(?:\([^)]*\))?:"
         r"|^perf!(?:\([^)]*\))?:"
         r"|^\[release\]"
-        r"|^(?:adiciona|adicionar|implementa|implementar|cria|criar|corrige|corrigir|corrigido|protege|proteger|reforça|reforcar|migra|migrar|torna|tornar|melhora|melhorar|aprimora|aprimorar|restaura|restaurar|repara|reparar|registra|registrar|limita|limitar|ignora|ignorar|separa|separar|atualiza|atualizar|ajusta|ajustar|notifica|notificar|garante|garantir|remove|remover|adapta|adaptar)\b",
+        r"|^(?:adiciona|adicionar|implementa|implementar|cria|criar|corrige|corrigir|corrigido|protege|proteger|reforça|reforcar|migra|migrar|torna|tornar|melhora|melhorar|aprimora|aprimorar|restaura|restaurar|repara|reparar|registra|registrar|limita|limitar|ignora|ignorar|separa|separar|atualiza|atualizar|ajusta|ajustar|notifica|notificar|garante|garantir|remove|remover|adapta|adaptar|preserva|preservar)\b",
         re.IGNORECASE,
     )
     return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
