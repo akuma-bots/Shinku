@@ -67,7 +67,7 @@ class TestPainelHistoricoRegistro(unittest.TestCase):
         self.assertEqual(seletor.children[0].custom_id, "nemesis:registro:membro:selecionar")
         from cogs.logs import DossieMembroRegistroView
         dossie = DossieMembroRegistroView({"guild": None, "membro": None}, 123)
-        rotulos = {item.label for item in dossie.children if isinstance(item, discord.ui.Button)}
+        rotulos = {getattr(item, "label", None) for item in dossie.children}
         self.assertIn("Atualizar dados", rotulos)
         self.assertNotIn("Anterior", rotulos)
         self.assertNotIn("Próxima", rotulos)
