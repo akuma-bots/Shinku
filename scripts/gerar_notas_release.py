@@ -184,7 +184,8 @@ def gerar(before: str, after: str) -> dict | None:
         "gerado_em": agora.isoformat(),
     }
 
-    
+
+
 def main() -> int:
     before = os.environ.get("BEFORE_SHA", "").strip()
     after = os.environ.get("AFTER_SHA", "").strip() or git("rev-parse", "HEAD")
