@@ -152,7 +152,7 @@ class Novidades(commands.Cog):
 
     async def cog_load(self):
         # Registra o botão de preferências para que DMs antigas continuem
-        # interativas mesmo depois de uma reinicialização da Shinku.
+        # interativas mesmo depois de uma reinicialização da Nêmesis Systeam.
         self.bot.add_view(NotasDMView({
             "titulo": "Atualização",
             "mensagem": "Consulte as notas de atualização da NÊMESIS.",
