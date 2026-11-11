@@ -52,6 +52,6 @@ def test_respostas_semanticas_preservam_assinatura_visual():
         embed_aviso("Atenção", "Verifique"),
         embed_info("Informação", "Detalhes"),
     ):
-        assert embed.footer.text == "NÊMESIS • SISTEMAS INTEGRADOS"
+        assert embed.footer.text == "NÊMESIS • SISTEMAS INTEGRADOS • Nêmesis Systeam"
         assert embed.author.name == "NÊMESIS • CENTRAL DE SISTEMAS"
         assert embed.title in {"OK", "Falha", "Atenção", "Informação"}
