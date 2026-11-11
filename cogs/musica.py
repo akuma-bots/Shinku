@@ -748,7 +748,7 @@ class MusicPanelView(discord.ui.View):
             await self.cog.abrir_playlists(interaction)
 
     @discord.ui.button(label="Ver fila", emoji="📜", style=discord.ButtonStyle.secondary,
-                       custom_id="nemesis:musica:fila", row=0)
+                       custom_id="nemesis:musica:fila", row=1)
     async def fila(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -774,7 +774,7 @@ class MusicPanelView(discord.ui.View):
         )
 
     @discord.ui.button(label="Pausar / Retomar", emoji="⏯️", style=discord.ButtonStyle.secondary,
-                       custom_id="nemesis:musica:pausar", row=1)
+                       custom_id="nemesis:musica:pausar", row=2)
     async def pausar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -792,7 +792,7 @@ class MusicPanelView(discord.ui.View):
         await interaction.response.send_message(mensagem, ephemeral=True)
 
     @discord.ui.button(label="Pular", emoji="⏭️", style=discord.ButtonStyle.primary,
-                       custom_id="nemesis:musica:pular", row=1)
+                       custom_id="nemesis:musica:pular", row=2)
     async def pular(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -810,7 +810,7 @@ class MusicPanelView(discord.ui.View):
 
 
     @discord.ui.button(label="Histórico", emoji="🕘", style=discord.ButtonStyle.secondary,
-                       custom_id="nemesis:musica:historico", row=0)
+                       custom_id="nemesis:musica:historico", row=1)
     async def historico(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -825,7 +825,7 @@ class MusicPanelView(discord.ui.View):
         )
 
     @discord.ui.button(label="Volume", emoji="🔊", style=discord.ButtonStyle.secondary,
-                       custom_id="nemesis:musica:volume", row=2)
+                       custom_id="nemesis:musica:volume", row=3)
     async def volume(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -834,7 +834,7 @@ class MusicPanelView(discord.ui.View):
         await interaction.response.send_modal(ModalVolumeMusica(self.cog, GUILD_NEMESIS_ID))
 
     @discord.ui.button(label="Autoplay: desligado", emoji="♾️", style=discord.ButtonStyle.secondary,
-                       custom_id="nemesis:musica:autoplay", row=2)
+                       custom_id="nemesis:musica:autoplay", row=3)
     async def autoplay(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -851,7 +851,7 @@ class MusicPanelView(discord.ui.View):
         )
 
     @discord.ui.button(label="Limpar fila", emoji="🧹", style=discord.ButtonStyle.danger,
-                       custom_id="nemesis:musica:limpar_fila", row=2)
+                       custom_id="nemesis:musica:limpar_fila", row=4)
     async def limpar_fila(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._validar_guild(interaction):
             return
@@ -895,7 +895,15 @@ class MusicPanelLayoutView(discord.ui.LayoutView):
             discord.ui.TextDisplay(f"## {titulo}\n{descricao}"),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         ]
-        for _, botoes in sorted(botoes_por_linha.items()):
+        secoes = {
+            0: "### ✦ ADICIONAR E ORGANIZAR",
+            1: "### ✦ BIBLIOTECA E FILA",
+            2: "### ✦ CONTROLES DE REPRODUÇÃO",
+            3: "### ✦ PREFERÊNCIAS",
+            4: "### ✦ GERENCIAMENTO",
+        }
+        for numero_linha, botoes in sorted(botoes_por_linha.items()):
+            componentes.append(discord.ui.TextDisplay(secoes.get(numero_linha, "### ✦ CONTROLES")))
             for inicio in range(0, len(botoes), 5):
                 componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
         componentes.extend([
@@ -1084,13 +1092,8 @@ class Musica(commands.Cog):
                 LOG.warning("Painel musical: sem acesso ao histórico do canal %s; será criada uma nova mensagem.", canal.id)
         embed = self._embed_musica(
             "𓂀 CENTRAL MUSICAL",
-            "Pesquise músicas, organize sua fila e mantenha suas playlists pessoais. "
-            "Entre em um canal de voz antes de iniciar a reprodução.\n\n"
-            "**RECURSOS**\n"
-            "🔎 Buscar e adicionar faixas\n"
-            "🎼 Criar, salvar, carregar e excluir playlists\n"
-            "📜 Consultar a fila de reprodução\n"
-            "⏯️ Pausar, retomar e pular músicas",
+            "Adicione faixas, gerencie sua biblioteca e controle a reprodução em um só lugar. "
+            "Entre em um canal de voz antes de iniciar. Os controles estão separados por função.",
         )
         embed.set_footer(text=MARCADOR_PAINEL_MUSICA)
         view = MusicPanelLayoutView(self, embed)
