@@ -1141,7 +1141,7 @@ class Musica(commands.Cog):
             item["voice_channel_id"] = voz.channel.id
             item["requested_by"] = interaction.user.id
         fila.extend(itens)
-                primeira = itens[0]
+        primeira = itens[0]
         posicao = len(fila) - len(itens) + 1
         estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
         quantidade = f" • {len(itens)} faixa(s)" if len(itens) > 1 else ""
@@ -1693,7 +1693,7 @@ class Musica(commands.Cog):
             )
             return
         fila.append(item)
-                posicao = len(fila)
+        posicao = len(fila)
         if voz.is_playing() or voz.is_paused() or self.tarefas.get(interaction.guild.id, None):
             await interaction.followup.send(embed=self._embed_musica(
                 "♫ Adicionada à fila",
