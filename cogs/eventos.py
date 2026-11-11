@@ -185,14 +185,14 @@ def _resumo_servidor(guild: discord.Guild) -> dict:
     membros = list(getattr(guild, "members", []) or [])
     humanos = [m for m in membros if not getattr(m, "bot", False)]
     bots = [m for m in membros if getattr(m, "bot", False)]
-    status_online = {discord.Status.online, discord.Status.idle, discord.Status.dnd}
+    online = sum(getattr(m, "status", discord.Status.offline) == discord.Status.online for m in humanos)
     online = sum(getattr(m, "status", discord.Status.offline) in status_online for m in humanos)
     ausentes = sum(getattr(m, "status", discord.Status.offline) == discord.Status.idle for m in humanos)
     ocupados = sum(getattr(m, "status", discord.Status.offline) == discord.Status.dnd for m in humanos)
     canais_voz = list(getattr(guild, "voice_channels", []) or []) + list(getattr(guild, "stage_channels", []) or [])
     em_voz = {membro.id for canal in canais_voz for membro in (getattr(canal, "members", []) or []) if not getattr(membro, "bot", False)}
     total = int(getattr(guild, "member_count", 0) or len(membros))
-    return {"total": total, "humanos_cache": len(humanos), "bots_cache": len(bots), "online": online, "ausentes": ausentes, "ocupados": ocupados, "offline_cache": max(0, len(humanos) - online), "voz": len(em_voz), "cache_completo": len(membros) >= total}
+    return {"total": total, "humanos_cache": len(humanos), "bots_cache": len(bots), "online": online, "ausentes": ausentes, "ocupados": ocupados, "offline_cache": max(0, len(humanos) - online - ausentes - ocupados), "voz": len(em_voz), "cache_completo": len(membros) >= total}
 
 
 def _barra_progresso(atual: int, alvo: int, largura: int = 10) -> str:
