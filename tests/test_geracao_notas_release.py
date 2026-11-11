@@ -75,6 +75,10 @@ class TestGeracaoNotasRelease(unittest.TestCase):
         ]
         self.assertEqual(MOD.commits_relevantes(assuntos), assuntos)
 
+    def test_reconhece_preservacao_de_estado_em_sistemas(self):
+        assuntos = ["Preserva valores padrão dos seletores especiais"]
+        self.assertEqual(MOD.commits_relevantes(assuntos), assuntos)
+
     def test_gera_nota_ativa_para_commit_funcional_em_portugues(self):
         original_git = MOD.git
         original_arquivos = MOD.arquivos_alterados
