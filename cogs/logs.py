@@ -124,7 +124,10 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
             novo.callback = callback
         else:
             continue
-        linhas.setdefault(item.row or 0, []).append(novo)
+        # Quando a View original não define row, distribui os controles
+        # sequencialmente em linhas de até cinco, em vez de empilhar tudo na primeira.
+        linha = item.row if item.row is not None else sum(len(grupo) for grupo in linhas.values()) // 5
+        linhas.setdefault(linha, []).append(novo)
     for _, itens in sorted(linhas.items()):
         for inicio in range(0, len(itens), 5):
             componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
