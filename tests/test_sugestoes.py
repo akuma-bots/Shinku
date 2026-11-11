@@ -221,8 +221,23 @@ class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
             total = await cog._sincronizar_publicacoes_existentes(guild)
         self.assertEqual(total, 1)
         mensagem.edit.assert_awaited_once()
-        self.assertEqual(mensagem.edit.await_args.kwargs["embed"].title, "💡 Sugestão antiga")
-        self.assertEqual(len(mensagem.edit.await_args.kwargs["view"].children), 6)
+        view = mensagem.edit.await_args.kwargs["view"]
+        controles = []
+        pendentes = list(view.children)
+        while pendentes:
+            componente = pendentes.pop()
+            custom_id = getattr(componente, "custom_id", None)
+            if custom_id:
+                controles.append(custom_id)
+            pendentes.extend(list(getattr(componente, "children", []) or []))
+        self.assertEqual(set(controles), {
+            "nemesis:sugestoes:votar:apoia",
+            "nemesis:sugestoes:votar:nao_apoia",
+            "nemesis:sugestoes:comentar",
+            "nemesis:sugestoes:acompanhar",
+            "nemesis:sugestoes:editar",
+            "nemesis:sugestoes:gerenciar",
+        })
 
     async def test_migracao_recupera_topico_do_forum_quando_id_salvo_esta_obsoleto(self):
         class FakeThread:
@@ -267,7 +282,10 @@ class TestOperacoesAssincronasSugestoes(unittest.IsolatedAsyncioTestCase):
             "nemesis:sugestoes:gerenciar",
         ]
         mensagem = SimpleNamespace(
-            components=[SimpleNamespace(children=[SimpleNamespace(custom_id=item) for item in ids_atuais])],
+            components=[SimpleNamespace(
+                content="-# NÊMESIS • PUBLICAÇÃO DE SUGESTÃO • V2",
+                children=[SimpleNamespace(custom_id=item) for item in ids_atuais],
+            )],
             edit=AsyncMock(),
         )
         canal = SimpleNamespace(fetch_message=AsyncMock(return_value=mensagem))
