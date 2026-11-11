@@ -448,7 +448,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.UserSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, default_values=list(item.default_values),
-                custom_id=item.custom_id, disabled=item.disabled,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -461,7 +461,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.RoleSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, default_values=list(item.default_values),
-                custom_id=item.custom_id, disabled=item.disabled,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -488,7 +488,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.MentionableSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, default_values=list(item.default_values),
-                custom_id=item.custom_id, disabled=item.disabled,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -501,7 +501,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.Select(
                 placeholder=item.placeholder, min_values=item.min_values,
                 max_values=item.max_values, options=list(item.options),
-                custom_id=item.custom_id, disabled=item.disabled,
+                custom_id=item.custom_id, disabled=item.disabled, id=item.id,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -515,6 +515,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord
             novo = discord.ui.Button(
                 label=item.label, style=item.style, disabled=item.disabled,
                 custom_id=item.custom_id, url=item.url, emoji=item.emoji,
+                sku_id=item.sku_id, id=item.id,
             )
             novo.callback = item.callback
             botoes.append(novo)
