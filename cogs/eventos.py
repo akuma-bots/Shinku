@@ -590,7 +590,9 @@ class Eventos(commands.Cog):
             eventos_historico_dados = await _todos_eventos()
             eventos_historico = [
                 item for item in eventos_historico_dados.values()
-                if isinstance(item, dict) and int(item.get("guild_id", 0) or 0) == guild.id
+                if isinstance(item, dict)
+                and int(item.get("guild_id", 0) or 0) == guild.id
+                and str(item.get("status") or "").lower() not in {"deleted", "cancelled", "canceled"}
             ]
             sorteios_concluidos = [
                 item for item in sorteios.values()
