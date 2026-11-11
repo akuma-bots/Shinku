@@ -183,3 +183,37 @@ def gerar(before: str, after: str) -> dict | None:
         "fuso_horario": "Horário de Brasília (BRT)",
         "gerado_em": agora.isoformat(),
     }
+
+    
+def main() -> int:
+    before = os.environ.get("BEFORE_SHA", "").strip()
+    after = os.environ.get("AFTER_SHA", "").strip() or git("rev-parse", "HEAD")
+    release = gerar(before, after)
+    if release is None:
+        print("Nenhuma alteração funcional elegível; manifesto preservado.")
+        return 0
+
+    anterior = {}
+    if MANIFEST.exists():
+        try:
+            anterior = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            anterior = {}
+    if anterior.get("release_id") == release["release_id"]:
+        print("Este commit já possui manifesto; nenhuma alteração necessária.")
+        return 0
+
+    MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    MANIFEST.write_text(
+        json.dumps(release, ensure_ascii=False, indent=2) + "\\n",
+        encoding="utf-8",
+    )
+    print(
+        f"Notas geradas: {release['data_atualizacao']} às "
+        f"{release['hora_atualizacao']} — {release['titulo']}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
