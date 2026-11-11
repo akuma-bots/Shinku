@@ -411,10 +411,11 @@ def _componentes_embed_inscricoes(embeds: list[discord.Embed]) -> list:
 
 
 def _contar_componentes_aninhados(item) -> int:
-    return 1 + sum(
-        _contar_componentes_aninhados(filho)
-        for filho in (getattr(item, "children", None) or [])
-    )
+    filhos = list(getattr(item, "children", None) or [])
+    acessorio = getattr(item, "accessory", None)
+    if acessorio is not None:
+        filhos.append(acessorio)
+    return 1 + sum(_contar_componentes_aninhados(filho) for filho in filhos)
 
 
 def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord.Embed] | None = None,
