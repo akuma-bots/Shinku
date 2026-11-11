@@ -1,14 +1,14 @@
-# Auditoria técnica do Shinku — NÊMESIS
+# Auditoria técnica do Nêmesis Systeam — NÊMESIS
 
 **Atualização:** 03/11/2026
-**Base:** branch `main` do repositório `akuma-bots/Shinku`
+**Base:** branch `main` do repositório `akuma-bots/Nemesis-Systeam`
 **Escopo:** autorização, hierarquia, estabilidade, armazenamento, notificações, observabilidade, documentação e testes.
 
 > Esta é uma revisão estática complementada por execução local automatizada dos testes. Ela não comprova permissões efetivas no Discord, conteúdo real do Upstash, funcionamento do Render nem publicação dos painéis no servidor.
 
 ## Resultado executivo
 
-O Shinku já possui módulos dedicados para moderação, AutoMod/anti-raid, tickets, parcerias, formulários, missões, temporadas, perfil, ranking, conquistas, sorteios, logs e revisões. A prioridade desta rodada foi corrigir divergências de autorização, tornar o envio de comunicados mais resistente a concorrência e melhorar a visibilidade operacional, sem duplicar sistemas existentes.
+O Nêmesis Systeam já possui módulos dedicados para moderação, AutoMod/anti-raid, tickets, parcerias, formulários, missões, temporadas, perfil, ranking, conquistas, sorteios, logs e revisões. A prioridade desta rodada foi corrigir divergências de autorização, tornar o envio de comunicados mais resistente a concorrência e melhorar a visibilidade operacional, sem duplicar sistemas existentes.
 
 ## Alterações realizadas nesta rodada
 
