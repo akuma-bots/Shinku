@@ -1,11 +1,11 @@
 {
-  "release_id": "20261111-104656",
+  "release_id": "20261111-105214",
   "habilitada": true,
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Torna preferências de notificações atômicas.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Torna preferências de notificações atômicas.\n\n**Áreas envolvidas:** mecanismos internos e infraestrutura.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Atualiza nome do bot na visão geral administrativa.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Atualiza nome do bot na visão geral administrativa.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "11/11/2026",
-  "hora_atualizacao": "10:46",
+  "hora_atualizacao": "10:52",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-11T10:46:56.379828-03:00"
+  "gerado_em": "2026-11-11T10:52:14.884712-03:00"
 }
