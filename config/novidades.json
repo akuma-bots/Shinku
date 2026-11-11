@@ -1,11 +1,11 @@
 {
-  "release_id": "20261111-0958-notas-dinamicas",
+  "release_id": "20261111-095452",
   "habilitada": true,
-  "tipo": "Melhoria da Central de Atualizações",
-  "titulo": "Notas de atualização mais específicas",
-  "mensagem": "A Central de Atualizações foi aprimorada para deixar de repetir comunicados genéricos.\n\n• Cada versão passa a destacar os commits funcionais que realmente foram publicados.\n• As alterações em português são apresentadas com seus títulos reais, em vez de uma descrição vaga por pasta.\n• As notas podem reunir até seis mudanças relevantes da mesma versão.\n• Ajustada a classificação entre novos recursos, melhorias e correções.\n\nA ideia é que cada comunicado explique o que mudou de verdade no Shinku.",
+  "tipo": "Melhorias dos sistemas",
+  "titulo": "Preserva IDs e valores dos controles nos cartões.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Preserva IDs e valores dos controles nos cartões.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "11/11/2026",
-  "hora_atualizacao": "06:58",
+  "hora_atualizacao": "09:54",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-11T06:58:00-03:00"
+  "gerado_em": "2026-11-11T09:54:52.506831-03:00"
 }
