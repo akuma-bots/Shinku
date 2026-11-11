@@ -341,22 +341,106 @@ def _texto_embed_inscricoes(embed: discord.Embed) -> str:
     return "\n\n".join(partes)
 
 
+def _dividir_texto_componentes(texto: str, limite: int = 3900) -> list[str]:
+    """Divide conteúdo sem exceder o limite do TextDisplay nem descartar caracteres."""
+    texto = str(texto or "")
+    if not texto:
+        return ["—"]
+    if limite < 1 or limite > 4000:
+        raise ValueError("O limite de TextDisplay deve ficar entre 1 e 4000 caracteres.")
 
-def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
+    partes = []
+    restante = texto
+    while len(restante) > limite:
+        corte = restante.rfind("\n", 0, limite + 1)
+        if corte >= limite // 2:
+            corte += 1
+        else:
+            corte = restante.rfind(" ", 0, limite + 1)
+            if corte >= limite // 2:
+                corte += 1
+            else:
+                corte = limite
+        partes.append(restante[:corte])
+        restante = restante[corte:]
+    if restante:
+        partes.append(restante)
+    return partes
+
+
+def _url_media_embed_inscricoes(embed: discord.Embed, atributo: str) -> str | None:
+    media = getattr(embed, atributo, None)
+    url = str(getattr(media, "url", "") or "").strip()
+    if url.startswith(("https://", "http://")):
+        return url
+    return None
+
+
+def _componentes_embed_inscricoes(embeds: list[discord.Embed]) -> list:
+    """Converte embeds para componentes V2 preservando texto, thumbnails e imagens."""
+    componentes = []
+    validos = [item for item in embeds if isinstance(item, discord.Embed)]
+    for indice, embed in enumerate(validos):
+        blocos = _dividir_texto_componentes(_texto_embed_inscricoes(embed))
+        thumbnail = _url_media_embed_inscricoes(embed, "thumbnail")
+        if thumbnail:
+            primeiros = blocos[:3]
+            componentes.append(discord.ui.Section(
+                *(discord.ui.TextDisplay(bloco) for bloco in primeiros),
+                accessory=discord.ui.Thumbnail(
+                    thumbnail,
+                    description=f"Imagem de identificação: {embed.title or 'formulário'}"[:256],
+                ),
+            ))
+            blocos = blocos[3:]
+        componentes.extend(discord.ui.TextDisplay(bloco) for bloco in blocos)
+
+        imagem = _url_media_embed_inscricoes(embed, "image")
+        if imagem:
+            componentes.append(discord.ui.MediaGallery(
+                discord.MediaGalleryItem(
+                    imagem,
+                    description=f"Imagem do documento: {embed.title or 'formulário'}"[:256],
+                )
+            ))
+        if indice < len(validos) - 1:
+            componentes.append(discord.ui.Separator(
+                visible=True, spacing=discord.SeparatorSpacing.small
+            ))
+    return componentes
+
+
+def _contar_componentes_aninhados(item) -> int:
+    return 1 + sum(
+        _contar_componentes_aninhados(filho)
+        for filho in (getattr(item, "children", None) or [])
+    )
+
+
+def _card_form_view(origem: discord.ui.View, embed: discord.Embed | list[discord.Embed] | None = None,
                     titulo: str = "CENTRAL DE INSCRIÇÕES", descricao: str = "",
                     marcador: str = "NÊMESIS • Gestão de Inscrições") -> discord.ui.LayoutView:
-    """Mantém seletores, botões e callbacks dos fluxos de formulário dentro do cartão."""
+    """Mantém conteúdo integral, mídias e controles no mesmo cartão Components V2."""
     layout = discord.ui.LayoutView(timeout=origem.timeout)
     if isinstance(embed, (list, tuple)):
-        texto = "\n\n".join(_texto_embed_inscricoes(item) for item in embed if isinstance(item, discord.Embed))
-    elif embed:
-        texto = _texto_embed_inscricoes(embed)
+        embeds = [item for item in embed if isinstance(item, discord.Embed)]
+    elif isinstance(embed, discord.Embed):
+        embeds = [embed]
+    else:
+        embeds = []
+
+    if embeds:
+        componentes = _componentes_embed_inscricoes(embeds)
     else:
         texto = f"## {titulo}\n{descricao}".strip()
-    componentes = [
-        discord.ui.TextDisplay(texto[:3900]),
-        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-    ]
+        componentes = [
+            discord.ui.TextDisplay(bloco)
+            for bloco in _dividir_texto_componentes(texto)
+        ]
+
+    componentes.append(discord.ui.Separator(
+        visible=True, spacing=discord.SeparatorSpacing.small
+    ))
     seletores, botoes = [], []
     for item in origem.children:
         if isinstance(item, discord.ui.UserSelect):
@@ -388,8 +472,8 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
         elif isinstance(item, discord.ui.ChannelSelect):
             novo = discord.ui.ChannelSelect(
                 placeholder=item.placeholder, min_values=item.min_values,
-                max_values=item.max_values, custom_id=item.custom_id,
-                disabled=item.disabled,
+                max_values=item.max_values, channel_types=list(item.channel_types),
+                custom_id=item.custom_id, disabled=item.disabled,
             )
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
@@ -420,7 +504,8 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
                 if hasattr(clone, "_resolved"):
-                    original._resolved = clone._resolved
+                    clone_resolvido = clone._resolved
+                    original._resolved = clone_resolvido
                 await original.callback(interaction)
             novo.callback = callback
             seletores.append(novo)
@@ -431,6 +516,7 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
             )
             novo.callback = item.callback
             botoes.append(novo)
+
     for seletor in seletores:
         componentes.append(discord.ui.ActionRow(seletor))
     for inicio in range(0, len(botoes), 5):
@@ -439,12 +525,20 @@ def _card_form_view(origem: discord.ui.View, embed: discord.Embed | None = None,
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay(f"-# {marcador}"),
     ])
+
+    # O Discord limita a 40 componentes no total, contando itens aninhados.
+    # Falhar explicitamente é preferível a truncar respostas do candidato.
+    total_componentes = 1 + sum(_contar_componentes_aninhados(item) for item in componentes)
+    if total_componentes > 40:
+        raise ValueError(
+            "O dossiê excede o limite de 40 componentes do Discord; "
+            "é necessário paginar o conteúdo antes de publicar o cartão."
+        )
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     verificacao = getattr(origem, "interaction_check", None)
     if callable(verificacao):
         layout.interaction_check = verificacao
     return layout
-
 
 
 def _mensagem_tem_cartao_inscricoes(mensagem: discord.Message) -> bool:
@@ -460,15 +554,15 @@ def _mensagem_tem_cartao_inscricoes(mensagem: discord.Message) -> bool:
 def _view_central_inscricoes(lista: list, embed: discord.Embed) -> discord.ui.LayoutView:
     view = discord.ui.LayoutView(timeout=None)
     seletor = SeletorInscricaoPublico(lista)
-    view.add_item(discord.ui.Container(
-        discord.ui.TextDisplay(_texto_embed_inscricoes(embed)),
+    componentes = _componentes_embed_inscricoes([embed])
+    componentes.extend([
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("### ◈ ACESSO AOS PROCESSOS SELETIVOS"),
         discord.ui.ActionRow(seletor),
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# Nêmesis Systeam"),
-        accent_colour=0x9F1239,
-    ))
+    ])
+    view.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     return view
 
 def _view_painel(formulario: dict) -> discord.ui.View:
