@@ -65,6 +65,12 @@ class TestPainelHistoricoRegistro(unittest.TestCase):
         self.assertIsNone(painel.timeout)
         self.assertEqual(painel.children[0].custom_id, "nemesis:registro:membro:abrir")
         self.assertEqual(seletor.children[0].custom_id, "nemesis:registro:membro:selecionar")
+        from cogs.logs import DossieMembroRegistroView
+        dossie = DossieMembroRegistroView({"guild": None, "membro": None}, 123)
+        rotulos = {item.label for item in dossie.children if isinstance(item, discord.ui.Button)}
+        self.assertIn("Atualizar dados", rotulos)
+        self.assertNotIn("Anterior", rotulos)
+        self.assertNotIn("Próxima", rotulos)
         self.assertFalse(hasattr(historico_membros, "HistoricoMembros"))
 
 
@@ -96,6 +102,7 @@ class TestEscopoHistoricoMembros(unittest.TestCase):
     def test_nao_consulta_mensagens_cargos_ou_conquistas_no_arquivo(self):
         from utils.historico_membros import CATEGORIAS_HISTORICO, ABAS
         self.assertNotIn("mensagens", CATEGORIAS_HISTORICO)
+        self.assertNotIn("mensagens", {chave for chave, *_ in ABAS})
         self.assertNotIn("administracao", CATEGORIAS_HISTORICO)
         self.assertNotIn("eventos", CATEGORIAS_HISTORICO)
         self.assertNotIn("conquistas", {chave for chave, *_ in ABAS})
@@ -141,10 +148,10 @@ class TestMensagensEMonitoramento(unittest.TestCase):
         self.assertIn("texto atual", texto)
         self.assertIn("texto anterior", texto)
 
-    def test_abas_incluem_mensagens_e_monitoramento_sem_cargos_ou_conquistas(self):
+    def test_abas_separam_monitoramento_de_mensagens(self):
         from utils.historico_membros import ABAS
         chaves = {chave for chave, *_ in ABAS}
-        self.assertIn("mensagens", chaves)
+        self.assertNotIn("mensagens", chaves)
         self.assertIn("atividade", chaves)
         self.assertNotIn("conquistas", chaves)
         self.assertNotIn("cargos", chaves)
