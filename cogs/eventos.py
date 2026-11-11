@@ -265,8 +265,12 @@ class Eventos(commands.Cog):
     @tasks.loop(seconds=60)
     async def atualizacao_periodica(self):
         guild = self.bot.get_guild(GUILD_NEMESIS_ID)
-        if guild is not None:
+        if guild is None:
+            return
+        try:
             await self.atualizar_agenda(guild, force=True)
+        except Exception:
+            _LOG.exception("Falha inesperada ao atualizar a Agenda ao Vivo; nova tentativa no próximo ciclo.")
 
     @atualizacao_periodica.before_loop
     async def antes_da_atualizacao_periodica(self):
