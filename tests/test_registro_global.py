@@ -108,6 +108,24 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(resultado)
         obter.assert_not_awaited()
 
+    async def test_arquivo_de_membros_nao_tenta_atualizar_cabecalho_tradicional(self):
+        thread = Mock()
+        thread.guild.id = registro_global.GUILD_NEMESIS_ID
+        thread.id = 123456
+        thread.archived = False
+        thread.locked = False
+        thread.fetch_message = AsyncMock()
+        registro_global._CABECALHOS_VERIFICADOS.discard((thread.guild.id, thread.id))
+
+        await registro_global._atualizar_cabecalho_topico(
+            thread,
+            registro_global.CATEGORIAS["historico_membros"][0],
+            registro_global.CATEGORIAS["historico_membros"][1],
+        )
+
+        thread.fetch_message.assert_not_awaited()
+        registro_global._CABECALHOS_VERIFICADOS.discard((thread.guild.id, thread.id))
+
     async def test_recusa_categoria_desconhecida(self):
         forum = Mock()
         forum.guild.id = registro_global.GUILD_NEMESIS_ID
@@ -178,7 +196,7 @@ class TestRegistroGlobal(unittest.IsolatedAsyncioTestCase):
         forum.archived_threads.side_effect = sem_arquivados
         forum.guild.get_thread.return_value = legado
         forum.create_thread = AsyncMock(return_value=SimpleNamespace(thread=novo))
-        registro_global._CABECALHOS_VERIFICADOS.discard((registro_global.GUILD_NEMESIS_ID, canonico.id))
+        registro_global._CABECALHOS_VERIFICADOS.discard((registro_global.GUILD_NEMESIS_ID, legado.id))
         with patch.object(registro_global, "_ler_ids", new=AsyncMock(return_value={"mensagens": 789})), \
              patch.object(registro_global, "_salvar_id", new=AsyncMock()) as salvar:
             resultado = await registro_global._obter_topico(forum, "mensagens")
