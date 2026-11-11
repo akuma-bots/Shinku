@@ -75,9 +75,7 @@ def commits_relevantes(assuntos: list[str]) -> list[str]:
         r"|^hotfix(?:\([^)]*\))?:"
         r"|^perf!(?:\([^)]*\))?:"
         r"|^\[release\]"
-        # Commits funcionais em português também podem classificar uma entrega.
-        # Isso mantém o fluxo automático compatível com o padrão de commits do projeto.
-        r"|^(?:adiciona|implementa|cria|corrige|corrigir|protege|reforça|migra|torna|melhora|aprimora|restaura|repara)\b",
+        r"|^(?:adiciona|adicionar|implementa|implementar|cria|criar|corrige|corrigir|corrigido|protege|proteger|reforça|reforcar|migra|migrar|torna|tornar|melhora|melhorar|aprimora|aprimorar|restaura|restaurar|repara|reparar|registra|registrar|limita|limitar|ignora|ignorar|separa|separar|atualiza|atualizar|ajusta|ajustar|notifica|notificar|garante|garantir|remove|remover|adapta|adaptar)\b",
         re.IGNORECASE,
     )
     return [assunto for assunto in assuntos if padrao.search(assunto.strip())]
@@ -148,7 +146,7 @@ def gerar(before: str, after: str) -> dict | None:
             # Os commits em português já descrevem a entrega. Exibir o assunto
             # real evita substituir alterações distintas por uma frase genérica.
             limpo = re.sub(
-                r"^(?:feat|feature|fix|perf|security|hotfix)(?:\\([^)]*\\))?:\\s*",
+                r"^(?:feat|feature|fix|perf|security|hotfix)(?:\([^)]*\))?:\s*",
                 "",
                 assunto,
                 flags=re.IGNORECASE,
@@ -162,12 +160,12 @@ def gerar(before: str, after: str) -> dict | None:
     if not linhas:
         return None
     mensagem = (
-        "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\\n\\n"
-        + "\\n".join(linhas)
+        "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n"
+        + "\n".join(linhas)
     )
     if areas:
-        mensagem += "\\n\\n**Áreas envolvidas:** " + ", ".join(areas) + "."
+        mensagem += "\n\n**Áreas envolvidas:** " + ", ".join(areas) + "."
     mensagem += (
-        "\\n\\nAs alterações foram integradas ao repositório principal. "
+        "\n\nAs alterações foram integradas ao repositório principal. "
         "A disponibilidade das funções depende da conclusão do deploy do bot."
     )
