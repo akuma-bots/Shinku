@@ -74,9 +74,28 @@ def _componentes_contem_marcador(componentes, marcador: str) -> bool:
     return False
 
 
+def _dividir_texto_componentes(texto: str, limite: int = 3900) -> list[str]:
+    """Divide texto sem descartar conteúdo e respeita o limite de cada TextDisplay."""
+    conteudo = str(texto or "")
+    limite_seguro = max(1, int(limite))
+    if not conteudo:
+        return [""]
+    partes = []
+    inicio = 0
+    while inicio < len(conteudo):
+        fim = min(inicio + limite_seguro, len(conteudo))
+        if fim < len(conteudo):
+            quebra = conteudo.rfind("\\n", inicio, fim)
+            if quebra > inicio:
+                fim = quebra + 1
+        partes.append(conteudo[inicio:fim])
+        inicio = fim
+    return partes
+
+
 def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
                    titulo: str = "CENTRAL DE HISTÓRICO", descricao: str = "Consulta restrita à liderança autorizada."):
-    """Mantém seletores e botões de consulta dentro de um cartão Components V2."""
+    """Mantém o histórico integral e os controles dentro de um único cartão Components V2."""
     layout = discord.ui.LayoutView(timeout=origem.timeout)
     partes = [f"## {embed.title if embed and embed.title else titulo}"]
     if embed and embed.description:
@@ -85,11 +104,12 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
         partes.append(descricao)
     if embed:
         for campo in embed.fields:
-            partes.append(f"**{campo.name}**\n{campo.value}")
+            partes.append(f"**{campo.name}**\\n{campo.value}")
         if embed.footer and embed.footer.text:
             partes.append(f"-# {embed.footer.text}")
+    texto = "\\n\\n".join(partes)
     componentes = [
-        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
+        *(discord.ui.TextDisplay(parte) for parte in _dividir_texto_componentes(texto)),
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
     ]
     linhas = {}
@@ -135,6 +155,14 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# Nêmesis Systeam • Arquivo e auditoria"),
     ])
+    total_componentes = 1 + len(componentes) + sum(
+        len(item.children) for item in componentes
+        if isinstance(item, discord.ui.ActionRow)
+    )
+    if total_componentes > 40:
+        raise ValueError(
+            "O dossiê excede o limite de componentes do Discord; é necessário paginar o conteúdo."
+        )
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     verificacao = getattr(origem, "interaction_check", None)
     if callable(verificacao):
