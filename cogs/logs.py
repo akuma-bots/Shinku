@@ -107,10 +107,10 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
             partes.append(f"**{campo.name}**\n{campo.value}")
         if embed.footer and embed.footer.text:
             partes.append(f"-# {embed.footer.text}")
-    texto = "\n\n".join(partes)
-    componentes = [
-        *(discord.ui.TextDisplay(parte) for parte in _dividir_texto_componentes(texto)),
-        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+    texto = "\\n\\n".join(partes)
+    textos = [
+        discord.ui.TextDisplay(parte)
+        for parte in _dividir_texto_componentes(texto)
     ]
     linhas = {}
     for item in origem.children:
@@ -148,22 +148,49 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
         # sequencialmente em linhas de até cinco, em vez de empilhar tudo na primeira.
         linha = item.row if item.row is not None else sum(len(grupo) for grupo in linhas.values()) // 5
         linhas.setdefault(linha, []).append(novo)
+
+    linhas_componentes = []
     for _, itens in sorted(linhas.items()):
         for inicio in range(0, len(itens), 5):
-            componentes.append(discord.ui.ActionRow(*itens[inicio:inicio + 5]))
-    componentes.extend([
+            linhas_componentes.append(
+                discord.ui.ActionRow(*itens[inicio:inicio + 5])
+            )
+
+    # O Discord limita cada Container a 10 filhos. O conteúdo anterior é
+    # agrupado em cartões de continuação; o último mantém texto e controles juntos.
+    capacidade_final = max(1, 10 - len(linhas_componentes) - 3)
+    textos_anteriores = textos[:-capacidade_final]
+    textos_finais = textos[-capacidade_final:]
+    for inicio in range(0, len(textos_anteriores), 10):
+        grupo = textos_anteriores[inicio:inicio + 10]
+        layout.add_item(discord.ui.Container(*grupo, accent_colour=0x9F1239))
+
+    componentes_finais = [
+        *textos_finais,
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
+        *linhas_componentes,
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay("-# Nêmesis Systeam • Arquivo e auditoria"),
-    ])
-    total_componentes = 1 + len(componentes) + sum(
-        len(item.children) for item in componentes
-        if isinstance(item, discord.ui.ActionRow)
+    ]
+    if len(componentes_finais) > 10:
+        raise ValueError(
+            "O cartão do dossiê excede o limite de componentes do Container."
+        )
+    layout.add_item(
+        discord.ui.Container(*componentes_finais, accent_colour=0x9F1239)
+    )
+
+    total_componentes = sum(
+        1 + len(container.children) + sum(
+            len(item.children) for item in container.children
+            if isinstance(item, discord.ui.ActionRow)
+        )
+        for container in layout.children
     )
     if total_componentes > 40:
         raise ValueError(
             "O dossiê excede o limite de componentes do Discord; é necessário paginar o conteúdo."
         )
-    layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
     verificacao = getattr(origem, "interaction_check", None)
     if callable(verificacao):
         layout.interaction_check = verificacao
