@@ -350,10 +350,10 @@ class TestCartaoHistoricoComponentsV2(unittest.IsolatedAsyncioTestCase):
 
         partes_esperadas = [f"## {embed.title}", embed.description]
         partes_esperadas.extend(
-            f"**{campo.name}**\\n{campo.value}" for campo in embed.fields
+            f"**{campo.name}**\n{campo.value}" for campo in embed.fields
         )
         partes_esperadas.append(f"-# {embed.footer.text}")
-        self.assertEqual("".join(textos), "\\n\\n".join(partes_esperadas))
+        self.assertEqual("".join(textos), "\n\n".join(partes_esperadas))
 
         linhas = [
             item for item in container.children
