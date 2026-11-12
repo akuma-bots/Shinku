@@ -281,3 +281,129 @@ class TestMonitoramentoAmpliado(unittest.IsolatedAsyncioTestCase):
 
         # O Arquivo de Membros não mantém uma trilha separada de cargos.
         registrar.assert_not_awaited()
+
+
+class TestCartaoHistoricoComponentsV2(unittest.IsolatedAsyncioTestCase):
+    async def test_dossie_extenso_preserva_todo_o_texto_e_aninha_controles(self):
+        from unittest.mock import AsyncMock
+        import discord
+        from cogs.logs import _card_registro
+
+        origem = discord.ui.View(timeout=90)
+        callback_aba = AsyncMock()
+        callback_usuario = AsyncMock()
+        callback_atualizar = AsyncMock()
+
+        seletor_aba = discord.ui.Select(
+            placeholder="Escolha uma seção",
+            options=[discord.SelectOption(label="Geral", value="geral")],
+            custom_id="nemesis:registro:membro:aba",
+            row=0,
+        )
+        seletor_aba.callback = callback_aba
+        seletor_usuario = discord.ui.UserSelect(
+            placeholder="Selecione um membro",
+            custom_id="nemesis:registro:membro:selecionar",
+            row=1,
+        )
+        seletor_usuario.callback = callback_usuario
+        botao = discord.ui.Button(
+            label="Atualizar dados",
+            custom_id="nemesis:registro:membro:atualizar",
+            row=2,
+        )
+        botao.callback = callback_atualizar
+
+        origem.add_item(seletor_aba)
+        origem.add_item(seletor_usuario)
+        origem.add_item(botao)
+        verificacao = AsyncMock(return_value=True)
+        origem.interaction_check = verificacao
+
+        embed = discord.Embed(
+            title="Dossiê individual extenso",
+            description="INICIO_DOSSIE " + ("detalhes da descrição " * 180),
+        )
+        for indice in range(20):
+            embed.add_field(
+                name=f"Registro {indice:02d}",
+                value=f"RESPOSTA_{indice:02d} " + ("detalhe preservado " * 45),
+                inline=False,
+            )
+        embed.set_footer(text="FIM_DO_DOSSIE")
+
+        cartao = _card_registro(origem, embed)
+
+        self.assertIsInstance(cartao, discord.ui.LayoutView)
+        self.assertEqual(cartao.timeout, 90)
+        self.assertIs(cartao.interaction_check, verificacao)
+        self.assertEqual(len(cartao.children), 1)
+
+        container = cartao.children[0]
+        self.assertIsInstance(container, discord.ui.Container)
+        textos = [
+            item.content for item in container.children
+            if isinstance(item, discord.ui.TextDisplay)
+        ]
+        self.assertGreater(len(textos), 1)
+        self.assertTrue(all(len(texto) <= 3900 for texto in textos))
+
+        partes_esperadas = [f"## {embed.title}", embed.description]
+        partes_esperadas.extend(
+            f"**{campo.name}**\\n{campo.value}" for campo in embed.fields
+        )
+        partes_esperadas.append(f"-# {embed.footer.text}")
+        self.assertEqual("".join(textos), "\\n\\n".join(partes_esperadas))
+
+        linhas = [
+            item for item in container.children
+            if isinstance(item, discord.ui.ActionRow)
+        ]
+        self.assertEqual(len(linhas), 3)
+        controles = [controle for linha in linhas for controle in linha.children]
+        self.assertEqual(
+            {controle.custom_id for controle in controles},
+            {
+                "nemesis:registro:membro:aba",
+                "nemesis:registro:membro:selecionar",
+                "nemesis:registro:membro:atualizar",
+            },
+        )
+        self.assertFalse(any(
+            isinstance(item, (discord.ui.Button, discord.ui.Select, discord.ui.UserSelect))
+            for item in container.children
+        ))
+
+        clone_aba = next(
+            item for item in controles
+            if item.custom_id == "nemesis:registro:membro:aba"
+        )
+        clone_usuario = next(
+            item for item in controles
+            if item.custom_id == "nemesis:registro:membro:selecionar"
+        )
+        clone_botao = next(
+            item for item in controles
+            if item.custom_id == "nemesis:registro:membro:atualizar"
+        )
+
+        interaction = object()
+        clone_aba._values = ["geral"]
+        await clone_aba.callback(interaction)
+        callback_aba.assert_awaited_once_with(interaction)
+        self.assertEqual(seletor_aba._values, ["geral"])
+
+        clone_usuario._values = ["123456"]
+        await clone_usuario.callback(interaction)
+        callback_usuario.assert_awaited_once_with(interaction)
+        self.assertEqual(seletor_usuario._values, ["123456"])
+
+        self.assertIs(clone_botao.callback, callback_atualizar)
+        self.assertEqual(clone_aba.options[0].value, "geral")
+        self.assertLessEqual(
+            1 + len(container.children) + sum(
+                len(item.children) for item in container.children
+                if isinstance(item, discord.ui.ActionRow)
+            ),
+            40,
+        )
