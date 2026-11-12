@@ -85,7 +85,7 @@ def _dividir_texto_componentes(texto: str, limite: int = 3900) -> list[str]:
     while inicio < len(conteudo):
         fim = min(inicio + limite_seguro, len(conteudo))
         if fim < len(conteudo):
-            quebra = conteudo.rfind("\\n", inicio, fim)
+            quebra = conteudo.rfind("\n", inicio, fim)
             if quebra > inicio:
                 fim = quebra + 1
         partes.append(conteudo[inicio:fim])
@@ -104,10 +104,10 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
         partes.append(descricao)
     if embed:
         for campo in embed.fields:
-            partes.append(f"**{campo.name}**\\n{campo.value}")
+            partes.append(f"**{campo.name}**\n{campo.value}")
         if embed.footer and embed.footer.text:
             partes.append(f"-# {embed.footer.text}")
-    texto = "\\n\\n".join(partes)
+    texto = "\n\n".join(partes)
     componentes = [
         *(discord.ui.TextDisplay(parte) for parte in _dividir_texto_componentes(texto)),
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
