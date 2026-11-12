@@ -107,7 +107,7 @@ def _card_registro(origem: discord.ui.View, embed: discord.Embed | None = None,
             partes.append(f"**{campo.name}**\n{campo.value}")
         if embed.footer and embed.footer.text:
             partes.append(f"-# {embed.footer.text}")
-    texto = "\\n\\n".join(partes)
+    texto = "\n\n".join(partes)
     textos = [
         discord.ui.TextDisplay(parte)
         for parte in _dividir_texto_componentes(texto)
