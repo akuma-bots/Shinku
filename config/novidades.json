@@ -1,11 +1,11 @@
 {
-  "release_id": "20261112-095452",
+  "release_id": "20261112-095520",
   "habilitada": true,
-  "tipo": "Melhorias dos sistemas",
-  "titulo": "Preserva conteúdo extenso no cartão do arquivo de membros.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Preserva conteúdo extenso no cartão do arquivo de membros.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "tipo": "Correções",
+  "titulo": "Corrige separadores do texto do dossiê V2.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Corrige separadores do texto do dossiê V2.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "12/11/2026",
-  "hora_atualizacao": "09:54",
+  "hora_atualizacao": "09:55",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-12T09:54:52.713230-03:00"
+  "gerado_em": "2026-11-12T09:55:20.992039-03:00"
 }
