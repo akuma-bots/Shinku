@@ -337,12 +337,19 @@ class TestCartaoHistoricoComponentsV2(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(cartao, discord.ui.LayoutView)
         self.assertEqual(cartao.timeout, 90)
         self.assertIs(cartao.interaction_check, verificacao)
-        self.assertEqual(len(cartao.children), 1)
+        self.assertGreater(len(cartao.children), 1)
 
-        container = cartao.children[0]
-        self.assertIsInstance(container, discord.ui.Container)
+        containers = cartao.children
+        self.assertTrue(all(isinstance(item, discord.ui.Container) for item in containers))
+        self.assertTrue(all(len(item.children) <= 10 for item in containers))
+        container = containers[-1]
+        self.assertTrue(any(
+            isinstance(item, discord.ui.TextDisplay) for item in container.children
+        ))
         textos = [
-            item.content for item in container.children
+            item.content
+            for bloco in containers
+            for item in bloco.children
             if isinstance(item, discord.ui.TextDisplay)
         ]
         self.assertGreater(len(textos), 1)
@@ -402,9 +409,12 @@ class TestCartaoHistoricoComponentsV2(unittest.IsolatedAsyncioTestCase):
         self.assertIs(clone_botao.callback, callback_atualizar)
         self.assertEqual(clone_aba.options[0].value, "geral")
         self.assertLessEqual(
-            1 + len(container.children) + sum(
-                len(item.children) for item in container.children
-                if isinstance(item, discord.ui.ActionRow)
+            sum(
+                1 + len(bloco.children) + sum(
+                    len(item.children) for item in bloco.children
+                    if isinstance(item, discord.ui.ActionRow)
+                )
+                for bloco in containers
             ),
             40,
         )
