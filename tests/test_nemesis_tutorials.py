@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -130,7 +131,7 @@ def test_indice_privado_mantem_seletor_aninhado_no_cartao():
     assert view.timeout == 900
 
 
-async def test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
+async def _test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
     view = TutorialDetalheLayoutView(123, "inicio")
     container = _container_da_view(view)
     linha_seletor = next(
@@ -154,3 +155,8 @@ async def test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
     nova_view = aceita.response.edit_message.await_args.kwargs["view"]
     assert isinstance(nova_view, TutorialDetalheLayoutView)
     assert nova_view.autor_id == 123
+
+
+
+def test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
+    asyncio.run(_test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega())
