@@ -100,7 +100,7 @@ def test_tutorial_longo_nao_perde_conteudo_ao_montar_components_v2():
         description="Orientações completas para consulta.",
     )
     for indice in range(4):
-        embed.add_field(name=f"ETAPA {indice + 1}", value=(f"conteudo-{indice}-" * 75), inline=False)
+        embed.add_field(name=f"ETAPA {indice + 1}", value=(f"conteudo-{indice}-" * 90), inline=False)
     esperado = _texto_embed_tutorial(embed)
     assert len(esperado) > 3900
 
