@@ -1148,15 +1148,41 @@ class Musica(commands.Cog):
         posicao = len(fila) - len(itens) + 1
         estado = "Adicionada à fila" if voz.is_playing() or voz.is_paused() else "Preparando reprodução"
         quantidade = f" • {len(itens)} faixa(s)" if len(itens) > 1 else ""
-        await interaction.followup.send(
-            embed=self._embed_musica(
-                f"♫ {estado}",
-                f"**[{discord.utils.escape_markdown(primeira['title'])}]({primeira['webpage_url']})**{quantidade}\n"
-                f"Duração: {self._tempo(primeira['duration'])} • Posição inicial: {posicao}",
-            ),
-            ephemeral=True,
+        confirmacao = self._embed_musica(
+            f"♫ {estado}",
+            f"**[{discord.utils.escape_markdown(primeira['title'])}]({primeira['webpage_url']})**{quantidade}\n"
+            f"Duração: {self._tempo(primeira['duration'])} • Posição inicial: {posicao}",
         )
+
+        # A fila e o player não podem depender da entrega da resposta ephemeral.
+        # Se o endpoint de webhook do Discord estiver limitado pela Cloudflare,
+        # a música ainda deve começar e a confirmação pode ir ao chat da call.
         await self._garantir_reprodutor(interaction.guild)
+        try:
+            await interaction.followup.send(embed=confirmacao, ephemeral=True)
+        except discord.HTTPException as erro:
+            LOG.warning(
+                "Falha ao confirmar pesquisa musical pela interação (guild=%s, status=%s).",
+                gid, getattr(erro, "status", None), exc_info=True,
+            )
+            try:
+                permissoes_chat = voz.channel.permissions_for(interaction.guild.me)
+                if permissoes_chat.send_messages:
+                    await voz.channel.send(
+                        content=f"{interaction.user.mention} • Música adicionada à reprodução.",
+                        embed=confirmacao,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                else:
+                    LOG.warning(
+                        "Sem permissão para enviar confirmação no chat da call (canal=%s).",
+                        voz.channel.id,
+                    )
+            except discord.HTTPException:
+                LOG.exception(
+                    "Também falhou a confirmação no chat da call (guild=%s, canal=%s).",
+                    gid, voz.channel.id,
+                )
 
 
     async def _extrair_varios(self, consulta: str) -> list[dict[str, Any]]:
