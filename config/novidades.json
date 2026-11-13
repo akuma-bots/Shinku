@@ -1,11 +1,11 @@
 {
-  "release_id": "20261113-094153",
+  "release_id": "20261113-152528",
   "habilitada": true,
   "tipo": "Melhorias dos sistemas",
-  "titulo": "Preserva conteúdo integral nos cartões de tutoriais V2.",
-  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Preserva conteúdo integral nos cartões de tutoriais V2.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
+  "titulo": "Garante reprodução mesmo quando Discord limita resposta da pesquisa musical.",
+  "mensagem": "A NÊMESIS recebeu uma atualização. Confira exatamente o que mudou nesta versão:\n\n• Garante reprodução mesmo quando Discord limita resposta da pesquisa musical.\n\n**Áreas envolvidas:** sistemas e comandos.\n\nAs alterações foram integradas ao repositório principal. A disponibilidade das funções depende da conclusão do deploy do bot.",
   "data_atualizacao": "13/11/2026",
-  "hora_atualizacao": "09:41",
+  "hora_atualizacao": "15:25",
   "fuso_horario": "Horário de Brasília (BRT)",
-  "gerado_em": "2026-11-13T09:41:53.643886-03:00"
+  "gerado_em": "2026-11-13T15:25:28.665485-03:00"
 }
