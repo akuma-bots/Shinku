@@ -362,6 +362,34 @@ def _embed_indice(guild: discord.Guild | None = None, bot: commands.Bot | None =
         aplicar_identidade_servidor(embed, guild, bot)
     return embed
 
+def _dividir_texto_componentes(texto: str, limite: int = 3900) -> list[str]:
+    """Divide conteúdo para TextDisplay sem remover caracteres ou quebrar linhas à toa."""
+    if limite < 1:
+        raise ValueError("O limite de TextDisplay deve ser positivo.")
+    partes = []
+    inicio = 0
+    while len(texto) - inicio > limite:
+        fim = inicio + limite
+        quebra = texto.rfind("\n", inicio, fim)
+        if quebra > inicio:
+            fim = quebra + 1
+        partes.append(texto[inicio:fim])
+        inicio = fim
+    if inicio < len(texto):
+        partes.append(texto[inicio:])
+    return partes or [""]
+
+
+def _texto_embed_tutorial(embed: discord.Embed, titulo_padrao: str = "GUIA NÊMESIS") -> str:
+    """Converte o conteúdo do guia em texto preservando a ordem e todos os campos."""
+    linhas = [f"## {embed.title or titulo_padrao}"]
+    if embed.description:
+        linhas.append(embed.description)
+    for campo in embed.fields:
+        linhas.append(f"**{campo.name}**\n{campo.value}")
+    return "\n\n".join(linhas)
+
+
 def _embed_tutorial(chave: str, guild: discord.Guild | None = None, bot: commands.Bot | None = None) -> discord.Embed:
     tutorial = TUTORIAIS[chave]
     embed = criar_embed(
@@ -495,11 +523,10 @@ class TutorialDetalheLayoutView(discord.ui.LayoutView):
         super().__init__(timeout=900)
         self.autor_id = int(autor_id)
         embed = _embed_tutorial(selecionado, None, None)
-        linhas = [f"## {embed.title or 'GUIA NÊMESIS'}"]
-        if embed.description:
-            linhas.append(embed.description)
-        for campo in embed.fields:
-            linhas.append(f"**{campo.name}**\n{campo.value}")
+        blocos = _dividir_texto_componentes(_texto_embed_tutorial(embed))
+        # O Container aceita até 10 filhos: texto + 5 componentes de navegação/rodapé.
+        if len(blocos) + 5 > 10:
+            raise ValueError("O tutorial excede a capacidade de um único cartão; requer paginação.")
         seletor = SeletorTutorialDetalhe(self.autor_id, selecionado)
         voltar = discord.ui.Button(
             label="Voltar ao índice", style=discord.ButtonStyle.secondary,
@@ -517,15 +544,15 @@ class TutorialDetalheLayoutView(discord.ui.LayoutView):
             )
 
         voltar.callback = callback
-        self.add_item(discord.ui.Container(
-            discord.ui.TextDisplay("\n\n".join(linhas)[:3900]),
+        componentes = [discord.ui.TextDisplay(bloco) for bloco in blocos]
+        componentes.extend([
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(seletor),
             discord.ui.ActionRow(voltar),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.TextDisplay("-# NÊMESIS • BIBLIOTECA DE SISTEMAS"),
-            accent_colour=0x9F1239,
-        ))
+        ])
+        self.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
 
 
 class TutorialIndiceLayoutView(discord.ui.LayoutView):
@@ -535,20 +562,18 @@ class TutorialIndiceLayoutView(discord.ui.LayoutView):
         super().__init__(timeout=900)
         self.autor_id = int(autor_id)
         embed = _embed_indice(None, None)
-        linhas = [f"## {embed.title or 'ÍNDICE DE SISTEMAS'}"]
-        if embed.description:
-            linhas.append(embed.description)
-        for campo in embed.fields:
-            linhas.append(f"**{campo.name}**\n{campo.value}")
+        blocos = _dividir_texto_componentes(_texto_embed_tutorial(embed, "ÍNDICE DE SISTEMAS"))
+        if len(blocos) + 4 > 10:
+            raise ValueError("O índice de tutoriais excede a capacidade de um único cartão.")
         seletor = SeletorTutorialIndice(self.autor_id)
-        self.add_item(discord.ui.Container(
-            discord.ui.TextDisplay("\n\n".join(linhas)[:3900]),
+        componentes = [discord.ui.TextDisplay(bloco) for bloco in blocos]
+        componentes.extend([
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.ActionRow(seletor),
             discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
             discord.ui.TextDisplay("-# NÊMESIS • BIBLIOTECA DE SISTEMAS"),
-            accent_colour=0x9F1239,
-        ))
+        ])
+        self.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
 
 
 class TutorialDetalheView(discord.ui.View):
