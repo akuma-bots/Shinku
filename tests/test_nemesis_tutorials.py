@@ -7,7 +7,8 @@ import discord
 
 from cogs.tutorial import (
     TUTORIAIS, Tutorial, CANAL_TUTORIAIS_ID, TutorialDetalheLayoutView,
-    TutorialIndiceLayoutView, _embed_indice, _embed_tutorial, _texto_embed_tutorial,
+    TutorialIndiceLayoutView, TutorialPainelLayoutView, _embed_indice, _embed_tutorial,
+    _texto_embed_tutorial,
 )
 from utils.guia_servidores import CANAIS_GUIA_SERVIDORES, CARGO_VISITANTES_ID, TAG_ORG_NEMESIS
 
@@ -160,3 +161,18 @@ async def _test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
 
 def test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega():
     asyncio.run(_test_seletor_de_tutorial_restringe_consulta_ao_dono_e_navega())
+
+
+
+def test_painel_publico_aninha_seletor_persistente_no_cartao():
+    view = TutorialPainelLayoutView(_embed_indice())
+    container = _container_da_view(view)
+    linhas = [
+        item for item in container.children
+        if isinstance(item, discord.ui.ActionRow)
+    ]
+    assert len(linhas) == 1
+    seletor = linhas[0].children[0]
+    assert isinstance(seletor, discord.ui.Select)
+    assert seletor.custom_id == "nemesis:tutoriais:publico"
+    assert view.timeout is None
