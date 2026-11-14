@@ -146,7 +146,10 @@ class TestSistemaSugestoes(unittest.TestCase):
     def test_cartao_v2_preserva_texto_longo_e_aninha_todos_os_controles(self):
         linhas = [f"PASSO-{indice:03d} " + ("instrução " * 24) for indice in range(120)]
         descricao = "\n".join(linhas)
-        embed = discord.Embed(title="Sugestão extensa", description=descricao)
+        embed = SimpleNamespace(
+            title="Sugestão extensa", description=descricao,
+            fields=[], image=None, footer=None,
+        )
         origem = PublicacaoSugestaoView()
         cartao = _card_sugestoes_view(origem, embed)
 
