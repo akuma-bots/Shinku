@@ -1,4 +1,6 @@
 import unittest
+
+import discord
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -13,6 +15,7 @@ from cogs.sugestoes import (
     _registro_no_canal,
     _registrar_voto,
     _embed_sugestao,
+    _card_sugestoes_view,
     _embed_painel_administrativo,
     PainelSugestoesView,
     PublicacaoSugestaoView,
@@ -139,6 +142,77 @@ class TestSistemaSugestoes(unittest.TestCase):
         self.assertTrue(botoes["nemesis:sugestoes:votar:apoia"].disabled)
         self.assertTrue(botoes["nemesis:sugestoes:editar"].disabled)
         self.assertFalse(botoes["nemesis:sugestoes:acompanhar"].disabled)
+
+    def test_cartao_v2_preserva_texto_longo_e_aninha_todos_os_controles(self):
+        linhas = [f"PASSO-{indice:03d} " + ("instrução " * 24) for indice in range(120)]
+        descricao = "\n".join(linhas)
+        embed = discord.Embed(title="Sugestão extensa", description=descricao)
+        origem = PublicacaoSugestaoView()
+        cartao = _card_sugestoes_view(origem, embed)
+
+        self.assertTrue(all(isinstance(item, discord.ui.Container) for item in cartao.children))
+        containers = list(cartao.children)
+        componentes = []
+
+        def percorrer(item):
+            componentes.append(item)
+            for filho in getattr(item, "children", []) or []:
+                percorrer(filho)
+
+        for container in containers:
+            percorrer(container)
+
+        textos = [item.content for item in componentes if isinstance(item, discord.ui.TextDisplay)]
+        self.assertGreater(len(textos), 1)
+        self.assertIn("PASSO-119", "".join(textos))
+        self.assertTrue(all(len(texto) <= 4000 for texto in textos))
+
+        linhas_controle = [
+            item for item in componentes if isinstance(item, discord.ui.ActionRow)
+        ]
+        self.assertGreaterEqual(len(linhas_controle), 2)
+        self.assertTrue(all(linha.children for linha in linhas_controle))
+        controles = [
+            filho
+            for linha in linhas_controle
+            for filho in linha.children
+        ]
+        self.assertEqual(
+            {item.custom_id for item in controles},
+            {
+                "nemesis:sugestoes:votar:apoia",
+                "nemesis:sugestoes:votar:nao_apoia",
+                "nemesis:sugestoes:comentar",
+                "nemesis:sugestoes:acompanhar",
+                "nemesis:sugestoes:editar",
+                "nemesis:sugestoes:gerenciar",
+            },
+        )
+        self.assertTrue(all(callable(item.callback) for item in controles))
+
+    def test_painel_administrativo_nao_corta_lista_de_dez_sugestoes(self):
+        registros = {
+            str(indice): {
+                "id": indice,
+                "titulo": f"Sugestão {indice:02d} " + ("x" * 75),
+                "status": "pendente",
+                "criado_em": f"2026-11-{indice:02d}T00:00:00+00:00",
+                "canal_publicacao_id": CANAL_SUGESTOES_ID,
+                "votos": {"1": "apoia", "2": "nao_apoia"},
+            }
+            for indice in range(1, 11)
+        }
+        embed = _embed_painel_administrativo(registros, "resumo")
+        campos = [
+            campo for campo in embed.fields
+            if campo.name.startswith("🕒 ATIVIDADE RECENTE")
+        ]
+        conteudo = "\n".join(campo.value for campo in campos)
+
+        self.assertGreater(len(campos), 1)
+        self.assertTrue(all(len(campo.value) <= 1024 for campo in campos))
+        for indice in range(1, 11):
+            self.assertIn(f"Sugestão {indice:02d}", conteudo)
 
     def test_painel_administrativo_exibe_contagens_e_populares(self):
         registros = {
