@@ -443,8 +443,11 @@ def _card_sugestoes_view(origem: discord.ui.View, embed: discord.Embed | None = 
             anteriores[inicio:inicio + 8]
             for inicio in range(0, len(anteriores), 8)
         ]
-        if len(grupos_continuacao) > 39:
-            raise ValueError("O conteúdo excede o limite de Containers desta mensagem.")
+        total_componentes = (
+            len(blocos_texto) + len(controles) + len(grupos_continuacao) + 4
+        )
+        if total_componentes > 40:
+            raise ValueError("O conteúdo excede o limite de componentes desta mensagem.")
         for grupo in grupos_continuacao:
             layout.add_item(discord.ui.Container(
                 *(discord.ui.TextDisplay(bloco) for bloco in grupo),
