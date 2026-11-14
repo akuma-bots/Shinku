@@ -166,9 +166,16 @@ class TestSistemaSugestoes(unittest.TestCase):
             percorrer(container)
 
         textos = [item.content for item in componentes if isinstance(item, discord.ui.TextDisplay)]
+        texto_renderizado = "".join(textos)
         self.assertGreater(len(textos), 1)
-        self.assertIn("PASSO-119", "".join(textos))
+        self.assertEqual(texto_renderizado, f"## Sugestão extensa\\n\\n{descricao}")
+        self.assertIn("PASSO-119", texto_renderizado)
         self.assertTrue(all(len(texto) <= 4000 for texto in textos))
+        self.assertTrue(any(
+            any(isinstance(filho, discord.ui.ActionRow) for filho in container.children)
+            and any(isinstance(filho, discord.ui.TextDisplay) for filho in container.children)
+            for container in containers
+        ))
 
         linhas_controle = [
             item for item in componentes if isinstance(item, discord.ui.ActionRow)
