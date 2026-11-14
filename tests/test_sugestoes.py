@@ -168,7 +168,8 @@ class TestSistemaSugestoes(unittest.TestCase):
         textos = [item.content for item in componentes if isinstance(item, discord.ui.TextDisplay)]
         texto_renderizado = "".join(textos)
         self.assertGreater(len(textos), 1)
-        self.assertEqual(texto_renderizado, f"## Sugestão extensa\\n\\n{descricao}")
+        self.assertTrue(texto_renderizado.startswith(f"## Sugestão extensa\\n\\n{descricao}"))
+        self.assertTrue(texto_renderizado.endswith("-# NÊMESIS • SUGESTÕES • V2"))
         self.assertIn("PASSO-119", texto_renderizado)
         self.assertTrue(all(len(texto) <= 4000 for texto in textos))
         self.assertTrue(any(
