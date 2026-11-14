@@ -292,6 +292,27 @@ def _registrar_voto(votos: dict, usuario_id: int, escolha: str) -> dict:
     return resultado
 
 
+def _dividir_texto_sugestoes(texto: str, limite: int = 3900) -> list[str]:
+    """Divide conteúdo para TextDisplay sem descartar caracteres."""
+    texto = str(texto or "")
+    if limite < 1:
+        raise ValueError("O limite de cada TextDisplay deve ser positivo.")
+    if not texto:
+        return ["\u200b"]
+
+    blocos = []
+    inicio = 0
+    while inicio < len(texto):
+        fim = min(inicio + limite, len(texto))
+        if fim < len(texto):
+            quebra = texto.rfind("\n", inicio, fim)
+            if quebra > inicio + limite // 2:
+                fim = quebra + 1
+        blocos.append(texto[inicio:fim])
+        inicio = fim
+    return blocos
+
+
 def _embed_painel() -> discord.Embed:
     embed = criar_embed(
         "💡 CENTRAL DE SUGESTÕES",
@@ -378,10 +399,8 @@ def _card_sugestoes_view(origem: discord.ui.View, embed: discord.Embed | None = 
             partes.append(f"[Abrir imagem anexada]({embed.image.url})")
         if embed.footer and embed.footer.text:
             partes.append(f"-# {embed.footer.text}")
-    componentes = [
-        discord.ui.TextDisplay("\n\n".join(partes)[:3900]),
-        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
-    ]
+
+    blocos_texto = _dividir_texto_sugestoes("\n\n".join(partes))
     seletores, botoes = [], []
     for item in origem.children:
         if isinstance(item, discord.ui.Select):
@@ -390,11 +409,13 @@ def _card_sugestoes_view(origem: discord.ui.View, embed: discord.Embed | None = 
                 max_values=item.max_values, options=list(item.options),
                 custom_id=item.custom_id, disabled=item.disabled,
             )
+
             async def callback(interaction, original=item, clone=novo):
                 original._values = clone._values
                 if hasattr(clone, "_resolved"):
                     original._resolved = clone._resolved
                 await original.callback(interaction)
+
             novo.callback = callback
             seletores.append(novo)
         elif isinstance(item, discord.ui.Button):
@@ -404,20 +425,51 @@ def _card_sugestoes_view(origem: discord.ui.View, embed: discord.Embed | None = 
             )
             novo.callback = item.callback
             botoes.append(novo)
-    for seletor in seletores:
-        componentes.append(discord.ui.ActionRow(seletor))
-    for inicio in range(0, len(botoes), 5):
-        componentes.append(discord.ui.ActionRow(*botoes[inicio:inicio + 5]))
+
+    controles = [discord.ui.ActionRow(seletor) for seletor in seletores]
+    controles.extend(
+        discord.ui.ActionRow(*botoes[inicio:inicio + 5])
+        for inicio in range(0, len(botoes), 5)
+    )
+
+    # Um Container aceita até 10 componentes filhos. Reserva espaço para
+    # separadores, rodapé e controles; blocos anteriores viram continuação
+    # no mesmo LayoutView, sem cortar o conteúdo original.
+    vagas_texto = max(1, 10 - len(controles) - 3)
+    if len(blocos_texto) > vagas_texto:
+        anteriores = blocos_texto[:-vagas_texto]
+        finais = blocos_texto[-vagas_texto:]
+        grupos_continuacao = [
+            anteriores[inicio:inicio + 8]
+            for inicio in range(0, len(anteriores), 8)
+        ]
+        if len(grupos_continuacao) > 39:
+            raise ValueError("O conteúdo excede o limite de Containers desta mensagem.")
+        for grupo in grupos_continuacao:
+            layout.add_item(discord.ui.Container(
+                *(discord.ui.TextDisplay(bloco) for bloco in grupo),
+                accent_colour=0x9F1239,
+            ))
+    else:
+        finais = blocos_texto
+
+    componentes = [discord.ui.TextDisplay(bloco) for bloco in finais]
+    componentes.append(
+        discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small)
+    )
+    componentes.extend(controles)
     componentes.extend([
         discord.ui.Separator(visible=True, spacing=discord.SeparatorSpacing.small),
         discord.ui.TextDisplay(f"-# {marcador}"),
     ])
+    if len(componentes) > 10:
+        raise ValueError("O cartão de sugestões excede o limite de componentes do Container.")
     layout.add_item(discord.ui.Container(*componentes, accent_colour=0x9F1239))
+
     verificacao = getattr(origem, "interaction_check", None)
     if callable(verificacao):
         layout.interaction_check = verificacao
     return layout
-
 
 def _mensagem_tem_cartao_sugestoes(mensagem: discord.Message, marcador: str) -> bool:
     pendentes = list(getattr(mensagem, "components", []) or [])
@@ -798,7 +850,23 @@ def _embed_painel_administrativo(registros: dict, filtro: str = "resumo") -> dis
             linhas.append(
                 f"• {rotulo} — 👍 {apoios} / 👎 {oposicoes} — {STATUS.get(item.get('status'), STATUS['pendente'])[0]}"
             )
-        embed.add_field(name=titulo, value="\n".join(linhas)[:1024], inline=False)
+        grupos = []
+        grupo_atual = []
+        tamanho_atual = 0
+        for linha in linhas:
+            incremento = len(linha) + (1 if grupo_atual else 0)
+            if grupo_atual and tamanho_atual + incremento > 950:
+                grupos.append("\n".join(grupo_atual))
+                grupo_atual = []
+                tamanho_atual = 0
+                incremento = len(linha)
+            grupo_atual.append(linha)
+            tamanho_atual += incremento
+        if grupo_atual:
+            grupos.append("\n".join(grupo_atual))
+        for indice, grupo in enumerate(grupos, start=1):
+            nome_campo = titulo if len(grupos) == 1 else f"{titulo} • {indice}/{len(grupos)}"
+            embed.add_field(name=nome_campo, value=grupo, inline=False)
     else:
         embed.add_field(name=titulo, value="Nenhuma sugestão encontrada nesta seleção.", inline=False)
     return embed
